@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function ChatDetailPage() {
   const params = useParams();
@@ -172,7 +173,7 @@ export default function ChatDetailPage() {
   }
 
   const displayMessages = messages || [];
-  const otherParticipants = chat.participants.filter((p) => p !== user._id);
+  const otherParticipants = chat.participants.filter((p: Id<"users">) => p !== user._id);
 
   return (
     <div className="container mx-auto max-w-7xl py-8">
@@ -206,7 +207,7 @@ export default function ChatDetailPage() {
               <p className="text-muted-foreground">No messages yet</p>
             </div>
           ) : (
-            displayMessages.map((msg) => {
+            displayMessages.map((msg: Doc<"messages">) => {
               const isOwnMessage = msg.senderId === user._id;
               const isRead = msg.readBy.some((r) => r.userId === user._id);
 
@@ -240,7 +241,7 @@ export default function ChatDetailPage() {
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="mt-2 space-y-1">
-                          {msg.attachments.map((att, idx) => (
+                          {msg.attachments?.map((att: { fileId: Id<"_storage">; fileName: string; fileSize: number; mimeType: string; url: string }, idx: number) => (
                             <a
                               key={idx}
                               href={att.url}

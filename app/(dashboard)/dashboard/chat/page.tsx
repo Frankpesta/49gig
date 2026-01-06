@@ -43,7 +43,7 @@ export default function ChatPage() {
     );
   }
 
-  const filteredChats = chats.filter((chat) => {
+  const filteredChats = chats?.filter((chat: Doc<"chats">) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -100,7 +100,7 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {filteredChats.map((chat) => (
+                  {filteredChats.map((chat: Doc<"chats">) => (
                     <Link
                       key={chat._id}
                       href={`/dashboard/chat/${chat._id}`}

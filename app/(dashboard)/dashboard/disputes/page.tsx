@@ -3,6 +3,7 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
+import { Doc } from "@/convex/_generated/dataModel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +146,7 @@ export default function DisputesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {disputes.map((dispute) => (
+                {disputes?.map((dispute: Doc<"disputes">) => (
                   <TableRow key={dispute._id}>
                     <TableCell className="font-mono text-xs">
                       {dispute._id.slice(-8)}

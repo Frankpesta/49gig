@@ -21,6 +21,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { AddEvidenceDialog } from "./add-evidence-dialog";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function DisputeDetailPage() {
   const params = useParams();
@@ -204,7 +205,7 @@ export default function DisputeDetailPage() {
                 <p className="text-muted-foreground text-sm">No evidence submitted yet</p>
               ) : (
                 <div className="space-y-3">
-                  {dispute.evidence.map((evidence, idx) => (
+                  {dispute.evidence.map((evidence: { type: "message" | "file" | "milestone_deliverable"; messageId?: Id<"messages">; fileId?: Id<"_storage">; milestoneId?: Id<"milestones">; description?: string }, idx: number) => (
                     <div
                       key={idx}
                       className="flex items-start gap-3 p-3 rounded-lg border"

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, FileText, Search, Shield, CreditCard, AlertCircle, Settings, User } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Doc } from "@/convex/_generated/dataModel";
 
 const ACTION_TYPE_ICONS: Record<string, any> = {
   auth: User,
@@ -74,14 +75,14 @@ export default function AuditLogsPage() {
     );
   }
 
-  const filteredLogs = logs.filter((log: any) => {
+  const filteredLogs = logs?.filter((log: Doc<"auditLogs">) => {
     const matchesSearch =
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.actor?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.actor?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.actor as { name?: string; email?: string })?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.actor as { name?: string; email?: string })?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.targetType?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
-  });
+  }) || [];
 
   return (
     <div className="space-y-6">
@@ -156,7 +157,7 @@ export default function AuditLogsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredLogs.map((log: any) => {
+                  filteredLogs.map((log: Doc<"auditLogs">) => {
                     const Icon = ACTION_TYPE_ICONS[log.actionType] || FileText;
                     return (
                       <TableRow key={log._id}>

@@ -25,6 +25,7 @@ import { AlertCircle, CheckCircle2, Clock, User } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Doc } from "@/convex/_generated/dataModel";
 
 export default function ModeratorDisputesPage() {
   const { user, isAuthenticated } = useAuth();
@@ -121,7 +122,7 @@ export default function ModeratorDisputesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {disputes.filter((d) => d.status === "open").length}
+              {disputes?.filter((d: Doc<"disputes">) => d.status === "open").length || 0}
             </div>
           </CardContent>
         </Card>
@@ -132,7 +133,7 @@ export default function ModeratorDisputesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {disputes.filter((d) => d.status === "under_review").length}
+              {disputes?.filter((d: Doc<"disputes">) => d.status === "under_review").length || 0}
             </div>
           </CardContent>
         </Card>
@@ -143,7 +144,7 @@ export default function ModeratorDisputesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {allDisputes.filter((d) => d.status === "resolved").length}
+              {allDisputes?.filter((d: Doc<"disputes">) => d.status === "resolved").length || 0}
             </div>
           </CardContent>
         </Card>
@@ -154,7 +155,7 @@ export default function ModeratorDisputesPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {allDisputes.filter((d) => d.status === "escalated").length}
+              {allDisputes?.filter((d: Doc<"disputes">) => d.status === "escalated").length || 0}
             </div>
           </CardContent>
         </Card>
@@ -210,7 +211,7 @@ export default function ModeratorDisputesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allDisputes.map((dispute) => (
+                {allDisputes?.map((dispute: Doc<"disputes">) => (
                   <TableRow key={dispute._id}>
                     <TableCell className="font-mono text-xs">
                       {dispute._id.slice(-8)}
