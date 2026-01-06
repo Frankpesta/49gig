@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/marketing/page-header";
 import {
   CheckCircle2,
   Users,
@@ -17,57 +18,56 @@ import {
   Award,
   FileCheck,
   Clock,
+  Sparkles,
 } from "lucide-react";
 
 export default function HowItWorksPage() {
   return (
     <div className="w-full">
-      {/* HERO SECTION - Clean Professional */}
-      <section className="bg-background py-16 sm:py-20 lg:py-24 border-b border-border/50">
-        <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground mb-6">
-            How It Works
-          </div>
-          
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6">
-            Simple. Secure. Structured.
-          </h1>
-          
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            49GIG removes the stress from hiring and working remotely by using a vetted talent system, smart matching, and milestone-based delivery—so both clients and freelancers can work with confidence.
-          </p>
-
-          <div className="flex flex-wrap justify-center gap-6 mb-8">
-            {[
-              { icon: Shield, text: "Vetted Talent" },
-              { icon: Target, text: "Smart Matching" },
-              { icon: FileCheck, text: "Milestone Delivery" },
-            ].map((item, index) => (
-              <div key={index} className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <item.icon className="h-5 w-5 text-primary" />
-                </div>
-                <span className="text-sm font-medium text-foreground">{item.text}</span>
+      {/* HERO SECTION - Using PageHeader Component */}
+      <PageHeader
+        badge={{
+          icon: Sparkles,
+          text: "How It Works",
+        }}
+        title="Simple. Secure. Structured."
+        description="49GIG removes the stress from hiring and working remotely by using a vetted talent system, smart matching, and milestone-based delivery—so both clients and freelancers can work with confidence."
+      >
+        {/* Feature Pills */}
+        <div className="flex flex-wrap justify-center gap-4 mb-6">
+          {[
+            { icon: Shield, text: "Vetted Talent" },
+            { icon: Target, text: "Smart Matching" },
+            { icon: FileCheck, text: "Milestone Delivery" },
+          ].map((item, index) => (
+            <div 
+              key={index} 
+              className="flex items-center gap-2 rounded-full bg-background/80 backdrop-blur-sm border border-border/50 px-4 py-2 shadow-sm"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <item.icon className="h-4 w-4 text-primary" />
               </div>
-            ))}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" asChild className="text-base h-12 px-8">
-              <Link href="#clients">
-                For Clients
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild className="text-base h-12 px-8">
-              <Link href="#freelancers">
-                For Freelancers
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
+              <span className="text-sm font-semibold text-foreground">{item.text}</span>
+            </div>
+          ))}
         </div>
-      </section>
+
+        {/* CTA Buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <Button size="lg" asChild className="text-base h-12 px-8 shadow-lg">
+            <Link href="#clients">
+              For Clients
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+          <Button size="lg" variant="outline" asChild className="text-base h-12 px-8">
+            <Link href="#freelancers">
+              For Freelancers
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </PageHeader>
 
       {/* FOR CLIENTS SECTION */}
       <section id="clients" className="py-16 sm:py-20 lg:py-24 bg-background">
