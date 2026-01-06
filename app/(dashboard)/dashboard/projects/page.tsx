@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams } from "next/navigation";
+import { Doc } from "@/convex/_generated/dataModel";
 
 const STATUS_CONFIG: Record<
   string,
@@ -161,7 +162,7 @@ export default function ProjectsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project: any) => {
+          {projects.map((project: Doc<"projects">) => {
             const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
             const StatusIcon = statusConfig.icon;
 

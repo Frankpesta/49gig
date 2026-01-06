@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Doc } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ export default function UsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<Doc<"users"> | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const users = useQuery(
@@ -82,12 +83,12 @@ export default function UsersPage() {
     );
   }
 
-  const filteredUsers = users.filter((u: any) => {
+  const filteredUsers = users?.filter((u: Doc<"users">) => {
     const matchesSearch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
-  });
+  }) || [];
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!user?._id) return;
@@ -208,7 +209,7 @@ export default function UsersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUsers.map((u: any) => (
+                  filteredUsers.map((u: Doc<"users">) => (
                     <TableRow key={u._id}>
                       <TableCell className="font-medium">{u.name}</TableCell>
                       <TableCell>{u.email}</TableCell>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AuthBranding, AuthMobileLogo } from "@/components/auth/auth-branding";
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
@@ -213,6 +213,32 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen">
+          <AuthBranding />
+          <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full max-w-md space-y-8">
+              <AuthMobileLogo />
+              <Card className="shadow-medium border-border/50">
+                <CardContent className="px-8 py-8">
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
   );
 }
 

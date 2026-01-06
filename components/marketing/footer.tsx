@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Facebook, Twitter, Linkedin, Instagram, Youtube, Mail } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Facebook, Twitter, Linkedin, Instagram, Youtube } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 
 const footerLinks = {
@@ -12,37 +11,40 @@ const footerLinks = {
       { label: "How It Works", href: "/how-it-works" },
       { label: "For Clients", href: "/for-clients" },
       { label: "For Freelancers", href: "/for-freelancers" },
+      { label: "Hire Talent", href: "/hire-talent" },
+      { label: "Hire a Team", href: "/hire-team" },
       { label: "Pricing", href: "/pricing" },
-      { label: "Success Stories", href: "/success-stories" },
     ],
   },
   company: {
     title: "Company",
     links: [
       { label: "About 49GIG", href: "/about" },
-      { label: "Why 49GIG", href: "/why-49gig" },
-      { label: "Blog", href: "/blog" },
-      { label: "Careers", href: "/careers" },
+      { label: "Use Cases", href: "/use-cases" },
+      { label: "Talent Categories", href: "/talent-categories" },
       { label: "Contact Us", href: "/contact" },
     ],
   },
   resources: {
     title: "Resources",
     links: [
-      { label: "Help Center", href: "/help" },
-      { label: "Talent Categories", href: "/talent-categories" },
-      { label: "Developer Resources", href: "/resources" },
-      { label: "API Documentation", href: "/api-docs" },
-      { label: "Community", href: "/community" },
+      { label: "Help Center", href: "/contact" },
+      { label: "Client Agreement", href: "/legal/client-agreement" },
+      { label: "Freelancer Agreement", href: "/legal/freelancer-agreement" },
+      { label: "Payment Terms", href: "/legal/payment-terms" },
+      { label: "Refund Policy", href: "/legal/refund-policy" },
     ],
   },
   legal: {
     title: "Legal",
     links: [
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Terms of Service", href: "/terms" },
-      { label: "Cookie Policy", href: "/cookies" },
-      { label: "GDPR", href: "/gdpr" },
+      { label: "Privacy Policy", href: "/legal/privacy-policy" },
+      { label: "Terms & Conditions", href: "/legal/terms" },
+      { label: "Cookie Policy", href: "/legal/cookie-policy" },
+      { label: "Data Protection", href: "/legal/data-protection" },
+      { label: "IP Policy", href: "/legal/intellectual-property" },
+      { label: "Anti-Fraud Policy", href: "/legal/anti-fraud" },
+      { label: "Code of Conduct", href: "/legal/code-of-conduct" },
     ],
   },
 };
@@ -85,8 +87,8 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12">
           {/* Brand Column */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-block">
-              <Logo width={300} height={82} className="h-24 w-auto" priority />
+            <Link href="/" className="inline-block mb-3">
+              <Logo width={180} height={50} className="h-10 w-auto" priority />
             </Link>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               Connecting businesses with vetted, top-tier freelance talent. 

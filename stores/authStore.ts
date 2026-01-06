@@ -8,6 +8,7 @@ export interface User {
   email: string;
   emailVerified: boolean;
   name: string;
+  authProvider: "email" | "google" | "magic_link";
   role: UserRole;
   profile?: {
     companyName?: string;

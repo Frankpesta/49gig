@@ -152,13 +152,10 @@ export default function Home() {
 
   return (
     <div className="w-full">
-      {/* HERO SECTION - With Video Background */}
-      <section className="relative bg-background py-20 sm:py-24 lg:py-32 border-b border-border/50 overflow-hidden min-h-[600px] lg:min-h-[700px]">
+      {/* HERO SECTION - Full Width Video Background */}
+      <section className="relative bg-background border-b border-border/50 overflow-hidden min-h-[600px] sm:min-h-[650px] lg:min-h-[700px] flex items-center">
         {/* Video Background */}
         <div className="absolute inset-0 z-0">
-          {/* Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-background/95 via-background/90 to-background/95 dark:from-background/98 dark:via-background/95 dark:to-background/98 z-10" />
-          
           {/* Video Element */}
           <video
             ref={videoRef}
@@ -167,7 +164,7 @@ export default function Home() {
             muted
             playsInline
             preload="auto"
-            className="absolute inset-0 w-full h-full object-cover opacity-30"
+            className="absolute inset-0 w-full h-full object-cover"
           >
             <source
               src="https://assets.mixkit.co/videos/preview/mixkit-businesspeople-working-in-an-office-4609-large.mp4"
@@ -178,74 +175,80 @@ export default function Home() {
               type="video/mp4"
             />
           </video>
+          
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-br from-background/96 via-background/93 to-background/96 dark:from-background/98 dark:via-background/96 dark:to-background/98" />
+          
+          {/* Additional subtle gradient for depth */}
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/50" />
         </div>
 
-        <div className="relative z-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-            {/* Left Column - Content */}
-            <div className="space-y-6 lg:space-y-8">
-          <div className="space-y-4">
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight text-foreground">
-                  Hire <span className="text-primary">World-Class</span> African Talent
-            </h1>
-                <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed">
-                  Connect with top 3% of vetted African professionals. Build exceptional teams. Scale faster with 49GIG.
-                </p>
+        <div className="relative z-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
+          <div className="max-w-3xl space-y-6 lg:space-y-8">
+            {/* Badge */}
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 backdrop-blur-sm px-4 py-2 text-sm font-medium text-primary shadow-sm">
+                <Star className="h-4 w-4 fill-primary" />
+                <span>Africa&apos;s #1 Freelance Platform</span>
               </div>
+            </div>
 
-              {/* Trust Indicators */}
-              <div className="flex flex-wrap items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <span className="text-sm font-medium text-foreground">100% Vetted</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-medium text-foreground">Secure Payments</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                  <span className="text-sm font-medium text-foreground">4.9/5 Rating</span>
-                </div>
-              </div>
-
-              {/* CTAs */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" asChild className="text-base h-12 px-8 shadow-lg">
-                  <Link href="/hire-talent">
-                    Hire Talent
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" asChild className="text-base h-12 px-8 bg-background/80 backdrop-blur-sm">
-                  <Link href="/get-started">
-                    Apply as Freelancer
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
-
-              {/* Social Proof */}
-              <p className="text-sm text-muted-foreground">
-                Trusted by 500+ companies including startups and Fortune 500s
+            {/* Main Heading */}
+            <div className="space-y-4">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight text-foreground">
+                Hire <span className="text-primary">World-Class</span> African Talent
+              </h1>
+              <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-2xl">
+                Connect with the top 3% of vetted African professionals. Build exceptional teams. Scale faster with 49GIG.
               </p>
             </div>
 
-            {/* Right Column - Hero Image */}
-            <div className="relative lg:block">
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-2xl border border-border/50 bg-card">
-                <Image
-                  src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1200&q=80"
-                  alt="Professional team collaboration"
-                  fill
-                  className="object-cover"
-                  priority
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
+            {/* Trust Indicators */}
+            <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+              <div className="flex items-center gap-2 rounded-full bg-background/80 backdrop-blur-sm px-4 py-2 border border-border/50 shadow-sm">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <span className="text-sm font-medium text-foreground">100% Vetted</span>
+              </div>
+              <div className="flex items-center gap-2 rounded-full bg-background/80 backdrop-blur-sm px-4 py-2 border border-border/50 shadow-sm">
+                <Shield className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium text-foreground">Secure Payments</span>
+              </div>
+              <div className="flex items-center gap-2 rounded-full bg-background/80 backdrop-blur-sm px-4 py-2 border border-border/50 shadow-sm">
+                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                <span className="text-sm font-medium text-foreground">4.9/5 Rating</span>
               </div>
             </div>
+
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button size="lg" asChild className="text-base h-12 px-8 shadow-lg">
+                <Link href="/hire-talent">
+                  Hire Talent
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                asChild 
+                className="text-base h-12 px-8 bg-background/90 backdrop-blur-sm border-2 hover:bg-background"
+              >
+                <Link href="/get-started">
+                  Apply as Freelancer
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            {/* Social Proof */}
+            <p className="text-sm text-muted-foreground">
+              Trusted by <span className="text-foreground font-medium">500+ companies</span> including startups and Fortune 500s
+            </p>
           </div>
         </div>
+
+        {/* Bottom fade effect */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent z-10" />
       </section>
 
       {/* TRUSTED BY MARQUEE */}

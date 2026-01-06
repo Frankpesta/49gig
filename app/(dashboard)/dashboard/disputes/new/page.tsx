@@ -80,7 +80,7 @@ export default function NewDisputePage() {
 
     try {
       // Prepare evidence from selected messages
-      const evidence = selectedMessages.map((msgId) => ({
+      const evidence = selectedMessages.map((msgId: string) => ({
         type: "message" as const,
         messageId: msgId as any,
         description: "Chat message evidence",

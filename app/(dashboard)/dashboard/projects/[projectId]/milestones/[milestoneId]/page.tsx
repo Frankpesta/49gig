@@ -285,7 +285,7 @@ export default function MilestoneDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {milestone.deliverables.map((deliverable: any, index: number) => (
+                  {milestone.deliverables?.map((deliverable: { name: string; fileId?: string; url?: string; submittedAt: number }, index: number) => (
                     <div key={index} className="flex items-center gap-2 p-2 rounded border">
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="flex-1">{deliverable.name}</span>
@@ -342,7 +342,7 @@ export default function MilestoneDetailPage() {
                     <CardDescription>Submit your completed work for review</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {deliverables.map((deliverable, index) => (
+                    {deliverables.map((deliverable: { name: string; url: string }, index: number) => (
                       <div key={index} className="space-y-2 p-4 border rounded-lg">
                         <div className="flex items-center justify-between">
                           <Label>Deliverable {index + 1}</Label>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
@@ -153,6 +153,36 @@ export default function OAuthCallbackPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
+          <div className="w-full max-w-md space-y-12">
+            <div className="text-center space-y-3">
+              <h1 className="text-4xl font-heading font-bold tracking-tight text-foreground">
+                Loading
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Please wait...
+              </p>
+            </div>
+            <Card className="shadow-medium border-border/50">
+              <CardContent className="px-8 py-8">
+                <div className="flex items-center justify-center py-8">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      }
+    >
+      <OAuthCallbackContent />
+    </Suspense>
   );
 }
 

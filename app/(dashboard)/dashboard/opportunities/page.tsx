@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Briefcase, TrendingUp, Clock, MapPin, CheckCircle2, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function OpportunitiesPage() {
   const { user, isAuthenticated } = useAuth();
@@ -81,7 +82,7 @@ export default function OpportunitiesPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {matches.map((match) => (
+        {matches.map((match: Doc<"matches"> & { project: { _id: Id<"projects">; intakeForm?: { title?: string; description?: string }; status: string; totalAmount: number; currency: string } | null }) => (
           <Card key={match._id} className="relative">
             <CardHeader>
               <div className="flex items-start justify-between">

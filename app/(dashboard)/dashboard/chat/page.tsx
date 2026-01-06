@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Doc } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ export default function ChatPage() {
     );
   }
 
-  const filteredChats = chats.filter((chat) => {
+  const filteredChats = chats?.filter((chat: Doc<"chats">) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -100,7 +101,7 @@ export default function ChatPage() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {filteredChats.map((chat) => (
+                  {filteredChats.map((chat: Doc<"chats">) => (
                     <Link
                       key={chat._id}
                       href={`/dashboard/chat/${chat._id}`}

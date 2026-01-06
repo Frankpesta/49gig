@@ -257,7 +257,7 @@ export default function ProfilePage() {
                   </div>
                   {formData.skills.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {formData.skills.map((skill) => (
+                      {formData.skills.map((skill: string) => (
                         <Badge key={skill} variant="secondary" className="gap-2">
                           {skill}
                           <button

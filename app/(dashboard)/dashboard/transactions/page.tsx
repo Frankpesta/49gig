@@ -49,6 +49,7 @@ type Transaction = {
   currency: string;
   status: "pending" | "processing" | "succeeded" | "failed" | "refunded" | "cancelled";
   createdAt: number;
+  netAmount?: number;
   project: {
     _id: Id<"projects">;
     title: string;
@@ -127,7 +128,7 @@ export default function TransactionsPage() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (t) =>
+        (t: Transaction) =>
           t.project?.title.toLowerCase().includes(query) ||
           t.milestone?.title.toLowerCase().includes(query) ||
           t._id.toLowerCase().includes(query) ||
@@ -136,9 +137,9 @@ export default function TransactionsPage() {
     }
 
     // Sort
-    filtered.sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+    filtered.sort((a: Transaction, b: Transaction) => {
+      let aValue: number | string;
+      let bValue: number | string;
 
       switch (sortField) {
         case "date":
@@ -180,23 +181,23 @@ export default function TransactionsPage() {
   const stats = useMemo(() => {
     if (!transactions) return null;
 
-    const succeeded = transactions.filter((t) => t.status === "succeeded");
+    const succeeded = transactions.filter((t: Transaction) => t.status === "succeeded");
     const isClient = user?.role === "client";
     const isFreelancer = user?.role === "freelancer";
 
     return {
       total: transactions.length,
       succeeded: succeeded.length,
-      totalAmount: succeeded.reduce((sum, t) => sum + t.amount, 0),
+      totalAmount: succeeded.reduce((sum: number, t: Transaction) => sum + t.amount, 0),
       totalReceived: isFreelancer
         ? succeeded
-            .filter((t) => t.type === "milestone_release" || t.type === "payout")
-            .reduce((sum, t) => sum + t.netAmount, 0)
+            .filter((t: Transaction) => t.type === "milestone_release" || t.type === "payout")
+            .reduce((sum: number, t: Transaction) => sum + (t.netAmount || 0), 0)
         : 0,
       totalPaid: isClient
         ? succeeded
-            .filter((t) => t.type === "pre_funding")
-            .reduce((sum, t) => sum + t.amount, 0)
+            .filter((t: Transaction) => t.type === "pre_funding")
+            .reduce((sum: number, t: Transaction) => sum + t.amount, 0)
         : 0,
     };
   }, [transactions, user?.role]);
