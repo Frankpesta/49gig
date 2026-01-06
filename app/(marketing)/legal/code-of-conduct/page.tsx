@@ -66,6 +66,7 @@ export default function CodeOfConductPage() {
 
             <h3>3.3 Intellectual Property Violations</h3>
             <p>Users must not:</p>
+            <ul>
               <li>Submit plagiarized work</li>
               <li>Use copyrighted materials without permission</li>
               <li>Infringe on trademarks or patents</li>
