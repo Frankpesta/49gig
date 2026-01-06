@@ -24,7 +24,17 @@ import {
 } from "@/components/ui/select";
 import { Loader2, FileText, Search, Shield, CreditCard, AlertCircle, Settings, User } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { Doc } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
+
+// Type for enriched audit log with actor information
+type EnrichedAuditLog = Doc<"auditLogs"> & {
+  actor: {
+    _id: Id<"users">;
+    name: string;
+    email: string;
+    role: string;
+  } | null;
+};
 
 const ACTION_TYPE_ICONS: Record<string, any> = {
   auth: User,
@@ -75,11 +85,11 @@ export default function AuditLogsPage() {
     );
   }
 
-  const filteredLogs = logs?.filter((log: Doc<"auditLogs">) => {
+  const filteredLogs = logs?.filter((log: EnrichedAuditLog) => {
     const matchesSearch =
       log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.actor as { name?: string; email?: string })?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (log.actor as { name?: string; email?: string })?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.actor?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.actor?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.targetType?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   }) || [];
@@ -157,7 +167,7 @@ export default function AuditLogsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredLogs.map((log: Doc<"auditLogs">) => {
+                  filteredLogs.map((log: EnrichedAuditLog) => {
                     const Icon = ACTION_TYPE_ICONS[log.actionType] || FileText;
                     return (
                       <TableRow key={log._id}>
