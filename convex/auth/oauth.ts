@@ -329,7 +329,15 @@ export const completeOAuthSignup = action({
     }),
     role: v.union(v.literal("client"), v.literal("freelancer")),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    userId: any;
+    sessionToken: string;
+    refreshToken: string;
+    expiresAt: number;
+    isNewUser: boolean;
+    userRole: "client" | "freelancer";
+  }> => {
     // Check if user was created in the meantime
     const existingUser = await ctx.runMutation(
       (internal as any)["auth/oauth"].checkUserExists,
@@ -354,7 +362,9 @@ export const completeOAuthSignup = action({
         refreshToken: session.refreshToken,
         expiresAt: session.expiresAt,
         isNewUser: false,
-        userRole: existingUser.role as "client" | "freelancer",
+        userRole: (existingUser.role === "client" || existingUser.role === "freelancer" 
+          ? existingUser.role 
+          : "client") as "client" | "freelancer",
       };
     }
 

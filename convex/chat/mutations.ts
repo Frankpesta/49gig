@@ -11,11 +11,11 @@ async function getCurrentUserInMutation(
   userId?: string
 ): Promise<Doc<"users"> | null> {
   if (userId) {
-    const user = await ctx.db.get(userId as any);
+    const user = await ctx.db.get(userId as Doc<"users">["_id"]);
     if (!user || user.status !== "active") {
       return null;
     }
-    return user as Doc<"users">;
+    return user;
   }
 
   const user = await getCurrentUser(ctx);
@@ -77,7 +77,7 @@ export const createProjectChat = mutation({
       type: "project",
       participants,
       projectId: args.projectId,
-      title: `Project: ${project.title || project.intakeForm?.title || "Untitled"}`,
+      title: `Project: ${project.intakeForm?.title || "Untitled"}`,
       status: "active",
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -190,7 +190,7 @@ export const sendMessage = mutation({
     // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "message_sent",
-      actionType: "user",
+      actionType: "system",
       actorId: user._id,
       actorRole: user.role,
       targetType: "message",
@@ -380,7 +380,7 @@ export const deleteMessage = mutation({
     // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "message_deleted",
-      actionType: "user",
+      actionType: "system",
       actorId: user._id,
       actorRole: user.role,
       targetType: "message",
@@ -401,7 +401,8 @@ export const deleteMessage = mutation({
  */
 export const createSupportChat = mutation({
   args: {
-    title: v.string(),
+    subject: v.string(),
+    initialMessage: v.string(),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -415,16 +416,48 @@ export const createSupportChat = mutation({
       type: "support",
       participants: [user._id], // Admin/moderator will be added when they respond
       supportRequestId: `support_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      title: args.title,
+      title: args.subject,
       status: "active",
       createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Create initial message
+    const senderRole =
+      user.role === "admin"
+        ? "admin"
+        : user.role === "moderator"
+        ? "moderator"
+        : user.role === "client"
+        ? "client"
+        : user.role === "freelancer"
+        ? "freelancer"
+        : "system";
+
+    await ctx.db.insert("messages", {
+      chatId,
+      senderId: user._id,
+      senderRole,
+      content: args.initialMessage,
+      contentType: "text",
+      isPinned: false,
+      isDeleted: false,
+      readBy: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Update chat metadata
+    await ctx.db.patch(chatId, {
+      lastMessageAt: Date.now(),
+      lastMessagePreview: args.initialMessage.substring(0, 100),
       updatedAt: Date.now(),
     });
 
     // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "support_chat_created",
-      actionType: "user",
+      actionType: "system",
       actorId: user._id,
       actorRole: user.role,
       targetType: "chat",

@@ -1,13 +1,47 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
+import { getCurrentUser } from "../auth";
+import { Doc } from "../_generated/dataModel";
+
+/**
+ * Helper to get current user in mutations
+ */
+async function getCurrentUserInMutation(
+  ctx: any,
+  userId?: string
+): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId as any as Doc<"users">["_id"]);
+    if (!user) {
+      return null;
+    }
+    const userDoc = user as Doc<"users">;
+    if (userDoc.status !== "active") {
+      return null;
+    }
+    return userDoc;
+  }
+
+  // Fall back to Convex Auth
+  const user = await getCurrentUser(ctx);
+  if (!user) {
+    return null;
+  }
+  const userDoc = user as Doc<"users">;
+  if (userDoc.status !== "active") {
+    return null;
+  }
+  return userDoc;
+}
 
 /**
  * Update user profile
+ * Supports both Convex Auth and session token authentication
  */
 export const updateProfile = mutation({
   args: {
+    name: v.optional(v.string()),
     profile: v.object({
-      name: v.optional(v.string()),
       companyName: v.optional(v.string()),
       companySize: v.optional(v.string()),
       industry: v.optional(v.string()),
@@ -24,23 +58,21 @@ export const updateProfile = mutation({
       timezone: v.optional(v.string()),
       portfolioUrl: v.optional(v.string()),
     }),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
       throw new Error("Not authenticated");
     }
 
-    if (!identity.email) {
-      throw new Error("Email not found in identity");
-    }
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
+    // Update name if provided
+    const updates: any = {
+      updatedAt: Date.now(),
+    };
 
-    if (!user || user.status !== "active") {
-      throw new Error("User not found or inactive");
+    if (args.name) {
+      updates.name = args.name;
     }
 
     // Update profile
@@ -49,9 +81,160 @@ export const updateProfile = mutation({
       ...args.profile,
     };
 
-    await ctx.db.patch(user._id, {
-      profile: updatedProfile,
-      updatedAt: Date.now(),
+    updates.profile = updatedProfile;
+
+    await ctx.db.patch(user._id, updates);
+
+    // Log audit
+    await ctx.db.insert("auditLogs", {
+      action: "profile_updated",
+      actionType: "system",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: user._id,
+      details: {
+        updatedFields: Object.keys(args.profile),
+      },
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Update user role (admin/moderator only)
+ */
+export const updateUserRole = mutation({
+  args: {
+    userId: v.id("users"),
+    newRole: v.union(
+      v.literal("client"),
+      v.literal("freelancer"),
+      v.literal("moderator"),
+      v.literal("admin")
+    ),
+    adminUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInMutation(ctx, args.adminUserId);
+    if (!admin) {
+      throw new Error("Not authenticated");
+    }
+
+    // Only admin can change roles
+    if (admin.role !== "admin") {
+      throw new Error("Only admins can change user roles");
+    }
+
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) {
+      throw new Error("User not found");
+    }
+
+    // Prevent changing own role
+    if (targetUser._id === admin._id) {
+      throw new Error("Cannot change your own role");
+    }
+
+    // Prevent demoting the last admin
+    if (targetUser.role === "admin" && args.newRole !== "admin") {
+      const adminCount = await ctx.db
+        .query("users")
+        .withIndex("by_role", (q) => q.eq("role", "admin"))
+        .filter((q) => q.eq(q.field("status"), "active"))
+        .collect();
+      if (adminCount.length <= 1) {
+        throw new Error("Cannot demote the last admin");
+      }
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.userId, {
+      role: args.newRole,
+      roleChangedAt: now,
+      roleChangedBy: admin._id,
+      updatedAt: now,
+    });
+
+    // Log audit
+    await ctx.db.insert("auditLogs", {
+      action: "role_changed",
+      actionType: "admin",
+      actorId: admin._id,
+      actorRole: admin.role,
+      targetType: "user",
+      targetId: args.userId,
+      details: {
+        oldRole: targetUser.role,
+        newRole: args.newRole,
+      },
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Update user status (admin/moderator only)
+ */
+export const updateUserStatus = mutation({
+  args: {
+    userId: v.id("users"),
+    newStatus: v.union(
+      v.literal("active"),
+      v.literal("suspended"),
+      v.literal("deleted")
+    ),
+    adminUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInMutation(ctx, args.adminUserId);
+    if (!admin) {
+      throw new Error("Not authenticated");
+    }
+
+    // Only admin or moderator can change status
+    if (admin.role !== "admin" && admin.role !== "moderator") {
+      throw new Error("Not authorized to change user status");
+    }
+
+    // Only admin can delete users
+    if (args.newStatus === "deleted" && admin.role !== "admin") {
+      throw new Error("Only admins can delete users");
+    }
+
+    const targetUser = await ctx.db.get(args.userId);
+    if (!targetUser) {
+      throw new Error("User not found");
+    }
+
+    // Prevent suspending/deleting yourself
+    if (targetUser._id === admin._id) {
+      throw new Error("Cannot change your own status");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.userId, {
+      status: args.newStatus,
+      updatedAt: now,
+    });
+
+    // Log audit
+    await ctx.db.insert("auditLogs", {
+      action: "user_status_changed",
+      actionType: admin.role === "admin" ? "admin" : "system",
+      actorId: admin._id,
+      actorRole: admin.role,
+      targetType: "user",
+      targetId: args.userId,
+      details: {
+        oldStatus: targetUser.status,
+        newStatus: args.newStatus,
+      },
+      createdAt: now,
     });
 
     return { success: true };

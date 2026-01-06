@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as analytics_queries from "../analytics/queries.js";
+import type * as audit_queries from "../audit/queries.js";
 import type * as auth from "../auth.js";
 import type * as auth_actions from "../auth/actions.js";
 import type * as auth_mutations from "../auth/mutations.js";
@@ -16,7 +18,16 @@ import type * as auth_password from "../auth/password.js";
 import type * as auth_queries from "../auth/queries.js";
 import type * as auth_rateLimit from "../auth/rateLimit.js";
 import type * as auth_sessions from "../auth/sessions.js";
+import type * as chat_mutations from "../chat/mutations.js";
+import type * as chat_queries from "../chat/queries.js";
 import type * as cron_sessions from "../cron/sessions.js";
+import type * as disputes_actions from "../disputes/actions.js";
+import type * as disputes_mutations from "../disputes/mutations.js";
+import type * as disputes_queries from "../disputes/queries.js";
+import type * as matching_actions from "../matching/actions.js";
+import type * as matching_mutations from "../matching/mutations.js";
+import type * as matching_queries from "../matching/queries.js";
+import type * as milestones_mutations from "../milestones/mutations.js";
 import type * as payments_actions from "../payments/actions.js";
 import type * as payments_mutations from "../payments/mutations.js";
 import type * as payments_queries from "../payments/queries.js";
@@ -38,6 +49,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "analytics/queries": typeof analytics_queries;
+  "audit/queries": typeof audit_queries;
   auth: typeof auth;
   "auth/actions": typeof auth_actions;
   "auth/mutations": typeof auth_mutations;
@@ -46,7 +59,16 @@ declare const fullApi: ApiFromModules<{
   "auth/queries": typeof auth_queries;
   "auth/rateLimit": typeof auth_rateLimit;
   "auth/sessions": typeof auth_sessions;
+  "chat/mutations": typeof chat_mutations;
+  "chat/queries": typeof chat_queries;
   "cron/sessions": typeof cron_sessions;
+  "disputes/actions": typeof disputes_actions;
+  "disputes/mutations": typeof disputes_mutations;
+  "disputes/queries": typeof disputes_queries;
+  "matching/actions": typeof matching_actions;
+  "matching/mutations": typeof matching_mutations;
+  "matching/queries": typeof matching_queries;
+  "milestones/mutations": typeof milestones_mutations;
   "payments/actions": typeof payments_actions;
   "payments/mutations": typeof payments_mutations;
   "payments/queries": typeof payments_queries;

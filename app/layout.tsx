@@ -37,7 +37,12 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${interTight.variable} font-sans antialiased`}
       >
-        <ThemeProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <ConvexClientProvider>{children}</ConvexClientProvider>
         </ThemeProvider>
       </body>
