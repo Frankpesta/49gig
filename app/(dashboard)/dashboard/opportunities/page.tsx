@@ -82,7 +82,7 @@ export default function OpportunitiesPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        {matches.map((match: Doc<"matches"> & { project: { _id: Id<"projects">; intakeForm?: { title?: string }; status: string; totalAmount: number; currency: string } | null }) => (
+        {matches.map((match: Doc<"matches"> & { project: { _id: Id<"projects">; intakeForm?: { title?: string; description?: string }; status: string; totalAmount: number; currency: string } | null }) => (
           <Card key={match._id} className="relative">
             <CardHeader>
               <div className="flex items-start justify-between">
