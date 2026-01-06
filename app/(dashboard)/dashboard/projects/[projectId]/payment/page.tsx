@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -115,6 +115,7 @@ export default function PaymentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const initializationRef = useRef(false); // Use ref to prevent multiple calls
 
   useEffect(() => {
     if (!user || user.role !== "client") {
@@ -135,21 +136,27 @@ export default function PaymentPage() {
     // Check if payment already exists and has a client secret
     if (paymentStatus?.payment?.stripePaymentIntentId && !clientSecret && !isInitializing) {
       // Payment intent exists, we need to retrieve it from Stripe
-      // For now, we'll create a new one if needed
+      // The action will handle retrieving the existing payment intent
     }
 
-    // Prevent multiple simultaneous calls
-    if (isInitializing || clientSecret) {
+    // CRITICAL: Prevent multiple simultaneous calls using ref
+    // This is more reliable than state for preventing race conditions
+    if (initializationRef.current || isInitializing || clientSecret) {
       return;
     }
 
     // Create payment intent
     const initializePayment = async () => {
-      if (isInitializing) return;
+      // Double-check with ref to prevent race conditions
+      if (initializationRef.current || isInitializing || clientSecret) {
+        return;
+      }
       
       try {
+        initializationRef.current = true;
         setIsInitializing(true);
         setIsLoading(true);
+        
         const result = await createPaymentIntent({
           projectId: projectId as any,
           amount: Math.round(project.totalAmount * 100), // Convert to cents
@@ -164,12 +171,17 @@ export default function PaymentPage() {
       } finally {
         setIsLoading(false);
         setIsInitializing(false);
+        // Don't reset the ref here - let it stay true to prevent re-initialization
+        // Only reset if we need to retry after an error
+        if (error) {
+          initializationRef.current = false;
+        }
       }
     };
 
     initializePayment();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?._id, project?._id, projectId]);
+  }, [user?._id, project?._id, projectId, paymentStatus?.isFunded]);
 
   if (!user || user.role !== "client") {
     return null;

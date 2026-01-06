@@ -20,12 +20,13 @@ export const getChats = query({
     }
 
     // Get all chats where user is a participant
-    const chats = await ctx.db
+    // Note: participants is an array, so we need to filter instead of using index
+    const allChats = await ctx.db
       .query("chats")
-      .withIndex("by_participant", (q) => q.eq("participants", user._id))
       .filter((q) => q.eq(q.field("status"), "active"))
-      .order("desc")
       .collect();
+    
+    const chats = allChats.filter((chat) => chat.participants.includes(user._id));
 
     // For admins/moderators, also include all chats
     if (user.role === "admin" || user.role === "moderator") {
@@ -206,11 +207,13 @@ export const getUnreadCount = query({
     }
 
     // Get all user's chats
-    const chats = await ctx.db
+    // Note: participants is an array, so we need to filter instead of using index
+    const allChats = await ctx.db
       .query("chats")
-      .withIndex("by_participant", (q) => q.eq("participants", user._id))
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
+    
+    const chats = allChats.filter((chat) => chat.participants.includes(user._id));
 
     let unreadCount = 0;
 

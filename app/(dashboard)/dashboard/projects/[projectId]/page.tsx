@@ -44,25 +44,58 @@ const STATUS_CONFIG: Record<
   disputed: { label: "Disputed", variant: "destructive", icon: AlertCircle },
 };
 
+// Helper function to validate Convex ID format
+function isValidConvexId(id: string | string[] | undefined): id is Id<"projects"> {
+  if (typeof id !== "string") return false;
+  if (id.length === 0 || id.length > 100) return false;
+  // Convex IDs are base62 encoded strings, starting with a letter
+  // and containing alphanumeric characters
+  return /^[a-zA-Z][a-zA-Z0-9]*$/.test(id);
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const { user } = useAuth();
-  const projectId = params.projectId as Id<"projects">;
+  const projectIdParam = params.projectId;
+  
+  // Validate the projectId from URL params
+  const isValidId = isValidConvexId(projectIdParam);
+  const projectId = isValidId ? (projectIdParam as Id<"projects">) : null;
 
   const project = useQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)["projects/queries"].getProject,
-    user?._id ? { projectId, userId: user._id } : "skip"
+    user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
 
   const milestones = useQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)["projects/queries"].getProjectMilestones,
-    user?._id ? { projectId, userId: user._id } : "skip"
+    user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
 
   if (!user) {
     return null;
+  }
+
+  // Handle invalid project ID
+  if (!isValidId) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
+            <h3 className="mb-2 text-lg font-semibold">Invalid Project ID</h3>
+            <p className="mb-4 text-center text-sm text-muted-foreground">
+              The project ID in the URL is not valid. Please check the URL and try again.
+            </p>
+            <Button asChild>
+              <Link href="/dashboard/projects">Back to Projects</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (project === undefined) {
@@ -201,11 +234,14 @@ export default function ProjectDetailPage() {
                       className="rounded-lg border p-4"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="space-y-1">
+                        <div className="space-y-1 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold">
+                            <Link
+                              href={`/dashboard/projects/${projectId}/milestones/${milestone._id}`}
+                              className="font-semibold hover:text-primary hover:underline"
+                            >
                               Milestone {index + 1}: {milestone.title}
-                            </span>
+                            </Link>
                             <Badge variant="outline">
                               {milestone.status.replace("_", " ")}
                             </Badge>
@@ -224,6 +260,11 @@ export default function ProjectDetailPage() {
                             </div>
                           </div>
                         </div>
+                        <Link href={`/dashboard/projects/${projectId}/milestones/${milestone._id}`}>
+                          <Button variant="outline" size="sm">
+                            View Details
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   ))}

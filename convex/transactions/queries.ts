@@ -140,9 +140,9 @@ export const getTransactions = query({
     // Enrich with project and milestone info
     const enrichedTransactions = await Promise.all(
       payments.map(async (payment) => {
-        const project = await ctx.db.get(payment.projectId);
+        const project = await ctx.db.get(payment.projectId) as Doc<"projects"> | null;
         const milestone = payment.milestoneId
-          ? await ctx.db.get(payment.milestoneId)
+          ? (await ctx.db.get(payment.milestoneId) as Doc<"milestones"> | null)
           : null;
 
         return {
@@ -150,7 +150,7 @@ export const getTransactions = query({
           project: project
             ? {
                 _id: project._id,
-                title: project.intakeForm.title,
+                title: project.intakeForm?.title || "Untitled Project",
                 clientId: project.clientId,
               }
             : null,

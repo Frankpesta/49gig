@@ -84,7 +84,7 @@ export const navigationItems: NavItem[] = [
   // Chat (All roles)
   {
     title: "Messages",
-    url: "/dashboard/messages",
+    url: "/dashboard/chat",
     icon: MessageSquare,
     badge: 0, // Will be updated with real-time count
     roles: ["client", "freelancer", "admin", "moderator"],
@@ -104,6 +104,14 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/disputes",
     icon: AlertCircle,
     roles: ["client", "freelancer", "moderator", "admin"],
+  },
+
+  // Moderator Dispute Management
+  {
+    title: "Dispute Management",
+    url: "/dashboard/moderator/disputes",
+    icon: AlertCircle,
+    roles: ["moderator", "admin"],
   },
 
   // Admin & Moderator: User Management

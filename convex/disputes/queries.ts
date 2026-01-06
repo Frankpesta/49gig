@@ -33,7 +33,7 @@ export const getDisputes = query({
       if (args.status) {
         return await ctx.db
           .query("disputes")
-          .withIndex("by_status", (q) => q.eq("status", args.status))
+          .withIndex("by_status", (q) => q.eq("status", args.status!))
           .order("desc")
           .collect();
       }

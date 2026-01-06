@@ -1,6 +1,6 @@
 export default function Home() {
   return (
-    <main className="mx-auto max-w-7xl px-6 py-24">
+    <div className="mx-auto max-w-7xl px-6 py-24">
       
       {/* HERO */}
       <section className="max-w-4xl">
@@ -41,6 +41,6 @@ export default function Home() {
         </div>
       </section>
 
-    </main>
+    </div>
   );
 }

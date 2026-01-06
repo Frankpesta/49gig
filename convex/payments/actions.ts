@@ -1,7 +1,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import Stripe from "stripe";
-import { internal } from "../_generated/api";
+import { internal, api } from "../_generated/api";
 
 /**
  * Get Stripe instance (lazy initialization)
@@ -54,7 +54,8 @@ export const createPaymentIntent = action({
       throw new Error("Project is not in a state that allows payment");
     }
 
-    // Check if payment already exists
+    // Check if payment already exists - CRITICAL: Check for ANY payment, not just succeeded
+    // This prevents duplicate payment creation
     const existingPayment = await ctx.runQuery(
       internal.payments.queries.getPaymentByProject,
       {
@@ -63,24 +64,44 @@ export const createPaymentIntent = action({
     );
 
     if (existingPayment) {
+      // If payment already succeeded, project is funded
       if (existingPayment.status === "succeeded") {
         throw new Error("Project is already funded");
       }
+      
       // If there's a pending payment intent, return its client secret
-      if (existingPayment.stripePaymentIntentId && existingPayment.status === "pending") {
+      // This handles the case where user refreshes the page or navigates back
+      if (existingPayment.stripePaymentIntentId && 
+          (existingPayment.status === "pending" || existingPayment.status === "processing")) {
         const stripe = getStripe();
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(
             existingPayment.stripePaymentIntentId
           );
-          return {
-            clientSecret: paymentIntent.client_secret,
-            paymentId: existingPayment._id,
-          };
+          
+          // Only return if payment intent is still in a valid state
+          if (paymentIntent.status === "requires_payment_method" || 
+              paymentIntent.status === "requires_confirmation" ||
+              paymentIntent.status === "requires_action") {
+            return {
+              clientSecret: paymentIntent.client_secret,
+              paymentId: existingPayment._id,
+            };
+          }
+          
+          // If payment intent is already succeeded/failed, we can create a new one
+          // But log this case for monitoring
+          console.warn(`Payment intent ${paymentIntent.id} is in state ${paymentIntent.status}, creating new payment`);
         } catch (stripeError) {
           // If retrieval fails, continue to create a new one
           console.error("Failed to retrieve existing payment intent:", stripeError);
         }
+      }
+      
+      // If there's a pending payment without a valid payment intent, don't create duplicate
+      // Wait for webhook to process or user to retry
+      if (existingPayment.status === "pending" && !existingPayment.stripePaymentIntentId) {
+        throw new Error("A payment is already being processed for this project. Please wait or contact support.");
       }
     }
 
@@ -201,6 +222,29 @@ export const handleStripeWebhook = action({
               data: args.data,
             }
           );
+
+          // Get payment to find project
+          const payment = await ctx.runQuery(
+            internal.payments.queries.getPaymentByIntentId,
+            {
+              paymentIntentId: args.paymentIntentId,
+            }
+          );
+
+          // If this is a pre-funding payment, trigger matching
+          if (payment && payment.type === "pre_funding") {
+            try {
+              // Generate matches for the funded project
+              // Call matching action directly
+              await ctx.runAction(api.matching.actions.generateMatches, {
+                projectId: payment.projectId,
+                limit: 5,
+              });
+            } catch (error) {
+              // Log error but don't fail the webhook
+              console.error("Failed to trigger matching:", error);
+            }
+          }
         }
         break;
 

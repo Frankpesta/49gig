@@ -1,4 +1,4 @@
-import { query } from "../_generated/server";
+import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -233,6 +233,23 @@ export const isFreelancerVerified = query({
     }
 
     return { verified: true };
+  },
+});
+
+/**
+ * Get vetting result by freelancer ID (internal)
+ */
+export const getVettingResultByFreelancer = internalQuery({
+  args: {
+    freelancerId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const vettingResult = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+      .first();
+
+    return vettingResult;
   },
 });
 

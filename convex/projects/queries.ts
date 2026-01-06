@@ -1,4 +1,4 @@
-import { query } from "../_generated/server";
+import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -256,6 +256,92 @@ export const getProjectMilestones = query({
       .order("asc")
       .collect();
 
+    return milestones;
+  },
+});
+
+/**
+ * Get a single milestone by ID
+ */
+export const getMilestoneById = query({
+  args: {
+    milestoneId: v.id("milestones"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const milestone = await ctx.db.get(args.milestoneId);
+    if (!milestone) {
+      throw new Error("Milestone not found");
+    }
+
+    // Get project for authorization
+    const project = await ctx.db.get(milestone.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Authorization: Only client, matched freelancer, admin, or moderator can view
+    const canView =
+      user.role === "admin" ||
+      user.role === "moderator" ||
+      project.clientId === user._id ||
+      project.matchedFreelancerId === user._id;
+
+    if (!canView) {
+      throw new Error("Not authorized to view this milestone");
+    }
+
+    return milestone;
+  },
+});
+
+/**
+ * Get project (internal - no auth required)
+ */
+export const getProjectInternal = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    return project;
+  },
+});
+
+/**
+ * Get projects by freelancer (internal - for matching engine)
+ */
+export const getProjectsByFreelancer = internalQuery({
+  args: {
+    freelancerId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", args.freelancerId))
+      .collect();
+    return projects;
+  },
+});
+
+/**
+ * Get project milestones (internal)
+ */
+export const getProjectMilestonesInternal = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const milestones = await ctx.db
+      .query("milestones")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .order("asc")
+      .collect();
     return milestones;
   },
 });

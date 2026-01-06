@@ -50,6 +50,43 @@ export const createPayment = internalMutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    // CRITICAL: Check for existing payment to prevent duplicates
+    // This is a safety check in case the action's check didn't catch it
+    if (args.type === "pre_funding") {
+      const existingPayment = await ctx.db
+        .query("payments")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .filter((q) => 
+          q.and(
+            q.eq(q.field("type"), "pre_funding"),
+            q.or(
+              q.eq(q.field("status"), "pending"),
+              q.eq(q.field("status"), "processing"),
+              q.eq(q.field("status"), "succeeded")
+            )
+          )
+        )
+        .first();
+
+      if (existingPayment) {
+        // If there's already a payment with the same payment intent ID, return that ID
+        if (args.stripePaymentIntentId && 
+            existingPayment.stripePaymentIntentId === args.stripePaymentIntentId) {
+          return existingPayment._id;
+        }
+        
+        // If there's a pending/processing payment, don't create duplicate
+        if (existingPayment.status === "pending" || existingPayment.status === "processing") {
+          throw new Error("A payment is already being processed for this project");
+        }
+        
+        // If there's a succeeded payment, don't create duplicate
+        if (existingPayment.status === "succeeded") {
+          throw new Error("Project is already funded");
+        }
+      }
+    }
+
     const paymentId = await ctx.db.insert("payments", {
       projectId: args.projectId,
       milestoneId: args.milestoneId,
