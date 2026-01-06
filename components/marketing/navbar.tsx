@@ -4,10 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { gsap } from "gsap";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
+import { useAuth } from "@/hooks/use-auth";
+import { Logo } from "@/components/ui/logo";
 
 interface NavLink {
   label: string;
@@ -55,6 +57,7 @@ export function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const pathname = usePathname();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -125,13 +128,16 @@ export function Navbar() {
             className="flex items-center shrink-0 group"
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            <span className="text-xl sm:text-2xl font-bold bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              49GIG
-            </span>
+            <Logo 
+              width={400} 
+              height={84} 
+              className="h-24 md:h-32 w-auto transition-opacity group-hover:opacity-80" 
+              priority
+            />
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex lg:items-center lg:gap-1 xl:gap-2 flex-1 justify-center">
+          <nav className="hidden lg:flex lg:items-center lg:gap-3 xl:gap-4 flex-1 justify-center">
             {navLinks.map((link) => (
               <div
                 key={link.href}
@@ -144,8 +150,8 @@ export function Navbar() {
                   className={cn(
                     "relative px-3 xl:px-4 py-2 text-sm font-medium transition-all rounded-md whitespace-nowrap",
                     pathname === link.href
-                      ? "text-foreground bg-accent/50"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent/30"
+                      ? "text-primary font-semibold"
+                      : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                   )}
                 >
                   <span className="flex items-center gap-1.5">
@@ -180,12 +186,23 @@ export function Navbar() {
           {/* CTA Buttons */}
           <div className="hidden lg:flex lg:items-center lg:gap-3 shrink-0">
             <ThemeToggle />
-            <Button variant="ghost" size="sm" asChild className="text-sm">
-              <Link href="/login">Sign In</Link>
-            </Button>
-            <Button size="sm" asChild className="text-sm">
-              <Link href="/get-started">Get Started</Link>
-            </Button>
+            {isAuthenticated ? (
+              <Button size="sm" asChild className="text-sm">
+                <Link href="/dashboard">
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  Dashboard
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" asChild className="text-sm">
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button size="sm" asChild className="text-sm">
+                  <Link href="/get-started">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -215,8 +232,8 @@ export function Navbar() {
                     className={cn(
                       "block px-4 py-3 text-base font-medium rounded-lg transition-all touch-manipulation",
                       pathname === link.href
-                        ? "bg-primary/10 text-foreground border-l-2 border-primary"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground active:bg-accent/80"
+                        ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary"
+                        : "text-muted-foreground hover:text-primary hover:bg-primary/10 active:bg-primary/20"
                     )}
                   >
                     <div className="flex items-center justify-between">
@@ -266,19 +283,33 @@ export function Navbar() {
                   <span className="text-sm font-medium text-muted-foreground">Theme</span>
                   <ThemeToggle />
                 </div>
-                <Button variant="outline" className="w-full" size="lg" asChild>
-                  <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                    Sign In
-                  </Link>
-                </Button>
-                <Button className="w-full" size="lg" asChild>
-                  <Link
-                    href="/get-started"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Get Started
-                  </Link>
-                </Button>
+                {isAuthenticated ? (
+                  <Button className="w-full" size="lg" asChild>
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      Dashboard
+                    </Link>
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="outline" className="w-full" size="lg" asChild>
+                      <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                        Sign In
+                      </Link>
+                    </Button>
+                    <Button className="w-full" size="lg" asChild>
+                      <Link
+                        href="/get-started"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        Get Started
+                      </Link>
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>

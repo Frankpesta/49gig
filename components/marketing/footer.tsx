@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Facebook, Twitter, Linkedin, Instagram, Youtube, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/ui/logo";
 
 const footerLinks = {
   platform: {
@@ -84,10 +85,8 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12">
           {/* Brand Column */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-block mb-4">
-              <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                49GIG
-              </span>
+            <Link href="/" className="inline-block">
+              <Logo width={300} height={82} className="h-24 w-auto" priority />
             </Link>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               Connecting businesses with vetted, top-tier freelance talent. 

@@ -20,6 +20,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useSessionRotation } from "@/hooks/use-session";
 import { useOAuth } from "@/hooks/use-oauth";
 import { AuthBranding, AuthMobileLogo } from "@/components/auth/auth-branding";
+import { Logo } from "@/components/ui/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,7 +29,8 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const signin = useMutation(
-    (api as any)["auth/mutations"].signin
+    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
+    api["auth/mutations"].signin
   );
   const { setUser } = useAuthStore();
   const { setRefreshToken } = useSessionRotation();
@@ -68,8 +70,9 @@ export default function LoginPage() {
           router.push("/dashboard");
         }
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to sign in");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to sign in";
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -80,28 +83,7 @@ export default function LoginPage() {
       {/* Left Column - Branding */}
       <div className="hidden lg:flex lg:flex-1 lg:flex-col lg:justify-between bg-gradient-to-br from-primary/10 via-primary/5 to-background p-12">
         <div className="space-y-8">
-          <div className="flex items-center gap-3">
-            <div className="flex aspect-square size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <svg
-                className="size-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                />
-              </svg>
-            </div>
-            <div>
-              <div className="text-xl font-bold tracking-tight">49GIG</div>
-              <div className="text-xs text-muted-foreground">Freelance Marketplace</div>
-            </div>
-          </div>
+          <Logo width={140} height={45} priority />
         </div>
 
         <div className="space-y-6 max-w-md">
@@ -306,7 +288,7 @@ export default function LoginPage() {
               Sign in with Google
             </Button>
             <p className="text-center text-sm text-muted-foreground pt-2">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/signup"
                 className="font-semibold text-primary hover:underline"
