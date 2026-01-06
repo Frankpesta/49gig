@@ -14,12 +14,11 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Logo } from "@/components/ui/logo";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +27,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/authStore";
 import { getNavigationForRole } from "@/lib/navigation";
 import {
@@ -36,7 +34,6 @@ import {
   User,
   Settings,
   ChevronUp,
-  Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -73,16 +70,22 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar collapsible="icon" variant="inset">
+    <Sidebar collapsible="icon" variant="inset" className="bg-background">
       <SidebarHeader className="border-b border-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Sparkles className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+              <Link href="/dashboard" className="">
+                <Logo 
+                  width={32} 
+                  height={32} 
+                  className="h-8 w-8 shrink-0" 
+                  priority 
+                />
+                <div className={cn(
+                  "grid flex-1 text-left text-sm leading-tight min-w-0",
+                  "group-data-[collapsible=icon]:hidden"
+                )}>
                   <span className="truncate font-semibold">49GIG</span>
                   <span className="truncate text-xs text-muted-foreground">
                     Freelance Marketplace
@@ -94,7 +97,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="scrollbar-hide">
         {navigationItems.map((item) => {
           const isActive = pathname === item.url || pathname.startsWith(item.url + "/");
           const Icon = item.icon;

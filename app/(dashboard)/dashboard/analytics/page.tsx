@@ -60,14 +60,24 @@ export default function AnalyticsPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Users Stats */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+        <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-primary/5 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Users
+              </CardTitle>
+              <div className="relative">
+                <div className="absolute inset-0 bg-primary/10 rounded-full blur-xl group-hover:bg-primary/20 transition-colors duration-300" />
+                <div className="relative bg-primary/10 rounded-full p-2.5 group-hover:bg-primary/20 transition-all duration-300 group-hover:scale-110">
+                  <Users className="h-5 w-5 text-primary animate-pulse group-hover:animate-bounce" />
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.users.total}</div>
-            <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+            <div className="text-3xl font-bold mb-1">{analytics.users.total}</div>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span>{analytics.users.clients} clients</span>
               <span>•</span>
               <span>{analytics.users.freelancers} freelancers</span>
@@ -76,14 +86,24 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Projects Stats */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <FolderKanban className="h-4 w-4 text-muted-foreground" />
+        <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Projects
+              </CardTitle>
+              <div className="relative">
+                <div className="absolute inset-0 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-colors duration-300" />
+                <div className="relative bg-blue-500/10 rounded-full p-2.5 group-hover:bg-blue-500/20 transition-all duration-300 group-hover:scale-110">
+                  <FolderKanban className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-pulse group-hover:animate-bounce" />
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.projects.total}</div>
-            <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+            <div className="text-3xl font-bold mb-1">{analytics.projects.total}</div>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span>{analytics.projects.completed} completed</span>
               <span>•</span>
               <span>{analytics.projects.in_progress} in progress</span>
@@ -92,16 +112,26 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Payments Stats */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+        <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Revenue
+              </CardTitle>
+              <div className="relative">
+                <div className="absolute inset-0 bg-green-500/10 rounded-full blur-xl group-hover:bg-green-500/20 transition-colors duration-300" />
+                <div className="relative bg-green-500/10 rounded-full p-2.5 group-hover:bg-green-500/20 transition-all duration-300 group-hover:scale-110">
+                  <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400 animate-pulse group-hover:animate-bounce" />
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-3xl font-bold mb-1">
               ${analytics.payments.totalAmount.toFixed(2)}
             </div>
-            <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span>{analytics.payments.succeeded} succeeded</span>
               <span>•</span>
               <span>${analytics.payments.totalPlatformFees.toFixed(2)} fees</span>
@@ -110,14 +140,24 @@ export default function AnalyticsPage() {
         </Card>
 
         {/* Verifications Stats */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Verifications</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
+        <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/5 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Verifications
+              </CardTitle>
+              <div className="relative">
+                <div className="absolute inset-0 bg-purple-500/10 rounded-full blur-xl group-hover:bg-purple-500/20 transition-colors duration-300" />
+                <div className="relative bg-purple-500/10 rounded-full p-2.5 group-hover:bg-purple-500/20 transition-all duration-300 group-hover:scale-110">
+                  <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400 animate-pulse group-hover:animate-bounce" />
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.verifications.total}</div>
-            <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+            <div className="text-3xl font-bold mb-1">{analytics.verifications.total}</div>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span>{analytics.verifications.approved} approved</span>
               <span>•</span>
               <span>Avg: {analytics.verifications.averageScore.toFixed(1)}%</span>

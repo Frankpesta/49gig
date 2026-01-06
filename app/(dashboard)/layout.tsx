@@ -170,8 +170,8 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border backdrop-blur supports-backdrop-filter:bg-background/60 px-4">
+      <SidebarInset className="bg-background">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/95 dark:bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex flex-1 items-center gap-2">
@@ -181,7 +181,7 @@ export default function DashboardLayout({
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-6 p-6 md:p-8 lg:p-10">
+        <div className="flex flex-1 flex-col gap-6 p-6 md:p-8 lg:p-10 bg-background">
           {children}
         </div>
       </SidebarInset>

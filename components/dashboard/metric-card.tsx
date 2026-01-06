@@ -75,34 +75,41 @@ export function MetricCard({
         className
       )}
     >
-      <CardContent className="space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
+      <CardContent className="p-6 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
             <div
               className={cn(
-                "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110 group-hover:rotate-3",
+                "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-lg transition-all duration-300 group-hover:scale-110",
                 styles.iconBg
               )}
             >
+              {/* Subtle glow effect on hover */}
+              <div
+                className={cn(
+                  "absolute inset-0 rounded-lg opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-50",
+                  styles.glow
+                )}
+              />
               <Icon
                 className={cn(
-                  "h-5 w-5 transition-colors",
+                  "h-6 w-6 relative z-10 transition-all duration-300 group-hover:scale-110",
                   styles.icon,
                   iconClassName
                 )}
               />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-muted-foreground leading-tight">
+            <div className="flex-1 min-w-0 pt-0.5">
+              <p className="text-sm font-medium text-muted-foreground leading-tight">
                 {title}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <div className="flex items-baseline gap-2.5">
-            <p className="text-2xl font-bold tracking-tight text-foreground">
+            <p className="text-3xl font-bold tracking-tight text-foreground">
               {value}
             </p>
             {trend && (
@@ -120,7 +127,7 @@ export function MetricCard({
             )}
           </div>
           {description && (
-            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+            <p className="text-sm text-muted-foreground/80 leading-relaxed">
               {description}
             </p>
           )}

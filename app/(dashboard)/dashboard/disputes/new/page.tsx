@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Doc } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -191,7 +192,7 @@ export default function NewDisputePage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">None (Project-level dispute)</SelectItem>
-                    {milestones.map((milestone) => (
+                    {milestones.map((milestone: Doc<"milestones">) => (
                       <SelectItem key={milestone._id} value={milestone._id}>
                         {milestone.title}
                       </SelectItem>
