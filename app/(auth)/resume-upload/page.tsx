@@ -15,10 +15,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AuthBranding, AuthMobileLogo } from "@/components/auth/auth-branding";
+import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
 
 export default function ResumeUploadPage() {
   const router = useRouter();
+  const { user, isAuthenticated, isInitializing } = useAuth();
   const profile = useQuery(
     // @ts-ignore dynamic path cast for generated types
     (api as any).users.queries.getCurrentUserProfile
@@ -26,7 +28,7 @@ export default function ResumeUploadPage() {
   const resumeInfo = useQuery(
     // @ts-ignore dynamic path cast for generated types
     (api as any).resume.queries.getFreelancerResume,
-    profile?._id ? { freelancerId: profile._id } : "skip"
+    (user?._id || profile?._id) ? { freelancerId: (user?._id || profile?._id) } : "skip"
   );
   const getUploadUrl = useAction(
     // @ts-ignore resume endpoints not in generated types yet
@@ -50,14 +52,27 @@ export default function ResumeUploadPage() {
   const cooldownDays = Math.ceil(cooldownMs / (1000 * 60 * 60 * 24));
 
   useEffect(() => {
-    // If not a freelancer, route back to dashboard
-    if (profile && profile.role !== "freelancer") {
+    // Wait for auth to initialize
+    if (isInitializing) return;
+
+    // Check authentication - use both user from useAuth and profile query
+    const currentUser = user || profile;
+    
+    // If not authenticated after initialization, redirect to login
+    if (!isAuthenticated && !isInitializing && currentUser === null) {
+      // Check if there's a session token as a fallback
+      const hasToken = typeof window !== "undefined" && localStorage.getItem("sessionToken");
+      if (!hasToken) {
+        router.replace("/login");
+      }
+      return;
+    }
+
+    // If authenticated but not a freelancer, route to dashboard
+    if (currentUser && currentUser.role !== "freelancer") {
       router.replace("/dashboard");
     }
-    if (profile === null) {
-      router.replace("/login");
-    }
-  }, [profile, router]);
+  }, [user, profile, isAuthenticated, isInitializing, router]);
 
   useEffect(() => {
     // If already processed, skip this step
@@ -66,7 +81,8 @@ export default function ResumeUploadPage() {
     }
   }, [resumeInfo?.resumeStatus, router]);
 
-  if (profile === undefined || (profile?.role === "freelancer" && resumeInfo === undefined)) {
+  // Show loading state while auth is initializing or profile is loading
+  if (isInitializing || (profile === undefined && user === undefined)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -76,6 +92,9 @@ export default function ResumeUploadPage() {
       </div>
     );
   }
+
+  // Get current user (prefer user from useAuth, fallback to profile)
+  const currentUser = user || profile;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
