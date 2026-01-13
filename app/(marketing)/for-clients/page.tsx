@@ -5,6 +5,10 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/marketing/page-header";
+import { AnimatedCard } from "@/components/ui/animated-card";
+import { InteractiveStats } from "@/components/ui/interactive-stats";
+import { HoverButton } from "@/components/ui/hover-button";
+import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
   Users,
@@ -26,9 +30,27 @@ import {
   UserCheck,
   FileText,
   BadgeCheck,
+  Sparkles,
+  TrendingUp,
+  Star,
+  Heart,
+  ArrowRight,
+  Play,
+  Lightbulb,
+  BarChart3,
+  MessageCircle,
+  ThumbsUp,
+  MapPin,
+  Workflow
 } from "lucide-react";
 
 export default function ForClientsPage() {
+  const clientStats = [
+    { value: "95", label: "Client Satisfaction", suffix: "%", icon: Star },
+    { value: "48", label: "Hours to Hire", suffix: "hrs", icon: Clock },
+    { value: "500", label: "Companies Served", suffix: "+", icon: Building2 },
+    { value: "3", label: "Days Average", suffix: "days", icon: Zap },
+  ];
   const whyChooseReasons = [
     {
       icon: Shield,
@@ -139,295 +161,834 @@ export default function ForClientsPage() {
 
   return (
     <div className="w-full">
-      {/* PAGE HEADER */}
+      {/* MODERN PAGE HEADER */}
       <PageHeader
         badge={{
           icon: Briefcase,
-          text: "For Clients",
+          text: "For Clients"
         }}
         title="Hire Vetted African Talent & Teams With Confidence"
         description="49GIG helps companies around the world hire highly vetted African freelancers and teams—delivering global-standard work at affordable, transparent rates."
       >
-        <div className="space-y-4">
-          <p className="text-base text-muted-foreground font-medium max-w-2xl mx-auto">
-            No job postings. No bidding. No uncertainty.<br />
-            <span className="text-foreground font-semibold">Just the right talent, matched to your needs.</span>
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" asChild className="text-base h-12 px-8 shadow-lg">
-              <Link href="/hire-talent">
-                Hire Vetted Talent
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild className="text-base h-12 px-8">
-              <Link href="/hire-team">
-                Hire a Team
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+        <div className="space-y-10">
+          {/* Enhanced Trust Badge */}
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 via-primary/5 to-secondary/10 backdrop-blur-xl px-8 py-4 text-base font-bold text-primary shadow-2xl border border-primary/20 hover:border-primary/30 transition-all duration-300 hover:scale-105">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary">
+                <Sparkles className="h-3.5 w-3.5 text-white animate-pulse" />
+              </div>
+              No job postings. No bidding. No uncertainty.
+              <Heart className="h-5 w-5 animate-pulse" />
+            </div>
           </div>
+
+          {/* Enhanced Value Proposition */}
+          <div className="text-center space-y-4">
+            <p className="text-xl lg:text-2xl text-muted-foreground font-medium max-w-4xl mx-auto leading-relaxed">
+              <span className="text-foreground font-black text-2xl lg:text-3xl bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                Just the right talent, matched to your needs.
+              </span>
+            </p>
+            <div className="flex flex-wrap justify-center items-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>100% Vetted</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                <span>Secure Payments</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-secondary-foreground" />
+                <span>48hr Average Hire</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Enhanced CTA Buttons */}
+          <div className="flex flex-col sm:flex-row gap-6 justify-center">
+            <SectionTransition variant="slide" direction="left" delay={300}>
+              <HoverButton size="lg" glow className="text-lg h-16 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0 group">
+                <Link href="/hire-talent" className="flex items-center gap-3">
+                  <Briefcase className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
+                  Hire Vetted Talent
+                  <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
+                </Link>
+              </HoverButton>
+            </SectionTransition>
+
+            <SectionTransition variant="slide" direction="right" delay={400}>
+              <HoverButton
+                size="lg"
+                variant="outline"
+                className="text-lg h-16 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl group"
+              >
+                <Link href="/hire-team" className="flex items-center gap-3">
+                  <Users className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
+                  Hire a Team
+                  <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
+                </Link>
+              </HoverButton>
+            </SectionTransition>
+          </div>
+
+          {/* Enhanced Stats Section */}
+          <SectionTransition variant="fade" delay={500}>
+            <div className="pt-12 border-t border-border/30">
+              <div className="bg-background/80 backdrop-blur-xl rounded-3xl p-8 border border-border/30 shadow-xl">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+                  {clientStats.map((stat, index) => (
+                    <div key={index} className="text-center group">
+                      <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-300 shadow-lg group-hover:shadow-primary/20 mb-4">
+                        <stat.icon className="h-7 w-7 text-primary group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                      <div className="text-3xl lg:text-4xl font-black text-foreground group-hover:text-primary transition-colors duration-300">
+                        {stat.value}{stat.suffix}
+                      </div>
+                      <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground/80 transition-colors duration-300 mt-2">
+                        {stat.label}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </SectionTransition>
         </div>
       </PageHeader>
 
-      {/* WHY COMPANIES CHOOSE 49GIG */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 lg:mb-16">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Why Companies Choose 49GIG
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              We make hiring exceptional African talent simple, secure, and successful
-            </p>
+      {/* MODERN WHY COMPANIES CHOOSE 49GIG */}
+      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-primary/5 to-background relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionTransition variant="fade" delay={200}>
+            <div className="text-center mb-20 lg:mb-24">
+              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary/20 to-secondary/20">
+                  <Lightbulb className="h-3.5 w-3.5 text-primary" />
+                </div>
+                Why Choose 49GIG
+              </div>
+              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+                Why Companies Choose <br className="hidden lg:block" />
+                <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">49GIG</span>
+              </h2>
+              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+                We make hiring exceptional African talent simple, secure, and successful with our proven platform and process.
+              </p>
+            </div>
+          </SectionTransition>
+
+          <div className="space-y-20 lg:space-y-24">
+            {whyChooseReasons.map((reason, index) => (
+              <SectionTransition key={index} variant="slide" direction={index % 2 === 0 ? "left" : "right"} delay={300 + index * 200}>
+                <div className={`grid gap-12 lg:grid-cols-2 lg:gap-16 items-center ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}>
+                  {/* Modern Content Card */}
+                  <div className="space-y-8">
+                    <div className="group relative">
+                      {/* Hover Glow Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl scale-110" />
+
+                      <div className="relative bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 lg:p-10 shadow-xl hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:scale-105">
+                        {/* Animated Background */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
+
+                        <div className="relative space-y-8">
+                          <div className="flex items-start gap-6">
+                            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20 group-hover:scale-110">
+                              <reason.icon className="h-10 w-10 text-primary group-hover:scale-110 transition-transform duration-300" />
+                            </div>
+                            <div className="space-y-3 flex-1">
+                              <h3 className="text-2xl lg:text-3xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
+                                {reason.title}
+                              </h3>
+                              <div className="h-1 w-16 bg-gradient-to-r from-primary to-secondary rounded-full group-hover:w-24 transition-all duration-300" />
+                            </div>
+                          </div>
+
+                          <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
+                            {reason.description}
+                          </p>
+
+                          <div className="space-y-4">
+                            {reason.features.map((feature, idx) => (
+                              <SectionTransition key={idx} variant="slide" direction="up" delay={500 + idx * 100}>
+                                <div className="flex items-start gap-4 group/item">
+                                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 group-hover/item:from-green-600 group-hover/item:to-emerald-600 transition-all duration-300 shadow-lg group-hover/item:scale-110 mt-1">
+                                    <CheckCircle2 className="h-4 w-4 text-white" />
+                                  </div>
+                                  <span className="text-base font-medium text-foreground leading-relaxed group-hover/item:text-primary transition-colors duration-300 flex-1">
+                                    {feature}
+                                  </span>
+                                </div>
+                              </SectionTransition>
+                            ))}
+                          </div>
+
+                          {/* Call to Action */}
+                          <div className="flex items-center justify-between pt-4 border-t border-border/30 group-hover:border-primary/30 transition-colors duration-300">
+                            <span className="text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                              Learn more about this benefit
+                            </span>
+                            <ArrowRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:translate-x-1" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Enhanced Image Section */}
+                  <div className={`relative ${index % 2 === 1 ? '' : 'lg:order-last'}`}>
+                    <div className="relative group">
+                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
+                        <Image
+                          src={
+                            index === 0
+                              ? "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
+                              : index === 1
+                              ? "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
+                              : index === 2
+                              ? "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80"
+                              : "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80"
+                          }
+                          alt={reason.title}
+                          fill
+                          className="object-cover transition-transform duration-700 group-hover:scale-110"
+                          sizes="(max-width: 1024px) 100vw, 50vw"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                        {/* Success overlay */}
+                        <div className="absolute bottom-4 left-4 bg-background/95 backdrop-blur-sm rounded-2xl px-4 py-2 border border-border/30 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-foreground">Proven results</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </SectionTransition>
+            ))}
           </div>
 
-          <div className="space-y-16 lg:space-y-24">
-            {whyChooseReasons.map((reason, index) => (
-              <div key={index} className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
-                {/* Image */}
-                <div className={`relative ${index % 2 === 1 ? 'lg:order-last' : ''}`}>
-                  <Card className="overflow-hidden border border-border/50 shadow-lg">
-                    <CardContent className="p-8 space-y-6">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
-                          <reason.icon className="h-7 w-7 text-primary" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-foreground">
-                          {reason.title}
-                        </h3>
-                      </div>
-                      <p className="text-base text-muted-foreground leading-relaxed">
-                        {reason.description}
-                      </p>
-                      <ul className="space-y-3">
-                        {reason.features.map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-3">
-                            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                            <span className="text-sm text-foreground">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Illustration/Image */}
-                <div className={`relative ${index % 2 === 1 ? '' : 'lg:order-last'}`}>
-                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-xl">
-                    <Image
-                      src={
-                        index === 0
-                          ? "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
-                          : index === 1
-                          ? "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
-                          : index === 2
-                          ? "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80"
-                          : "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80"
-                      }
-                      alt={reason.title}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 1024px) 100vw, 50vw"
-                    />
+          {/* Social Proof Section */}
+          <SectionTransition variant="fade" delay={600}>
+            <div className="mt-20 text-center">
+              <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-3xl p-8 border border-border/30">
+                <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
+                  Trusted by Industry Leaders
+                </h3>
+                <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+                  Join hundreds of companies who have successfully hired top African talent through 49GIG
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+                  <div className="space-y-2">
+                    <div className="text-3xl font-black text-primary">500+</div>
+                    <div className="text-sm text-muted-foreground">Companies Served</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-3xl font-black text-secondary">95%</div>
+                    <div className="text-sm text-muted-foreground">Client Satisfaction</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-3xl font-black text-green-600">48hrs</div>
+                    <div className="text-sm text-muted-foreground">Average Hire Time</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-3xl font-black text-purple-600">120+</div>
+                    <div className="text-sm text-muted-foreground">Countries Reached</div>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          </SectionTransition>
         </div>
       </section>
 
-      {/* HOW HIRING WORKS */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-muted/30 border-y border-border/50">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 lg:mb-16">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              How Hiring Works
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              A simple, structured process that gets you from need to hire in days, not weeks
-            </p>
+      {/* MODERN HOW HIRING WORKS - Interactive Timeline */}
+      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-muted/20 via-background to-muted/20 border-y border-border/30 relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionTransition variant="fade" delay={200}>
+            <div className="text-center mb-20 lg:mb-24">
+              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary/20 to-secondary/20">
+                  <Workflow className="h-3.5 w-3.5 text-primary" />
+                </div>
+                How Hiring Works
+              </div>
+              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+                From Need to Hire in <br className="hidden lg:block" />
+                <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Just 5 Steps</span>
+              </h2>
+              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+                Our streamlined process gets you from project idea to working with vetted talent in days, not weeks.
+              </p>
+            </div>
+          </SectionTransition>
+
+          {/* Interactive Timeline */}
+          <div className="relative max-w-6xl mx-auto">
+            {/* Central Timeline Line */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-secondary to-primary transform -translate-x-1/2 hidden lg:block" />
+
+            <div className="space-y-16 lg:space-y-20">
+              {hiringSteps.map((step, index) => (
+                <SectionTransition key={index} variant="slide" direction={index % 2 === 0 ? "left" : "right"} delay={300 + index * 150}>
+                  <div className={`relative grid gap-8 lg:grid-cols-2 lg:gap-16 items-center ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}>
+                    {/* Timeline Node */}
+                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 hidden lg:block">
+                      <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${index === 0 ? 'from-blue-500 to-blue-600' :
+                        index === 1 ? 'from-green-500 to-green-600' :
+                        index === 2 ? 'from-purple-500 to-purple-600' :
+                        index === 3 ? 'from-orange-500 to-orange-600' :
+                        'from-teal-500 to-teal-600'} shadow-2xl border-4 border-background`}>
+                        <step.icon className="h-7 w-7 text-white" />
+                      </div>
+                      <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg border-4 border-background">
+                        {step.step}
+                      </div>
+                    </div>
+
+                    {/* Content Card */}
+                    <div className={`lg:${index % 2 === 0 ? 'pr-16' : 'pl-16'} space-y-6`}>
+                      <div className="bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:scale-105">
+                        <div className="space-y-6">
+                          {/* Mobile Step Indicator */}
+                          <div className="flex items-center gap-4 lg:hidden">
+                            <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${index === 0 ? 'from-blue-500 to-blue-600' :
+                              index === 1 ? 'from-green-500 to-green-600' :
+                              index === 2 ? 'from-purple-500 to-purple-600' :
+                              index === 3 ? 'from-orange-500 to-orange-600' :
+                              'from-teal-500 to-teal-600'} shadow-lg`}>
+                              <step.icon className="h-6 w-6 text-white" />
+                            </div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg">
+                              {step.step}
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                            <h3 className="text-2xl lg:text-3xl font-bold text-foreground leading-tight">
+                              {step.title}
+                            </h3>
+                            <div className="h-1 w-16 bg-gradient-to-r from-primary to-secondary rounded-full" />
+                            <p className="text-lg text-muted-foreground leading-relaxed">
+                              {step.description}
+                            </p>
+                          </div>
+
+                          {/* Step-specific features */}
+                          {index === 0 && (
+                            <div className="bg-primary/10 rounded-2xl p-4 border border-primary/20">
+                              <p className="text-sm text-primary font-medium">
+                                💡 No job postings, no bidding, no wasted time—just instant matching with pre-vetted talent.
+                              </p>
+                            </div>
+                          )}
+                          {index === 1 && (
+                            <div className="bg-secondary/10 rounded-2xl p-4 border border-secondary/20">
+                              <p className="text-sm text-secondary-foreground font-medium">
+                                🎯 Our smart form takes just 5 minutes and ensures we understand exactly what you need.
+                              </p>
+                            </div>
+                          )}
+                          {index === 2 && (
+                            <div className="bg-green-500/10 rounded-2xl p-4 border border-green-500/20">
+                              <p className="text-sm text-green-700 font-medium">
+                                ⚡ Get matched in 48 hours with professionals who fit your exact requirements.
+                              </p>
+                            </div>
+                          )}
+                          {index === 3 && (
+                            <div className="bg-purple-500/10 rounded-2xl p-4 border border-purple-500/20">
+                              <p className="text-sm text-purple-700 font-medium">
+                                🛡️ Secure contracts protect both parties with clear terms and conditions.
+                              </p>
+                            </div>
+                          )}
+                          {index === 4 && (
+                            <div className="bg-orange-500/10 rounded-2xl p-4 border border-orange-500/20">
+                              <p className="text-sm text-orange-700 font-medium">
+                                💰 Pay only for approved work with full transparency and milestone tracking.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Enhanced Image Section */}
+                    <div className="relative group lg:block hidden">
+                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
+                        <Image
+                          src={step.image}
+                          alt={step.title}
+                          fill
+                          className="object-cover transition-transform duration-700 group-hover:scale-110"
+                          sizes="(max-width: 1024px) 100vw, 50vw"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                        {/* Time indicator */}
+                        <div className="absolute top-4 right-4 bg-background/95 backdrop-blur-sm rounded-2xl px-4 py-2 border border-border/30 shadow-lg">
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-primary" />
+                            <span className="text-sm font-medium text-foreground">
+                              {index === 0 ? 'Instant' : index === 1 ? '5 min' : index === 2 ? '48 hrs' : index === 3 ? '1 day' : 'Ongoing'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </SectionTransition>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-16 lg:space-y-20">
-            {hiringSteps.map((step, index) => (
-              <div key={index} className="grid gap-8 lg:grid-cols-2 lg:gap-12 items-center">
-                {/* Image */}
-                <div className={`relative ${index % 2 === 1 ? 'lg:order-last' : ''}`}>
-                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-xl border border-border/50">
-                    <Image
-                      src={step.image}
-                      alt={step.title}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 1024px) 100vw, 50vw"
-                    />
+          {/* Process Overview */}
+          <SectionTransition variant="fade" delay={800}>
+            <div className="mt-20 text-center">
+              <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-3xl p-8 border border-border/30">
+                <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
+                  The Complete Hiring Journey
+                </h3>
+                <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+                  From project brief to successful delivery, we handle every step so you can focus on your business.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                  <div className="space-y-2">
+                    <div className="text-2xl font-bold text-primary">3 Days</div>
+                    <div className="text-sm text-muted-foreground">Average time to hire</div>
                   </div>
-                  {/* Step Number Badge */}
-                  <div className="absolute -top-4 -left-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground text-2xl font-bold shadow-lg border-4 border-background">
-                    {step.step}
+                  <div className="space-y-2">
+                    <div className="text-2xl font-bold text-secondary">0 Risk</div>
+                    <div className="text-sm text-muted-foreground">Money-back guarantee</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-2xl font-bold text-green-600">24/7</div>
+                    <div className="text-sm text-muted-foreground">Support throughout</div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </SectionTransition>
+        </div>
+      </section>
 
-                {/* Content */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                      <step.icon className="h-6 w-6 text-primary" />
+      {/* MODERN CLIENT PROTECTION SECTION */}
+      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-green-500/5 to-background relative overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-green-500/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
+            <div className="space-y-8">
+              <SectionTransition variant="fade" delay={200}>
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-green-500/10 to-emerald-500/10 px-6 py-3 text-sm font-bold text-green-700 border border-green-500/20 shadow-lg">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-green-500/20 to-emerald-500/20">
+                      <Shield className="h-3.5 w-3.5 text-green-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-foreground">
-                      {step.title}
-                    </h3>
+                    100% Client Protection
                   </div>
-                  <p className="text-base text-muted-foreground leading-relaxed">
-                    {step.description}
+                  <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground leading-tight">
+                    Your Project, <br className="hidden lg:block" />
+                    <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Fully Protected</span>
+                  </h2>
+                  <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed">
+                    Comprehensive protection features ensure your project stays secure from start to finish, with guaranteed results and peace of mind.
                   </p>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+              </SectionTransition>
 
-      {/* BUILT-IN CLIENT PROTECTION */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full bg-green-500/10 px-4 py-2 text-sm font-medium text-green-600 dark:text-green-400">
-                <Shield className="h-4 w-4" />
-                Client Protection
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
-                Built-In Client Protection
-              </h2>
-              <p className="text-base text-muted-foreground leading-relaxed">
-                Your project stays protected with our comprehensive client protection features, giving you peace of mind throughout the entire engagement.
-              </p>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {protectionFeatures.map((feature, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10">
-                      <feature.icon className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
+                    <div className="group flex items-start gap-4 p-4 rounded-2xl bg-background/50 backdrop-blur-sm border border-border/30 hover:border-green-500/30 transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 group-hover:from-green-500/30 group-hover:to-emerald-500/30 transition-all duration-300 shadow-lg group-hover:scale-110">
+                        <feature.icon className="h-6 w-6 text-green-600 group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+                      <div className="space-y-1 flex-1">
+                        <span className="text-base font-bold text-foreground group-hover:text-green-700 transition-colors duration-300">{feature.text}</span>
+                        <div className="h-0.5 w-0 bg-green-500 group-hover:w-full transition-all duration-300 rounded-full" />
+                      </div>
                     </div>
-                    <span className="text-base font-medium text-foreground">{feature.text}</span>
-                  </div>
+                  </SectionTransition>
                 ))}
               </div>
+
+              <SectionTransition variant="fade" delay={600}>
+                <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-3xl p-6 border border-green-500/20">
+                  <div className="flex items-center gap-3 mb-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-bold text-green-700">Money-Back Guarantee</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Not satisfied with the work? Get a full refund. Your satisfaction is our guarantee.
+                  </p>
+                </div>
+              </SectionTransition>
             </div>
 
-            <div className="relative">
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-xl">
-                <Image
-                  src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80"
-                  alt="Client protection"
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
+            <SectionTransition variant="scale" delay={400}>
+              <div className="relative group">
+                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-green-500/20 transition-all duration-500 group-hover:scale-105">
+                  <Image
+                    src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80"
+                    alt="Client protection"
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-110"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-green-500/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </div>
+
+                {/* Protection metrics overlay */}
+                <div className="absolute bottom-6 left-6 right-6">
+                  <div className="bg-background/95 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-border/30">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-lg font-bold text-green-600">99.9%</div>
+                        <div className="text-xs text-muted-foreground">Uptime</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-primary">$2M+</div>
+                        <div className="text-xs text-muted-foreground">Protected</div>
+                      </div>
+                      <div>
+                        <div className="text-lg font-bold text-secondary">24/7</div>
+                        <div className="text-xs text-muted-foreground">Support</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            </SectionTransition>
           </div>
         </div>
       </section>
 
-      {/* WHO 49GIG IS FOR */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-muted/30 border-y border-border/50">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Who 49GIG Is For
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              If you value quality, affordability, and reliability, 49GIG is built for you
-            </p>
-          </div>
+      {/* MODERN WHO 49GIG IS FOR SECTION */}
+      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-muted/20 via-background to-muted/20 border-y border-border/30 relative overflow-hidden">
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <SectionTransition variant="fade" delay={200}>
+            <div className="text-center mb-20 lg:mb-24">
+              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary/20 to-secondary/20">
+                  <Building2 className="h-3.5 w-3.5 text-primary" />
+                </div>
+                Perfect For
+              </div>
+              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+                Built For <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Every Business</span>
+              </h2>
+              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+                From startups to enterprises, if you value quality, affordability, and reliability, 49GIG is designed for you.
+              </p>
+            </div>
+          </SectionTransition>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-5">
             {idealFor.map((item, index) => (
-              <Card key={index} className="border border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
-                <CardContent className="p-6 text-center space-y-4">
-                  <div className="flex justify-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
-                      <item.icon className="h-7 w-7 text-primary" />
+              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
+                <div className="group relative h-full">
+                  {/* Hover Glow Effect */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl scale-110" />
+
+                  <div className="relative h-full bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
+                    {/* Animated Background */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                    <div className="relative text-center space-y-6">
+                      <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20 group-hover:scale-110">
+                        <item.icon className="h-8 w-8 text-primary group-hover:scale-110 transition-transform duration-300" />
+                      </div>
+
+                      <div className="space-y-3">
+                        <h3 className="text-lg lg:text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
+                          {item.text}
+                        </h3>
+                        <p className="text-sm text-muted-foreground group-hover:text-foreground/90 transition-colors duration-300 leading-relaxed">
+                          {index === 0 && "Fast-moving teams needing quick talent solutions"}
+                          {index === 1 && "Growing businesses scaling operations efficiently"}
+                          {index === 2 && "Creative agencies delivering client projects"}
+                          {index === 3 && "Expanding companies building new capabilities"}
+                          {index === 4 && "Large organizations outsourcing specialized work"}
+                        </p>
+                      </div>
+
+                      {/* Progress Bar Animation */}
+                      <div className="space-y-2">
+                        <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
+                          <div className="h-full w-0 bg-gradient-to-r from-primary to-secondary rounded-full group-hover:w-full transition-all duration-700 ease-out" />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-base font-semibold text-foreground">{item.text}</p>
-                </CardContent>
-              </Card>
+                </div>
+              </SectionTransition>
             ))}
           </div>
         </div>
       </section>
 
-      {/* WHY AFRICA */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-            <div className="relative lg:order-first">
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-2xl">
-                <Image
-                  src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&q=80"
-                  alt="African professionals"
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
-              </div>
-            </div>
+      {/* MODERN WHY AFRICA SECTION */}
+      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-primary via-primary/95 to-secondary text-primary-foreground relative overflow-hidden">
+        {/* Enhanced Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          }} />
+        </div>
 
-            <div className="space-y-6">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold">
-                Why Africa?
-              </h2>
-              <p className="text-lg text-primary-foreground/90 leading-relaxed">
-                Africa is home to a rapidly growing pool of skilled, globally competitive professionals. 49GIG unlocks this talent—giving you access to exceptional value.
-              </p>
-              <div className="space-y-4">
-                {africaAdvantages.map((advantage, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-foreground/10">
-                      <advantage.icon className="h-4 w-4" />
+        {/* Floating Elements */}
+        <div className="absolute top-20 right-20 w-4 h-4 bg-secondary/30 rounded-full animate-pulse" />
+        <div className="absolute bottom-32 left-16 w-3 h-3 bg-white/20 rounded-full animate-pulse" style={{ animationDelay: "1s" }} />
+        <div className="absolute top-1/2 right-10 w-2 h-2 bg-secondary/20 rounded-full animate-pulse" style={{ animationDelay: "2s" }} />
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-12 lg:grid-cols-2 lg:gap-20 items-center">
+            <SectionTransition variant="slide" direction="left" delay={200}>
+              <div className="space-y-8">
+                <div className="space-y-6">
+                  <div className="inline-flex items-center gap-3 rounded-full bg-primary-foreground/10 px-6 py-3 text-sm font-bold text-primary-foreground border border-primary-foreground/20 shadow-lg">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-secondary to-primary">
+                      <MapPin className="h-3.5 w-3.5 text-primary-foreground" />
                     </div>
-                    <span className="text-base font-medium">{advantage.text}</span>
+                    Why Africa
                   </div>
-                ))}
+                  <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight">
+                    Unlocking Africa's <br className="hidden lg:block" />
+                    <span className="text-secondary">World-Class Talent</span>
+                  </h2>
+                  <p className="text-xl text-primary-foreground/90 leading-relaxed">
+                    Africa is home to a rapidly growing pool of skilled, globally competitive professionals. 49GIG unlocks this talent—giving you exceptional value at competitive rates.
+                  </p>
+                </div>
+
+                <div className="space-y-5">
+                  {africaAdvantages.map((advantage, index) => (
+                    <SectionTransition key={index} variant="slide" direction="left" delay={400 + index * 100}>
+                      <div className="flex items-start gap-4 group">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary/20 to-primary/20 group-hover:from-secondary/30 group-hover:to-primary/30 transition-all duration-300 shadow-lg group-hover:scale-110">
+                          <advantage.icon className="h-5 w-5 text-primary-foreground group-hover:scale-110 transition-transform duration-300" />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-lg font-semibold leading-relaxed">{advantage.text}</span>
+                          <div className="h-0.5 w-0 bg-secondary group-hover:w-full transition-all duration-300 rounded-full" />
+                        </div>
+                      </div>
+                    </SectionTransition>
+                  ))}
+                </div>
+
+                <SectionTransition variant="fade" delay={700}>
+                  <div className="bg-primary-foreground/10 rounded-3xl p-6 border border-primary-foreground/20">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div>
+                        <div className="text-2xl font-black text-secondary">1.4B</div>
+                        <div className="text-sm text-primary-foreground/80">Population</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-black text-secondary">54</div>
+                        <div className="text-sm text-primary-foreground/80">Countries</div>
+                      </div>
+                    </div>
+                  </div>
+                </SectionTransition>
               </div>
-            </div>
+            </SectionTransition>
+
+            <SectionTransition variant="scale" delay={600}>
+              <div className="relative group">
+                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-primary-foreground/20 group-hover:shadow-secondary/20 transition-all duration-500 group-hover:scale-105">
+                  <Image
+                    src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=800&q=80"
+                    alt="African professionals"
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-110"
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/20 via-transparent to-secondary/10" />
+                </div>
+
+                {/* Success metrics overlay */}
+                <div className="absolute bottom-6 left-6 right-6">
+                  <div className="bg-primary-foreground/95 backdrop-blur-md rounded-2xl p-4 shadow-xl border border-primary-foreground/20">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <div className="text-xl font-bold text-primary">500K+</div>
+                        <div className="text-xs text-primary-foreground/70">Skilled Professionals</div>
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold text-secondary">4.9★</div>
+                        <div className="text-xs text-primary-foreground/70">Average Rating</div>
+                      </div>
+                      <div>
+                        <div className="text-xl font-bold text-green-600">35%</div>
+                        <div className="text-xs text-primary-foreground/70">Cost Savings</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </SectionTransition>
           </div>
         </div>
       </section>
 
-      {/* FINAL CTA */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Ready to Hire with Confidence?
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Start your project today and work with vetted African talent that delivers real results
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" asChild className="text-base h-12 px-8 shadow-lg">
-              <Link href="/hire-talent">
-                Hire Vetted Talent
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button size="lg" asChild className="text-base h-12 px-8 shadow-lg bg-secondary hover:bg-secondary/90">
-              <Link href="/hire-team">
-                Hire a Team
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild className="text-base h-12 px-8">
-              <Link href="/contact">
-                Start a Project
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
+      {/* MODERN FINAL CTA SECTION */}
+      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-primary/10 via-background to-secondary/10 border-y border-border/30 relative overflow-hidden">
+        {/* Enhanced Background Elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-10 left-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-10 right-10 w-40 h-40 bg-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+          <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "2s" }} />
+          <div className="absolute bottom-1/3 right-1/3 w-20 h-20 bg-secondary/5 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "3s" }} />
+        </div>
+
+        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <SectionTransition variant="fade" delay={200}>
+            <div className="text-center space-y-12">
+              {/* Enhanced Badge */}
+              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-8 py-4 text-sm font-bold text-primary border border-primary/20 shadow-2xl">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary">
+                  <Rocket className="h-4 w-4 text-white" />
+                </div>
+                Ready to Get Started?
+                <Sparkles className="h-5 w-5 animate-pulse" />
+              </div>
+
+              {/* Enhanced Headline */}
+              <div className="space-y-6">
+                <h2 className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-foreground leading-[0.9] tracking-tight">
+                  Hire African Talent <br className="hidden lg:block" />
+                  <span className="bg-gradient-to-r from-primary via-primary/90 to-secondary bg-clip-text text-transparent">With Confidence</span>
+                </h2>
+                <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+                  Start your project today and work with vetted African talent that delivers exceptional results at competitive rates.
+                </p>
+              </div>
+
+              {/* Enhanced Trust Indicators */}
+              <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12 pt-8">
+                <div className="group flex items-center gap-4 rounded-2xl bg-background/90 backdrop-blur-xl px-6 py-4 border border-border/30 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 group-hover:from-green-500/30 group-hover:to-emerald-500/30 transition-all duration-300 shadow-lg">
+                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-bold text-foreground">100% Vetted</div>
+                    <div className="text-xs text-muted-foreground">Top 3% only</div>
+                  </div>
+                </div>
+
+                <div className="group flex items-center gap-4 rounded-2xl bg-background/90 backdrop-blur-xl px-6 py-4 border border-border/30 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/30 group-hover:from-primary/30 group-hover:to-primary/40 transition-all duration-300 shadow-lg">
+                    <Shield className="h-6 w-6 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-bold text-foreground">Secure Payments</div>
+                    <div className="text-xs text-muted-foreground">Milestone-based</div>
+                  </div>
+                </div>
+
+                <div className="group flex items-center gap-4 rounded-2xl bg-background/90 backdrop-blur-xl px-6 py-4 border border-border/30 shadow-xl hover:shadow-secondary/20 transition-all duration-300 hover:border-secondary/40 hover:scale-105">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/30 group-hover:from-secondary/30 group-hover:to-secondary/40 transition-all duration-300 shadow-lg">
+                    <Award className="h-6 w-6 text-secondary-foreground" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-bold text-foreground">Guaranteed Results</div>
+                    <div className="text-xs text-muted-foreground">Money-back promise</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Enhanced CTA Buttons */}
+              <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
+                <SectionTransition variant="slide" direction="left" delay={600}>
+                  <div className="group">
+                    <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0 group-hover:scale-105 transition-all duration-300">
+                      <Link href="/hire-talent" className="flex items-center gap-3">
+                        <Briefcase className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
+                        Hire Vetted Talent
+                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
+                      </Link>
+                    </HoverButton>
+                  </div>
+                </SectionTransition>
+
+                <SectionTransition variant="slide" direction="right" delay={700}>
+                  <div className="group">
+                    <HoverButton
+                      size="lg"
+                      variant="outline"
+                      className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl group-hover:scale-105 transition-all duration-300"
+                    >
+                      <Link href="/hire-team" className="flex items-center gap-3">
+                        <Users className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
+                        Hire a Team
+                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
+                      </Link>
+                    </HoverButton>
+                  </div>
+                </SectionTransition>
+              </div>
+
+              {/* Additional CTA */}
+              <SectionTransition variant="fade" delay={800}>
+                <div className="pt-8">
+                  <HoverButton
+                    size="lg"
+                    variant="ghost"
+                    className="text-lg h-16 px-12 bg-background/50 backdrop-blur-xl border-2 border-primary/20 hover:bg-primary/5 hover:border-primary shadow-xl"
+                  >
+                    <Link href="/contact" className="flex items-center gap-3">
+                      <MessageCircle className="h-6 w-6" />
+                      Have Questions? Let's Talk
+                      <ArrowRight className="h-6 w-6" />
+                    </Link>
+                  </HoverButton>
+                </div>
+              </SectionTransition>
+
+              {/* Enhanced Guarantee Section */}
+              <SectionTransition variant="fade" delay={900}>
+                <div className="bg-background/80 backdrop-blur-xl rounded-3xl p-8 border border-border/30 shadow-xl max-w-4xl mx-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                    <div className="space-y-2">
+                      <div className="text-2xl font-bold text-primary">Free</div>
+                      <div className="text-sm text-muted-foreground">No setup fees</div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-2xl font-bold text-secondary">48hrs</div>
+                      <div className="text-sm text-muted-foreground">Average hire time</div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-2xl font-bold text-green-600">Guaranteed</div>
+                      <div className="text-sm text-muted-foreground">Results or refund</div>
+                    </div>
+                  </div>
+                </div>
+              </SectionTransition>
+            </div>
+          </SectionTransition>
         </div>
       </section>
     </div>

@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
 import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
+import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
@@ -31,6 +32,14 @@ export default function DashboardLayout({
     isAuthenticated && userProfile?.role === "freelancer" ? {} : "skip"
   );
 
+  // Resume status for freelancers
+  const resumeInfo = useQuery(
+    (api as any).resume.queries.getFreelancerResume,
+    isAuthenticated && userProfile?._id && userProfile.role === "freelancer"
+      ? { freelancerId: userProfile._id }
+      : "skip"
+  );
+
   useEffect(() => {
     // Only redirect if we've finished initializing and user is definitely not authenticated
     // Give Convex time to establish auth state after login
@@ -49,6 +58,21 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, isInitializing, router]);
 
+  // Enforce resume upload completion before dashboard for freelancers
+  useEffect(() => {
+    if (!isAuthenticated || isInitializing) return;
+    if (!userProfile || userProfile.role !== "freelancer") return;
+    if (resumeInfo === undefined) return;
+
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+    const onResumeUpload = currentPath.startsWith("/resume-upload");
+    const isProcessed = resumeInfo?.resumeStatus === "processed";
+
+    if (!isProcessed && !onResumeUpload) {
+      router.replace("/resume-upload");
+    }
+  }, [isAuthenticated, isInitializing, resumeInfo, router, userProfile]);
+
   // CRITICAL: Check if freelancer is verified - ENFORCE STRICTLY
   // This runs whenever auth state, user profile, or verification status changes
   useEffect(() => {
@@ -63,6 +87,10 @@ export default function DashboardLayout({
 
     // Check if user is a freelancer
     if (userProfile?.role === "freelancer") {
+      // If resume not processed, resume guard handles redirect
+      if (resumeInfo && resumeInfo.resumeStatus !== "processed") {
+        return;
+      }
       // Only check path on client side
       if (typeof window === "undefined") return;
       
@@ -97,6 +125,8 @@ export default function DashboardLayout({
       !isInitializing &&
       isAuthenticated &&
       userProfile?.role === "freelancer" &&
+      resumeInfo &&
+      resumeInfo.resumeStatus === "processed" &&
       isVerified !== undefined &&
       !isVerified.verified
     ) {

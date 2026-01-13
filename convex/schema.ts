@@ -50,6 +50,24 @@ export default defineSchema({
       })
     ),
 
+    // Resume (freelancer)
+    resumeUrl: v.optional(v.string()),
+    resumeFileId: v.optional(v.id("_storage")),
+    resumeUploadedAt: v.optional(v.number()),
+    resumeStatus: v.optional(
+      v.union(
+        v.literal("not_uploaded"),
+        v.literal("pending_upload"),
+        v.literal("uploaded"),
+        v.literal("processing"),
+        v.literal("processed"),
+        v.literal("failed")
+      )
+    ),
+    resumeBio: v.optional(v.string()),
+    resumeParsedData: v.optional(v.any()),
+    resumeCanReuploadAt: v.optional(v.number()),
+
     // Status
     status: v.union(
       v.literal("active"),
@@ -81,7 +99,8 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_role", ["role"])
     .index("by_status", ["status"])
-    .index("by_verification_status", ["verificationStatus"]),
+    .index("by_verification_status", ["verificationStatus"])
+    .index("by_resume_status", ["resumeStatus"]),
 
   projects: defineTable({
     // Client

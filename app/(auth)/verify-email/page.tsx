@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AuthBranding, AuthMobileLogo } from "@/components/auth/auth-branding";
 
@@ -32,6 +32,12 @@ function VerifyEmailContent() {
   const resendVerification = useMutation(
     (api as any)["auth/mutations"].resendEmailVerification
   );
+  
+  // Query user profile after successful verification to check role
+  const userProfile = useQuery(
+    api.users.queries.getCurrentUserProfile,
+    success ? {} : "skip"
+  );
 
   useEffect(() => {
     const tokenParam = searchParams.get("token");
@@ -40,6 +46,31 @@ function VerifyEmailContent() {
       handleVerify(tokenParam);
     }
   }, [searchParams]);
+
+  // Handle redirect after successful verification and user profile is loaded
+  useEffect(() => {
+    if (!success || !userProfile) return;
+
+    // Check if user is a freelancer - freelancers always need resume upload after email verification
+    const isFreelancer = userProfile.role === "freelancer";
+    const hasPendingFlag = typeof window !== "undefined" && localStorage.getItem("pending_resume_upload");
+    
+    // For freelancers, always redirect to resume upload (manual signup or OAuth)
+    if (isFreelancer || hasPendingFlag) {
+      // Ensure flag is set for consistency
+      if (typeof window !== "undefined" && isFreelancer) {
+        localStorage.setItem("pending_resume_upload", "freelancer");
+      }
+      setTimeout(() => {
+        router.replace("/resume-upload");
+      }, 1200);
+    } else {
+      // Client or other roles: go to dashboard
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1200);
+    }
+  }, [success, userProfile, router]);
 
   const handleVerify = async (verifyToken: string) => {
     setIsLoading(true);
@@ -50,11 +81,8 @@ function VerifyEmailContent() {
 
       if (result.success) {
         setSuccess(true);
-        // Note: We'll redirect to dashboard, but the layout will check
-        // and redirect freelancers to verification if needed
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 2000);
+        // Note: We'll check user role via userProfile query after verification
+        // The redirect logic is handled in useEffect below
       }
     } catch (err: any) {
       setError(err.message || "Failed to verify email");
@@ -92,7 +120,7 @@ function VerifyEmailContent() {
                 Check your inbox for the verification email
               </p>
             </div>
-            <Card className="shadow-medium border-border/50">
+            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
             <CardHeader className="space-y-2 px-8 pt-8 pb-6">
               <CardTitle className="text-2xl font-heading font-semibold">
                 Email Sent
@@ -130,7 +158,7 @@ function VerifyEmailContent() {
                 Your email has been verified successfully
               </p>
             </div>
-            <Card className="shadow-medium border-border/50">
+            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
             <CardHeader className="space-y-2 px-8 pt-8 pb-6">
               <CardTitle className="text-2xl font-heading font-semibold">
                 Verification Complete
@@ -172,7 +200,7 @@ function VerifyEmailContent() {
               Enter the verification token from your email
             </p>
           </div>
-          <Card className="shadow-medium border-border/50">
+          <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
           <CardHeader className="space-y-2 px-8 pt-8 pb-6">
             <CardTitle className="text-2xl font-heading font-semibold">
               Email Verification
@@ -253,7 +281,7 @@ export default function VerifyEmailPage() {
           <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
             <div className="mx-auto w-full max-w-md space-y-8">
               <AuthMobileLogo />
-              <Card className="shadow-medium border-border/50">
+              <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
                 <CardContent className="px-8 py-8">
                   <div className="flex items-center justify-center py-8">
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />

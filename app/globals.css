@@ -46,8 +46,8 @@
 
 /* ============================================
    LIGHT THEME (49GIG Branding)
-   Primary: #345478 (Deep Blue-Gray)
-   Secondary: #FFCE40 (Golden Yellow)
+   Primary: #1B344A (Blue)
+   Secondary: #FEC110 (Yellow)
    ============================================ */
 :root {
   --background: oklch(100% 0 0);
@@ -56,9 +56,9 @@
   --card-foreground: oklch(15% 0 0);
   --popover: oklch(100% 0 0);
   --popover-foreground: oklch(15% 0 0);
-  --primary: oklch(35% 0.045 235); /* #345478 - Deep Blue-Gray */
+  --primary: oklch(28% 0.05 240); /* #1B344A - Blue */
   --primary-foreground: oklch(100% 0 0);
-  --secondary: oklch(85% 0.14 90); /* #FFCE40 - Golden Yellow */
+  --secondary: oklch(82% 0.16 90); /* #FEC110 - Yellow */
   --secondary-foreground: oklch(20% 0 0);
   --muted: oklch(97% 0 0);
   --muted-foreground: oklch(55% 0 0);
@@ -68,11 +68,11 @@
   --destructive-foreground: oklch(100% 0 0);
   --border: oklch(92% 0 0);
   --input: oklch(92% 0 0);
-  --ring: oklch(35% 0.045 235); /* Primary color for focus rings */
+  --ring: oklch(28% 0.05 240); /* Primary color for focus rings */
 
   /* Charts - Complementary to brand colors */
-  --chart-1: oklch(45% 0.06 235); /* Primary variant */
-  --chart-2: oklch(75% 0.12 90); /* Secondary variant */
+  --chart-1: oklch(38% 0.06 240); /* Primary variant */
+  --chart-2: oklch(78% 0.14 90); /* Secondary variant */
   --chart-3: oklch(60% 0.08 180); /* Teal complement */
   --chart-4: oklch(65% 0.12 340); /* Pink accent */
   --chart-5: oklch(55% 0.1 120); /* Green accent */
@@ -80,7 +80,7 @@
   /* Sidebar */
   --sidebar: oklch(98% 0 0);
   --sidebar-foreground: oklch(15% 0 0);
-  --sidebar-primary: oklch(35% 0.045 235); /* Primary color */
+  --sidebar-primary: oklch(28% 0.05 240); /* Primary color */
   --sidebar-primary-foreground: oklch(100% 0 0);
   --sidebar-accent: oklch(96% 0 0);
   --sidebar-accent-foreground: oklch(20% 0 0);
@@ -90,8 +90,8 @@
 
 /* ============================================
    DARK THEME (49GIG Branding)
-   Primary: Lighter variation of #345478
-   Secondary: #FFCE40 (Golden Yellow)
+   Primary: Lighter variation of #1B344A
+   Secondary: #FEC110 (Yellow)
    ============================================ */
 .dark {
   --background: oklch(10% 0 0);
@@ -100,9 +100,9 @@
   --card-foreground: oklch(98% 0 0);
   --popover: oklch(15% 0 0);
   --popover-foreground: oklch(98% 0 0);
-  --primary: oklch(60% 0.05 235); /* Lighter blue-gray for dark mode */
-  --primary-foreground: oklch(10% 0 0);
-  --secondary: oklch(85% 0.14 90); /* #FFCE40 - Golden Yellow (same as light) */
+  --primary: oklch(55% 0.06 240); /* Lighter blue for dark mode */
+  --primary-foreground: oklch(98% 0 0);
+  --secondary: oklch(82% 0.16 90); /* #FEC110 - Yellow (same as light) */
   --secondary-foreground: oklch(10% 0 0);
   --muted: oklch(20% 0 0);
   --muted-foreground: oklch(70% 0 0);
@@ -112,11 +112,11 @@
   --destructive-foreground: oklch(98% 0 0);
   --border: oklch(25% 0 0);
   --input: oklch(25% 0 0);
-  --ring: oklch(60% 0.05 235); /* Primary color for focus rings */
+  --ring: oklch(55% 0.06 240); /* Primary color for focus rings */
 
   /* Charts - Complementary to brand colors (adjusted for dark mode) */
-  --chart-1: oklch(65% 0.06 235); /* Primary variant */
-  --chart-2: oklch(80% 0.12 90); /* Secondary variant */
+  --chart-1: oklch(60% 0.06 240); /* Primary variant */
+  --chart-2: oklch(80% 0.15 90); /* Secondary variant */
   --chart-3: oklch(70% 0.08 180); /* Teal complement */
   --chart-4: oklch(75% 0.12 340); /* Pink accent */
   --chart-5: oklch(65% 0.1 120); /* Green accent */
@@ -124,7 +124,7 @@
   /* Sidebar */
   --sidebar: oklch(15% 0 0);
   --sidebar-foreground: oklch(98% 0 0);
-  --sidebar-primary: oklch(60% 0.05 235); /* Primary color */
+  --sidebar-primary: oklch(55% 0.06 240); /* Primary color */
   --sidebar-primary-foreground: oklch(98% 0 0);
   --sidebar-accent: oklch(20% 0 0);
   --sidebar-accent-foreground: oklch(98% 0 0);
@@ -343,6 +343,29 @@
   .animate-marquee:hover,
   .animate-marquee-slow:hover {
     animation-play-state: paused;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px);
+      opacity: 0.3;
+    }
+    25% {
+      transform: translateY(-20px) translateX(10px);
+      opacity: 0.6;
+    }
+    50% {
+      transform: translateY(-40px) translateX(-10px);
+      opacity: 0.4;
+    }
+    75% {
+      transform: translateY(-20px) translateX(5px);
+      opacity: 0.5;
+    }
+  }
+
+  .animate-float {
+    animation: float 15s ease-in-out infinite;
   }
 }
 

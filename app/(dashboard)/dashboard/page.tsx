@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -30,6 +31,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
+      {/* Warning Checklist - Show at top for freelancers */}
+      {isFreelancer && <FreelancerChecklist />}
+      
       {/* Welcome Section with Gradient */}
       <div className="relative space-y-3 overflow-hidden rounded-xl border bg-gradient-to-br from-primary/5 via-background to-background p-6 shadow-sm">
         <div className="relative z-10">

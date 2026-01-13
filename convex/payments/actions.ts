@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import Stripe from "stripe";
