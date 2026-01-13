@@ -1,13 +1,14 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
-import { internal } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 30 * 6;
 
 /**
  * Complete resume upload: store file reference, set status, and build a basic bio.
  * Later we can trigger a richer parsing/LLM step here.
+ * Supports both Convex Auth and session token authentication.
  */
 export const completeResumeUpload = mutation({
   args: {
@@ -15,9 +16,23 @@ export const completeResumeUpload = mutation({
     fileName: v.string(),
     fileSize: v.number(),
     mimeType: v.string(),
+    sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    let user = null;
+
+    // Try Convex Auth first
+    user = await getCurrentUser(ctx);
+    
+    // If no Convex Auth user and session token provided, verify session token
+    if (!user && args.sessionToken) {
+      user = await ctx.runQuery(
+        // @ts-expect-error dynamic path casting
+        api["auth/queries"].verifySession as any,
+        { sessionToken: args.sessionToken }
+      );
+    }
+
     if (!user) {
       throw new Error("Unauthorized");
     }
