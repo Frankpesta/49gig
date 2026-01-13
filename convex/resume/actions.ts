@@ -14,11 +14,27 @@ const openai = new OpenAI({
 /**
  * Generate a signed upload URL for resume PDF uploads.
  * Only freelancers can upload resumes.
+ * Supports both Convex Auth and session token authentication.
  */
 export const getResumeUploadUrl = action({
-  args: {},
-  handler: async (ctx) => {
-    const user = await ctx.runQuery(api.auth.getCurrentUserQuery, {});
+  args: {
+    sessionToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let user = null;
+
+    // Try Convex Auth first
+    user = await ctx.runQuery(api.auth.getCurrentUserQuery, {});
+    
+    // If no Convex Auth user and session token provided, verify session token
+    if (!user && args.sessionToken) {
+      user = await ctx.runQuery(
+        // @ts-expect-error dynamic path casting
+        api["auth/queries"].verifySession as any,
+        { sessionToken: args.sessionToken }
+      );
+    }
+
     if (!user) {
       throw new Error("Unauthorized");
     }
