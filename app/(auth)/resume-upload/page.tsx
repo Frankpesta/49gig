@@ -157,11 +157,13 @@ export default function ResumeUploadPage() {
       }
 
       // 3) Finalize in Convex (stores metadata and builds placeholder bio)
+      // Pass session token if available (for email/password auth)
       await completeUpload({
         fileId: storageId,
         fileName: file.name,
         fileSize: file.size,
         mimeType: file.type,
+        sessionToken: sessionToken || undefined,
       });
 
       // Clear pending flag since upload is complete
