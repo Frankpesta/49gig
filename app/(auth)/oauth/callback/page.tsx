@@ -66,9 +66,10 @@ function OAuthCallbackContent() {
           }
 
           // CRITICAL: Check user role and redirect accordingly
-          // Freelancers MUST go to verification page immediately
+          // Freelancers: go to resume upload, then verification
           if (result.userRole === "freelancer") {
-            router.replace("/verification");
+            localStorage.setItem("pending_resume_upload", "freelancer");
+            router.replace("/resume-upload");
           } else {
             // Redirect other users to dashboard
             if (result.isNewUser) {

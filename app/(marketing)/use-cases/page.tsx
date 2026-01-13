@@ -28,6 +28,10 @@ import {
 } from "lucide-react";
 
 export default function UseCasesPage() {
+  const breadcrumbs = [
+    { label: "Use Cases", icon: Target },
+  ];
+
   const clientUseCases = [
     {
       icon: Code,
@@ -141,7 +145,7 @@ export default function UseCasesPage() {
       <PageHeader
         badge={{
           icon: Briefcase,
-          text: "Use Cases",
+          text: "Use Cases"
         }}
         title="How 49GIG Helps Businesses and Freelancers Succeed"
         description="49GIG is more than a freelance marketplace. It's a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients. Here's how our platform can be applied across different projects, industries, and scenarios."

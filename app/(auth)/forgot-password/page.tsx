@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
                 We've sent a password reset link
               </p>
             </div>
-            <Card className="shadow-medium border-border/50">
+            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
             <CardHeader className="space-y-2 px-8 pt-8 pb-6">
               <CardTitle className="text-2xl font-heading font-semibold">
                 Email Sent
@@ -131,7 +131,7 @@ export default function ForgotPasswordPage() {
               Enter your email to receive a reset link
             </p>
           </div>
-          <Card className="shadow-medium border-border/50">
+          <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
           <CardHeader className="space-y-2 px-8 pt-8 pb-6">
             <CardTitle className="text-2xl font-heading font-semibold">
               Forgot Password

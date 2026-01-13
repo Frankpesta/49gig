@@ -98,7 +98,7 @@ function ResetPasswordContent() {
                 Your password has been reset successfully
               </p>
             </div>
-            <Card className="shadow-medium border-border/50">
+            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
             <CardHeader className="space-y-2 px-8 pt-8 pb-6">
               <CardTitle className="text-2xl font-heading font-semibold">
                 Success
@@ -140,7 +140,7 @@ function ResetPasswordContent() {
               Enter your new password below
             </p>
           </div>
-          <Card className="shadow-medium border-border/50">
+          <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
           <CardHeader className="space-y-2 px-8 pt-8 pb-6">
             <CardTitle className="text-2xl font-heading font-semibold">
               Reset Password

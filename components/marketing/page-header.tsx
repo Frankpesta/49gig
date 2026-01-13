@@ -1,8 +1,16 @@
 "use client";
 
 import { ReactNode } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, ChevronRight, Home } from "lucide-react";
+import { SectionTransition } from "@/components/ui/section-transition";
+
+interface BreadcrumbItem {
+  label: string;
+  href?: string;
+  icon?: LucideIcon;
+}
 
 interface PageHeaderProps {
   title: string;
@@ -11,7 +19,7 @@ interface PageHeaderProps {
     icon?: LucideIcon;
     text: string;
   };
-  gradient?: boolean;
+  breadcrumbs?: BreadcrumbItem[];
   children?: ReactNode;
   className?: string;
 }
@@ -20,61 +28,80 @@ export function PageHeader({
   title,
   description,
   badge,
-  gradient = true,
+  breadcrumbs,
   children,
   className,
 }: PageHeaderProps) {
   return (
-    <section
-      className={cn(
-        "relative w-full overflow-hidden border-b border-border/50",
-        gradient
-          ? "bg-gradient-to-b from-muted/50 via-background to-background"
-          : "bg-background",
-        className
-      )}
-    >
-      {/* Decorative Elements */}
+    <section className={cn("relative w-full py-20 sm:py-28 lg:py-36 overflow-hidden bg-gradient-to-br from-background via-muted/5 to-background border-b border-border/20", className)}>
+      {/* Clean Background Elements */}
       <div className="absolute inset-0 -z-10">
-        {/* Subtle grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03]"
-          style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }}
-        />
-        
-        {/* Gradient orbs */}
-        <div className="absolute right-0 top-0 h-[400px] w-[400px] -translate-y-1/2 translate-x-1/3 rounded-full bg-primary/5 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-[300px] w-[300px] translate-y-1/2 -translate-x-1/3 rounded-full bg-secondary/5 blur-3xl" />
+        <div className="absolute top-20 left-20 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-20 w-80 h-80 bg-secondary/3 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
-        <div className="text-center space-y-6">
-          {/* Badge */}
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="text-center space-y-8">
+
+          {/* Clean Breadcrumbs */}
+          {breadcrumbs && breadcrumbs.length > 0 && (
+            <nav className="flex justify-center mb-8" aria-label="Breadcrumb">
+              <div className="flex items-center gap-1 px-6 py-3 bg-background/80 backdrop-blur-sm rounded-full border border-border/30 shadow-sm">
+                <Link href="/" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors">
+                  <Home className="h-4 w-4" />
+                  <span>Home</span>
+                </Link>
+                {breadcrumbs.map((item, index) => (
+                  <div key={index} className="flex items-center gap-1">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+                    {item.href ? (
+                      <Link
+                        href={item.href}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+                      >
+                        {item.icon && <item.icon className="h-4 w-4" />}
+                        <span>{item.label}</span>
+                      </Link>
+                    ) : (
+                      <span className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground">
+                        {item.icon && <item.icon className="h-4 w-4" />}
+                        <span>{item.label}</span>
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </nav>
+          )}
+
+          {/* Clean Badge */}
           {badge && (
             <div className="flex justify-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 backdrop-blur-sm px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm">
-                {badge.icon && <badge.icon className="h-4 w-4 text-primary" />}
+              <div className="inline-flex items-center gap-3 px-6 py-3 bg-primary/5 border border-primary/20 rounded-full text-sm font-medium text-primary">
+                {badge.icon && <badge.icon className="h-4 w-4" />}
                 <span>{badge.text}</span>
               </div>
             </div>
           )}
 
-          {/* Title */}
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight tracking-tight text-foreground">
+          {/* Clean Title */}
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground leading-tight">
             {title}
           </h1>
 
-          {/* Description */}
+          {/* Clean Description */}
           {description && (
-            <p className="mx-auto max-w-3xl text-lg sm:text-xl text-muted-foreground leading-relaxed">
+            <p className="text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed">
               {description}
             </p>
           )}
 
-          {/* Children (CTAs, additional content) */}
-          {children && <div className="pt-4">{children}</div>}
+          {/* Content */}
+          {children && (
+            <div className="pt-8">
+              {children}
+            </div>
+          )}
         </div>
       </div>
     </section>

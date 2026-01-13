@@ -1,6 +1,5 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
 
 /**
  * OAuth sign-in handler (deprecated - use auth/oauth functions instead)
@@ -12,15 +11,9 @@ export const oauthSignIn = action({
     code: v.string(),
   },
   handler: async (ctx, args): Promise<any> => {
-    // Redirect to new OAuth implementation
-    // Call the OAuth callback action
-    return await ctx.runAction(
-      (api as any)["auth/oauth"].handleGoogleCallback,
-      {
-        code: args.code,
-        state: "",
-      }
-    );
+    // Deprecated: kept for backwards compatibility; please use /oauth callback flow
+    console.warn("oauthSignIn action is deprecated; use /oauth/callback flow instead.");
+    return { success: false, message: "Deprecated OAuth handler. Use /oauth/callback." };
   },
 });
 

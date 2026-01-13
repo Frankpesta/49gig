@@ -116,7 +116,7 @@ export default function ContactPage() {
       <PageHeader
         badge={{
           icon: MessageSquare,
-          text: "Contact Us",
+          text: "Contact Us"
         }}
         title="Get in Touch With 49GIG"
         description="Have questions about hiring talent, joining as a freelancer, or anything else? We're here to help. Reach out to our team and we'll get back to you as soon as possible."
