@@ -136,7 +136,9 @@ export default function ResumeUploadPage() {
       setIsUploading(true);
 
       // 1) Get signed upload URL from Convex
-      const { url } = await getUploadUrl({});
+      // Pass session token if available (for email/password auth)
+      const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
+      const { url } = await getUploadUrl({ sessionToken: sessionToken || undefined });
 
       // 2) Upload the PDF directly to Convex storage
       const uploadRes = await fetch(url, {
