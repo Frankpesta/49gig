@@ -17,7 +17,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isInitializing } = useAuth();
+  const { user, isAuthenticated, isInitializing } = useAuth();
   const router = useRouter();
   
   // Get user profile to check role
@@ -35,8 +35,11 @@ export default function DashboardLayout({
   // Resume status for freelancers
   const resumeInfo = useQuery(
     (api as any).resume.queries.getFreelancerResume,
-    isAuthenticated && userProfile?._id && userProfile.role === "freelancer"
-      ? { freelancerId: userProfile._id }
+    isAuthenticated && (userProfile?._id || user?._id) && (userProfile?.role === "freelancer" || user?.role === "freelancer")
+      ? {
+          freelancerId: (userProfile?._id || user?._id)!,
+          requesterId: (userProfile?._id || user?._id)!,
+        }
       : "skip"
   );
 
@@ -66,9 +69,13 @@ export default function DashboardLayout({
 
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
     const onResumeUpload = currentPath.startsWith("/resume-upload");
-    const isProcessed = resumeInfo?.resumeStatus === "processed";
+    const resumeStatus = resumeInfo?.resumeStatus;
+    const hasUploaded =
+      resumeStatus === "uploaded" ||
+      resumeStatus === "processing" ||
+      resumeStatus === "processed";
 
-    if (!isProcessed && !onResumeUpload) {
+    if (!hasUploaded && !onResumeUpload) {
       router.replace("/resume-upload");
     }
   }, [isAuthenticated, isInitializing, resumeInfo, router, userProfile]);

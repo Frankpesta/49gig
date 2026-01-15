@@ -4,6 +4,32 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 
 /**
+ * Helper function to get current user in queries
+ * Supports both Convex Auth and session token authentication via userId
+ */
+async function getCurrentUserInQuery(
+  ctx: any,
+  userId?: Doc<"users">["_id"]
+): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId);
+    if (!user) {
+      return null;
+    }
+    if (user.status !== "active") {
+      return null;
+    }
+    return user as Doc<"users">;
+  }
+
+  const user = await getCurrentUser(ctx);
+  if (!user || user.status !== "active") {
+    return null;
+  }
+  return user as Doc<"users">;
+}
+
+/**
  * Public-facing resume info for a freelancer (bio + resume link).
  * Allowed:
  *  - the freelancer themselves
@@ -11,9 +37,9 @@ import { Doc } from "../_generated/dataModel";
  *  - clients (e.g., for matched views) — broader check can be tightened later.
  */
 export const getFreelancerResume = query({
-  args: { freelancerId: v.id("users") },
+  args: { freelancerId: v.id("users"), requesterId: v.optional(v.id("users")) },
   handler: async (ctx, args) => {
-    const requester = await getCurrentUser(ctx);
+    const requester = await getCurrentUserInQuery(ctx, args.requesterId);
     if (!requester) {
       return null;
     }
