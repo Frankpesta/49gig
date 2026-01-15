@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -57,6 +57,64 @@ const COMMON_SKILLS = [
   "Kubernetes",
 ];
 
+const TEAM_STACK_OPTIONS = Array.from(
+  new Set([
+    "React",
+    "Node.js",
+    "Python",
+    "Java",
+    "PHP",
+    "Go",
+    "Rust",
+    "Mobile Dev",
+    "UI Design",
+    "UX Research",
+    "Prototyping",
+    "Figma",
+    "Adobe XD",
+    "Brand Design",
+    "SQL",
+    "Tableau",
+    "Power BI",
+    "Machine Learning",
+    "Statistics",
+    "SEO",
+    "PPC",
+    "Social Media",
+    "Content Marketing",
+    "Email Marketing",
+    "Analytics",
+    "Copywriting",
+    "Blog Writing",
+    "Technical Writing",
+    "SEO Content",
+    "Creative Writing",
+    "Agile",
+    "Scrum",
+    "Product Strategy",
+    "Project Planning",
+    "Team Leadership",
+    "DevOps",
+    "AWS",
+    "Docker",
+    "Kubernetes",
+  ])
+);
+
+const INDIVIDUAL_PRICING = {
+  starter: 25,
+  professional: 50,
+  enterprise: 100,
+} as const;
+
+const TEAM_PRICING_TIERS = [
+  { tier: "startup", min: 3, max: 5, monthly: 2500 },
+  { tier: "growth", min: 6, max: 8, monthly: 5000 },
+  { tier: "enterprise", min: 9, max: 999, monthly: null },
+] as const;
+
+const DEFAULT_HOURS_PER_WEEK = 40;
+
 export default function CreateProjectPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -74,6 +132,13 @@ export default function CreateProjectPage() {
     description: "",
     category: "",
     requiredSkills: [] as string[],
+    engagementType: "individual" as "individual" | "team",
+    durationValue: "4",
+    durationUnit: "week" as "week" | "month" | "year",
+    hoursPerWeek: DEFAULT_HOURS_PER_WEEK,
+    pricingPlan: "professional" as "starter" | "professional" | "enterprise",
+    teamSize: "3",
+    teamPricingTier: "startup" as "startup" | "growth" | "enterprise" | "custom",
     budget: "",
     timeline: "",
     deliverables: [] as string[],
@@ -83,6 +148,70 @@ export default function CreateProjectPage() {
   const [newSkill, setNewSkill] = useState("");
   const [newDeliverable, setNewDeliverable] = useState("");
 
+  const durationValueNumber = useMemo(() => {
+    const value = parseInt(formData.durationValue, 10);
+    return Number.isNaN(value) ? 0 : value;
+  }, [formData.durationValue]);
+
+  const durationWeeks = useMemo(() => {
+    if (durationValueNumber <= 0) return 0;
+    if (formData.durationUnit === "week") return durationValueNumber;
+    if (formData.durationUnit === "month") return durationValueNumber * 4;
+    return durationValueNumber * 52;
+  }, [durationValueNumber, formData.durationUnit]);
+
+  const durationMonths = useMemo(() => {
+    if (durationValueNumber <= 0) return 0;
+    if (formData.durationUnit === "month") return durationValueNumber;
+    if (formData.durationUnit === "week") return durationValueNumber / 4;
+    return durationValueNumber * 12;
+  }, [durationValueNumber, formData.durationUnit]);
+
+  const timelineLabel = useMemo(() => {
+    if (!durationValueNumber) return "";
+    const unitLabel = formData.durationUnit;
+    return `${durationValueNumber} ${unitLabel}${durationValueNumber === 1 ? "" : "s"}`;
+  }, [durationValueNumber, formData.durationUnit]);
+
+  const derivedTeamTier = useMemo(() => {
+    if (formData.engagementType !== "team") return undefined;
+    const teamSize = parseInt(formData.teamSize, 10);
+    if (Number.isNaN(teamSize) || teamSize < 3) return undefined;
+    const tier = TEAM_PRICING_TIERS.find(
+      (t) => teamSize >= t.min && teamSize <= t.max
+    );
+    return tier?.tier ?? "custom";
+  }, [formData.engagementType, formData.teamSize]);
+
+  const calculatedBudget = useMemo(() => {
+    if (formData.engagementType === "individual") {
+      if (!durationWeeks || !formData.pricingPlan) return 0;
+      const hourlyRate = INDIVIDUAL_PRICING[formData.pricingPlan];
+      return Math.round(hourlyRate * formData.hoursPerWeek * durationWeeks);
+    }
+
+    const teamSize = parseInt(formData.teamSize, 10);
+    if (Number.isNaN(teamSize) || teamSize < 3) return 0;
+    const tier = TEAM_PRICING_TIERS.find(
+      (t) => teamSize >= t.min && teamSize <= t.max
+    );
+    if (!tier || !tier.monthly) return 0;
+    return Math.round(tier.monthly * durationMonths);
+  }, [
+    formData.engagementType,
+    formData.pricingPlan,
+    formData.hoursPerWeek,
+    formData.teamSize,
+    durationWeeks,
+    durationMonths,
+  ]);
+
+  const estimatedHours = useMemo(() => {
+    if (formData.engagementType !== "individual") return undefined;
+    if (!durationWeeks) return undefined;
+    return formData.hoursPerWeek * durationWeeks;
+  }, [formData.engagementType, formData.hoursPerWeek, durationWeeks]);
+
   const handleNext = () => {
     if (step === 1) {
       if (!formData.title || !formData.description || !formData.category) {
@@ -90,12 +219,27 @@ export default function CreateProjectPage() {
         return;
       }
     } else if (step === 2) {
-      if (
-        formData.requiredSkills.length === 0 ||
-        !formData.budget ||
-        !formData.timeline
-      ) {
-        setError("Please fill in all required fields");
+      if (formData.requiredSkills.length === 0) {
+        setError("Please select required skills or stack");
+        return;
+      }
+      if (!formData.durationValue) {
+        setError("Please set the project duration");
+        return;
+      }
+      if (formData.engagementType === "team") {
+        const teamSize = parseInt(formData.teamSize, 10);
+        if (Number.isNaN(teamSize) || teamSize < 3) {
+          setError("Team size must be at least 3 members");
+          return;
+        }
+      }
+      if (!calculatedBudget) {
+        setError("Unable to calculate pricing. Please review your selections.");
+        return;
+      }
+      if (formData.engagementType === "team" && derivedTeamTier === "enterprise") {
+        setError("Enterprise team pricing is custom. Please contact sales.");
         return;
       }
     }
@@ -155,7 +299,7 @@ export default function CreateProjectPage() {
     setError(null);
 
     try {
-      const budget = parseFloat(formData.budget);
+      const budget = calculatedBudget;
       if (isNaN(budget) || budget <= 0) {
         throw new Error("Invalid budget amount");
       }
@@ -171,7 +315,16 @@ export default function CreateProjectPage() {
           category: formData.category,
           requiredSkills: formData.requiredSkills,
           budget: totalAmount,
-          timeline: formData.timeline,
+          timeline: timelineLabel,
+          engagementType: formData.engagementType,
+          durationValue: parseInt(formData.durationValue, 10),
+          durationUnit: formData.durationUnit,
+          hoursPerWeek: formData.engagementType === "individual" ? formData.hoursPerWeek : undefined,
+          pricingPlan: formData.engagementType === "individual" ? formData.pricingPlan : undefined,
+          teamSize: formData.engagementType === "team" ? parseInt(formData.teamSize, 10) : undefined,
+          teamPricingTier: formData.engagementType === "team" ? derivedTeamTier : undefined,
+          estimatedHours,
+          estimatedBudget: totalAmount,
           deliverables: formData.deliverables,
           additionalRequirements: formData.additionalRequirements || undefined,
         },
@@ -311,6 +464,33 @@ export default function CreateProjectPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label>Engagement Type *</Label>
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    type="button"
+                    variant={formData.engagementType === "individual" ? "default" : "outline"}
+                    onClick={() =>
+                      setFormData({ ...formData, engagementType: "individual" })
+                    }
+                  >
+                    Individual Talent
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.engagementType === "team" ? "default" : "outline"}
+                    onClick={() =>
+                      setFormData({ ...formData, engagementType: "team" })
+                    }
+                  >
+                    Dedicated Team
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Choose whether you want an individual freelancer or a full team.
+                </p>
+              </div>
             </div>
           )}
 
@@ -318,7 +498,11 @@ export default function CreateProjectPage() {
           {step === 2 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Required Skills *</Label>
+                <Label>
+                  {formData.engagementType === "team"
+                    ? "Team Stack Requirements *"
+                    : "Required Skills *"}
+                </Label>
                 <div className="flex gap-2">
                   <Input
                     placeholder="Add a skill"
@@ -336,7 +520,10 @@ export default function CreateProjectPage() {
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {COMMON_SKILLS.map((skill) => (
+                  {(formData.engagementType === "team"
+                    ? TEAM_STACK_OPTIONS
+                    : COMMON_SKILLS
+                  ).map((skill) => (
                     <Badge
                       key={skill}
                       variant={
@@ -382,33 +569,138 @@ export default function CreateProjectPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="budget">Budget (USD) *</Label>
-                <Input
-                  id="budget"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="1000.00"
-                  value={formData.budget}
-                  onChange={(e) =>
-                    setFormData({ ...formData, budget: e.target.value })
-                  }
-                />
+                <Label>Duration *</Label>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="e.g., 4"
+                    value={formData.durationValue}
+                    onChange={(e) =>
+                      setFormData({ ...formData, durationValue: e.target.value })
+                    }
+                  />
+                  <Select
+                    value={formData.durationUnit}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        durationUnit: value as "week" | "month" | "year",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="week">Weeks</SelectItem>
+                      <SelectItem value="month">Months</SelectItem>
+                      <SelectItem value="year">Years</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center rounded-md border px-3 text-sm text-muted-foreground">
+                    {timelineLabel || "Timeline"}
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Platform fee: 10% (${(parseFloat(formData.budget) * 0.1 || 0).toFixed(2)})
+                  Duration can be weeks, months, or years. Use internationally accepted work hours.
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="timeline">Timeline *</Label>
-                <Input
-                  id="timeline"
-                  placeholder="e.g., 2 weeks, 1 month, 3 months"
-                  value={formData.timeline}
-                  onChange={(e) =>
-                    setFormData({ ...formData, timeline: e.target.value })
-                  }
-                />
+              {formData.engagementType === "individual" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Pricing Plan *</Label>
+                    <Select
+                      value={formData.pricingPlan}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          pricingPlan: value as "starter" | "professional" | "enterprise",
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="starter">Starter ($25/hr)</SelectItem>
+                        <SelectItem value="professional">Professional ($50/hr)</SelectItem>
+                        <SelectItem value="enterprise">Enterprise ($100/hr)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Pricing matches the marketing page hourly rates.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Work Hours Per Week</Label>
+                    <Select
+                      value={String(formData.hoursPerWeek)}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          hoursPerWeek: parseInt(value, 10),
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select hours" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="20">20 hours/week</SelectItem>
+                        <SelectItem value="30">30 hours/week</SelectItem>
+                        <SelectItem value="40">40 hours/week (standard)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              {formData.engagementType === "team" && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="teamSize">Team Size *</Label>
+                    <Input
+                      id="teamSize"
+                      type="number"
+                      min="3"
+                      placeholder="e.g., 5"
+                      value={formData.teamSize}
+                      onChange={(e) =>
+                        setFormData({ ...formData, teamSize: e.target.value })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Team pricing is based on number of members from the marketing team plans.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Estimated Budget</span>
+                  <span className="text-lg font-bold">
+                    {calculatedBudget
+                      ? `$${calculatedBudget.toLocaleString()}`
+                      : "Custom pricing"}
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Platform fee: 10% (${(calculatedBudget * 0.1 || 0).toFixed(2)})
+                </div>
+                {estimatedHours && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Estimated hours: {estimatedHours}
+                  </div>
+                )}
+                {formData.engagementType === "team" && derivedTeamTier && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Team tier: {derivedTeamTier}
+                  </div>
+                )}
               </div>
             </div>
           )}

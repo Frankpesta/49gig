@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
+import { Doc } from "../_generated/dataModel";
 
 /**
  * Public-facing resume info for a freelancer (bio + resume link).
@@ -71,3 +72,34 @@ export const getFreelancerResume = query({
   },
 });
 
+/**
+ * Get a user by session token (for actions needing session auth).
+ * Returns the user without sensitive fields.
+ */
+export const getUserBySessionToken = query({
+  args: {
+    sessionToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_token", (q) => q.eq("sessionToken", args.sessionToken))
+      .first();
+
+    if (!session || !session.isActive) {
+      return null;
+    }
+
+    if (session.expiresAt < Date.now()) {
+      return null;
+    }
+
+    const user = await ctx.db.get(session.userId);
+    if (!user || user.status !== "active") {
+      return null;
+    }
+
+    const { passwordHash, ...userWithoutPassword } = user as Doc<"users">;
+    return userWithoutPassword;
+  },
+});

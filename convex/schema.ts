@@ -114,6 +114,30 @@ export default defineSchema({
       requiredSkills: v.array(v.string()),
       budget: v.number(),
       timeline: v.string(),
+      engagementType: v.optional(v.union(v.literal("individual"), v.literal("team"))),
+      durationValue: v.optional(v.number()),
+      durationUnit: v.optional(
+        v.union(v.literal("week"), v.literal("month"), v.literal("year"))
+      ),
+      hoursPerWeek: v.optional(v.number()),
+      pricingPlan: v.optional(
+        v.union(
+          v.literal("starter"),
+          v.literal("professional"),
+          v.literal("enterprise")
+        )
+      ),
+      teamSize: v.optional(v.number()),
+      teamPricingTier: v.optional(
+        v.union(
+          v.literal("startup"),
+          v.literal("growth"),
+          v.literal("enterprise"),
+          v.literal("custom")
+        )
+      ),
+      estimatedHours: v.optional(v.number()),
+      estimatedBudget: v.optional(v.number()),
       deliverables: v.array(v.string()),
       additionalRequirements: v.optional(v.string()),
     }),

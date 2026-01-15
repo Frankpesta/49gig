@@ -1,11 +1,10 @@
-// @ts-nocheck
 "use node";
 
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
-import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import OpenAI from "openai";
+import type { Doc } from "../_generated/dataModel";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -21,18 +20,33 @@ export const getResumeUploadUrl = action({
     sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let user = null;
+    type UserWithoutPassword = Omit<Doc<"users">, "passwordHash">;
+    let user: UserWithoutPassword | null = null;
+    const runGetCurrentUser = ctx.runQuery as (
+      query: unknown,
+      args: Record<string, never>
+    ) => Promise<UserWithoutPassword | null>;
+    const runVerifySession = ctx.runQuery as (
+      query: unknown,
+      args: { sessionToken: string }
+    ) => Promise<UserWithoutPassword | null>;
+    // @ts-expect-error Generated api types are excessively deep for this cast
+    const apiUnknown = api as unknown as Record<string, unknown>;
+    const users = apiUnknown["users"] as Record<string, unknown>;
+    const usersQueries = users["queries"] as Record<string, unknown>;
+    const resume = apiUnknown["resume"] as Record<string, unknown>;
+    const resumeQueries = resume["queries"] as Record<string, unknown>;
+    const getCurrentUserQuery = usersQueries["getCurrentUserProfile"];
+    const getUserBySessionTokenQuery = resumeQueries["getUserBySessionToken"];
 
     // Try Convex Auth first
-    user = await ctx.runQuery(api.auth.getCurrentUserQuery, {});
+    user = await runGetCurrentUser(getCurrentUserQuery, {});
     
     // If no Convex Auth user and session token provided, verify session token
     if (!user && args.sessionToken) {
-      user = await ctx.runQuery(
-        // @ts-expect-error dynamic path casting
-        api["auth/queries"].verifySession as any,
-        { sessionToken: args.sessionToken }
-      );
+      user = await runVerifySession(getUserBySessionTokenQuery, {
+        sessionToken: args.sessionToken,
+      });
     }
 
     if (!user) {
@@ -57,12 +71,13 @@ export const parseResumeAndBuildBio = action({
     fileId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
+    const setResumeProcessingMutation = api.resume.mutations.setResumeProcessing;
+    const applyParsedResumeMutation = api.resume.mutations.applyParsedResumeData;
     // Mark processing
-    await ctx.runMutation(
-      // @ts-expect-error internal path casting
-      internal.resume.mutations.setResumeProcessing as any,
-      { userId: args.userId, fileId: args.fileId }
-    );
+    await ctx.runMutation(setResumeProcessingMutation, {
+      userId: args.userId,
+      fileId: args.fileId,
+    });
 
     try {
       const fileUrl = await ctx.storage.getUrl(args.fileId);
@@ -84,67 +99,21 @@ export const parseResumeAndBuildBio = action({
       const pdfFile = new File([pdfBlob], "resume.pdf", { type: "application/pdf" });
       
       // Upload file to OpenAI
+      // OpenAI SDK expects File, Blob, or FileData type
       const uploadedFile = await openai.files.create({
-        file: pdfFile as any,
+        file: pdfFile as File,
         purpose: "assistants",
       });
 
-      // Step 3: Use OpenAI to extract and parse the resume in one step
-      // We'll use the file ID with Assistants API or use a completion that can reference files
-      // Since chat completions don't directly support file attachments, we'll use a workaround:
-      // Ask OpenAI to extract text from the PDF using the file ID
-      
-      // For now, let's use OpenAI's file content API to get text (if supported)
-      // If not, we'll use a two-step process with Assistants API
       let resumeText = "";
-      
       try {
-        // Try to get file content (may not work for PDFs)
+        // Try to get file content (may not work for PDFs depending on OpenAI support)
         const fileContent = await openai.files.content(uploadedFile.id);
         resumeText = await fileContent.text();
-      } catch (fileError) {
-        // If direct file content doesn't work, use Assistants API
-        // Create a simple assistant to extract text
-        const assistant = await openai.beta.assistants.create({
-          name: "Resume Parser",
-          instructions: "Extract all text content from the uploaded PDF file. Return only the raw text, no formatting or explanations.",
-          model: "gpt-4o-mini",
-          tools: [{ type: "code_interpreter" }],
-        });
-
-        const thread = await openai.beta.threads.create({
-          messages: [
-            {
-              role: "user",
-              content: "Extract all text from the uploaded PDF resume file.",
-              file_ids: [uploadedFile.id],
-            },
-          ],
-        });
-
-        const run = await openai.beta.threads.runs.create(thread.id, {
-          assistant_id: assistant.id,
-        });
-
-        // Wait for completion (simplified - in production, poll for status)
-        let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-        let attempts = 0;
-        while (runStatus.status !== "completed" && attempts < 10) {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
-          attempts++;
-        }
-
-        if (runStatus.status === "completed") {
-          const messages = await openai.beta.threads.messages.list(thread.id);
-          const lastMessage = messages.data[0];
-          if (lastMessage?.content[0]?.type === "text") {
-            resumeText = lastMessage.content[0].text.value;
-          }
-        }
-
-        // Clean up
-        await openai.beta.assistants.del(assistant.id);
+      } catch {
+        throw new Error(
+          "PDF text extraction failed. Please ensure your resume PDF contains selectable text (not just images)."
+        );
       }
 
       // Validate extracted text
@@ -185,9 +154,19 @@ ${resumeText.substring(0, 8000)}`, // Limit to avoid token limits
       }
 
       // Parse JSON response
-      let parsed;
+      let parsed: {
+        summary?: string;
+        skills?: string[];
+        highlights?: string[];
+        experience?: string;
+      };
       try {
-        parsed = JSON.parse(responseText);
+        parsed = JSON.parse(responseText) as {
+          summary?: string;
+          skills?: string[];
+          highlights?: string[];
+          experience?: string;
+        };
       } catch (parseError) {
         throw new Error(`Failed to parse OpenAI response as JSON: ${parseError}`);
       }
@@ -208,39 +187,32 @@ ${resumeText.substring(0, 8000)}`, // Limit to avoid token limits
       const resumeBio = parsedData.summary;
 
       // Step 3: Save parsed data
-      await ctx.runMutation(
-        // @ts-expect-error internal path casting
-        internal.resume.mutations.applyParsedResumeData as any,
-        {
-          userId: args.userId,
-          resumeBio,
-          resumeParsedData: parsedData,
-          resumeStatus: "processed",
-        }
-      );
+      await ctx.runMutation(applyParsedResumeMutation, {
+        userId: args.userId,
+        resumeBio,
+        resumeParsedData: parsedData,
+        resumeStatus: "processed",
+      });
 
       console.log(`Successfully parsed resume for user ${args.userId}`);
       return { success: true, resumeStatus: "processed" as const };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Parsing failed";
       console.error(`Resume parsing error for user ${args.userId}:`, error);
       
       // Save error state
-      await ctx.runMutation(
-        // @ts-expect-error internal path casting
-        internal.resume.mutations.applyParsedResumeData as any,
-        {
-          userId: args.userId,
-          resumeBio:
-            "We couldn't parse this resume automatically. Please reupload a clean PDF or contact support.",
-          resumeParsedData: {
-            parsedAt: Date.now(),
-            error: error?.message || "Parsing failed",
-            source: "openai-gpt4o-mini",
-          },
-          resumeStatus: "failed",
-          error: error?.message,
-        }
-      );
+      await ctx.runMutation(applyParsedResumeMutation, {
+        userId: args.userId,
+        resumeBio:
+          "We couldn't parse this resume automatically. Please reupload a clean PDF or contact support.",
+        resumeParsedData: {
+          parsedAt: Date.now(),
+          error: errorMessage,
+          source: "openai-gpt4o-mini",
+        },
+        resumeStatus: "failed",
+        error: errorMessage,
+      });
 
       // Re-throw error for logging/monitoring
       throw error;
