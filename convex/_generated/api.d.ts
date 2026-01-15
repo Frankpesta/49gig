@@ -21,6 +21,7 @@ import type * as auth_sessions from "../auth/sessions.js";
 import type * as chat_mutations from "../chat/mutations.js";
 import type * as chat_queries from "../chat/queries.js";
 import type * as cron_sessions from "../cron/sessions.js";
+import type * as dashboard_queries from "../dashboard/queries.js";
 import type * as disputes_actions from "../disputes/actions.js";
 import type * as disputes_mutations from "../disputes/mutations.js";
 import type * as disputes_queries from "../disputes/queries.js";
@@ -65,6 +66,7 @@ declare const fullApi: ApiFromModules<{
   "chat/mutations": typeof chat_mutations;
   "chat/queries": typeof chat_queries;
   "cron/sessions": typeof cron_sessions;
+  "dashboard/queries": typeof dashboard_queries;
   "disputes/actions": typeof disputes_actions;
   "disputes/mutations": typeof disputes_mutations;
   "disputes/queries": typeof disputes_queries;

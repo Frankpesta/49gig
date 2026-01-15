@@ -1,6 +1,8 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +17,14 @@ import {
   ArrowRight,
   Sparkles,
   DollarSign,
+  Users,
+  Activity,
+  ShieldCheck,
+  Wallet,
+  Timer,
+  Gauge,
+  Star,
+  Target,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -28,6 +38,200 @@ export default function DashboardPage() {
   const isClient = user.role === "client";
   const isFreelancer = user.role === "freelancer";
   const isAdmin = user.role === "admin";
+
+  const dashboardMetrics = useQuery(
+    (api as any).dashboard.queries.getDashboardMetrics,
+    user?._id ? { userId: user._id } : "skip"
+  );
+
+  const formatCurrency = (value: number) =>
+    `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+  const metrics = isClient
+    ? [
+        {
+          title: "Active Projects",
+          subtitle: "Currently in progress",
+          value: dashboardMetrics?.metrics?.activeProjects ?? 0,
+          description: "Live projects being worked on",
+          icon: Briefcase,
+          variant: "primary" as const,
+          trend: { value: 12, label: "30d", isPositive: true },
+          progress: { value: 15, label: "Delivery" },
+          badge: "Client",
+        },
+        {
+          title: "Proposals",
+          subtitle: "New this week",
+          value: dashboardMetrics?.metrics?.proposals ?? 0,
+          description: "Freelancer offers received",
+          icon: Target,
+          variant: "default" as const,
+          trend: { value: 5, label: "7d", isPositive: true },
+          badge: "Inbox",
+        },
+        {
+          title: "Budget in Escrow",
+          subtitle: "Secured payments",
+          value: formatCurrency(dashboardMetrics?.metrics?.escrowed ?? 0),
+          description: "Funds protected for milestones",
+          icon: Wallet,
+          variant: "success" as const,
+          trend: { value: 2, label: "30d", isPositive: true },
+          badge: "Secure",
+        },
+        {
+          title: "Total Spend",
+          subtitle: "All time",
+          value: formatCurrency(dashboardMetrics?.metrics?.totalSpend ?? 0),
+          description: "Cumulative project spend",
+          icon: DollarSign,
+          variant: "success" as const,
+          trend: { value: 0, label: "30d", isPositive: true },
+          badge: "Lifetime",
+        },
+        {
+          title: "Avg. Match Time",
+          subtitle: "Time to hire",
+          value: `${dashboardMetrics?.metrics?.avgMatchHours ?? 0}h`,
+          description: "Average time to shortlist",
+          icon: Timer,
+          variant: "warning" as const,
+          badge: "SLA",
+        },
+        {
+          title: "Satisfaction",
+          subtitle: "Client experience",
+          value: `${dashboardMetrics?.metrics?.satisfactionRate ?? 0}%`,
+          description: "Average delivery rating",
+          icon: Star,
+          variant: "default" as const,
+          progress: { value: dashboardMetrics?.metrics?.satisfactionRate ?? 0, label: "Quality" },
+          badge: "Top",
+        },
+      ]
+    : isFreelancer
+    ? [
+        {
+          title: "Active Projects",
+          subtitle: "Currently assigned",
+          value: dashboardMetrics?.metrics?.activeProjects ?? 0,
+          description: "Projects you’re working on",
+          icon: Briefcase,
+          variant: "primary" as const,
+          trend: { value: 8, label: "30d", isPositive: true },
+          badge: "Freelancer",
+        },
+        {
+          title: "Earnings",
+          subtitle: "This month",
+          value: formatCurrency(dashboardMetrics?.metrics?.earnings ?? 0),
+          description: "Payouts and approved milestones",
+          icon: DollarSign,
+          variant: "success" as const,
+          trend: { value: 6, label: "30d", isPositive: true },
+          badge: "MTD",
+        },
+        {
+          title: "Match Score",
+          subtitle: "Profile strength",
+          value: `${dashboardMetrics?.metrics?.matchScore ?? 0}%`,
+          description: "Completeness & relevance",
+          icon: Gauge,
+          variant: "warning" as const,
+          progress: { value: dashboardMetrics?.metrics?.matchScore ?? 0, label: "Profile" },
+          badge: "Improve",
+        },
+        {
+          title: "Estimated Hours",
+          subtitle: "This week",
+          value: `${dashboardMetrics?.metrics?.estimatedHours ?? 0}h`,
+          description: "Projected workload",
+          icon: Clock,
+          variant: "default" as const,
+          badge: "Weekly",
+        },
+        {
+          title: "Pending Reviews",
+          subtitle: "Client feedback",
+          value: dashboardMetrics?.metrics?.pendingReviews ?? 0,
+          description: "Awaiting approvals",
+          icon: ShieldCheck,
+          variant: "warning" as const,
+          badge: "Pending",
+        },
+        {
+          title: "Response Rate",
+          subtitle: "Last 30 days",
+          value: `${dashboardMetrics?.metrics?.responseRate ?? 0}%`,
+          description: "Client reply efficiency",
+          icon: Activity,
+          variant: "default" as const,
+          progress: { value: dashboardMetrics?.metrics?.responseRate ?? 0, label: "Engagement" },
+          badge: "Goal",
+        },
+      ]
+    : [
+        {
+          title: "Total Projects",
+          subtitle: "Platform-wide",
+          value: dashboardMetrics?.metrics?.totalProjects ?? 0,
+          description: "All projects in the system",
+          icon: Briefcase,
+          variant: "primary" as const,
+          trend: { value: 12, label: "30d", isPositive: true },
+          badge: "Admin",
+        },
+        {
+          title: "Active Clients",
+          subtitle: "Engaged accounts",
+          value: dashboardMetrics?.metrics?.activeClients ?? 0,
+          description: "Currently hiring",
+          icon: Users,
+          variant: "default" as const,
+          trend: { value: 3, label: "30d", isPositive: true },
+          badge: "Clients",
+        },
+        {
+          title: "Active Freelancers",
+          subtitle: "Verified & available",
+          value: dashboardMetrics?.metrics?.activeFreelancers ?? 0,
+          description: "Delivering projects",
+          icon: TrendingUp,
+          variant: "success" as const,
+          trend: { value: 9, label: "30d", isPositive: true },
+          badge: "Talent",
+        },
+        {
+          title: "Revenue",
+          subtitle: "This month",
+          value: formatCurrency(dashboardMetrics?.metrics?.revenue ?? 0),
+          description: "Platform earnings",
+          icon: DollarSign,
+          variant: "success" as const,
+          trend: { value: 5, label: "30d", isPositive: true },
+          badge: "MTD",
+        },
+        {
+          title: "Open Disputes",
+          subtitle: "Needs attention",
+          value: dashboardMetrics?.metrics?.openDisputes ?? 0,
+          description: "Cases in review",
+          icon: AlertCircle,
+          variant: "warning" as const,
+          badge: "Risk",
+        },
+        {
+          title: "System Health",
+          subtitle: "Operational status",
+          value: `${dashboardMetrics?.metrics?.systemHealth ?? 100}%`,
+          description: "Uptime and reliability",
+          icon: Activity,
+          variant: "default" as const,
+          progress: { value: dashboardMetrics?.metrics?.systemHealth ?? 100, label: "Uptime" },
+          badge: "Stable",
+        },
+      ];
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
@@ -57,40 +261,21 @@ export default function DashboardPage() {
       </div>
 
       {/* Enhanced Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title={isClient ? "Active Projects" : isFreelancer ? "Active Projects" : "Total Projects"}
-          value="0"
-          description={isClient ? "Projects in progress" : isFreelancer ? "Projects you're working on" : "All platform projects"}
-          icon={Briefcase}
-          variant="primary"
-          trend={isAdmin ? { value: 12, label: "vs last month", isPositive: true } : undefined}
-        />
-
-        <MetricCard
-          title="Messages"
-          value="0"
-          description="Unread messages"
-          icon={MessageSquare}
-          variant="default"
-        />
-
-        <MetricCard
-          title={isClient ? "Total Spent" : isFreelancer ? "Earnings" : "Revenue"}
-          value="$0"
-          description={isClient ? "This month" : isFreelancer ? "This month" : "Platform revenue"}
-          icon={DollarSign}
-          variant="success"
-          trend={isAdmin ? { value: 8, label: "vs last month", isPositive: true } : undefined}
-        />
-
-        <MetricCard
-          title={isClient ? "Pending Approvals" : isFreelancer ? "Pending Deliverables" : "System Health"}
-          value="0"
-          description={isClient ? "Awaiting your review" : isFreelancer ? "To submit" : "All systems operational"}
-          icon={Clock}
-          variant={isAdmin ? "success" : "warning"}
-        />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {metrics.map((metric) => (
+          <MetricCard
+            key={metric.title}
+            title={metric.title}
+            subtitle={metric.subtitle}
+            value={metric.value}
+            description={metric.description}
+            icon={metric.icon}
+            variant={metric.variant}
+            trend={metric.trend}
+            progress={metric.progress}
+            badge={metric.badge}
+          />
+        ))}
       </div>
 
       {/* Quick Actions with Enhanced Design */}
