@@ -9,12 +9,19 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   description?: string;
+  subtitle?: string;
+  badge?: string;
   icon: LucideIcon;
   trend?: {
     value: number;
     label: string;
     isPositive: boolean;
   };
+  progress?: {
+    value: number;
+    label?: string;
+  };
+  footnote?: string;
   variant?: "default" | "primary" | "success" | "warning" | "destructive";
   className?: string;
   iconClassName?: string;
@@ -58,8 +65,12 @@ export function MetricCard({
   title,
   value,
   description,
+  subtitle,
+  badge,
   icon: Icon,
   trend,
+  progress,
+  footnote,
   variant = "default",
   className,
   iconClassName,
@@ -70,24 +81,23 @@ export function MetricCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden border transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-0.5",
+        "group relative overflow-hidden border transition-all duration-500 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1",
         styles.card,
         className
       )}
     >
-      <CardContent className="p-6 space-y-4">
+      <CardContent className="p-6 space-y-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div
               className={cn(
-                "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-lg transition-all duration-300 group-hover:scale-110",
+                "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110",
                 styles.iconBg
               )}
             >
-              {/* Subtle glow effect on hover */}
               <div
                 className={cn(
-                  "absolute inset-0 rounded-lg opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-50",
+                  "absolute inset-0 rounded-xl opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-60",
                   styles.glow
                 )}
               />
@@ -99,12 +109,22 @@ export function MetricCard({
                 )}
               />
             </div>
-            <div className="flex-1 min-w-0 pt-0.5">
-              <p className="text-sm font-medium text-muted-foreground leading-tight">
+            <div className="flex-1 min-w-0 pt-0.5 space-y-1">
+              <p className="text-sm font-semibold text-muted-foreground leading-tight">
                 {title}
               </p>
+              {subtitle && (
+                <p className="text-xs text-muted-foreground/80 leading-tight">
+                  {subtitle}
+                </p>
+              )}
             </div>
           </div>
+          {badge && (
+            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {badge}
+            </span>
+          )}
         </div>
 
         <div className="space-y-1">
@@ -123,6 +143,7 @@ export function MetricCard({
               >
                 <span>{trend.isPositive ? "↑" : "↓"}</span>
                 {Math.abs(trend.value)}%
+                {trend.label ? <span className="ml-1 opacity-70">{trend.label}</span> : null}
               </span>
             )}
           </div>
@@ -133,7 +154,29 @@ export function MetricCard({
           )}
         </div>
 
+        {progress && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>{progress.label || "Progress"}</span>
+              <span>{Math.round(progress.value)}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-700",
+                  styles.glow
+                )}
+                style={{ width: `${Math.min(100, Math.max(0, progress.value))}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {children && <div className="pt-2">{children}</div>}
+
+        {footnote && (
+          <p className="text-xs text-muted-foreground/70">{footnote}</p>
+        )}
 
         {/* Enhanced decorative gradient overlay */}
         <div
