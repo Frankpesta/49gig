@@ -4,7 +4,6 @@ import { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { LucideIcon, ChevronRight, Home } from "lucide-react";
-import { SectionTransition } from "@/components/ui/section-transition";
 
 interface BreadcrumbItem {
   label: string;
@@ -33,75 +32,62 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <section className={cn("relative w-full py-20 sm:py-28 lg:py-36 overflow-hidden bg-gradient-to-br from-background via-muted/5 to-background border-b border-border/20", className)}>
-      {/* Clean Background Elements */}
+    <section
+      className={cn(
+        "relative w-full border-b border-border/30 bg-background",
+        className
+      )}
+    >
       <div className="absolute inset-0 -z-10">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-20 w-80 h-80 bg-secondary/3 rounded-full blur-3xl" />
+        <div className="absolute inset-0 bg-linear-to-br from-primary/8 via-background to-secondary/8" />
+        <div className="absolute inset-0 opacity-[0.05] [background-image:radial-gradient(circle_at_1px_1px,rgba(52,84,120,0.2)_1px,transparent_0)] [background-size:24px_24px]" />
       </div>
 
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center space-y-8">
-
-          {/* Clean Breadcrumbs */}
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-18 lg:py-22">
+        <div className="max-w-3xl space-y-6">
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav className="flex justify-center mb-8" aria-label="Breadcrumb">
-              <div className="flex items-center gap-1 px-6 py-3 bg-background/80 backdrop-blur-sm rounded-full border border-border/30 shadow-sm">
-                <Link href="/" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors">
-                  <Home className="h-4 w-4" />
-                  <span>Home</span>
-                </Link>
-                {breadcrumbs.map((item, index) => (
-                  <div key={index} className="flex items-center gap-1">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
-                    {item.href ? (
-                      <Link
-                        href={item.href}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
-                      >
-                        {item.icon && <item.icon className="h-4 w-4" />}
-                        <span>{item.label}</span>
-                      </Link>
-                    ) : (
-                      <span className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-foreground">
-                        {item.icon && <item.icon className="h-4 w-4" />}
-                        <span>{item.label}</span>
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+            <nav className="flex items-center gap-1 text-sm text-muted-foreground" aria-label="Breadcrumb">
+              <Link href="/" className="flex items-center gap-2 hover:text-foreground transition-colors">
+                <Home className="h-4 w-4" />
+                <span>Home</span>
+              </Link>
+              {breadcrumbs.map((item, index) => (
+                <div key={index} className="flex items-center gap-1">
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/60" />
+                  {item.href ? (
+                    <Link href={item.href} className="flex items-center gap-2 hover:text-foreground transition-colors">
+                      {item.icon && <item.icon className="h-4 w-4" />}
+                      <span>{item.label}</span>
+                    </Link>
+                  ) : (
+                    <span className="flex items-center gap-2 text-foreground font-medium">
+                      {item.icon && <item.icon className="h-4 w-4" />}
+                      <span>{item.label}</span>
+                    </span>
+                  )}
+                </div>
+              ))}
             </nav>
           )}
 
-          {/* Clean Badge */}
           {badge && (
-            <div className="flex justify-center">
-              <div className="inline-flex items-center gap-3 px-6 py-3 bg-primary/5 border border-primary/20 rounded-full text-sm font-medium text-primary">
-                {badge.icon && <badge.icon className="h-4 w-4" />}
-                <span>{badge.text}</span>
-              </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-background/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {badge.icon && <badge.icon className="h-3.5 w-3.5 text-primary" />}
+              <span>{badge.text}</span>
             </div>
           )}
 
-          {/* Clean Title */}
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground leading-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-foreground">
             {title}
           </h1>
 
-          {/* Clean Description */}
           {description && (
-            <p className="text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
               {description}
             </p>
           )}
 
-          {/* Content */}
-          {children && (
-            <div className="pt-8">
-              {children}
-            </div>
-          )}
+          {children && <div className="pt-4">{children}</div>}
         </div>
       </div>
     </section>

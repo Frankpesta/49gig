@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { HoverButton } from "@/components/ui/hover-button";
@@ -44,26 +43,6 @@ import {
 } from "lucide-react";
 
 export default function Home() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    // Ensure video plays on mount
-    if (videoRef.current) {
-      videoRef.current.play().catch(error => {
-        console.log("Video autoplay failed:", error);
-      });
-    }
-  }, []);
-
-  // Generate particle positions once using useState lazy initializer
-  const particles = useState(() => {
-    return Array.from({ length: 20 }, () => ({
-      left: Math.random() * 100,
-      top: Math.random() * 100,
-      animationDelay: Math.random() * 5,
-      animationDuration: 10 + Math.random() * 10,
-    }));
-  })[0];
 
   const stats = [
     { value: "10,000", label: "Vetted Professionals", suffix: "+", icon: Users },
@@ -175,217 +154,89 @@ export default function Home() {
 
   return (
     <div className="w-full">
-      {/* ENHANCED HERO SECTION WITH VIDEO BACKGROUND */}
-      <section className="relative min-h-screen flex items-center overflow-hidden bg-linear-to-br from-background via-primary/5 to-background">
-        {/* Enhanced Video Background */}
-        <div className="absolute inset-0 z-0">
-          <video
-            ref={videoRef}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
-            className="absolute inset-0 w-full h-full object-cover scale-110"
-            style={{ filter: 'brightness(0.4) contrast(1.1)' }}
-          >
-            <source
-              src="https://videos.pexels.com/video-files/3045163/3045163-hd_1920_1080_30fps.mp4"
-              type="video/mp4"
-            />
-            <source
-              src="https://assets.mixkit.co/videos/preview/mixkit-businesspeople-working-in-an-office-4609-large.mp4"
-              type="video/mp4"
-            />
-          </video>
-          
-          {/* Multi-layer gradient overlays for depth */}
-          <div className="absolute inset-0 bg-linear-to-r from-background/85 via-background/75 to-background/85" />
-          <div className="absolute inset-0 bg-linear-to-b from-background/60 via-transparent to-background/80" />
-          <div className="absolute inset-0 bg-linear-to-tr from-primary/10 via-transparent to-secondary/10" />
-          
-          {/* Animated gradient orbs for visual interest */}
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
-          <div className="absolute top-1/2 right-1/3 w-72 h-72 bg-primary/10 rounded-full blur-2xl animate-pulse" style={{ animationDuration: '12s', animationDelay: '4s' }} />
+      {/* CLEAN HERO SECTION */}
+      <section className="relative overflow-hidden bg-background">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute inset-0 bg-linear-to-br from-primary/8 via-background to-secondary/8" />
+          <div className="absolute inset-0 opacity-[0.05] bg-[radial-gradient(circle_at_1px_1px,rgba(52,84,120,0.2)_1px,transparent_0)] bg-size-[24px_24px]" />
+          <div className="absolute top-0 left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
         </div>
 
-        {/* Floating particles effect */}
-        <div className="absolute inset-0 z-[1] overflow-hidden pointer-events-none">
-          {particles.map((particle, i) => (
-            <div
-              key={i}
-              className="absolute w-2 h-2 bg-primary/30 rounded-full animate-float"
-              style={{
-                left: `${particle.left}%`,
-                top: `${particle.top}%`,
-                animationDelay: `${particle.animationDelay}s`,
-                animationDuration: `${particle.animationDuration}s`,
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-            {/* Left Content - Enhanced with better contrast */}
-            <SectionTransition variant="slide" direction="left" delay={200}>
-              <div className="space-y-8 relative">
-                {/* Subtle glow effect behind content for better readability */}
-                <div className="absolute -inset-4 bg-background/50 backdrop-blur-2xl rounded-3xl -z-10 opacity-80" />
-                {/* Premium Badge - Enhanced */}
-                <div className="inline-flex items-center gap-3 rounded-full border border-primary/30 bg-background/80 backdrop-blur-xl px-6 py-3 text-sm font-bold text-primary shadow-xl shadow-primary/20 hover:shadow-primary/30 transition-all duration-300">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-linear-to-r from-primary/20 to-secondary/20">
-                    <Crown className="h-3.5 w-3.5" />
-                  </div>
-                  <span>Africa&apos;s Premier Freelance Platform</span>
-                  <Award className="h-4 w-4" />
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-center">
+            <SectionTransition variant="slide" direction="left" delay={150}>
+              <div className="space-y-8">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-background/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <Crown className="h-4 w-4 text-primary" />
+                  Africa&apos;s Premier Freelance Network
                 </div>
 
-                {/* Sophisticated Headline */}
-                <div className="space-y-6">
-                  <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black leading-tight tracking-tight text-foreground">
-                    Hire{" "}
-                    <span className="bg-linear-to-r from-primary via-primary/90 to-secondary bg-clip-text text-transparent">
-                      World-Class
-                    </span>{" "}
-                    <br className="hidden lg:block" />
-                    African Talent
+                <div className="space-y-5">
+                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-foreground">
+                    Hire world-class African talent, faster.
                   </h1>
-                  <p className="text-lg sm:text-xl lg:text-xl xl:text-2xl text-muted-foreground leading-relaxed max-w-2xl font-medium">
-                    Connect with the top 3% of vetted African professionals. Build exceptional teams. Scale faster with 49GIG.
+                  <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-2xl">
+                    Connect with the top 3% of vetted professionals across engineering, design, and growth. Build exceptional teams with confidence.
                   </p>
                 </div>
 
-                {/* Enhanced Trust Indicators */}
-                <div className="flex flex-wrap gap-4">
-                  <div className="group flex items-center gap-4 rounded-2xl bg-background/80 backdrop-blur-xl px-6 py-4 border border-border/50 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105 hover:bg-background/90">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-green-500/15 to-emerald-500/15 group-hover:from-green-500/20 group-hover:to-emerald-500/20 transition-all duration-300 shadow-sm">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-sm font-bold text-foreground">100% Vetted</span>
-                      <div className="h-0.5 w-0 bg-primary group-hover:w-full transition-all duration-300 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="group flex items-center gap-4 rounded-2xl bg-background/80 backdrop-blur-xl px-6 py-4 border border-border/50 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105 hover:bg-background/90">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-primary/15 to-primary/20 group-hover:from-primary/20 group-hover:to-primary/25 transition-all duration-300 shadow-sm">
-                      <Shield className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-sm font-bold text-foreground">Secure Payments</span>
-                      <div className="h-0.5 w-0 bg-primary group-hover:w-full transition-all duration-300 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="group flex items-center gap-4 rounded-2xl bg-background/80 backdrop-blur-xl px-6 py-4 border border-border/50 shadow-xl hover:shadow-secondary/20 transition-all duration-300 hover:border-secondary/40 hover:scale-105 hover:bg-background/90">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-secondary/15 to-secondary/20 group-hover:from-secondary/20 group-hover:to-secondary/25 transition-all duration-300 shadow-sm">
-                      <Star className="h-5 w-5 text-secondary-foreground fill-secondary-foreground" />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-sm font-bold text-foreground">4.9/5 Rating</span>
-                      <div className="h-0.5 w-0 bg-secondary group-hover:w-full transition-all duration-300 rounded-full" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Premium CTA Buttons */}
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <HoverButton size="lg" glow className="text-base h-14 px-8 shadow-2xl bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0 group">
+                  <HoverButton size="lg" glow className="h-12 px-7 text-base bg-linear-to-r from-primary to-primary/90 border-0">
                     <Link href="/hire-talent" className="flex items-center gap-2">
-                      <Briefcase className="h-5 w-5 group-hover:rotate-12 transition-transform duration-300" />
                       Hire Talent
-                      <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform duration-300" />
+                      <ArrowRight className="h-4 w-4" />
                     </Link>
                   </HoverButton>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-base h-14 px-8 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 hover:border-primary shadow-xl group"
-                  >
+                  <HoverButton size="lg" variant="outline" className="h-12 px-7 text-base bg-background/90 border-border/50">
                     <Link href="/get-started" className="flex items-center gap-2">
-                      <Rocket className="h-5 w-5 group-hover:rotate-12 transition-transform duration-300" />
                       Apply as Freelancer
-                      <ArrowRight className="h-5 w-5 group-hover:translate-x-2 transition-transform duration-300" />
+                      <ArrowRight className="h-4 w-4" />
                     </Link>
                   </HoverButton>
                 </div>
 
-                {/* Sophisticated Social Proof */}
-                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-6 text-muted-foreground">
-                  <div className="flex items-center gap-4">
-                    <div className="flex -space-x-3">
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div key={i} className="w-10 h-10 rounded-full bg-linear-to-br from-primary/15 via-primary/10 to-secondary/15 border-2 border-background flex items-center justify-center text-sm font-bold text-primary shadow-lg hover:scale-110 transition-transform duration-200">
-                          {i}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-center lg:text-left">
-                      <div className="text-sm font-bold text-foreground">500+ companies</div>
-                      <div className="text-xs text-muted-foreground">trust 49GIG worldwide</div>
-                    </div>
+                <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    100% vetted talent
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-background/60 backdrop-blur-sm rounded-full border border-border/30 shadow-sm">
-                    <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-pulse" />
-                    <span className="text-sm font-medium">Loved by professionals</span>
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-primary" />
+                    Secure payments
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-secondary-foreground fill-secondary-foreground" />
+                    4.9/5 average rating
                   </div>
                 </div>
               </div>
             </SectionTransition>
 
-            {/* Right Content - Refined Visual */}
-            <SectionTransition variant="slide" direction="right" delay={400}>
+            <SectionTransition variant="slide" direction="right" delay={250}>
               <div className="relative">
-                <div className="relative aspect-[4/3] max-w-2xl mx-auto">
-                  {/* Premium visual container */}
-                  <div className="absolute inset-0 bg-linear-to-br from-primary/8 via-secondary/4 to-primary/8 rounded-3xl border border-border/40 shadow-2xl">
-                    <div className="absolute inset-6 bg-linear-to-br from-background/95 via-background to-muted/10 rounded-2xl backdrop-blur-sm border border-border/30 shadow-xl">
-                      <div className="h-full flex items-center justify-center p-8">
-                        <div className="text-center space-y-8">
-                          {/* Central icon with sophisticated design */}
-                          <div className="relative">
-                            <div className="w-32 h-32 mx-auto bg-linear-to-br from-primary via-primary/90 to-secondary rounded-3xl flex items-center justify-center shadow-2xl shadow-primary/20">
-                              <Users className="h-16 w-16 text-white" />
-                            </div>
-                            {/* Elegant ring animation */}
-                            <div className="absolute inset-0 rounded-3xl border-2 border-primary/20 animate-pulse" />
-                          </div>
+                <div className="relative aspect-4/5 overflow-hidden rounded-3xl border border-border/40 bg-muted/30 shadow-2xl">
+                  <Image
+                    src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&q=80"
+                    alt="Team collaboration"
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 bg-linear-to-t from-background/80 via-transparent to-transparent" />
+                </div>
 
-          <div className="space-y-4">
-                            <h3 className="text-3xl lg:text-4xl font-black text-foreground">Global Network</h3>
-                            <p className="text-lg text-muted-foreground max-w-md leading-relaxed">
-                              Connecting Africa&apos;s finest talent with opportunities worldwide
-            </p>
-          </div>
-
-                          {/* Sophisticated stats display */}
-                          <div className="grid grid-cols-2 gap-6 pt-4">
-                            <div className="text-center p-4 bg-background/50 backdrop-blur-sm rounded-xl border border-border/30">
-                              <div className="text-3xl font-black text-primary mb-1">10K+</div>
-                              <div className="text-sm text-muted-foreground font-medium">Professionals</div>
-                            </div>
-                            <div className="text-center p-4 bg-background/50 backdrop-blur-sm rounded-xl border border-border/30">
-                              <div className="text-3xl font-black text-secondary mb-1">120+</div>
-                              <div className="text-sm text-muted-foreground font-medium">Countries</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Refined floating elements */}
-                  <div className="absolute -top-6 -right-6 w-20 h-20 bg-primary/10 rounded-full blur-xl animate-pulse" />
-                  <div className="absolute -bottom-6 -left-6 w-16 h-16 bg-secondary/10 rounded-full blur-xl animate-pulse" style={{ animationDelay: "2s" }} />
-                  <div className="absolute top-1/2 -right-8 w-12 h-12 bg-primary/15 rounded-full blur-lg animate-pulse" style={{ animationDelay: "1s" }} />
+                <div className="absolute -left-6 bottom-6 rounded-2xl border border-border/40 bg-background/95 px-5 py-4 shadow-xl">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Average match time</div>
+                  <div className="text-2xl font-semibold text-foreground">48 hours</div>
+                </div>
+                <div className="absolute -right-4 top-6 rounded-2xl border border-border/40 bg-background/95 px-5 py-4 shadow-xl">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Top talent</div>
+                  <div className="text-2xl font-semibold text-foreground">3%</div>
                 </div>
               </div>
             </SectionTransition>
           </div>
         </div>
-
-        {/* Sophisticated bottom accent */}
-        <div className="absolute bottom-0 left-0 right-0 h-40 bg-linear-to-t from-background/80 via-background/40 to-transparent pointer-events-none" />
       </section>
 
       {/* TRUSTED BY MARQUEE */}
@@ -829,7 +680,7 @@ export default function Home() {
 
                     {/* Enhanced Image Section */}
                     <div className="relative group lg:block hidden">
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
+                      <div className="relative aspect-4/3 w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
                         <Image
                           src={item.image}
                           alt={item.title}
@@ -956,7 +807,7 @@ export default function Home() {
 
               <SectionTransition variant="scale" delay={600}>
                 <div className="relative group">
-                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-primary-foreground/20 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
+                  <div className="relative aspect-4/3 w-full overflow-hidden rounded-3xl shadow-2xl border border-primary-foreground/20 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
                     <Image
                       src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1200&q=80"
                       alt="Freelancer working"
