@@ -28,7 +28,12 @@ export default function ResumeUploadPage() {
   const resumeInfo = useQuery(
     // @ts-ignore dynamic path cast for generated types
     (api as any).resume.queries.getFreelancerResume,
-    (user?._id || profile?._id) ? { freelancerId: (user?._id || profile?._id) } : "skip"
+    user?._id || profile?._id
+      ? {
+          freelancerId: (user?._id || profile?._id)!,
+          requesterId: (user?._id || profile?._id)!,
+        }
+      : "skip"
   );
   const getUploadUrl = useAction(
     // @ts-ignore resume endpoints not in generated types yet
@@ -75,8 +80,13 @@ export default function ResumeUploadPage() {
   }, [user, profile, isAuthenticated, isInitializing, router]);
 
   useEffect(() => {
-    // If already processed, skip this step
-    if (resumeInfo?.resumeStatus === "processed") {
+    // If already uploaded or processed, skip this step
+    const status = resumeInfo?.resumeStatus;
+    const hasUploaded =
+      status === "uploaded" ||
+      status === "processing" ||
+      status === "processed";
+    if (hasUploaded) {
       router.replace("/verification");
     }
   }, [resumeInfo?.resumeStatus, router]);

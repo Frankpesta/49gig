@@ -30,7 +30,7 @@ export function FreelancerChecklist() {
   // Get resume status
   const resumeInfo = useQuery(
     (api as any).resume.queries.getFreelancerResume,
-    user?._id ? { freelancerId: user._id } : "skip"
+    user?._id ? { freelancerId: user._id, requesterId: user._id } : "skip"
   );
 
   // Get verification status
