@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, User, Building2, Briefcase, Globe, Link as LinkIcon } from "lucide-react";
+import { Loader2, Save, User, Building2, Briefcase, Globe, Link as LinkIcon, FileText } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -39,6 +39,11 @@ export default function ProfilePage() {
   const [newSkill, setNewSkill] = useState("");
 
   const updateProfile = useMutation(api.users.mutations.updateProfile);
+  const resumeInfo = useQuery(
+    // @ts-ignore dynamic path cast for generated types
+    (api as any).resume.queries.getFreelancerResume,
+    user?._id ? { freelancerId: user._id, requesterId: user._id } : "skip"
+  );
 
   // Initialize form data from user
   useEffect(() => {
@@ -220,6 +225,29 @@ export default function ProfilePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Executive Summary
+                </CardTitle>
+                <CardDescription>
+                  Generated from your resume. This section is read-only.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {resumeInfo?.resumeBio ? (
+                  <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground leading-relaxed">
+                    {resumeInfo.resumeBio}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 text-sm text-muted-foreground">
+                    No executive summary yet. Upload your resume to generate one.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
                   <Briefcase className="h-5 w-5" />
                   Professional Information
                 </CardTitle>
@@ -227,12 +255,12 @@ export default function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="bio">Bio</Label>
+                  <Label htmlFor="bio">About you</Label>
                   <Textarea
                     id="bio"
                     value={formData.bio}
                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    placeholder="Tell us about yourself and your expertise..."
+                    placeholder="Share a short overview of your experience and focus..."
                     rows={4}
                   />
                 </div>

@@ -17,6 +17,7 @@ import {
 import { AuthBranding, AuthMobileLogo } from "@/components/auth/auth-branding";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
+import { CheckCircle2, FileText, ShieldCheck, Sparkles, UploadCloud } from "lucide-react";
 
 export default function ResumeUploadPage() {
   const router = useRouter();
@@ -194,101 +195,178 @@ export default function ResumeUploadPage() {
   return (
     <div className="flex min-h-screen relative bg-linear-to-br from-background via-primary/5 to-background overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -left-16 top-10 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
-        <div className="absolute right-0 bottom-10 h-96 w-96 rounded-full bg-secondary/20 blur-3xl" />
+        <div className="absolute -left-16 top-10 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute right-0 bottom-10 h-96 w-96 rounded-full bg-secondary/15 blur-3xl" />
       </div>
 
       <AuthBranding />
 
       <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative">
-        <div className="mx-auto w-full max-w-md space-y-10">
+        <div className="mx-auto w-full max-w-2xl space-y-10">
           <AuthMobileLogo />
 
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
-              <span className="h-2 w-2 rounded-full bg-primary" />
-              Step 1: Upload your resume (PDF)
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-              Upload your resume
-            </h1>
-            <p className="text-muted-foreground leading-relaxed">
-              We’ll extract key details to build your professional bio. After upload, you’ll continue to the verification process.
-            </p>
-          </div>
-
-          <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-            <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-              <CardTitle className="text-2xl font-heading font-semibold">
-                Resume Upload
-              </CardTitle>
-              <CardDescription>
-                Upload a PDF (max 10MB). Parsing and profile enrichment will follow.
-              </CardDescription>
-            </CardHeader>
-
-            <form onSubmit={handleUpload}>
-              <CardContent className="space-y-6 px-8 pb-8 pt-0">
-                {error && (
-                  <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
-                    {error}
-                  </div>
-                )}
-                {resumeInfo && (
-                  <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-sm text-muted-foreground">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground">Status</span>
-                      <span className="uppercase text-xs tracking-wide text-primary">
-                        {resumeInfo.resumeStatus || "not_uploaded"}
-                      </span>
-                    </div>
-                    {resumeInfo.resumeStatus === "processing" && (
-                      <p className="mt-1 text-xs">
-                        We’re parsing your resume. This usually takes a few seconds.
-                      </p>
-                    )}
-                    {isCooldown && (
-                      <p className="mt-1 text-xs text-amber-600">
-                        Reupload available in about {cooldownDays} day(s).
-                      </p>
-                    )}
-                  </div>
-                )}
-                {success && (
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-700">
-                    Resume uploaded successfully. Redirecting to verification...
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <Label htmlFor="resume" className="text-sm font-medium">
-                    PDF file
-                  </Label>
-                  <Input
-                    id="resume"
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handleFileChange}
-                    disabled={isUploading || isCooldown}
-                    className="h-11 cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:border-border file:text-sm file:font-medium file:bg-primary/10 file:text-primary hover:file:bg-primary/15"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Tip: Include a concise summary, key skills, and top projects. We’ll build your bio from this.
-                  </p>
+          <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] items-start">
+            <div className="space-y-6">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Step 1 of 3 · Resume Upload
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
+                    1
+                  </span>
+                  <span className="font-medium text-foreground">Resume</span>
                 </div>
-              </CardContent>
+                <div className="h-px w-8 bg-border" />
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground font-semibold">
+                    2
+                  </span>
+                  <span>Verification</span>
+                </div>
+                <div className="h-px w-8 bg-border" />
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-muted-foreground font-semibold">
+                    3
+                  </span>
+                  <span>Dashboard</span>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground">
+                  Show us your best work.
+                </h1>
+                <p className="text-muted-foreground leading-relaxed text-lg">
+                  Upload your resume to generate a professional bio and accelerate verification. We’ll parse only what’s needed for your profile.
+                </p>
+              </div>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  PDF only, max 10MB
+                </div>
+                <div className="flex items-center gap-3">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Bio generated automatically
+                </div>
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  Secure and private storage
+                </div>
+              </div>
+            </div>
 
-              <CardFooter className="pt-8 pb-8 px-8 border-t">
-                <Button
-                  type="submit"
-                  className="w-full h-11 text-base font-medium"
-                  disabled={isUploading || isCooldown}
-                >
-                  {isUploading ? "Uploading..." : "Upload & Continue"}
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
+            <Card className="shadow-2xl border-border/50 bg-background/90 backdrop-blur-xl">
+              <CardHeader className="space-y-2 px-6 pt-6 pb-4">
+                <CardTitle className="text-xl font-semibold">
+                  Resume Upload
+                </CardTitle>
+                <CardDescription>
+                  Upload a PDF to continue. We’ll enrich your profile automatically.
+                </CardDescription>
+              </CardHeader>
+
+              <form onSubmit={handleUpload}>
+                <CardContent className="space-y-5 px-6 pb-6 pt-0">
+                  {error && (
+                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                      {error}
+                    </div>
+                  )}
+                  {resumeInfo && (
+                    <div className="rounded-lg border border-border/60 bg-muted/40 p-3 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-foreground">Status</span>
+                        <span className="uppercase text-xs tracking-wide text-primary">
+                          {resumeInfo.resumeStatus || "not_uploaded"}
+                        </span>
+                      </div>
+                      {resumeInfo.resumeStatus === "processing" && (
+                        <p className="mt-1 text-xs">
+                          We’re parsing your resume. This usually takes a few seconds.
+                        </p>
+                      )}
+                      {isCooldown && (
+                        <p className="mt-1 text-xs text-amber-600">
+                          Reupload available in about {cooldownDays} day(s).
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {success && (
+                    <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700">
+                      Resume uploaded successfully. Redirecting to verification...
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <Label htmlFor="resume" className="text-sm font-medium text-foreground">
+                      PDF file
+                    </Label>
+                    <label
+                      htmlFor="resume"
+                      className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-center transition ${
+                        isUploading || isCooldown ? "opacity-60 cursor-not-allowed" : "hover:border-primary/40 hover:bg-primary/5"
+                      }`}
+                    >
+                      <UploadCloud className="h-6 w-6 text-primary" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {file ? "Replace file" : "Drag & drop or click to upload"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          PDF only · up to 10MB
+                        </p>
+                      </div>
+                    </label>
+                    <Input
+                      id="resume"
+                      type="file"
+                      accept="application/pdf"
+                      onChange={handleFileChange}
+                      disabled={isUploading || isCooldown}
+                      className="hidden"
+                    />
+                    {file && (
+                      <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-xs text-muted-foreground">
+                        <FileText className="h-4 w-4 text-primary" />
+                        <span className="truncate">{file.name}</span>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Tip: Include a concise summary, key skills, and top projects. We’ll build your bio from this.
+                    </p>
+                  </div>
+                </CardContent>
+
+                <CardFooter className="pt-5 pb-6 px-6 border-t">
+                  <Button
+                    type="submit"
+                    className="w-full h-11 text-base font-medium"
+                    disabled={isUploading || isCooldown}
+                  >
+                    {isUploading ? "Uploading..." : "Upload & Continue"}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+
+            {resumeInfo?.resumeStatus === "processed" && resumeInfo?.resumeBio && (
+              <Card className="border-border/50 bg-background/90 shadow-xl">
+                <CardHeader className="space-y-1 px-6 pt-6 pb-4">
+                  <CardTitle className="text-lg font-semibold">Bio Preview</CardTitle>
+                  <CardDescription>
+                    This is generated from your resume and is read‑only.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-6 pb-6">
+                  <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm text-muted-foreground leading-relaxed">
+                    {resumeInfo.resumeBio}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>
