@@ -159,6 +159,11 @@ export default defineSchema({
     matchedFreelancerId: v.optional(v.id("users")),
     matchedAt: v.optional(v.number()),
 
+    // Contract
+    contractFileId: v.optional(v.id("_storage")),
+    contractGeneratedAt: v.optional(v.number()),
+    contractSignedAt: v.optional(v.number()),
+
     // Payment
     totalAmount: v.number(),
     escrowedAmount: v.number(),
@@ -519,6 +524,18 @@ export default defineSchema({
     .index("by_freelancer", ["freelancerId"])
     .index("by_status", ["status"])
     .index("by_expires", ["expiresAt"]),
+
+  notifications: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    message: v.string(),
+    type: v.string(), // system | admin | project | payment | dispute | etc.
+    data: v.optional(v.any()),
+    readAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_read", ["userId", "readAt"]),
 
   disputes: defineTable({
     // Project

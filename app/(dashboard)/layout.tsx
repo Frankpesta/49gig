@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { NotificationListener } from "@/components/notifications/notification-listener";
 
 export default function DashboardLayout({
   children,
@@ -206,6 +207,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
+      <NotificationListener />
       <AppSidebar />
       <SidebarInset className="bg-background">
         <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/95 dark:bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-4">

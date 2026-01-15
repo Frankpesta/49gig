@@ -1,6 +1,13 @@
 import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    contracts: { actions: { generateAndSendContract: unknown } };
+  };
+};
 
 /**
  * Create a match (internal - called by matching action)
@@ -156,6 +163,14 @@ export const acceptMatch = mutation({
         score: match.score,
       },
       createdAt: now,
+    });
+
+    // Generate contract and email both parties
+    const generateAndSendContract = api.api.contracts.actions
+      .generateAndSendContract as unknown as FunctionReference<"action">;
+
+    await ctx.scheduler.runAfter(0, generateAndSendContract, {
+      matchId: args.matchId,
     });
 
     return args.matchId;

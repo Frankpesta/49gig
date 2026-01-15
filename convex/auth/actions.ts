@@ -1,5 +1,30 @@
+"use node";
+
 import { action } from "../_generated/server";
 import { v } from "convex/values";
+import React from "react";
+import { sendEmail } from "../email/send";
+import { VerificationEmail, PasswordResetEmail, WelcomeEmail } from "../../emails/templates";
+
+function getAppUrl() {
+  return (
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://49gig.com"
+  );
+}
+
+function getLogoUrl(appUrl: string) {
+  return `${appUrl}/logo-light.png`;
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 /**
  * OAuth sign-in handler (deprecated - use auth/oauth functions instead)
@@ -25,14 +50,26 @@ export const sendVerificationEmail = action({
   args: {
     userId: v.id("users"),
     email: v.string(),
+    name: v.optional(v.string()),
+    verifyUrl: v.string(),
   },
   handler: async (ctx, args) => {
-    // TODO: Integrate with email service (SendGrid, Resend, etc.)
-    // Generate verification token
-    // Send email with verification link
-    // Store token in database
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
 
-    console.log(`Would send verification email to ${args.email}`);
+    await sendEmail({
+      to: args.email,
+      subject: "Verify your email",
+      react: React.createElement(VerificationEmail, {
+        name: args.name || "there",
+        verifyUrl: args.verifyUrl,
+        appUrl,
+        logoUrl,
+        date,
+      }),
+    });
+
     return { success: true };
   },
 });
@@ -44,12 +81,55 @@ export const sendPasswordResetEmail = action({
   args: {
     email: v.string(),
     resetToken: v.string(),
+    name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // TODO: Integrate with email service
-    // Send email with reset link containing token
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+    const resetUrl = `${appUrl}/reset-password?email=${encodeURIComponent(
+      args.email
+    )}&token=${encodeURIComponent(args.resetToken)}`;
 
-    console.log(`Would send password reset email to ${args.email}`);
+    await sendEmail({
+      to: args.email,
+      subject: "Reset your password",
+      react: React.createElement(PasswordResetEmail, {
+        name: args.name || "there",
+        resetUrl,
+        appUrl,
+        logoUrl,
+        date,
+      }),
+    });
+
+    return { success: true };
+  },
+});
+
+export const sendWelcomeEmail = action({
+  args: {
+    email: v.string(),
+    name: v.optional(v.string()),
+    role: v.union(v.literal("client"), v.literal("freelancer")),
+  },
+  handler: async (ctx, args) => {
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+
+    await sendEmail({
+      to: args.email,
+      subject: "Welcome to 49GIG",
+      react: React.createElement(WelcomeEmail, {
+        name: args.name || "there",
+        role: args.role,
+        appUrl,
+        logoUrl,
+        date,
+      }),
+    });
+
     return { success: true };
   },
 });
