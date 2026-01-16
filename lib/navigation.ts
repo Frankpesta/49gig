@@ -122,6 +122,14 @@ export const navigationItems: NavItem[] = [
     roles: ["admin", "moderator"],
   },
 
+  // Admin & Moderator: Notifications
+  {
+    title: "Notifications",
+    url: "/dashboard/notifications",
+    icon: Bell,
+    roles: ["admin", "moderator"],
+  },
+
   // Admin: Analytics
   {
     title: "Analytics",

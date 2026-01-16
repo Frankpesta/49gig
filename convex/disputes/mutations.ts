@@ -2,7 +2,13 @@ import { mutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
-import { api } from "../_generated/api";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Helper to get current user in mutations
@@ -140,6 +146,12 @@ export const initiateDispute = mutation({
       updatedAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
     // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "dispute_initiated",
@@ -157,7 +169,17 @@ export const initiateDispute = mutation({
       createdAt: Date.now(),
     });
 
-    // TODO: Send notification to other party
+    const otherPartyId =
+      user._id === project.clientId ? project.matchedFreelancerId : project.clientId;
+    if (otherPartyId) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [otherPartyId],
+        title: "New dispute opened",
+        message: `A dispute was opened for ${project.intakeForm.title}.`,
+        type: "dispute",
+        data: { disputeId, projectId: args.projectId },
+      });
+    }
     // TODO: Create system message in project chat
 
     return disputeId;
@@ -278,6 +300,12 @@ export const assignModerator = mutation({
       updatedAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
     // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "dispute_assigned",
@@ -290,6 +318,14 @@ export const assignModerator = mutation({
         moderatorId: args.moderatorId,
       },
       createdAt: Date.now(),
+    });
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.moderatorId],
+      title: "Dispute assigned",
+      message: "A dispute has been assigned to you for review.",
+      type: "dispute",
+      data: { disputeId: args.disputeId, projectId: dispute.projectId },
     });
 
     return { success: true };
@@ -340,6 +376,12 @@ export const resolveDispute = mutation({
 
     const now = Date.now();
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
     // Update dispute
     await ctx.db.patch(args.disputeId, {
       status: "resolved",
@@ -371,7 +413,18 @@ export const resolveDispute = mutation({
 
     // TODO: Release funds based on resolution
     // TODO: Handle freelancer replacement if needed
-    // TODO: Send notifications
+    const notifyUserIds = [project.clientId, project.matchedFreelancerId].filter(
+      Boolean
+    ) as Doc<"users">["_id"][];
+    if (notifyUserIds.length > 0) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: notifyUserIds,
+        title: "Dispute resolved",
+        message: `The dispute for ${project.intakeForm.title} has been resolved.`,
+        type: "dispute",
+        data: { disputeId: args.disputeId, projectId: dispute.projectId },
+      });
+    }
 
     // Create audit log
     await ctx.db.insert("auditLogs", {

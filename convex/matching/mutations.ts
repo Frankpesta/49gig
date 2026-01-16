@@ -6,6 +6,7 @@ import type { FunctionReference } from "convex/server";
 const api = require("../_generated/api") as {
   api: {
     contracts: { actions: { generateAndSendContract: unknown } };
+    notifications: { actions: { sendSystemNotification: unknown } };
   };
 };
 
@@ -32,6 +33,11 @@ export const createMatch = internalMutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    const sendSystemNotification = api.api.notifications.actions
+      .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
+
+    const project = await ctx.db.get(args.projectId);
+
     // Check if match already exists
     const existing = await ctx.db
       .query("matches")
@@ -49,6 +55,16 @@ export const createMatch = internalMutation({
         expiresAt: args.expiresAt,
         updatedAt: now,
       });
+
+      if (project) {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: [args.freelancerId],
+          title: "Match updated",
+          message: `We refreshed your match for ${project.intakeForm.title}.`,
+          type: "match",
+          data: { matchId: existing._id, projectId: args.projectId },
+        });
+      }
       return existing._id;
     }
 
@@ -65,6 +81,16 @@ export const createMatch = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    if (project) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [args.freelancerId],
+        title: "New match opportunity",
+        message: `You have a new match for ${project.intakeForm.title}.`,
+        type: "match",
+        data: { matchId, projectId: args.projectId },
+      });
+    }
 
     return matchId;
   },
@@ -115,6 +141,9 @@ export const acceptMatch = mutation({
 
     const now = Date.now();
 
+    const sendSystemNotification = api.api.notifications.actions
+      .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
+
     // Update match status
     await ctx.db.patch(args.matchId, {
       status: "accepted",
@@ -163,6 +192,22 @@ export const acceptMatch = mutation({
         score: match.score,
       },
       createdAt: now,
+    });
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [match.freelancerId],
+      title: "You’ve been selected",
+      message: `You were selected for ${project.intakeForm.title}.`,
+      type: "match",
+      data: { matchId: args.matchId, projectId: match.projectId },
+    });
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Match accepted",
+      message: `Contract generation has started for ${project.intakeForm.title}.`,
+      type: "match",
+      data: { matchId: args.matchId, projectId: match.projectId },
     });
 
     // Generate contract and email both parties
@@ -222,6 +267,9 @@ export const rejectMatch = mutation({
 
     const now = Date.now();
 
+    const sendSystemNotification = api.api.notifications.actions
+      .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
+
     // Update match status
     await ctx.db.patch(args.matchId, {
       status: "rejected",
@@ -244,6 +292,14 @@ export const rejectMatch = mutation({
         score: match.score,
       },
       createdAt: now,
+    });
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [match.freelancerId],
+      title: "Match declined",
+      message: `The client declined the match for ${project.intakeForm.title}.`,
+      type: "match",
+      data: { matchId: args.matchId, projectId: match.projectId },
     });
 
     return args.matchId;
