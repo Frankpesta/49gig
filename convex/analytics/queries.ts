@@ -115,3 +115,158 @@ export const getPlatformAnalytics = query({
   },
 });
 
+
+/**
+ * Admin dashboard charts (time series + distributions)
+ */
+export const getAdminChartData = query({
+  args: {
+    userId: v.optional(v.id("users")),
+    rangeDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    let user: Doc<"users"> | null = null;
+    if (args.userId) {
+      const userDoc = await ctx.db.get(args.userId);
+      if (userDoc && (userDoc as Doc<"users">).status === "active") {
+        user = userDoc as Doc<"users">;
+      }
+    } else {
+      user = await getCurrentUser(ctx);
+    }
+
+    if (!user || user.role !== "admin") {
+      return null;
+    }
+
+    const now = new Date();
+    const rangeDays = args.rangeDays === 90 || args.rangeDays === 365 || args.rangeDays === 30
+      ? args.rangeDays
+      : 180;
+    const monthsCount = rangeDays === 30 ? 1 : rangeDays === 90 ? 3 : rangeDays === 365 ? 12 : 6;
+    const months: Array<{
+      key: string;
+      label: string;
+      start: number;
+      end: number;
+    }> = [];
+    for (let i = monthsCount - 1; i >= 0; i -= 1) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const start = date.getTime();
+      const end = new Date(date.getFullYear(), date.getMonth() + 1, 1).getTime();
+      months.push({
+        key: `${date.getFullYear()}-${date.getMonth() + 1}`,
+        label: date.toLocaleString("en-US", { month: "short" }),
+        start,
+        end,
+      });
+    }
+
+    const allUsers = await ctx.db.query("users").collect();
+    const allPayments = await ctx.db.query("payments").collect();
+    const allProjects = await ctx.db.query("projects").collect();
+    const allDisputes = await ctx.db.query("disputes").collect();
+
+    const usersByMonth = months.map((month) => {
+      const monthUsers = allUsers.filter(
+        (u) => u.createdAt >= month.start && u.createdAt < month.end
+      );
+      return {
+        month: month.label,
+        total: monthUsers.length,
+        clients: monthUsers.filter((u) => u.role === "client").length,
+        freelancers: monthUsers.filter((u) => u.role === "freelancer").length,
+      };
+    });
+
+    const revenueByMonth = months.map((month) => {
+      const monthPayments = allPayments.filter(
+        (p) =>
+          p.status === "succeeded" &&
+          p.type === "platform_fee" &&
+          p.createdAt >= month.start &&
+          p.createdAt < month.end
+      );
+      return {
+        month: month.label,
+        revenue: monthPayments.reduce((sum, p) => sum + p.amount, 0),
+        volume: monthPayments.length,
+      };
+    });
+
+    const projectsByMonth = months.map((month) => {
+      const monthProjects = allProjects.filter(
+        (p) => p.createdAt >= month.start && p.createdAt < month.end
+      );
+      return {
+        month: month.label,
+        created: monthProjects.length,
+      };
+    });
+
+    const statusKeys = [
+      "draft",
+      "pending_funding",
+      "funded",
+      "matching",
+      "matched",
+      "in_progress",
+      "completed",
+      "cancelled",
+      "disputed",
+    ] as const;
+
+    const projectStatusByMonth = months.map((month) => {
+      const monthProjects = allProjects.filter(
+        (p) => p.createdAt >= month.start && p.createdAt < month.end
+      );
+      const counts: Record<string, number> = {};
+      for (const key of statusKeys) {
+        counts[key] = monthProjects.filter((p) => p.status === key).length;
+      }
+      return {
+        month: month.label,
+        ...counts,
+      } as {
+        month: string;
+        draft: number;
+        pending_funding: number;
+        funded: number;
+        matching: number;
+        matched: number;
+        in_progress: number;
+        completed: number;
+        cancelled: number;
+        disputed: number;
+      };
+    });
+
+    const projectStatusCounts: Record<string, number> = {};
+    for (const project of allProjects) {
+      projectStatusCounts[project.status] =
+        (projectStatusCounts[project.status] || 0) + 1;
+    }
+
+    const disputeStatusCounts: Record<string, number> = {};
+    for (const dispute of allDisputes) {
+      disputeStatusCounts[dispute.status] =
+        (disputeStatusCounts[dispute.status] || 0) + 1;
+    }
+
+    return {
+      usersByMonth,
+      revenueByMonth,
+      projectsByMonth,
+      projectStatusByMonth,
+      projectStatus: Object.entries(projectStatusCounts).map(([name, value]) => ({
+        name,
+        value,
+      })),
+      disputeStatus: Object.entries(disputeStatusCounts).map(([name, value]) => ({
+        name,
+        value,
+      })),
+      generatedAt: Date.now(),
+    };
+  },
+});

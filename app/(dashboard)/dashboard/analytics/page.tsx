@@ -1,19 +1,28 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AdminCharts } from "@/components/dashboard/admin-charts";
 import { Loader2, Users, FolderKanban, CreditCard, Shield, AlertCircle, TrendingUp, DollarSign } from "lucide-react";
 
 export default function AnalyticsPage() {
   const { user, isAuthenticated } = useAuth();
+  const [adminRangeDays, setAdminRangeDays] = useState(90);
 
   const analytics = useQuery(
     (api as any)["analytics/queries"].getPlatformAnalytics,
     isAuthenticated && user?._id && user.role === "admin"
       ? { userId: user._id }
+      : "skip"
+  );
+  const adminCharts = useQuery(
+    (api as any)["analytics/queries"].getAdminChartData,
+    isAuthenticated && user?._id && user.role === "admin"
+      ? { userId: user._id, rangeDays: adminRangeDays }
       : "skip"
   );
 
@@ -331,6 +340,29 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-2xl font-heading font-semibold">Charts</h2>
+          <p className="text-sm text-muted-foreground">
+            Drill down by time range to explore platform trends.
+          </p>
+        </div>
+        {adminCharts ? (
+          <AdminCharts
+            data={adminCharts}
+            timeRangeDays={adminRangeDays}
+            onTimeRangeChange={setAdminRangeDays}
+          />
+        ) : (
+          <Card className="flex h-[220px] items-center justify-center">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading charts...
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
