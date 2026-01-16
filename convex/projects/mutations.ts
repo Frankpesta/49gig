@@ -2,6 +2,13 @@ import { mutation, internalMutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Helper function to get current user in mutations
@@ -124,6 +131,19 @@ export const createProject = mutation({
       createdAt: now,
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [user._id],
+      title: "Project created",
+      message: `Your project "${args.intakeForm.title}" was created.`,
+      type: "project",
+      data: { projectId },
+    });
+
     return projectId;
   },
 });
@@ -231,6 +251,19 @@ export const updateProject = mutation({
       createdAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Project updated",
+      message: `Project "${project.intakeForm.title}" was updated.`,
+      type: "project",
+      data: { projectId: args.projectId },
+    });
+
     return args.projectId;
   },
 });
@@ -335,6 +368,34 @@ export const updateProjectStatus = mutation({
       createdAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    const statusLabels: Record<Doc<"projects">["status"], string> = {
+      draft: "Draft",
+      pending_funding: "Pending funding",
+      funded: "Funded",
+      matching: "Matching in progress",
+      matched: "Matched",
+      in_progress: "In progress",
+      completed: "Completed",
+      cancelled: "Cancelled",
+      disputed: "Disputed",
+    };
+    const recipientIds = [project.clientId];
+    if (project.matchedFreelancerId) {
+      recipientIds.push(project.matchedFreelancerId);
+    }
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: recipientIds,
+      title: "Project status updated",
+      message: `Project "${project.intakeForm.title}" is now ${statusLabels[args.status]}.`,
+      type: "project",
+      data: { projectId: args.projectId, status: args.status },
+    });
+
     return args.projectId;
   },
 });
@@ -430,6 +491,23 @@ export const createMilestones = mutation({
         totalAmount: totalMilestoneAmount,
       },
       createdAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    const recipients = [project.clientId];
+    if (project.matchedFreelancerId) {
+      recipients.push(project.matchedFreelancerId);
+    }
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: recipients,
+      title: "Milestones created",
+      message: `Milestones were created for "${project.intakeForm.title}".`,
+      type: "milestone",
+      data: { projectId: args.projectId, milestoneCount: args.milestones.length },
     });
 
     return milestoneIds;

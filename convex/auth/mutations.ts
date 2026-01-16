@@ -8,6 +8,7 @@ import { Doc } from "../_generated/dataModel";
 const api = require("../_generated/api") as {
   api: {
     auth: { actions: { sendTwoFactorCodeEmail: unknown } };
+    notifications: { actions: { sendSystemNotification: unknown } };
   };
 };
 
@@ -171,6 +172,18 @@ export const signup = mutation({
       createdAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [userId],
+      title: "Welcome to 49GIG",
+      message: "Your account is ready. Complete your setup to get started.",
+      type: "account",
+      data: { userId },
+    });
     // Clear rate limit on successful signup
     clearRateLimit(`signup:${args.email}`);
 

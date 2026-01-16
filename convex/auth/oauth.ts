@@ -2,6 +2,13 @@
 import { action, mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Google OAuth Configuration
@@ -288,6 +295,19 @@ export const createOrUpdateUser = mutation({
         provider: "google",
       },
       createdAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [userId],
+      title: "Welcome to 49GIG",
+      message: "Your account is ready. Complete your setup to get started.",
+      type: "account",
+      data: { userId },
     });
 
     return userId;

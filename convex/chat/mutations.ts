@@ -2,6 +2,13 @@ import { mutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Helper to get current user in mutations
@@ -201,6 +208,28 @@ export const sendMessage = mutation({
       },
       createdAt: Date.now(),
     });
+
+    if (args.contentType !== "system") {
+      const sendSystemNotification =
+        api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+          "action",
+          "internal"
+        >;
+      const recipientIds = chat.participants.filter((id) => id !== user._id);
+      if (recipientIds.length > 0) {
+        const preview =
+          args.contentType === "file"
+            ? "Sent a file."
+            : args.content.trim().substring(0, 120);
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: recipientIds,
+          title: `New message from ${user.name}`,
+          message: preview || "New message",
+          type: "message",
+          data: { chatId: args.chatId, messageId, projectId: chat.projectId },
+        });
+      }
+    }
 
     return messageId;
   },
