@@ -2,6 +2,13 @@ import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Helper to get current user in mutations
@@ -262,6 +269,19 @@ export const updateUserRole = mutation({
       createdAt: now,
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.userId],
+      title: "Role updated",
+      message: `Your role was updated to ${args.newRole}.`,
+      type: "account",
+      data: { userId: args.userId, role: args.newRole },
+    });
+
     return { success: true };
   },
 });
@@ -324,6 +344,19 @@ export const updateUserStatus = mutation({
         newStatus: args.newStatus,
       },
       createdAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.userId],
+      title: "Account status updated",
+      message: `Your account status is now ${args.newStatus}.`,
+      type: "account",
+      data: { userId: args.userId, status: args.newStatus },
     });
 
     return { success: true };

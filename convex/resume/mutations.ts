@@ -2,6 +2,13 @@ import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { api, internal } from "../_generated/api";
+import type { FunctionReference } from "convex/server";
+
+const notificationsApi = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 30 * 6;
 
@@ -71,6 +78,20 @@ export const completeResumeUpload = mutation({
       resumeCanReuploadAt: now + SIX_MONTHS_MS,
     });
 
+    const sendSystemNotification =
+      notificationsApi.api.notifications.actions
+        .sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [user._id],
+      title: "Resume uploaded",
+      message: "We received your resume and started processing it.",
+      type: "resume",
+      data: { userId: user._id },
+    });
+
     // Kick off parsing asynchronously (LLM / parser hook)
     await ctx.scheduler.runAfter(
       0,
@@ -121,6 +142,23 @@ export const applyParsedResumeData = mutation({
         error: args.error,
       },
       resumeStatus: args.resumeStatus,
+    });
+
+    const sendSystemNotification =
+      notificationsApi.api.notifications.actions
+        .sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.userId],
+      title: args.resumeStatus === "processed" ? "Resume processed" : "Resume failed",
+      message:
+        args.resumeStatus === "processed"
+          ? "Your resume is ready. Review your executive summary."
+          : "We couldn’t process your resume. Please try again.",
+      type: "resume",
+      data: { userId: args.userId },
     });
   },
 });
