@@ -15,6 +15,8 @@ export default defineSchema({
       v.literal("magic_link")
     ),
     passwordHash: v.optional(v.string()), // Only for email auth
+    twoFactorEnabled: v.optional(v.boolean()),
+    twoFactorMethod: v.optional(v.union(v.literal("email"))),
 
     // Role & Permissions
     role: v.union(
@@ -67,6 +69,15 @@ export default defineSchema({
     resumeBio: v.optional(v.string()),
     resumeParsedData: v.optional(v.any()),
     resumeCanReuploadAt: v.optional(v.number()),
+
+    // Notification preferences
+    notificationPreferences: v.optional(
+      v.object({
+        email: v.boolean(),
+        push: v.boolean(),
+        inApp: v.boolean(),
+      })
+    ),
 
     // Status
     status: v.union(
@@ -536,6 +547,23 @@ export default defineSchema({
   })
     .index("by_user", ["userId", "createdAt"])
     .index("by_read", ["userId", "readAt"]),
+
+  twoFactorTokens: defineTable({
+    userId: v.id("users"),
+    code: v.string(),
+    purpose: v.union(
+      v.literal("signin"),
+      v.literal("enable"),
+      v.literal("disable")
+    ),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    attempts: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_purpose", ["purpose", "createdAt"])
+    .index("by_expires", ["expiresAt"]),
 
   disputes: defineTable({
     // Project

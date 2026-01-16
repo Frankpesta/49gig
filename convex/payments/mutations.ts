@@ -1,7 +1,13 @@
 import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
-import { internal } from "../_generated/api";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Helper to get current user in mutations
@@ -162,6 +168,12 @@ export const handlePaymentSuccess = internalMutation({
       throw new Error(`Payment not found for intent: ${args.paymentIntentId}`);
     }
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
     // Update payment status
     const now = Date.now();
     await ctx.db.patch(payment._id, {
@@ -221,6 +233,27 @@ export const handlePaymentSuccess = internalMutation({
       });
     }
 
+    if (project) {
+      const amountLabel = `${payment.amount} ${payment.currency}`;
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [project.clientId],
+        title: "Payment received",
+        message: `We received ${amountLabel} for ${project.intakeForm.title}.`,
+        type: "payment",
+        data: { paymentId: payment._id, projectId: payment.projectId },
+      });
+
+      if (project.matchedFreelancerId && payment.type === "milestone_release") {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: [project.matchedFreelancerId],
+          title: "Milestone payout released",
+          message: `A milestone payment was released for ${project.intakeForm.title}.`,
+          type: "payment",
+          data: { paymentId: payment._id, projectId: payment.projectId },
+        });
+      }
+    }
+
     return payment._id;
   },
 });
@@ -248,6 +281,11 @@ export const handlePaymentFailure = internalMutation({
     }
 
     const now = Date.now();
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
     await ctx.db.patch(payment._id, {
       status: "failed",
       webhookReceived: true,
@@ -278,6 +316,16 @@ export const handlePaymentFailure = internalMutation({
       });
     }
 
+    if (project) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [project.clientId],
+        title: "Payment failed",
+        message: `A payment attempt for ${project.intakeForm.title} failed.`,
+        type: "payment",
+        data: { paymentId: payment._id, projectId: payment.projectId },
+      });
+    }
+
     return payment._id;
   },
 });
@@ -304,6 +352,11 @@ export const handlePaymentCancellation = internalMutation({
     }
 
     const now = Date.now();
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
     await ctx.db.patch(payment._id, {
       status: "cancelled",
       webhookReceived: true,
@@ -337,6 +390,16 @@ export const handlePaymentCancellation = internalMutation({
           paymentIntentId: args.paymentIntentId,
         },
         createdAt: now,
+      });
+    }
+
+    if (project) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [project.clientId],
+        title: "Payment cancelled",
+        message: `A payment for ${project.intakeForm.title} was cancelled.`,
+        type: "payment",
+        data: { paymentId: payment._id, projectId: payment.projectId },
       });
     }
 

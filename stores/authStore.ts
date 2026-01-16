@@ -21,6 +21,11 @@ export interface User {
     timezone?: string;
     portfolioUrl?: string;
   };
+  notificationPreferences?: {
+    email: boolean;
+    push: boolean;
+    inApp: boolean;
+  };
   status: "active" | "suspended" | "deleted";
   createdAt: number;
   updatedAt: number;

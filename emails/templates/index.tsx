@@ -117,6 +117,54 @@ export function PasswordResetEmail({
   );
 }
 
+export function TwoFactorCodeEmail({
+  name = "there",
+  code,
+  purpose,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { code: string; purpose: string }) {
+  return (
+    <EmailLayout
+      title="Your verification code"
+      preview="Use this code to complete your sign in."
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi {name}, use the code below to {purpose}.
+      </Text>
+      <Section
+        style={{
+          backgroundColor: "#f9fafb",
+          borderRadius: "8px",
+          padding: "16px",
+          textAlign: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: "24px",
+            fontWeight: 700,
+            letterSpacing: "4px",
+            margin: 0,
+            color: "#111827",
+          }}
+        >
+          {code}
+        </Text>
+      </Section>
+      <Text style={textStyle}>
+        This code expires in 10 minutes. If you did not request this, you can
+        ignore the email.
+      </Text>
+    </EmailLayout>
+  );
+}
+
 export function PasswordChangedEmail({
   name = "there",
   appUrl,
@@ -645,7 +693,8 @@ export function MilestoneCreatedEmail({
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, a new milestone "{milestoneName}" was created for {projectName}.
+        Hi {name}, a new milestone &quot;{milestoneName}&quot; was created for{" "}
+        {projectName}.
       </Text>
       <EmailButton href={`${appUrl}/dashboard/projects`}>View milestones</EmailButton>
     </EmailLayout>
@@ -669,8 +718,8 @@ export function MilestoneApprovedEmail({
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the milestone "{milestoneName}" for {projectName} has been
-        approved.
+        Hi {name}, the milestone &quot;{milestoneName}&quot; for {projectName} has
+        been approved.
       </Text>
     </EmailLayout>
   );
@@ -694,7 +743,7 @@ export function MilestoneRejectedEmail({
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the milestone "{milestoneName}" for {projectName} needs
+        Hi {name}, the milestone &quot;{milestoneName}&quot; for {projectName} needs
         revisions.
       </Text>
       {reason && <Text style={textStyle}>Reason: {reason}</Text>}

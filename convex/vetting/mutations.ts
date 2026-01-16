@@ -3,6 +3,13 @@ import { v } from "convex/values";
 import { calculateOverallScore, checkFraudFlags } from "./engine";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Helper function to get current user in mutations
@@ -100,6 +107,19 @@ export const initializeVerification = mutation({
       targetType: "vettingResult",
       targetId: vettingResultId,
       createdAt: Date.now(),
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [user._id],
+      title: "Verification started",
+      message: "Your verification has started. Complete all steps to continue.",
+      type: "verification",
+      data: { vettingResultId },
     });
 
     return { vettingResultId };
@@ -472,6 +492,19 @@ export const submitSkillAssessment = mutation({
       createdAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [user._id],
+      title: "Skill assessment submitted",
+      message: "Your skill assessment has been received.",
+      type: "verification",
+      data: { vettingResultId: vettingResult._id },
+    });
+
     return { success: true };
   },
 });
@@ -596,6 +629,24 @@ export const completeVerification = mutation({
       createdAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [user._id],
+      title: "Verification submitted",
+      message:
+        status === "approved"
+          ? "Verification completed and pending admin review."
+          : status === "flagged"
+          ? "Verification completed and pending review."
+          : "Verification was rejected due to fraud flags.",
+      type: "verification",
+      data: { vettingResultId: vettingResult._id },
+    });
+
     return {
       success: true,
       status,
@@ -678,6 +729,19 @@ export const approveVerification = mutation({
       createdAt: Date.now(),
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.freelancerId],
+      title: "Verification approved",
+      message: "Your verification has been approved. Welcome aboard!",
+      type: "verification",
+      data: { vettingResultId: vettingResult._id },
+    });
+
     return { success: true };
   },
 });
@@ -747,6 +811,19 @@ export const rejectVerification = mutation({
         reviewNotes: args.reviewNotes,
       },
       createdAt: Date.now(),
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.freelancerId],
+      title: "Verification rejected",
+      message: "Your verification was rejected. Please review the feedback.",
+      type: "verification",
+      data: { vettingResultId: vettingResult._id },
     });
 
     return { success: true };
