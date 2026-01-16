@@ -258,6 +258,13 @@ export const createOrUpdateUser = mutation({
       authProvider: "google",
       role: args.role,
       status: "active",
+      twoFactorEnabled: false,
+      twoFactorMethod: undefined,
+      notificationPreferences: {
+        email: true,
+        push: true,
+        inApp: true,
+      },
       profile: args.picture
         ? {
             // Store profile picture URL if available

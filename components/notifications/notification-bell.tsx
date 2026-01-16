@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { usePusherNotifications } from "@/hooks/use-pusher-notifications";
+import { useAuth } from "@/hooks/use-auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,24 +17,40 @@ import { Button } from "@/components/ui/button";
 import { Bell, CheckCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function NotificationBell() {
+  const { user } = useAuth();
+  const inAppEnabled = user?.notificationPreferences?.inApp ?? true;
   const [refreshKey, setRefreshKey] = useState(0);
-  const notifications = useQuery(api.notifications.queries.getMyNotifications, {
-    limit: 20,
-    refreshKey,
-  });
+  const notifications = useQuery(
+    api.notifications.queries.getMyNotifications,
+    inAppEnabled
+      ? {
+          limit: 20,
+          refreshKey,
+        }
+      : "skip"
+  );
   const markNotificationRead = useMutation(api.notifications.mutations.markNotificationRead);
   const markAllRead = useMutation(api.notifications.mutations.markAllRead);
 
   usePusherNotifications({
-    onNotification: () => setRefreshKey((prev) => prev + 1),
+    onNotification: (payload) => {
+      setRefreshKey((prev) => prev + 1);
+      const pushEnabled = user?.notificationPreferences?.push ?? true;
+      if (pushEnabled) {
+        toast(payload.title, {
+          description: payload.message,
+        });
+      }
+    },
   });
 
-  const unreadCount = useMemo(
-    () => (notifications || []).filter((n) => !n.readAt).length,
-    [notifications]
-  );
+  const unreadCount = useMemo(() => {
+    if (!inAppEnabled) return 0;
+    return (notifications || []).filter((n) => !n.readAt).length;
+  }, [notifications, inAppEnabled]);
 
   const handleMarkAllRead = async () => {
     await markAllRead({});
@@ -71,7 +88,11 @@ export function NotificationBell() {
         </div>
         <DropdownMenuSeparator />
         <div className="max-h-[360px] overflow-auto">
-          {(notifications || []).length === 0 ? (
+          {!inAppEnabled ? (
+            <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+              In-app notifications are disabled.
+            </div>
+          ) : (notifications || []).length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               You’re all caught up.
             </div>

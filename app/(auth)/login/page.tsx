@@ -26,11 +26,18 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorTokenId, setTwoFactorTokenId] = useState<string | null>(null);
+  const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const signin = useMutation(
     // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].signin
+  );
+  const verifyTwoFactorSignin = useMutation(
+    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
+    api["auth/mutations"].verifyTwoFactorSignin
   );
   const { setUser } = useAuthStore();
   const { setRefreshToken } = useSessionRotation();
@@ -42,10 +49,39 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
+      if (requiresTwoFactor && twoFactorTokenId) {
+        const result = await verifyTwoFactorSignin({
+          tokenId: twoFactorTokenId,
+          code: twoFactorCode,
+        });
+
+        if (result.success && result.refreshToken) {
+          setRefreshToken(result.refreshToken);
+          if (result.sessionToken) {
+            localStorage.setItem("sessionToken", result.sessionToken);
+          }
+          await new Promise((resolve) => setTimeout(resolve, 50));
+
+          if (result.userRole === "freelancer") {
+            router.replace("/verification");
+          } else {
+            router.push("/dashboard");
+          }
+        }
+        return;
+      }
+
       const result = await signin({
         email,
         password,
       });
+
+      if (result.requiresTwoFactor) {
+        setRequiresTwoFactor(true);
+        setTwoFactorTokenId(result.twoFactorTokenId);
+        setError("");
+        return;
+      }
 
       if (result.success && result.refreshToken) {
         // Store refresh token for automatic rotation
@@ -55,11 +91,11 @@ export default function LoginPage() {
           // In production, store securely (httpOnly cookie preferred)
           localStorage.setItem("sessionToken", result.sessionToken);
         }
-        
+
         // Small delay to ensure localStorage is set before navigation
         // This prevents race conditions with the auth hook reading the token
         await new Promise(resolve => setTimeout(resolve, 50));
-        
+
         // CRITICAL: Freelancers MUST be redirected to verification page
         // They cannot access any part of the platform until verified
         if (result.userRole === "freelancer") {
@@ -187,7 +223,7 @@ export default function LoginPage() {
         <div className="mx-auto w-full max-w-md space-y-10">
           <AuthMobileLogo />
 
-          {/* Header */}
+                    {/* Header */}
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
               <span className="h-2 w-2 rounded-full bg-primary" />
@@ -218,51 +254,80 @@ export default function LoginPage() {
                     {error}
                   </div>
                 )}
-                <div className="space-y-3">
-                  <Label htmlFor="email" className="text-sm font-medium">
-                    Email address
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="h-11"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-sm font-medium">
-                      Password
+                {!requiresTwoFactor ? (
+                  <>
+                    <div className="space-y-3">
+                      <Label htmlFor="email" className="text-sm font-medium">
+                        Email address
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password" className="text-sm font-medium">
+                          Password
+                        </Label>
+                        <Link
+                          href="/forgot-password"
+                          className="text-sm text-primary hover:underline font-medium"
+                        >
+                          Forgot password?
+                        </Link>
+                      </div>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        className="h-11"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <Label htmlFor="twoFactorCode" className="text-sm font-medium">
+                      Verification code
                     </Label>
-                    <Link
-                      href="/forgot-password"
-                      className="text-sm text-primary hover:underline font-medium"
-                    >
-                      Forgot password?
-                    </Link>
+                    <Input
+                      id="twoFactorCode"
+                      type="text"
+                      placeholder="Enter the 6-digit code"
+                      value={twoFactorCode}
+                      onChange={(e) => setTwoFactorCode(e.target.value)}
+                      required
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      We sent a verification code to your email address.
+                    </p>
                   </div>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    className="h-11"
-                  />
-                </div>
+                )}
                 <div className="pt-2">
                   <Button
                     type="submit"
                     className="w-full h-11 text-base font-medium"
                     disabled={isLoading}
                   >
-                    {isLoading ? "Signing in..." : "Sign In"}
+                    {isLoading
+                      ? requiresTwoFactor
+                        ? "Verifying..."
+                        : "Signing in..."
+                      : requiresTwoFactor
+                      ? "Verify & Sign in"
+                      : "Sign In"}
                   </Button>
                 </div>
               </CardContent>

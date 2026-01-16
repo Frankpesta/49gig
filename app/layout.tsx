@@ -3,6 +3,7 @@ import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/lib/convex-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "sonner";
 
 // Inter - Professional, clean, enterprise-grade font (Andela-inspired)
 const inter = Inter({
@@ -43,7 +44,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConvexClientProvider>{children}</ConvexClientProvider>
+          <ConvexClientProvider>
+            {children}
+            <Toaster richColors position="top-right" />
+          </ConvexClientProvider>
         </ThemeProvider>
       </body>
     </html>

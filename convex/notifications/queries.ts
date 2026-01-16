@@ -55,3 +55,37 @@ export const listAllUserIds = internalQuery({
       .map((u) => u._id);
   },
 });
+
+export const getNotificationPreferences = internalQuery({
+  args: {
+    userIds: v.array(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const results: Array<{
+      userId: Doc<"users">["_id"];
+      email: boolean;
+      push: boolean;
+      inApp: boolean;
+    }> = [];
+
+    for (const userId of args.userIds) {
+      const user = await ctx.db.get(userId);
+      if (!user || user.status !== "active") {
+        continue;
+      }
+      const prefs = user.notificationPreferences || {
+        email: true,
+        push: true,
+        inApp: true,
+      };
+      results.push({
+        userId,
+        email: prefs.email,
+        push: prefs.push,
+        inApp: prefs.inApp,
+      });
+    }
+
+    return results;
+  },
+});

@@ -104,6 +104,95 @@ export const updateProfile = mutation({
 });
 
 /**
+ * Update notification preferences
+ */
+export const updateNotificationPreferences = mutation({
+  args: {
+    preferences: v.object({
+      email: v.boolean(),
+      push: v.boolean(),
+      inApp: v.boolean(),
+    }),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    await ctx.db.patch(user._id, {
+      notificationPreferences: args.preferences,
+      updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "notification_preferences_updated",
+      actionType: "system",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: user._id,
+      details: args.preferences,
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Soft-delete account and revoke sessions
+ */
+export const deleteAccount = mutation({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    if (user.status === "deleted") {
+      throw new Error("Account already deleted");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(user._id, {
+      status: "deleted",
+      updatedAt: now,
+    });
+
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    for (const session of sessions) {
+      await ctx.db.patch(session._id, {
+        isActive: false,
+        revokedAt: now,
+        revokedReason: "account_deleted",
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.insert("auditLogs", {
+      action: "account_deleted",
+      actionType: "system",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: user._id,
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
  * Update user role (admin/moderator only)
  */
 export const updateUserRole = mutation({

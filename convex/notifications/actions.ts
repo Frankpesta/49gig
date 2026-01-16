@@ -12,6 +12,7 @@ const api = require("../_generated/api") as {
       queries: {
         listUserIdsByRole: unknown;
         listAllUserIds: unknown;
+        getNotificationPreferences: unknown;
       };
       mutations: {
         createNotifications: unknown;
@@ -52,26 +53,43 @@ async function dispatchNotifications({
   if (userIds.length === 0) return;
 
   const now = Date.now();
+  const getNotificationPreferences = api.api.notifications.queries
+    .getNotificationPreferences as unknown as FunctionReference<"query", "internal">;
   const createNotifications = api.api.notifications.mutations
     .createNotifications as unknown as FunctionReference<
     "mutation",
     "internal"
   >;
 
-  await ctx.runMutation(createNotifications, {
-    notifications: userIds.map((userId) => ({
-      userId,
-      title,
-      message,
-      type,
-      data,
-      createdAt: now,
-    })),
+  const preferences = await ctx.runQuery(getNotificationPreferences, {
+    userIds,
   });
+
+  const inAppUserIds = preferences
+    .filter((pref: { inApp: boolean }) => pref.inApp)
+    .map((pref: { userId: Id<"users"> }) => pref.userId);
+
+  if (inAppUserIds.length > 0) {
+    await ctx.runMutation(createNotifications, {
+      notifications: inAppUserIds.map((userId: Id<"users">) => ({
+        userId,
+        title,
+        message,
+        type,
+        data,
+        createdAt: now,
+      })),
+    });
+  }
 
   if (!pusherEnabled) return;
 
-  const channels = userIds.map((id) => `user-${id}`);
+  const channels = preferences
+    .filter((pref: { push: boolean }) => pref.push)
+    .map((pref: { userId: Id<"users"> }) => `user-${pref.userId}`);
+
+  if (channels.length === 0) return;
+
   await pusher.trigger(channels, "notification:new", {
     title,
     message,

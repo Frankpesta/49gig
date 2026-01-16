@@ -2,6 +2,101 @@ import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { checkRateLimit, clearRateLimit } from "./rateLimit";
 import { hashPassword, verifyPassword } from "./password";
+import type { FunctionReference } from "convex/server";
+import { Doc } from "../_generated/dataModel";
+
+const api = require("../_generated/api") as {
+  api: {
+    auth: { actions: { sendTwoFactorCodeEmail: unknown } };
+  };
+};
+
+const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+const REFRESH_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const TWO_FACTOR_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const TWO_FACTOR_MAX_ATTEMPTS = 5;
+
+function generateToken(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+}
+
+function generateTwoFactorCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+async function createSessionForUser(ctx: any, userId: Doc<"users">["_id"]) {
+  const now = Date.now();
+  const sessionToken = generateToken("token");
+  const refreshToken = generateToken("refresh");
+
+  const sessionId = await ctx.db.insert("sessions", {
+    userId,
+    sessionToken,
+    refreshToken,
+    expiresAt: now + SESSION_DURATION_MS,
+    refreshExpiresAt: now + REFRESH_DURATION_MS,
+    lastRotatedAt: now,
+    rotationCount: 0,
+    ipAddress: undefined,
+    userAgent: undefined,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  return {
+    sessionId,
+    sessionToken,
+    refreshToken,
+    expiresAt: now + SESSION_DURATION_MS,
+  };
+}
+
+async function createTwoFactorToken(
+  ctx: any,
+  userId: Doc<"users">["_id"],
+  purpose: "signin" | "enable" | "disable"
+) {
+  const code = generateTwoFactorCode();
+  const now = Date.now();
+  const tokenId = await ctx.db.insert("twoFactorTokens", {
+    userId,
+    code,
+    purpose,
+    expiresAt: now + TWO_FACTOR_EXPIRY_MS,
+    attempts: 0,
+    createdAt: now,
+  });
+
+  return { tokenId, code };
+}
+
+async function getActiveUserById(
+  ctx: any,
+  userId?: Doc<"users">["_id"]
+): Promise<Doc<"users"> | null> {
+  if (!userId) return null;
+  const user = await ctx.db.get(userId);
+  if (!user) return null;
+  const userDoc = user as Doc<"users">;
+  if (userDoc.status !== "active") return null;
+  return userDoc;
+}
+
+async function getUserBySessionToken(ctx: any, sessionToken: string) {
+  const session = await ctx.db
+    .query("sessions")
+    .withIndex("by_token", (q: any) => q.eq("sessionToken", sessionToken))
+    .first();
+  if (!session || !session.isActive || session.expiresAt < Date.now()) {
+    throw new Error("Session invalid or expired");
+  }
+  const user = await ctx.db.get(session.userId);
+  if (!user || user.status !== "active") {
+    throw new Error("User not found");
+  }
+  return { session, user: user as Doc<"users"> };
+}
 
 /**
  * Sign up with email and password
@@ -48,6 +143,13 @@ export const signup = mutation({
       name: args.name,
       authProvider: "email",
       passwordHash: passwordHash,
+      twoFactorEnabled: false,
+      twoFactorMethod: undefined,
+      notificationPreferences: {
+        email: true,
+        push: true,
+        inApp: true,
+      },
       role: args.role,
       status: "active",
       createdAt: Date.now(),
@@ -143,35 +245,30 @@ export const signin = mutation({
       updatedAt: now,
     });
 
-    // Create session using internal mutation
-    // Note: In production, you'd call the createSession mutation
-    // For now, we'll create it directly here
-    const sessionToken = `token_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    const refreshToken = `refresh_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
-    const REFRESH_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-    
-    const sessionId = await ctx.db.insert("sessions", {
-      userId: user._id,
-      sessionToken,
-      refreshToken,
-      expiresAt: now + SESSION_DURATION_MS,
-      refreshExpiresAt: now + REFRESH_DURATION_MS,
-      lastRotatedAt: now,
-      rotationCount: 0,
-      ipAddress: undefined,
-      userAgent: undefined,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-    
-    const session = {
-      sessionId,
-      sessionToken,
-      refreshToken,
-      expiresAt: now + SESSION_DURATION_MS,
-    };
+    if (user.twoFactorEnabled) {
+      const sendTwoFactorCodeEmail = api.api.auth.actions
+        .sendTwoFactorCodeEmail as unknown as FunctionReference<"action">;
+      const { tokenId, code } = await createTwoFactorToken(
+        ctx,
+        user._id,
+        "signin"
+      );
+
+      await ctx.scheduler.runAfter(0, sendTwoFactorCodeEmail, {
+        email: user.email,
+        name: user.name,
+        code,
+        purpose: "sign in",
+      });
+
+      return {
+        success: true,
+        requiresTwoFactor: true,
+        twoFactorTokenId: tokenId,
+      };
+    }
+
+    const session = await createSessionForUser(ctx, user._id);
 
     // Create audit log for successful login
     await ctx.db.insert("auditLogs", {
@@ -390,3 +487,336 @@ export const resendEmailVerification = mutation({
   },
 });
 
+/**
+ * Change password (email auth only)
+ */
+export const changePassword = mutation({
+  args: {
+    currentPassword: v.string(),
+    newPassword: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getActiveUserById(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    if (user.authProvider !== "email" || !user.passwordHash) {
+      throw new Error("Password change is only available for email accounts");
+    }
+
+    if (args.newPassword.length < 8) {
+      throw new Error("Password must be at least 8 characters");
+    }
+
+    const isValid = verifyPassword(args.currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new Error("Current password is incorrect");
+    }
+
+    const passwordHash = hashPassword(args.newPassword);
+    await ctx.db.patch(user._id, {
+      passwordHash,
+      updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "password_changed",
+      actionType: "auth",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: user._id,
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Two-factor: request enable
+ */
+export const requestTwoFactorEnable = mutation({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await getActiveUserById(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    if (user.twoFactorEnabled) {
+      throw new Error("Two-factor authentication is already enabled");
+    }
+
+    const sendTwoFactorCodeEmail = api.api.auth.actions
+      .sendTwoFactorCodeEmail as unknown as FunctionReference<"action">;
+    const { tokenId, code } = await createTwoFactorToken(
+      ctx,
+      user._id,
+      "enable"
+    );
+
+    await ctx.scheduler.runAfter(0, sendTwoFactorCodeEmail, {
+      email: user.email,
+      name: user.name,
+      code,
+      purpose: "enable two-factor authentication",
+    });
+
+    return { success: true, twoFactorTokenId: tokenId };
+  },
+});
+
+export const confirmTwoFactorEnable = mutation({
+  args: {
+    tokenId: v.id("twoFactorTokens"),
+    code: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getActiveUserById(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const token = await ctx.db.get(args.tokenId);
+    if (!token || token.userId !== user._id || token.purpose !== "enable") {
+      throw new Error("Invalid verification code");
+    }
+
+    if (token.usedAt || token.expiresAt < Date.now()) {
+      throw new Error("Verification code expired");
+    }
+
+    if (token.code !== args.code) {
+      const attempts = token.attempts + 1;
+      await ctx.db.patch(args.tokenId, { attempts });
+      if (attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+        await ctx.db.patch(args.tokenId, { usedAt: Date.now() });
+      }
+      throw new Error("Invalid verification code");
+    }
+
+    await ctx.db.patch(args.tokenId, { usedAt: Date.now() });
+    await ctx.db.patch(user._id, {
+      twoFactorEnabled: true,
+      twoFactorMethod: "email",
+      updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "two_factor_enabled",
+      actionType: "auth",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: user._id,
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Two-factor: request disable
+ */
+export const requestTwoFactorDisable = mutation({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await getActiveUserById(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    if (!user.twoFactorEnabled) {
+      throw new Error("Two-factor authentication is not enabled");
+    }
+
+    const sendTwoFactorCodeEmail = api.api.auth.actions
+      .sendTwoFactorCodeEmail as unknown as FunctionReference<"action">;
+    const { tokenId, code } = await createTwoFactorToken(
+      ctx,
+      user._id,
+      "disable"
+    );
+
+    await ctx.scheduler.runAfter(0, sendTwoFactorCodeEmail, {
+      email: user.email,
+      name: user.name,
+      code,
+      purpose: "disable two-factor authentication",
+    });
+
+    return { success: true, twoFactorTokenId: tokenId };
+  },
+});
+
+export const confirmTwoFactorDisable = mutation({
+  args: {
+    tokenId: v.id("twoFactorTokens"),
+    code: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getActiveUserById(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const token = await ctx.db.get(args.tokenId);
+    if (!token || token.userId !== user._id || token.purpose !== "disable") {
+      throw new Error("Invalid verification code");
+    }
+
+    if (token.usedAt || token.expiresAt < Date.now()) {
+      throw new Error("Verification code expired");
+    }
+
+    if (token.code !== args.code) {
+      const attempts = token.attempts + 1;
+      await ctx.db.patch(args.tokenId, { attempts });
+      if (attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+        await ctx.db.patch(args.tokenId, { usedAt: Date.now() });
+      }
+      throw new Error("Invalid verification code");
+    }
+
+    await ctx.db.patch(args.tokenId, { usedAt: Date.now() });
+    await ctx.db.patch(user._id, {
+      twoFactorEnabled: false,
+      twoFactorMethod: undefined,
+      updatedAt: Date.now(),
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "two_factor_disabled",
+      actionType: "auth",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: user._id,
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Verify two-factor code and create session
+ */
+export const verifyTwoFactorSignin = mutation({
+  args: {
+    tokenId: v.id("twoFactorTokens"),
+    code: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const token = await ctx.db.get(args.tokenId);
+    if (!token || token.purpose !== "signin") {
+      throw new Error("Invalid verification code");
+    }
+
+    if (token.usedAt || token.expiresAt < Date.now()) {
+      throw new Error("Verification code expired");
+    }
+
+    if (token.code !== args.code) {
+      const attempts = token.attempts + 1;
+      await ctx.db.patch(args.tokenId, { attempts });
+      if (attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+        await ctx.db.patch(args.tokenId, { usedAt: Date.now() });
+      }
+      throw new Error("Invalid verification code");
+    }
+
+    const user = await ctx.db.get(token.userId);
+    if (!user || user.status !== "active") {
+      throw new Error("User not found");
+    }
+
+    await ctx.db.patch(args.tokenId, { usedAt: Date.now() });
+    const session = await createSessionForUser(ctx, user._id);
+
+    await ctx.db.insert("auditLogs", {
+      action: "login_success",
+      actionType: "auth",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: user._id,
+      details: {
+        email: user.email,
+        sessionId: session.sessionId,
+      },
+      createdAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      userId: user._id,
+      sessionToken: session.sessionToken,
+      refreshToken: session.refreshToken,
+      expiresAt: session.expiresAt,
+      userRole: user.role,
+    };
+  },
+});
+
+/**
+ * Revoke a specific session by ID
+ */
+export const revokeSessionById = mutation({
+  args: {
+    sessionToken: v.string(),
+    sessionId: v.id("sessions"),
+  },
+  handler: async (ctx, args) => {
+    const { user } = await getUserBySessionToken(ctx, args.sessionToken);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== user._id) {
+      throw new Error("Session not found");
+    }
+
+    await ctx.db.patch(session._id, {
+      isActive: false,
+      revokedAt: Date.now(),
+      revokedReason: "user_logout",
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Revoke all other sessions
+ */
+export const revokeOtherSessions = mutation({
+  args: {
+    sessionToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const { user, session } = await getUserBySessionToken(ctx, args.sessionToken);
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q: any) => q.eq("userId", user._id))
+      .collect();
+
+    const now = Date.now();
+    for (const s of sessions) {
+      if (s._id === session._id) continue;
+      if (!s.isActive) continue;
+      await ctx.db.patch(s._id, {
+        isActive: false,
+        revokedAt: now,
+        revokedReason: "user_logout_other_sessions",
+        updatedAt: now,
+      });
+    }
+
+    return { success: true };
+  },
+});

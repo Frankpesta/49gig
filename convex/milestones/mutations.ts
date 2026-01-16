@@ -2,6 +2,13 @@ import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 /**
  * Helper to get current user in mutations
@@ -104,6 +111,20 @@ export const submitMilestone = mutation({
       createdAt: now,
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Milestone submitted",
+      message: `A milestone was submitted for ${project.intakeForm.title}.`,
+      type: "milestone",
+      data: { milestoneId: args.milestoneId, projectId: milestone.projectId },
+    });
+
     return args.milestoneId;
   },
 });
@@ -170,6 +191,22 @@ export const approveMilestone = mutation({
       createdAt: now,
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
+    if (project.matchedFreelancerId) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [project.matchedFreelancerId],
+        title: "Milestone approved",
+        message: `A milestone was approved for ${project.intakeForm.title}.`,
+        type: "milestone",
+        data: { milestoneId: args.milestoneId, projectId: milestone.projectId },
+      });
+    }
+
     return args.milestoneId;
   },
 });
@@ -233,6 +270,22 @@ export const rejectMilestone = mutation({
       createdAt: now,
     });
 
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
+    if (project.matchedFreelancerId) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [project.matchedFreelancerId],
+        title: "Milestone rejected",
+        message: `A milestone was rejected for ${project.intakeForm.title}.`,
+        type: "milestone",
+        data: { milestoneId: args.milestoneId, projectId: milestone.projectId },
+      });
+    }
+
     return args.milestoneId;
   },
 });
@@ -291,6 +344,20 @@ export const startMilestone = mutation({
         projectId: milestone.projectId,
       },
       createdAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Milestone started",
+      message: `Work has started on a milestone for ${project.intakeForm.title}.`,
+      type: "milestone",
+      data: { milestoneId: args.milestoneId, projectId: milestone.projectId },
     });
 
     return args.milestoneId;
