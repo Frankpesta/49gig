@@ -8,6 +8,7 @@ import type { FunctionReference } from "convex/server";
 
 const api = require("../_generated/api") as {
   api: {
+    auth: { queries: { verifySession: unknown } };
     notifications: {
       queries: {
         listUserIdsByRole: unknown;
@@ -187,14 +188,35 @@ export const sendAdminNotification = action({
     title: v.string(),
     message: v.string(),
     data: v.optional(v.any()),
+    sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
+    let role: string | null = typeof identity?.role === "string" ? identity.role : null;
+    let userId: Id<"users"> | null = null;
+
+    if (!role && args.sessionToken) {
+      const authQueries = (api.api as unknown as Record<string, unknown>)[
+        "auth/queries"
+      ] as Record<string, unknown>;
+      const verifySession = authQueries[
+        "verifySession"
+      ] as unknown as FunctionReference<"query">;
+      const sessionUser = (await ctx.runQuery(verifySession, {
+        sessionToken: args.sessionToken,
+      })) as { _id?: Id<"users">; role?: string; status?: string } | null;
+
+      if (sessionUser && sessionUser.status === "active") {
+        role = sessionUser.role || null;
+        userId = sessionUser._id || null;
+      }
+    }
+
+    if (!role) {
       throw new Error("Not authenticated");
     }
 
-    if (identity.role !== "admin" && identity.role !== "moderator") {
+    if (role !== "admin" && role !== "moderator") {
       throw new Error("Not authorized");
     }
 

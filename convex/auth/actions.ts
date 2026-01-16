@@ -4,7 +4,12 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import React from "react";
 import { sendEmail } from "../email/send";
-import { VerificationEmail, PasswordResetEmail, WelcomeEmail } from "../../emails/templates";
+import {
+  VerificationEmail,
+  PasswordResetEmail,
+  WelcomeEmail,
+  TwoFactorCodeEmail,
+} from "../../emails/templates";
 
 function getAppUrl() {
   return (
@@ -134,3 +139,31 @@ export const sendWelcomeEmail = action({
   },
 });
 
+export const sendTwoFactorCodeEmail = action({
+  args: {
+    email: v.string(),
+    name: v.optional(v.string()),
+    code: v.string(),
+    purpose: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+
+    await sendEmail({
+      to: args.email,
+      subject: "Your 49GIG verification code",
+      react: React.createElement(TwoFactorCodeEmail, {
+        name: args.name || "there",
+        code: args.code,
+        purpose: args.purpose || "sign in",
+        appUrl,
+        logoUrl,
+        date,
+      }),
+    });
+
+    return { success: true };
+  },
+});

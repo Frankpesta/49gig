@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -24,6 +24,7 @@ export default function AdminNotificationsPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   const users = useQuery(
     (api as any)["users/queries"].getAllUsersAdmin,
@@ -45,6 +46,12 @@ export default function AdminNotificationsPage() {
       );
     });
   }, [users, searchTerm]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSessionToken(localStorage.getItem("sessionToken"));
+    }
+  }, []);
 
   if (!isAuthenticated || !user) {
     return (
@@ -95,6 +102,7 @@ export default function AdminNotificationsPage() {
         },
         title: title.trim(),
         message: message.trim(),
+        sessionToken: sessionToken || undefined,
       });
 
       setTitle("");

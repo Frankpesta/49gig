@@ -12,6 +12,13 @@ const api = require("../_generated/api") as {
   };
 };
 
+const authActions = (api.api as unknown as Record<string, unknown>)[
+  "auth/actions"
+] as Record<string, unknown>;
+const sendTwoFactorCodeEmailRef = authActions[
+  "sendTwoFactorCodeEmail"
+] as unknown as FunctionReference<"action">;
+
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REFRESH_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const TWO_FACTOR_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
@@ -259,8 +266,7 @@ export const signin = mutation({
     });
 
     if (user.twoFactorEnabled) {
-      const sendTwoFactorCodeEmail = api.api.auth.actions
-        .sendTwoFactorCodeEmail as unknown as FunctionReference<"action">;
+      const sendTwoFactorCodeEmail = sendTwoFactorCodeEmailRef;
       const { tokenId, code } = await createTwoFactorToken(
         ctx,
         user._id,
@@ -563,8 +569,7 @@ export const requestTwoFactorEnable = mutation({
       throw new Error("Two-factor authentication is already enabled");
     }
 
-    const sendTwoFactorCodeEmail = api.api.auth.actions
-      .sendTwoFactorCodeEmail as unknown as FunctionReference<"action">;
+    const sendTwoFactorCodeEmail = sendTwoFactorCodeEmailRef;
     const { tokenId, code } = await createTwoFactorToken(
       ctx,
       user._id,
@@ -648,8 +653,7 @@ export const requestTwoFactorDisable = mutation({
       throw new Error("Two-factor authentication is not enabled");
     }
 
-    const sendTwoFactorCodeEmail = api.api.auth.actions
-      .sendTwoFactorCodeEmail as unknown as FunctionReference<"action">;
+    const sendTwoFactorCodeEmail = sendTwoFactorCodeEmailRef;
     const { tokenId, code } = await createTwoFactorToken(
       ctx,
       user._id,
