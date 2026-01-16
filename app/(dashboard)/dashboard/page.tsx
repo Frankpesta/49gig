@@ -1,9 +1,11 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { MetricCard } from "@/components/dashboard/metric-card";
+import { AdminCharts } from "@/components/dashboard/admin-charts";
 import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,7 @@ import Link from "next/link";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [adminRangeDays, setAdminRangeDays] = useState(90);
 
   if (!user) {
     return null;
@@ -42,6 +45,10 @@ export default function DashboardPage() {
   const dashboardMetrics = useQuery(
     (api as any).dashboard.queries.getDashboardMetrics,
     user?._id ? { userId: user._id } : "skip"
+  );
+  const adminCharts = useQuery(
+    (api as any)["analytics/queries"].getAdminChartData,
+    isAdmin && user?._id ? { userId: user._id, rangeDays: adminRangeDays } : "skip"
   );
 
   const formatCurrency = (value: number) =>
@@ -277,6 +284,31 @@ export default function DashboardPage() {
           />
         ))}
       </div>
+
+      {isAdmin && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-heading font-semibold">Platform trends</h2>
+            <p className="text-sm text-muted-foreground">
+              Real-time operational charts for admins.
+            </p>
+          </div>
+          {adminCharts ? (
+            <AdminCharts
+              data={adminCharts}
+              timeRangeDays={adminRangeDays}
+              onTimeRangeChange={setAdminRangeDays}
+            />
+          ) : (
+            <Card className="flex h-[220px] items-center justify-center">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                Loading charts...
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Quick Actions with Enhanced Design */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
