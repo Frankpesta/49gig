@@ -31,12 +31,8 @@ export default function LoginPage() {
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const signin = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
-    api["auth/mutations"].signin
-  );
+  const signin = useMutation(api["auth/mutations"].signin);
   const verifyTwoFactorSignin = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].verifyTwoFactorSignin
   );
   const { setUser } = useAuthStore();
