@@ -5,7 +5,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useAuthStore } from "@/stores/authStore";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ type SessionInfo = {
 export default function SettingsPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { logout } = useAuthStore();
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -49,50 +50,55 @@ export default function SettingsPage() {
   const [twoFactorMode, setTwoFactorMode] = useState<"enable" | "disable" | null>(
     null
   );
+  const [stripeStatus, setStripeStatus] = useState<{
+    chargesEnabled: boolean;
+    payoutsEnabled: boolean;
+    detailsSubmitted: boolean;
+    requirements: {
+      currently_due: string[];
+      past_due: string[];
+      eventually_due: string[];
+      pending_verification: string[];
+      disabled_reason?: string | null;
+    };
+  } | null>(null);
+  const [isStripeStatusLoading, setIsStripeStatusLoading] = useState(false);
+  const [stripeNoticeHandled, setStripeNoticeHandled] = useState(false);
 
-  const changePassword = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
-    api["auth/mutations"].changePassword
-  );
+  const changePassword = useMutation(api["auth/mutations"].changePassword);
   const updateNotificationPreferences = useMutation(
     api.users.mutations.updateNotificationPreferences
   );
   const requestTwoFactorEnable = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].requestTwoFactorEnable
   );
   const confirmTwoFactorEnable = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].confirmTwoFactorEnable
   );
   const requestTwoFactorDisable = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].requestTwoFactorDisable
   );
   const confirmTwoFactorDisable = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].confirmTwoFactorDisable
   );
   const revokeSessionById = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].revokeSessionById
   );
   const revokeOtherSessions = useMutation(
-    // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
     api["auth/mutations"].revokeOtherSessions
   );
   const deleteAccount = useMutation(api.users.mutations.deleteAccount);
   const createConnectLoginLink = useAction(
-    // @ts-expect-error - Dynamic path access for "payments/actions" requires type assertion
     api["payments/actions"].createConnectLoginLink
   );
   const createConnectAccountLink = useAction(
-    // @ts-expect-error - Dynamic path access for "payments/actions" requires type assertion
     api["payments/actions"].createConnectAccountLink
+  );
+  const getConnectAccountStatus = useAction(
+    api["payments/actions"].getConnectAccountStatus
   );
 
   const sessionsData = useQuery(
-    // @ts-expect-error - Dynamic path access for "auth/queries" requires type assertion
     api["auth/queries"].listSessionsForToken,
     sessionToken ? { sessionToken } : "skip"
   );
@@ -114,10 +120,6 @@ export default function SettingsPage() {
     }
   }, [user]);
 
-  const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
-  const stripeAccountId = (currentUser as any)?.stripeAccountId;
-  const isFreelancer = user.role === "freelancer";
-
   if (!isAuthenticated || !user) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -125,6 +127,10 @@ export default function SettingsPage() {
       </div>
     );
   }
+
+  const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
+  const stripeAccountId = (currentUser as any)?.stripeAccountId;
+  const isFreelancer = user.role === "freelancer";
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -222,10 +228,34 @@ export default function SettingsPage() {
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       if (stripeAccountId) {
-        const result = await createConnectLoginLink({
-          userId: user._id,
-          returnUrl: `${origin}/dashboard/settings?stripe=manage`,
-        });
+        const needsOnboarding =
+          stripeStatus &&
+          (stripeStatus.requirements.past_due.length > 0 ||
+            stripeStatus.requirements.currently_due.length > 0 ||
+            stripeStatus.requirements.pending_verification.length > 0 ||
+            !stripeStatus.detailsSubmitted);
+
+        if (needsOnboarding) {
+          const result = await createConnectAccountLink({
+            userId: user._id,
+            returnUrl: `${origin}/dashboard/settings?stripe=connected`,
+            refreshUrl: `${origin}/dashboard/settings?stripe=refresh`,
+          });
+          if (result?.url) {
+            window.location.href = result.url;
+          }
+          return;
+        }
+
+        const attemptLogin = async () =>
+          createConnectLoginLink({
+            userId: user._id,
+            returnUrl: `${origin}/dashboard/settings?stripe=manage`,
+          });
+        let result = await attemptLogin();
+        if (!result?.url) {
+          result = await attemptLogin();
+        }
         if (result?.url) {
           window.location.href = result.url;
         }
@@ -247,6 +277,64 @@ export default function SettingsPage() {
       );
     }
   };
+
+  const handleRefreshStripeStatus = async () => {
+    if (!stripeAccountId) return;
+    setIsStripeStatusLoading(true);
+    try {
+      const result = await getConnectAccountStatus({ userId: user._id });
+      setStripeStatus(result?.connected ? result : null);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to refresh Stripe status"
+      );
+    } finally {
+      setIsStripeStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!stripeAccountId) {
+      setStripeStatus(null);
+      return;
+    }
+    let isMounted = true;
+    setIsStripeStatusLoading(true);
+    getConnectAccountStatus({ userId: user._id })
+      .then((result) => {
+        if (isMounted) {
+          setStripeStatus(result?.connected ? result : null);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setStripeStatus(null);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsStripeStatusLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [getConnectAccountStatus, stripeAccountId, user._id]);
+
+  useEffect(() => {
+    if (stripeNoticeHandled) return;
+    const notice = searchParams.get("stripe");
+    if (!notice) return;
+    setStripeNoticeHandled(true);
+    if (notice === "connected") {
+      toast.success("Stripe connected");
+    } else if (notice === "refresh") {
+      toast.error("Stripe session expired. Refreshing...");
+      handleStripeConnect();
+    } else if (notice === "manage") {
+      toast.success("Stripe dashboard opened");
+    }
+  }, [searchParams, stripeNoticeHandled]);
 
   const handleRevokeSession = async (sessionId: string) => {
     if (!sessionToken) return;
@@ -546,8 +634,8 @@ export default function SettingsPage() {
               Connect your Stripe account to receive payouts.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1">
+          <CardContent className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-2">
               <p className="text-sm font-medium">
                 {stripeAccountId ? "Stripe connected" : "Stripe not connected"}
               </p>
@@ -556,10 +644,81 @@ export default function SettingsPage() {
                   ? "Your payouts will be sent to your connected bank account."
                   : "Complete onboarding to enable payouts."}
               </p>
+              {stripeAccountId && (
+                <div className="text-xs text-muted-foreground">
+                  {isStripeStatusLoading ? (
+                    <span>Checking payout status...</span>
+                  ) : stripeStatus ? (
+                    <div className="space-y-1">
+                      <div>
+                        Payouts:{" "}
+                        <span className="font-medium">
+                          {stripeStatus.payoutsEnabled ? "enabled" : "disabled"}
+                        </span>
+                      </div>
+                      <div>
+                        Charges:{" "}
+                        <span className="font-medium">
+                          {stripeStatus.chargesEnabled ? "enabled" : "disabled"}
+                        </span>
+                      </div>
+                      <div>
+                        Details submitted:{" "}
+                        <span className="font-medium">
+                          {stripeStatus.detailsSubmitted ? "yes" : "no"}
+                        </span>
+                      </div>
+                      {stripeStatus.requirements.past_due.length > 0 && (
+                        <div className="text-destructive">
+                          Action required:{" "}
+                          {stripeStatus.requirements.past_due.join(", ")}
+                        </div>
+                      )}
+                      {stripeStatus.requirements.currently_due.length > 0 && (
+                        <div>
+                          Pending: {stripeStatus.requirements.currently_due.join(", ")}
+                        </div>
+                      )}
+                      {stripeStatus.requirements.eventually_due.length > 0 && (
+                        <div>
+                          Eventually due: {stripeStatus.requirements.eventually_due.join(", ")}
+                        </div>
+                      )}
+                      {stripeStatus.requirements.pending_verification.length > 0 && (
+                        <div>
+                          Verification pending:{" "}
+                          {stripeStatus.requirements.pending_verification.join(", ")}
+                        </div>
+                      )}
+                      {stripeStatus.requirements.disabled_reason && (
+                        <div className="text-destructive">
+                          Disabled: {stripeStatus.requirements.disabled_reason}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span>Unable to load Stripe status.</span>
+                  )}
+                </div>
+              )}
             </div>
-            <Button onClick={handleStripeConnect} variant={stripeAccountId ? "outline" : "default"}>
-              {stripeAccountId ? "Manage Stripe" : "Connect Stripe"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {stripeAccountId && (
+                <Button
+                  variant="outline"
+                  onClick={handleRefreshStripeStatus}
+                  disabled={isStripeStatusLoading}
+                >
+                  Refresh status
+                </Button>
+              )}
+              <Button
+                onClick={handleStripeConnect}
+                variant={stripeAccountId ? "outline" : "default"}
+              >
+                {stripeAccountId ? "Manage Stripe" : "Connect Stripe"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

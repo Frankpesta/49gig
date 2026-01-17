@@ -33,6 +33,8 @@ export default function ModeratorDisputesPage() {
   const [statusFilter, setStatusFilter] = useState<
     "open" | "under_review" | "resolved" | "escalated" | "closed" | undefined
   >(undefined);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   const disputes = useQuery(
     api.disputes.queries.getPendingDisputes,
@@ -104,6 +106,12 @@ export default function ModeratorDisputesPage() {
     return labels[type] || type;
   };
 
+  const totalPages = Math.max(1, Math.ceil(allDisputes.length / itemsPerPage));
+  const paginatedDisputes = allDisputes.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="container mx-auto max-w-7xl py-8">
       <div className="mb-8">
@@ -165,9 +173,10 @@ export default function ModeratorDisputesPage() {
       <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center">
         <Select
           value={statusFilter || "all"}
-          onValueChange={(value) =>
-            setStatusFilter(value === "all" ? undefined : (value as any))
-          }
+          onValueChange={(value) => {
+            setStatusFilter(value === "all" ? undefined : (value as any));
+            setCurrentPage(1);
+          }}
         >
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Filter by status" />
@@ -211,7 +220,7 @@ export default function ModeratorDisputesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {allDisputes?.map((dispute: Doc<"disputes">) => (
+                {paginatedDisputes.map((dispute: Doc<"disputes">) => (
                   <TableRow key={dispute._id}>
                     <TableCell className="font-mono text-xs">
                       {dispute._id.slice(-8)}
@@ -274,6 +283,31 @@ export default function ModeratorDisputesPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {allDisputes.length > itemsPerPage && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

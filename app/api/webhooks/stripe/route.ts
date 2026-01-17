@@ -63,16 +63,6 @@ export async function POST(request: NextRequest) {
         break;
       }
 
-      case "payment_intent.canceled": {
-        const paymentIntentCanceled = event.data.object as Stripe.PaymentIntent;
-        await convex.action((api as any)["payments/actions"].handleStripeWebhook, {
-          eventType: "payment_intent.canceled",
-          eventId: event.id,
-          paymentIntentId: paymentIntentCanceled.id,
-          data: paymentIntentCanceled,
-        });
-        break;
-      }
       case "transfer.created":
       case "transfer.paid":
       case "transfer.failed":

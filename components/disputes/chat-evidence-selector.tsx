@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Check } from "lucide-react";
 import { useState } from "react";
-import { Id } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 interface ChatEvidenceSelectorProps {
   projectId: Id<"projects">;
@@ -81,7 +81,7 @@ export function ChatEvidenceSelector({
           </p>
           <div className="flex flex-wrap gap-2">
             {selectedMessages.map((msgId) => {
-              const msg = messages?.find((m) => m._id === msgId);
+              const msg = messages?.find((m: Doc<"messages">) => m._id === msgId);
               if (!msg) return null;
               return (
                 <Badge key={msgId} variant="secondary" className="text-xs">
@@ -109,7 +109,7 @@ export function ChatEvidenceSelector({
               </p>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {messages.map((message) => (
+                {messages.map((message: Doc<"messages">) => (
                   <div
                     key={message._id}
                     className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${

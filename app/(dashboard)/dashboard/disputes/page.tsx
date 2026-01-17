@@ -24,6 +24,8 @@ export default function DisputesPage() {
   const [statusFilter, setStatusFilter] = useState<
     "open" | "under_review" | "resolved" | "escalated" | "closed" | undefined
   >(undefined);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   const disputes = useQuery(
     api.disputes.queries.getDisputes,
@@ -73,6 +75,12 @@ export default function DisputesPage() {
     return labels[type] || type;
   };
 
+  const totalPages = Math.max(1, Math.ceil(disputes.length / itemsPerPage));
+  const paginatedDisputes = disputes.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
     <div className="container mx-auto max-w-7xl py-8">
       <div className="mb-8 flex items-center justify-between">
@@ -96,25 +104,37 @@ export default function DisputesPage() {
       <div className="mb-6 flex gap-2">
         <Button
           variant={statusFilter === undefined ? "default" : "outline"}
-          onClick={() => setStatusFilter(undefined)}
+          onClick={() => {
+            setStatusFilter(undefined);
+            setCurrentPage(1);
+          }}
         >
           All
         </Button>
         <Button
           variant={statusFilter === "open" ? "default" : "outline"}
-          onClick={() => setStatusFilter("open")}
+          onClick={() => {
+            setStatusFilter("open");
+            setCurrentPage(1);
+          }}
         >
           Open
         </Button>
         <Button
           variant={statusFilter === "under_review" ? "default" : "outline"}
-          onClick={() => setStatusFilter("under_review")}
+          onClick={() => {
+            setStatusFilter("under_review");
+            setCurrentPage(1);
+          }}
         >
           Under Review
         </Button>
         <Button
           variant={statusFilter === "resolved" ? "default" : "outline"}
-          onClick={() => setStatusFilter("resolved")}
+          onClick={() => {
+            setStatusFilter("resolved");
+            setCurrentPage(1);
+          }}
         >
           Resolved
         </Button>
@@ -146,7 +166,7 @@ export default function DisputesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {disputes?.map((dispute: Doc<"disputes">) => (
+                {paginatedDisputes.map((dispute: Doc<"disputes">) => (
                   <TableRow key={dispute._id}>
                     <TableCell className="font-mono text-xs">
                       {dispute._id.slice(-8)}
@@ -181,6 +201,31 @@ export default function DisputesPage() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {disputes.length > itemsPerPage && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -2,7 +2,30 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import Stripe from "stripe";
+import React from "react";
 import { internal, api } from "../_generated/api";
+import { sendEmail } from "../email/send";
+import {
+  RefundIssuedEmail,
+  PayoutSentEmail,
+  PayoutFailedEmail,
+} from "../../emails/templates";
+
+function getAppUrl() {
+  return process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://49gig.com";
+}
+
+function getLogoUrl(appUrl: string) {
+  return appUrl + "/logo-light.png";
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 /**
  * Get Stripe instance (lazy initialization)
@@ -10,7 +33,9 @@ import { internal, api } from "../_generated/api";
 function getStripe(): Stripe {
   const apiKey = process.env.STRIPE_SECRET_KEY;
   if (!apiKey) {
-    throw new Error("STRIPE_SECRET_KEY environment variable is not set. Please configure it in the Convex dashboard.");
+    throw new Error(
+      "STRIPE_SECRET_KEY environment variable is not set. Please configure it in the Convex dashboard."
+    );
   }
   return new Stripe(apiKey, {
     apiVersion: "2025-12-15.clover",
@@ -19,21 +44,18 @@ function getStripe(): Stripe {
 
 /**
  * Create a Stripe Payment Intent for project pre-funding
- * This creates a payment intent that the client will pay
  */
 export const createPaymentIntent = action({
   args: {
     projectId: v.id("projects"),
-    amount: v.number(), // Amount in cents
-    currency: v.string(), // e.g., "usd"
+    amount: v.number(),
+    currency: v.string(),
     userId: v.id("users"),
   },
   handler: async (ctx, args): Promise<{ clientSecret: string | null; paymentId: string }> => {
-    // Verify user and project
     const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
       userId: args.userId,
     });
-
     if (!user || user.role !== "client") {
       throw new Error("Only clients can create payment intents");
     }
@@ -42,74 +64,58 @@ export const createPaymentIntent = action({
       projectId: args.projectId,
       userId: args.userId,
     });
-
     if (!project) {
       throw new Error("Project not found");
     }
-
     if (project.clientId !== user._id) {
       throw new Error("Not authorized to pay for this project");
     }
-
     if (project.status !== "draft" && project.status !== "pending_funding") {
       throw new Error("Project is not in a state that allows payment");
     }
 
-    // Check if payment already exists - CRITICAL: Check for ANY payment, not just succeeded
-    // This prevents duplicate payment creation
     const existingPayment = await ctx.runQuery(
       internal.payments.queries.getPaymentByProject,
-      {
-        projectId: args.projectId,
-      }
+      { projectId: args.projectId }
     );
-
     if (existingPayment) {
-      // If payment already succeeded, project is funded
       if (existingPayment.status === "succeeded") {
         throw new Error("Project is already funded");
       }
-      
-      // If there's a pending payment intent, return its client secret
-      // This handles the case where user refreshes the page or navigates back
-      if (existingPayment.stripePaymentIntentId && 
-          (existingPayment.status === "pending" || existingPayment.status === "processing")) {
+      if (
+        existingPayment.stripePaymentIntentId &&
+        (existingPayment.status === "pending" || existingPayment.status === "processing")
+      ) {
         const stripe = getStripe();
         try {
           const paymentIntent = await stripe.paymentIntents.retrieve(
             existingPayment.stripePaymentIntentId
           );
-          
-          // Only return if payment intent is still in a valid state
-          if (paymentIntent.status === "requires_payment_method" || 
-              paymentIntent.status === "requires_confirmation" ||
-              paymentIntent.status === "requires_action") {
+          if (
+            paymentIntent.status === "requires_payment_method" ||
+            paymentIntent.status === "requires_confirmation" ||
+            paymentIntent.status === "requires_action"
+          ) {
             return {
               clientSecret: paymentIntent.client_secret,
               paymentId: existingPayment._id,
             };
           }
-          
-          // If payment intent is already succeeded/failed, we can create a new one
-          // But log this case for monitoring
-          console.warn(`Payment intent ${paymentIntent.id} is in state ${paymentIntent.status}, creating new payment`);
+          console.warn(
+            "Payment intent " + paymentIntent.id + " is in state " + paymentIntent.status + ", creating new payment"
+          );
         } catch (stripeError) {
-          // If retrieval fails, continue to create a new one
           console.error("Failed to retrieve existing payment intent:", stripeError);
         }
       }
-      
-      // If there's a pending payment without a valid payment intent, don't create duplicate
-      // Wait for webhook to process or user to retry
       if (existingPayment.status === "pending" && !existingPayment.stripePaymentIntentId) {
-        throw new Error("A payment is already being processed for this project. Please wait or contact support.");
+        throw new Error(
+          "A payment is already being processed for this project. Please wait or contact support."
+        );
       }
     }
 
-    // Create or retrieve Stripe customer
     const stripe = getStripe();
-    // User object from verifyUser query should have all fields including stripeCustomerId
-    // Type assertion needed because TypeScript doesn't know about optional fields
     const userWithStripe = user as typeof user & { stripeCustomerId?: string };
     let customerId: string | undefined = userWithStripe.stripeCustomerId;
     if (!customerId) {
@@ -121,15 +127,12 @@ export const createPaymentIntent = action({
         },
       });
       customerId = customer.id;
-
-      // Update user with Stripe customer ID
       await ctx.runMutation(internal.payments.mutations.updateUserStripeId, {
         userId: args.userId,
         stripeCustomerId: customerId,
       });
     }
 
-    // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: args.amount,
       currency: args.currency,
@@ -139,14 +142,13 @@ export const createPaymentIntent = action({
         userId: args.userId,
         type: "pre_funding",
       },
-      description: `Project funding: ${project.intakeForm.title}`,
+      description: "Project funding: " + project.intakeForm.title,
       automatic_payment_methods: {
         enabled: true,
       },
     });
 
-    // Create payment record in database
-    const platformFee = project.platformFee || 10; // Default 10%
+    const platformFee = project.platformFee || 10;
     const platformFeeAmount = Math.round((args.amount * platformFee) / 100);
     const netAmount = args.amount - platformFeeAmount;
 
@@ -155,7 +157,7 @@ export const createPaymentIntent = action({
       {
         projectId: args.projectId,
         type: "pre_funding",
-        amount: args.amount / 100, // Convert cents to dollars
+        amount: args.amount / 100,
         currency: args.currency,
         platformFee: platformFeeAmount / 100,
         netAmount: netAmount / 100,
@@ -165,13 +167,11 @@ export const createPaymentIntent = action({
       }
     );
 
-    // Update project status to pending_funding only if still in draft
-    // This prevents race conditions from multiple simultaneous calls
     const currentProject = await ctx.runQuery(internal.payments.queries.getProject, {
       projectId: args.projectId,
       userId: args.userId,
     });
-    
+
     if (currentProject && currentProject.status === "draft") {
       await ctx.runMutation(internal.projects.mutations.updateProjectStatusInternal, {
         projectId: args.projectId,
@@ -188,7 +188,6 @@ export const createPaymentIntent = action({
 
 /**
  * Handle Stripe webhook events
- * This is called by Stripe when payment events occur
  */
 export const handleStripeWebhook = action({
   args: {
@@ -198,51 +197,35 @@ export const handleStripeWebhook = action({
     data: v.any(),
   },
   handler: async (ctx, args) => {
-    // Verify webhook hasn't been processed
     const existingWebhook = await ctx.runQuery(
       internal.payments.queries.getWebhookByEventId,
-      {
-        eventId: args.eventId,
-      }
+      { eventId: args.eventId }
     );
 
     if (existingWebhook) {
-      // Idempotent: already processed
       return { processed: true, existing: true };
     }
 
-    // Process webhook based on event type
     switch (args.eventType) {
       case "payment_intent.succeeded":
         if (args.paymentIntentId) {
-          await ctx.runMutation(
-            internal.payments.mutations.handlePaymentSuccess,
-            {
-              paymentIntentId: args.paymentIntentId,
-              eventId: args.eventId,
-              data: args.data,
-            }
-          );
+          await ctx.runMutation(internal.payments.mutations.handlePaymentSuccess, {
+            paymentIntentId: args.paymentIntentId,
+            eventId: args.eventId,
+            data: args.data,
+          });
 
-          // Get payment to find project
-          const payment = await ctx.runQuery(
-            internal.payments.queries.getPaymentByIntentId,
-            {
-              paymentIntentId: args.paymentIntentId,
-            }
-          );
+          const payment = await ctx.runQuery(internal.payments.queries.getPaymentByIntentId, {
+            paymentIntentId: args.paymentIntentId,
+          });
 
-          // If this is a pre-funding payment, trigger matching
           if (payment && payment.type === "pre_funding") {
             try {
-              // Generate matches for the funded project
-              // Call matching action directly
               await ctx.runAction(api.matching.actions.generateMatches, {
                 projectId: payment.projectId,
                 limit: 5,
               });
             } catch (error) {
-              // Log error but don't fail the webhook
               console.error("Failed to trigger matching:", error);
             }
           }
@@ -251,26 +234,20 @@ export const handleStripeWebhook = action({
 
       case "payment_intent.payment_failed":
         if (args.paymentIntentId) {
-          await ctx.runMutation(
-            internal.payments.mutations.handlePaymentFailure,
-            {
-              paymentIntentId: args.paymentIntentId,
-              eventId: args.eventId,
-              errorMessage: args.data?.last_payment_error?.message || "Payment failed",
-            }
-          );
+          await ctx.runMutation(internal.payments.mutations.handlePaymentFailure, {
+            paymentIntentId: args.paymentIntentId,
+            eventId: args.eventId,
+            errorMessage: args.data?.last_payment_error?.message || "Payment failed",
+          });
         }
         break;
 
       case "payment_intent.canceled":
         if (args.paymentIntentId) {
-          await ctx.runMutation(
-            internal.payments.mutations.handlePaymentCancellation,
-            {
-              paymentIntentId: args.paymentIntentId,
-              eventId: args.eventId,
-            }
-          );
+          await ctx.runMutation(internal.payments.mutations.handlePaymentCancellation, {
+            paymentIntentId: args.paymentIntentId,
+            eventId: args.eventId,
+          });
         }
         break;
 
@@ -332,6 +309,27 @@ export const handleStripeWebhook = action({
               type: "payment",
               data: { transferId, paymentId: payment._id },
             });
+
+            const appUrl = getAppUrl();
+            const logoUrl = getLogoUrl(appUrl);
+            const date = formatDate();
+            const transferUser = await ctx.db.get(payment.userId);
+            if (transferUser?.email) {
+              await sendEmail({
+                to: transferUser.email,
+                subject: "Payout failed",
+                react: React.createElement(PayoutFailedEmail, {
+                  name: transferUser.name || "there",
+                  amount: payment.amount.toFixed(2),
+                  currency: payment.currency.toUpperCase(),
+                  appUrl,
+                  logoUrl,
+                  date,
+                  reason: failureMessage || "Payout failed",
+                }),
+              });
+            }
+
             await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
               action: "transfer_failed",
               actorId: payment.userId,
@@ -343,6 +341,7 @@ export const handleStripeWebhook = action({
         }
         break;
       }
+
       case "payout.paid": {
         const payoutId = args.data?.object?.id as string | undefined;
         if (payoutId) {
@@ -391,6 +390,27 @@ export const handleStripeWebhook = action({
               type: "payment",
               data: { payoutId, paymentId: payment._id },
             });
+
+            const appUrl = getAppUrl();
+            const logoUrl = getLogoUrl(appUrl);
+            const date = formatDate();
+            const payoutUser = await ctx.db.get(payment.userId);
+            if (payoutUser?.email) {
+              await sendEmail({
+                to: payoutUser.email,
+                subject: "Payout failed",
+                react: React.createElement(PayoutFailedEmail, {
+                  name: payoutUser.name || "there",
+                  amount: payment.amount.toFixed(2),
+                  currency: payment.currency.toUpperCase(),
+                  appUrl,
+                  logoUrl,
+                  date,
+                  reason: failureMessage || "Payout failed",
+                }),
+              });
+            }
+
             await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
               action: "payout_failed",
               actorId: payment.userId,
@@ -402,12 +422,209 @@ export const handleStripeWebhook = action({
         }
         break;
       }
+
       default:
-        // Log unhandled event types
-        console.log(`Unhandled webhook event: ${args.eventType}`);
+        console.log("Unhandled webhook event: " + args.eventType);
     }
 
     return { processed: true };
+  },
+});
+
+/**
+ * Refund a payment intent (full or partial) for dispute resolution
+ */
+export const refundPaymentIntent = action({
+  args: {
+    projectId: v.id("projects"),
+    amount: v.number(),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.runQuery(internal.payments.queries.getPaymentByProject, {
+      projectId: args.projectId,
+    });
+    if (!payment || !payment.stripePaymentIntentId) {
+      throw new Error("No payment intent found for this project");
+    }
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const stripe = getStripe();
+    const amountInCents = Math.round(args.amount * 100);
+    const paymentAmountInCents = Math.round(payment.amount * 100);
+
+    const refund = await stripe.refunds.create({
+      payment_intent: payment.stripePaymentIntentId,
+      amount: amountInCents < paymentAmountInCents ? amountInCents : undefined,
+      reason: "requested_by_customer",
+      metadata: {
+        projectId: args.projectId,
+        reason: args.reason || "dispute_resolution",
+      },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.createPayment, {
+      projectId: args.projectId,
+      type: "refund",
+      amount: args.amount,
+      currency: payment.currency,
+      platformFee: 0,
+      netAmount: args.amount,
+      stripePaymentIntentId: payment.stripePaymentIntentId,
+      stripeRefundId: refund.id,
+      stripeCustomerId: payment.stripeCustomerId,
+      userId: project.clientId,
+      status: "refunded",
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Refund issued",
+      message: "A refund of " + args.amount + " " + payment.currency.toUpperCase() + " was issued for " + project.intakeForm.title + ".",
+      type: "payment",
+      data: { projectId: args.projectId, refundId: refund.id },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+      action: "refund_issued",
+      actorId: project.clientId,
+      actorRole: "system",
+      targetId: refund.id,
+      details: {
+        amount: args.amount,
+        currency: payment.currency,
+        projectId: args.projectId,
+      },
+    });
+
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+    const client = await ctx.db.get(project.clientId);
+    if (client?.email) {
+      await sendEmail({
+        to: client.email,
+        subject: "Refund issued",
+        react: React.createElement(RefundIssuedEmail, {
+          name: client.name || "there",
+          amount: args.amount.toFixed(2),
+          projectName: project.intakeForm.title,
+          appUrl,
+          logoUrl,
+          date,
+        }),
+      });
+    }
+
+    return { success: true, refundId: refund.id };
+  },
+});
+
+/**
+ * Create a Stripe Connect transfer to a freelancer
+ */
+export const createPayoutTransfer = action({
+  args: {
+    projectId: v.id("projects"),
+    freelancerId: v.id("users"),
+    amount: v.number(),
+    currency: v.string(),
+    milestoneId: v.optional(v.id("milestones")),
+  },
+  handler: async (ctx, args) => {
+    const stripe = getStripe();
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    const freelancer = await ctx.db.get(args.freelancerId);
+    if (!freelancer || freelancer.status !== "active") {
+      throw new Error("Freelancer not found");
+    }
+    const freelancerDoc = freelancer as typeof freelancer & {
+      stripeAccountId?: string;
+    };
+    if (!freelancerDoc.stripeAccountId) {
+      throw new Error("Freelancer Stripe account not connected");
+    }
+
+    const transfer = await stripe.transfers.create({
+      amount: Math.round(args.amount * 100),
+      currency: args.currency,
+      destination: freelancerDoc.stripeAccountId,
+      metadata: {
+        projectId: args.projectId,
+        freelancerId: args.freelancerId,
+      },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.createPayment, {
+      projectId: args.projectId,
+      milestoneId: args.milestoneId,
+      type: "payout",
+      amount: args.amount,
+      currency: args.currency,
+      platformFee: 0,
+      netAmount: args.amount,
+      stripeTransferId: transfer.id,
+      stripeAccountId: freelancerDoc.stripeAccountId,
+      userId: args.freelancerId,
+      status: "succeeded",
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.freelancerId],
+      title: "Payout sent",
+      message: "A payout of " + args.amount + " " + args.currency.toUpperCase() + " was sent for " + project.intakeForm.title + ".",
+      type: "payment",
+      data: { projectId: args.projectId, transferId: transfer.id },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+      action: "payout_sent",
+      actorId: args.freelancerId,
+      actorRole: "system",
+      targetId: transfer.id,
+      details: {
+        amount: args.amount,
+        currency: args.currency,
+        projectId: args.projectId,
+        milestoneId: args.milestoneId,
+      },
+    });
+
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+    if (freelancerDoc?.email) {
+      await sendEmail({
+        to: freelancerDoc.email,
+        subject: "Payout sent",
+        react: React.createElement(PayoutSentEmail, {
+          name: freelancerDoc.name || "there",
+          amount: args.amount.toFixed(2),
+          projectName: project.intakeForm.title,
+          appUrl,
+          logoUrl,
+          date,
+        }),
+      });
+    }
+
+    return { success: true, transferId: transfer.id };
   },
 });
 
@@ -523,7 +740,8 @@ export const createConnectLoginLink = action({
     }
 
     const stripe = getStripe();
-    const loginLink = await stripe.accounts.createLoginLink(accountId,
+    const loginLink = await stripe.accounts.createLoginLink(
+      accountId,
       args.returnUrl ? { redirect_url: args.returnUrl } : undefined
     );
 
@@ -532,159 +750,40 @@ export const createConnectLoginLink = action({
 });
 
 /**
- * Refund a payment intent (full or partial) for dispute resolution
+ * Get Stripe Connect account status
  */
-export const refundPaymentIntent = action({
+export const getConnectAccountStatus = action({
   args: {
-    projectId: v.id("projects"),
-    amount: v.number(), // Amount in dollars
-    reason: v.optional(v.string()),
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const payment = await ctx.runQuery(internal.payments.queries.getPaymentByProject, {
-      projectId: args.projectId,
+    const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: args.userId,
     });
-    if (!payment || !payment.stripePaymentIntentId) {
-      throw new Error("No payment intent found for this project");
+    if (!user || user.role !== "freelancer") {
+      throw new Error("Only freelancers can access Stripe status");
     }
-    const project = await ctx.db.get(args.projectId);
-    if (!project) {
-      throw new Error("Project not found");
+
+    const accountId = (user as typeof user & { stripeAccountId?: string }).stripeAccountId;
+    if (!accountId) {
+      return { connected: false };
     }
 
     const stripe = getStripe();
-    const amountInCents = Math.round(args.amount * 100);
-    const paymentAmountInCents = Math.round(payment.amount * 100);
-
-    const refund = await stripe.refunds.create({
-      payment_intent: payment.stripePaymentIntentId,
-      amount: amountInCents < paymentAmountInCents ? amountInCents : undefined,
-      reason: "requested_by_customer",
-      metadata: {
-        projectId: args.projectId,
-        reason: args.reason || "dispute_resolution",
+    const account = await stripe.accounts.retrieve(accountId);
+    return {
+      connected: true,
+      accountId,
+      chargesEnabled: account.charges_enabled,
+      payoutsEnabled: account.payouts_enabled,
+      detailsSubmitted: account.details_submitted,
+      requirements: {
+        currently_due: account.requirements?.currently_due || [],
+        past_due: account.requirements?.past_due || [],
+        eventually_due: account.requirements?.eventually_due || [],
+        pending_verification: account.requirements?.pending_verification || [],
+        disabled_reason: account.requirements?.disabled_reason || null,
       },
-    });
-
-    await ctx.runMutation(internal.payments.mutations.createPayment, {
-      projectId: args.projectId,
-      type: "refund",
-      amount: args.amount,
-      currency: payment.currency,
-      platformFee: 0,
-      netAmount: args.amount,
-      stripePaymentIntentId: payment.stripePaymentIntentId,
-      stripeRefundId: refund.id,
-      stripeCustomerId: payment.stripeCustomerId,
-      userId: project.clientId,
-      status: "refunded",
-    });
-
-    const sendSystemNotification =
-      api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
-        "action",
-        "internal"
-      >;
-    await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: [project.clientId],
-      title: "Refund issued",
-      message: "A refund was issued for your project.",
-      type: "payment",
-      data: { projectId: args.projectId, refundId: refund.id },
-    });
-
-    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
-      action: "refund_issued",
-      actorId: project.clientId,
-      actorRole: "system",
-      targetId: refund.id,
-      details: {
-        amount: args.amount,
-        currency: payment.currency,
-        projectId: args.projectId,
-      },
-    });
-
-    return { success: true, refundId: refund.id };
-  },
-});
-
-/**
- * Create a Stripe Connect transfer to a freelancer
- */
-export const createPayoutTransfer = action({
-  args: {
-    projectId: v.id("projects"),
-    freelancerId: v.id("users"),
-    amount: v.number(), // Amount in dollars
-    currency: v.string(),
-    milestoneId: v.optional(v.id("milestones")),
-  },
-  handler: async (ctx, args) => {
-    const stripe = getStripe();
-    const project = await ctx.db.get(args.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
-    const freelancer = await ctx.db.get(args.freelancerId);
-    if (!freelancer || freelancer.status !== "active") {
-      throw new Error("Freelancer not found");
-    }
-    const freelancerDoc = freelancer;
-    if (!freelancerDoc.stripeAccountId) {
-      throw new Error("Freelancer Stripe account not connected");
-    }
-
-    const transfer = await stripe.transfers.create({
-      amount: Math.round(args.amount * 100),
-      currency: args.currency,
-      destination: freelancerDoc.stripeAccountId,
-      metadata: {
-        projectId: args.projectId,
-        freelancerId: args.freelancerId,
-      },
-    });
-
-    await ctx.runMutation(internal.payments.mutations.createPayment, {
-      projectId: args.projectId,
-      milestoneId: args.milestoneId,
-      type: "payout",
-      amount: args.amount,
-      currency: args.currency,
-      platformFee: 0,
-      netAmount: args.amount,
-      stripeTransferId: transfer.id,
-      stripeAccountId: freelancerDoc.stripeAccountId,
-      userId: args.freelancerId,
-      status: "succeeded",
-    });
-
-    const sendSystemNotification =
-      api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
-        "action",
-        "internal"
-      >;
-    await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: [args.freelancerId],
-      title: "Payout sent",
-      message: `A payout of ${args.amount} ${args.currency.toUpperCase()} was sent for ${project.intakeForm.title}.`,
-      type: "payment",
-      data: { projectId: args.projectId, transferId: transfer.id },
-    });
-
-    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
-      action: "payout_sent",
-      actorId: args.freelancerId,
-      actorRole: "system",
-      targetId: transfer.id,
-      details: {
-        amount: args.amount,
-        currency: args.currency,
-        projectId: args.projectId,
-        milestoneId: args.milestoneId,
-      },
-    });
-
-    return { success: true, transferId: transfer.id };
+    };
   },
 });

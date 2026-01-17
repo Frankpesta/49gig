@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
@@ -44,6 +44,8 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedUser, setSelectedUser] = useState<Doc<"users"> | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   const users = useQuery(
     (api as any)["users/queries"].getAllUsersAdmin,
@@ -89,6 +91,15 @@ export default function UsersPage() {
       u.email.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   }) || [];
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, statusFilter]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!user?._id) return;
@@ -209,7 +220,7 @@ export default function UsersPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredUsers.map((u: Doc<"users">) => (
+                  paginatedUsers.map((u: Doc<"users">) => (
                     <TableRow key={u._id}>
                       <TableCell className="font-medium">{u.name}</TableCell>
                       <TableCell>{u.email}</TableCell>
@@ -349,6 +360,29 @@ export default function UsersPage() {
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
