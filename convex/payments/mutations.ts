@@ -49,9 +49,23 @@ export const createPayment = internalMutation({
     platformFee: v.optional(v.number()),
     netAmount: v.number(),
     stripePaymentIntentId: v.optional(v.string()),
+    stripeRefundId: v.optional(v.string()),
+    stripePayoutId: v.optional(v.string()),
+    stripeTransferId: v.optional(v.string()),
     stripeCustomerId: v.optional(v.string()),
+    stripeAccountId: v.optional(v.string()),
     milestoneId: v.optional(v.id("milestones")),
     userId: v.id("users"),
+    status: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("processing"),
+        v.literal("succeeded"),
+        v.literal("failed"),
+        v.literal("refunded"),
+        v.literal("cancelled")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -102,8 +116,12 @@ export const createPayment = internalMutation({
       platformFee: args.platformFee,
       netAmount: args.netAmount,
       stripePaymentIntentId: args.stripePaymentIntentId,
+      stripeRefundId: args.stripeRefundId,
+      stripePayoutId: args.stripePayoutId,
+      stripeTransferId: args.stripeTransferId,
       stripeCustomerId: args.stripeCustomerId,
-      status: "pending",
+      stripeAccountId: args.stripeAccountId,
+      status: args.status || "pending",
       webhookReceived: false,
       createdAt: now,
       updatedAt: now,
@@ -141,6 +159,126 @@ export const updateUserStripeId = internalMutation({
   handler: async (ctx, args): Promise<void> => {
     await ctx.db.patch(args.userId, {
       stripeCustomerId: args.stripeCustomerId,
+    });
+  },
+});
+
+/**
+ * Update user's Stripe Connect account ID
+ * Internal mutation
+ */
+export const updateUserStripeAccountId = internalMutation({
+  args: {
+    userId: v.id("users"),
+    stripeAccountId: v.string(),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    await ctx.db.patch(args.userId, {
+      stripeAccountId: args.stripeAccountId,
+    });
+  },
+});
+
+/**
+ * Update payment status by Stripe transfer ID
+ * Internal mutation
+ */
+export const updatePaymentByTransferId = internalMutation({
+  args: {
+    transferId: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("refunded"),
+      v.literal("cancelled")
+    ),
+    errorMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_stripe_transfer", (q) => q.eq("stripeTransferId", args.transferId))
+      .first();
+    if (!payment) {
+      return null;
+    }
+    const now = Date.now();
+    await ctx.db.patch(payment._id, {
+      status: args.status,
+      errorMessage: args.errorMessage,
+      processedAt: now,
+      updatedAt: now,
+    });
+    return payment._id;
+  },
+});
+
+/**
+ * Update payment status by Stripe payout ID
+ * Internal mutation
+ */
+export const updatePaymentByPayoutId = internalMutation({
+  args: {
+    payoutId: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+      v.literal("refunded"),
+      v.literal("cancelled")
+    ),
+    errorMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_stripe_payout", (q) => q.eq("stripePayoutId", args.payoutId))
+      .first();
+    if (!payment) {
+      return null;
+    }
+    const now = Date.now();
+    await ctx.db.patch(payment._id, {
+      status: args.status,
+      errorMessage: args.errorMessage,
+      processedAt: now,
+      updatedAt: now,
+    });
+    return payment._id;
+  },
+});
+
+/**
+ * Log a payment audit entry
+ * Internal mutation
+ */
+export const logPaymentAudit = internalMutation({
+  args: {
+    action: v.string(),
+    actorId: v.id("users"),
+    actorRole: v.union(
+      v.literal("client"),
+      v.literal("freelancer"),
+      v.literal("admin"),
+      v.literal("moderator"),
+      v.literal("system")
+    ),
+    targetId: v.optional(v.string()),
+    details: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("auditLogs", {
+      action: args.action,
+      actionType: "payment",
+      actorId: args.actorId,
+      actorRole: args.actorRole,
+      targetType: "payment",
+      targetId: args.targetId,
+      details: args.details,
+      createdAt: Date.now(),
     });
   },
 });

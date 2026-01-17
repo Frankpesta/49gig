@@ -26,6 +26,7 @@ function VerifyEmailContent() {
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const verifyEmail = useMutation(
     (api as any)["auth/mutations"].verifyEmail
   );
@@ -44,6 +45,9 @@ function VerifyEmailContent() {
     if (tokenParam) {
       setToken(tokenParam);
       handleVerify(tokenParam);
+    }
+    if (typeof window !== "undefined") {
+      setSessionToken(localStorage.getItem("sessionToken"));
     }
   }, [searchParams]);
 
@@ -96,7 +100,7 @@ function VerifyEmailContent() {
     setError("");
 
     try {
-      await resendVerification({});
+      await resendVerification({ sessionToken: sessionToken || undefined });
       setSuccess(true);
     } catch (err: any) {
       setError(err.message || "Failed to resend verification email");

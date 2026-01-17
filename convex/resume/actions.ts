@@ -30,8 +30,7 @@ export const getResumeUploadUrl = action({
       query: unknown,
       args: { sessionToken: string }
     ) => Promise<UserWithoutPassword | null>;
-    // @ts-expect-error Generated api types are excessively deep for this cast
-    const apiUnknown = api as unknown as Record<string, unknown>;
+    const apiUnknown: any = require("../_generated/api").api;
     const users = apiUnknown["users"] as Record<string, unknown>;
     const usersQueries = users["queries"] as Record<string, unknown>;
     const resume = apiUnknown["resume"] as Record<string, unknown>;
@@ -71,8 +70,9 @@ export const parseResumeAndBuildBio = action({
     fileId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
-    const setResumeProcessingMutation = api.resume.mutations.setResumeProcessing;
-    const applyParsedResumeMutation = api.resume.mutations.applyParsedResumeData;
+    const apiUnknown: any = require("../_generated/api").api;
+    const setResumeProcessingMutation = apiUnknown.resume.mutations.setResumeProcessing;
+    const applyParsedResumeMutation = apiUnknown.resume.mutations.applyParsedResumeData;
     // Mark processing
     await ctx.runMutation(setResumeProcessingMutation, {
       userId: args.userId,

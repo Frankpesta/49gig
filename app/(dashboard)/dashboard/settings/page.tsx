@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useAuthStore } from "@/stores/authStore";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Settings, Lock, Bell, Shield, Trash2 } from "lucide-react";
+import { Loader2, Settings, Lock, Bell, Shield, Trash2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -82,11 +82,23 @@ export default function SettingsPage() {
     api["auth/mutations"].revokeOtherSessions
   );
   const deleteAccount = useMutation(api.users.mutations.deleteAccount);
+  const createConnectLoginLink = useAction(
+    // @ts-expect-error - Dynamic path access for "payments/actions" requires type assertion
+    api["payments/actions"].createConnectLoginLink
+  );
+  const createConnectAccountLink = useAction(
+    // @ts-expect-error - Dynamic path access for "payments/actions" requires type assertion
+    api["payments/actions"].createConnectAccountLink
+  );
 
   const sessionsData = useQuery(
     // @ts-expect-error - Dynamic path access for "auth/queries" requires type assertion
     api["auth/queries"].listSessionsForToken,
     sessionToken ? { sessionToken } : "skip"
+  );
+  const currentUser = useQuery(
+    api.users.queries.getCurrentUserProfile,
+    isAuthenticated ? {} : "skip"
   );
 
   useEffect(() => {
@@ -103,6 +115,8 @@ export default function SettingsPage() {
   }, [user]);
 
   const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
+  const stripeAccountId = (currentUser as any)?.stripeAccountId;
+  const isFreelancer = user.role === "freelancer";
 
   if (!isAuthenticated || !user) {
     return (
@@ -201,6 +215,36 @@ export default function SettingsPage() {
       toast.error(error instanceof Error ? error.message : "Verification failed");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleStripeConnect = async () => {
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      if (stripeAccountId) {
+        const result = await createConnectLoginLink({
+          userId: user._id,
+          returnUrl: `${origin}/dashboard/settings?stripe=manage`,
+        });
+        if (result?.url) {
+          window.location.href = result.url;
+        }
+        return;
+      }
+      const returnUrl = `${origin}/dashboard/settings?stripe=connected`;
+      const refreshUrl = `${origin}/dashboard/settings?stripe=refresh`;
+      const result = await createConnectAccountLink({
+        userId: user._id,
+        returnUrl,
+        refreshUrl,
+      });
+      if (result?.url) {
+        window.location.href = result.url;
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to start Stripe onboarding"
+      );
     }
   };
 
@@ -490,6 +534,35 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {isFreelancer && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Payouts
+            </CardTitle>
+            <CardDescription>
+              Connect your Stripe account to receive payouts.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">
+                {stripeAccountId ? "Stripe connected" : "Stripe not connected"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {stripeAccountId
+                  ? "Your payouts will be sent to your connected bank account."
+                  : "Complete onboarding to enable payouts."}
+              </p>
+            </div>
+            <Button onClick={handleStripeConnect} variant={stripeAccountId ? "outline" : "default"}>
+              {stripeAccountId ? "Manage Stripe" : "Connect Stripe"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Notification Settings */}
       <Card>

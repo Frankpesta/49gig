@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 
 /**
  * Automated dispute resolution
@@ -162,11 +162,20 @@ export const releaseDisputeFunds = action({
     }
 
     const { decision, resolutionAmount } = dispute.resolution;
+    const basePayment = await ctx.runQuery(
+      internal.payments.queries.getPaymentByProject,
+      { projectId: dispute.projectId }
+    );
+    const currency = basePayment?.currency || "usd";
 
     // Handle fund release based on decision
     if (decision === "client_favor") {
       // Refund to client
-      // TODO: Implement Stripe refund
+      await ctx.runAction(api.payments.actions.refundPaymentIntent, {
+        projectId: dispute.projectId,
+        amount: dispute.lockedAmount,
+        reason: "dispute_client_favor",
+      });
       await ctx.runMutation(
         (api as any)["projects/mutations"].updateProjectStatusInternal,
         {
@@ -177,24 +186,35 @@ export const releaseDisputeFunds = action({
       );
     } else if (decision === "freelancer_favor") {
       // Release to freelancer
-      if (dispute.milestoneId) {
-        // Release milestone payment
-        // TODO: Implement Stripe Connect payout
-        await ctx.runMutation(
-          (api as any)["payments/mutations"].handlePaymentSuccess,
-          {
-            projectId: dispute.projectId,
-            milestoneId: dispute.milestoneId,
-            amount: resolutionAmount || dispute.lockedAmount,
-          }
-        );
+      if (project.matchedFreelancerId) {
+        await ctx.runAction(api.payments.actions.createPayoutTransfer, {
+          projectId: dispute.projectId,
+          freelancerId: project.matchedFreelancerId,
+          milestoneId: dispute.milestoneId,
+          amount: resolutionAmount || dispute.lockedAmount,
+          currency,
+        });
       }
     } else if (decision === "partial") {
       // Split funds
       if (resolutionAmount) {
         const clientRefund = dispute.lockedAmount - resolutionAmount;
-        // TODO: Refund clientRefund to client
-        // TODO: Release resolutionAmount to freelancer
+        if (clientRefund > 0) {
+          await ctx.runAction(api.payments.actions.refundPaymentIntent, {
+            projectId: dispute.projectId,
+            amount: clientRefund,
+            reason: "dispute_partial_refund",
+          });
+        }
+        if (resolutionAmount > 0 && project.matchedFreelancerId) {
+          await ctx.runAction(api.payments.actions.createPayoutTransfer, {
+            projectId: dispute.projectId,
+            freelancerId: project.matchedFreelancerId,
+            milestoneId: dispute.milestoneId,
+            amount: resolutionAmount,
+            currency,
+          });
+        }
       }
     } else if (decision === "replacement") {
       // Hold funds for new freelancer

@@ -101,6 +101,7 @@ export default defineSchema({
 
     // Stripe
     stripeCustomerId: v.optional(v.string()),
+    stripeAccountId: v.optional(v.string()),
 
     // Audit
     createdAt: v.number(),
@@ -112,6 +113,28 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_verification_status", ["verificationStatus"])
     .index("by_resume_status", ["resumeStatus"]),
+
+  emailVerificationTokens: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"])
+    .index("by_expires", ["expiresAt"]),
+
+  passwordResetTokens: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    expiresAt: v.number(),
+    usedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_token", ["token"])
+    .index("by_expires", ["expiresAt"]),
 
   projects: defineTable({
     // Client
@@ -672,6 +695,7 @@ export default defineSchema({
 
     // Stripe
     stripePaymentIntentId: v.optional(v.string()),
+    stripeRefundId: v.optional(v.string()),
     stripePayoutId: v.optional(v.string()),
     stripeTransferId: v.optional(v.string()),
     stripeCustomerId: v.optional(v.string()),
@@ -704,6 +728,9 @@ export default defineSchema({
     .index("by_milestone", ["milestoneId"])
     .index("by_status", ["status"])
     .index("by_stripe_payment_intent", ["stripePaymentIntentId"])
+    .index("by_stripe_transfer", ["stripeTransferId"])
+    .index("by_stripe_refund", ["stripeRefundId"])
+    .index("by_stripe_payout", ["stripePayoutId"])
     .index("by_webhook", ["webhookReceived"]),
 
   auditLogs: defineTable({

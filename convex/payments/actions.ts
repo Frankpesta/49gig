@@ -274,6 +274,134 @@ export const handleStripeWebhook = action({
         }
         break;
 
+      case "transfer.created": {
+        const transferId = args.data?.object?.id as string | undefined;
+        if (transferId) {
+          await ctx.runMutation(internal.payments.mutations.updatePaymentByTransferId, {
+            transferId,
+            status: "processing",
+          });
+        }
+        break;
+      }
+      case "transfer.paid": {
+        const transferId = args.data?.object?.id as string | undefined;
+        if (transferId) {
+          await ctx.runMutation(internal.payments.mutations.updatePaymentByTransferId, {
+            transferId,
+            status: "succeeded",
+          });
+          const payment = await ctx.runQuery(internal.payments.queries.getPaymentByTransferId, {
+            transferId,
+          });
+          if (payment) {
+            await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+              action: "transfer_succeeded",
+              actorId: payment.userId,
+              actorRole: "system",
+              targetId: payment._id,
+              details: { transferId },
+            });
+          }
+        }
+        break;
+      }
+      case "transfer.failed":
+      case "transfer.reversed": {
+        const transferId = args.data?.object?.id as string | undefined;
+        const failureMessage = args.data?.object?.failure_message as string | undefined;
+        if (transferId) {
+          await ctx.runMutation(internal.payments.mutations.updatePaymentByTransferId, {
+            transferId,
+            status: "failed",
+            errorMessage: failureMessage,
+          });
+          const payment = await ctx.runQuery(internal.payments.queries.getPaymentByTransferId, {
+            transferId,
+          });
+          if (payment) {
+            const sendSystemNotification =
+              api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
+                "action",
+                "internal"
+              >;
+            await ctx.scheduler.runAfter(0, sendSystemNotification, {
+              userIds: [payment.userId],
+              title: "Payout failed",
+              message: "We could not complete your payout. Please contact support.",
+              type: "payment",
+              data: { transferId, paymentId: payment._id },
+            });
+            await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+              action: "transfer_failed",
+              actorId: payment.userId,
+              actorRole: "system",
+              targetId: payment._id,
+              details: { transferId, failureMessage },
+            });
+          }
+        }
+        break;
+      }
+      case "payout.paid": {
+        const payoutId = args.data?.object?.id as string | undefined;
+        if (payoutId) {
+          await ctx.runMutation(internal.payments.mutations.updatePaymentByPayoutId, {
+            payoutId,
+            status: "succeeded",
+          });
+          const payment = await ctx.runQuery(internal.payments.queries.getPaymentByPayoutId, {
+            payoutId,
+          });
+          if (payment) {
+            await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+              action: "payout_succeeded",
+              actorId: payment.userId,
+              actorRole: "system",
+              targetId: payment._id,
+              details: { payoutId },
+            });
+          }
+        }
+        break;
+      }
+      case "payout.failed":
+      case "payout.canceled": {
+        const payoutId = args.data?.object?.id as string | undefined;
+        const failureMessage = args.data?.object?.failure_message as string | undefined;
+        if (payoutId) {
+          await ctx.runMutation(internal.payments.mutations.updatePaymentByPayoutId, {
+            payoutId,
+            status: "failed",
+            errorMessage: failureMessage,
+          });
+          const payment = await ctx.runQuery(internal.payments.queries.getPaymentByPayoutId, {
+            payoutId,
+          });
+          if (payment) {
+            const sendSystemNotification =
+              api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
+                "action",
+                "internal"
+              >;
+            await ctx.scheduler.runAfter(0, sendSystemNotification, {
+              userIds: [payment.userId],
+              title: "Payout failed",
+              message: "We could not complete your payout. Please contact support.",
+              type: "payment",
+              data: { payoutId, paymentId: payment._id },
+            });
+            await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+              action: "payout_failed",
+              actorId: payment.userId,
+              actorRole: "system",
+              targetId: payment._id,
+              details: { payoutId, failureMessage },
+            });
+          }
+        }
+        break;
+      }
       default:
         // Log unhandled event types
         console.log(`Unhandled webhook event: ${args.eventType}`);
@@ -283,3 +411,280 @@ export const handleStripeWebhook = action({
   },
 });
 
+/**
+ * Create Stripe Connect account for a freelancer
+ */
+export const createConnectAccount = action({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: args.userId,
+    });
+    if (!user || user.role !== "freelancer") {
+      throw new Error("Only freelancers can create Stripe Connect accounts");
+    }
+
+    const existing = user as typeof user & { stripeAccountId?: string };
+    if (existing.stripeAccountId) {
+      return { accountId: existing.stripeAccountId, alreadyExists: true };
+    }
+
+    const stripe = getStripe();
+    const account = await stripe.accounts.create({
+      type: "express",
+      email: user.email,
+      capabilities: {
+        transfers: { requested: true },
+      },
+      metadata: {
+        userId: args.userId,
+      },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.updateUserStripeAccountId, {
+      userId: args.userId,
+      stripeAccountId: account.id,
+    });
+
+    return { accountId: account.id, alreadyExists: false };
+  },
+});
+
+/**
+ * Create Stripe Connect onboarding link
+ */
+export const createConnectAccountLink = action({
+  args: {
+    userId: v.id("users"),
+    returnUrl: v.string(),
+    refreshUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: args.userId,
+    });
+    if (!user || user.role !== "freelancer") {
+      throw new Error("Only freelancers can create Stripe Connect accounts");
+    }
+
+    const stripe = getStripe();
+    let accountId = (user as typeof user & { stripeAccountId?: string }).stripeAccountId;
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        email: user.email,
+        capabilities: {
+          transfers: { requested: true },
+        },
+        metadata: {
+          userId: args.userId,
+        },
+      });
+      accountId = account.id;
+      await ctx.runMutation(internal.payments.mutations.updateUserStripeAccountId, {
+        userId: args.userId,
+        stripeAccountId: account.id,
+      });
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: args.refreshUrl,
+      return_url: args.returnUrl,
+      type: "account_onboarding",
+    });
+
+    return { url: accountLink.url, accountId };
+  },
+});
+
+/**
+ * Create Stripe Connect dashboard login link
+ */
+export const createConnectLoginLink = action({
+  args: {
+    userId: v.id("users"),
+    returnUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: args.userId,
+    });
+    if (!user || user.role !== "freelancer") {
+      throw new Error("Only freelancers can access Stripe dashboard");
+    }
+
+    const accountId = (user as typeof user & { stripeAccountId?: string }).stripeAccountId;
+    if (!accountId) {
+      throw new Error("Stripe account not connected");
+    }
+
+    const stripe = getStripe();
+    const loginLink = await stripe.accounts.createLoginLink(accountId,
+      args.returnUrl ? { redirect_url: args.returnUrl } : undefined
+    );
+
+    return { url: loginLink.url, accountId };
+  },
+});
+
+/**
+ * Refund a payment intent (full or partial) for dispute resolution
+ */
+export const refundPaymentIntent = action({
+  args: {
+    projectId: v.id("projects"),
+    amount: v.number(), // Amount in dollars
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.runQuery(internal.payments.queries.getPaymentByProject, {
+      projectId: args.projectId,
+    });
+    if (!payment || !payment.stripePaymentIntentId) {
+      throw new Error("No payment intent found for this project");
+    }
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const stripe = getStripe();
+    const amountInCents = Math.round(args.amount * 100);
+    const paymentAmountInCents = Math.round(payment.amount * 100);
+
+    const refund = await stripe.refunds.create({
+      payment_intent: payment.stripePaymentIntentId,
+      amount: amountInCents < paymentAmountInCents ? amountInCents : undefined,
+      reason: "requested_by_customer",
+      metadata: {
+        projectId: args.projectId,
+        reason: args.reason || "dispute_resolution",
+      },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.createPayment, {
+      projectId: args.projectId,
+      type: "refund",
+      amount: args.amount,
+      currency: payment.currency,
+      platformFee: 0,
+      netAmount: args.amount,
+      stripePaymentIntentId: payment.stripePaymentIntentId,
+      stripeRefundId: refund.id,
+      stripeCustomerId: payment.stripeCustomerId,
+      userId: project.clientId,
+      status: "refunded",
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Refund issued",
+      message: "A refund was issued for your project.",
+      type: "payment",
+      data: { projectId: args.projectId, refundId: refund.id },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+      action: "refund_issued",
+      actorId: project.clientId,
+      actorRole: "system",
+      targetId: refund.id,
+      details: {
+        amount: args.amount,
+        currency: payment.currency,
+        projectId: args.projectId,
+      },
+    });
+
+    return { success: true, refundId: refund.id };
+  },
+});
+
+/**
+ * Create a Stripe Connect transfer to a freelancer
+ */
+export const createPayoutTransfer = action({
+  args: {
+    projectId: v.id("projects"),
+    freelancerId: v.id("users"),
+    amount: v.number(), // Amount in dollars
+    currency: v.string(),
+    milestoneId: v.optional(v.id("milestones")),
+  },
+  handler: async (ctx, args) => {
+    const stripe = getStripe();
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    const freelancer = await ctx.db.get(args.freelancerId);
+    if (!freelancer || freelancer.status !== "active") {
+      throw new Error("Freelancer not found");
+    }
+    const freelancerDoc = freelancer;
+    if (!freelancerDoc.stripeAccountId) {
+      throw new Error("Freelancer Stripe account not connected");
+    }
+
+    const transfer = await stripe.transfers.create({
+      amount: Math.round(args.amount * 100),
+      currency: args.currency,
+      destination: freelancerDoc.stripeAccountId,
+      metadata: {
+        projectId: args.projectId,
+        freelancerId: args.freelancerId,
+      },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.createPayment, {
+      projectId: args.projectId,
+      milestoneId: args.milestoneId,
+      type: "payout",
+      amount: args.amount,
+      currency: args.currency,
+      platformFee: 0,
+      netAmount: args.amount,
+      stripeTransferId: transfer.id,
+      stripeAccountId: freelancerDoc.stripeAccountId,
+      userId: args.freelancerId,
+      status: "succeeded",
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as import("convex/server").FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.freelancerId],
+      title: "Payout sent",
+      message: `A payout of ${args.amount} ${args.currency.toUpperCase()} was sent for ${project.intakeForm.title}.`,
+      type: "payment",
+      data: { projectId: args.projectId, transferId: transfer.id },
+    });
+
+    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+      action: "payout_sent",
+      actorId: args.freelancerId,
+      actorRole: "system",
+      targetId: transfer.id,
+      details: {
+        amount: args.amount,
+        currency: args.currency,
+        projectId: args.projectId,
+        milestoneId: args.milestoneId,
+      },
+    });
+
+    return { success: true, transferId: transfer.id };
+  },
+});

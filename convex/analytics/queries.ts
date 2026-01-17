@@ -121,6 +121,7 @@ export const getPlatformAnalytics = query({
 export const getAdminChartData = query({
   args: {
     userId: v.optional(v.id("users")),
+    rangeDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     let user: Doc<"users"> | null = null;
@@ -138,13 +139,17 @@ export const getAdminChartData = query({
     }
 
     const now = new Date();
+    const monthsBack = Math.max(
+      1,
+      Math.ceil((args.rangeDays ?? 180) / 30)
+    );
     const months: Array<{
       key: string;
       label: string;
       start: number;
       end: number;
     }> = [];
-    for (let i = 5; i >= 0; i -= 1) {
+    for (let i = monthsBack - 1; i >= 0; i -= 1) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const start = date.getTime();
       const end = new Date(date.getFullYear(), date.getMonth() + 1, 1).getTime();

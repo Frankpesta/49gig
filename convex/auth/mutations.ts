@@ -7,7 +7,13 @@ import { Doc } from "../_generated/dataModel";
 
 const api = require("../_generated/api") as {
   api: {
-    auth: { actions: { sendTwoFactorCodeEmail: unknown } };
+    auth: {
+      actions: {
+        sendTwoFactorCodeEmail: unknown;
+        sendVerificationEmail: unknown;
+        sendPasswordResetEmail: unknown;
+      };
+    };
     notifications: { actions: { sendSystemNotification: unknown } };
   };
 };
@@ -18,11 +24,19 @@ const authActions = (api.api as unknown as Record<string, unknown>)[
 const sendTwoFactorCodeEmailRef = authActions[
   "sendTwoFactorCodeEmail"
 ] as unknown as FunctionReference<"action">;
+const sendVerificationEmailRef = authActions[
+  "sendVerificationEmail"
+] as unknown as FunctionReference<"action">;
+const sendPasswordResetEmailRef = authActions[
+  "sendPasswordResetEmail"
+] as unknown as FunctionReference<"action">;
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 const REFRESH_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const TWO_FACTOR_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
+const EMAIL_VERIFICATION_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
 function generateToken(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
@@ -194,8 +208,21 @@ export const signup = mutation({
     // Clear rate limit on successful signup
     clearRateLimit(`signup:${args.email}`);
 
-    // TODO: Send email verification
-    // For now, return success
+    const now = Date.now();
+    const verificationToken = generateToken("verify");
+    await ctx.db.insert("emailVerificationTokens", {
+      userId,
+      token: verificationToken,
+      expiresAt: now + EMAIL_VERIFICATION_EXPIRY_MS,
+      createdAt: now,
+    });
+    await ctx.scheduler.runAfter(0, sendVerificationEmailRef, {
+      userId,
+      email: args.email,
+      name: args.name,
+      token: verificationToken,
+    });
+
     return {
       success: true,
       userId,
@@ -337,13 +364,25 @@ export const requestPasswordReset = mutation({
     }
 
     // Generate reset token (in production, use secure token generation)
-    const resetToken = `reset_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const resetTokenExpiry = Date.now() + 3600000; // 1 hour
+    const now = Date.now();
+    const resetToken = generateToken("reset");
+    const resetTokenExpiry = now + PASSWORD_RESET_EXPIRY_MS;
 
-    // Store reset token (you might want a separate table for this)
-    // For now, we'll add it to user (in production, use a separate table)
-    await ctx.db.patch(user._id, {
-      updatedAt: Date.now(),
+    const existingTokens = await ctx.db
+      .query("passwordResetTokens")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const token of existingTokens) {
+      if (!token.usedAt) {
+        await ctx.db.patch(token._id, { usedAt: now });
+      }
+    }
+
+    await ctx.db.insert("passwordResetTokens", {
+      userId: user._id,
+      token: resetToken,
+      expiresAt: resetTokenExpiry,
+      createdAt: now,
     });
 
     // Create audit log
@@ -360,13 +399,13 @@ export const requestPasswordReset = mutation({
       createdAt: Date.now(),
     });
 
-    // TODO: Send password reset email with token
-    // For now, return success (in production, don't return token to client)
-    return {
-      success: true,
-      // In production, don't return token - send via email
-      resetToken: resetToken, // Remove in production
-    };
+    await ctx.scheduler.runAfter(0, sendPasswordResetEmailRef, {
+      email: user.email,
+      resetToken,
+      name: user.name,
+    });
+
+    return { success: true };
   },
 });
 
@@ -394,8 +433,19 @@ export const resetPassword = mutation({
       throw new Error("Password must be at least 8 characters");
     }
 
-    // TODO: Verify reset token and expiry
-    // For now, accept any token (in production, verify properly)
+    const tokenDoc = await ctx.db
+      .query("passwordResetTokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .first();
+    if (!tokenDoc || tokenDoc.userId !== user._id) {
+      throw new Error("Invalid reset token");
+    }
+    if (tokenDoc.usedAt) {
+      throw new Error("Reset token already used");
+    }
+    if (tokenDoc.expiresAt < Date.now()) {
+      throw new Error("Reset token expired");
+    }
 
     // Hash new password using bcrypt (synchronous)
     const passwordHash = hashPassword(args.newPassword);
@@ -404,6 +454,9 @@ export const resetPassword = mutation({
     await ctx.db.patch(user._id, {
       passwordHash: passwordHash,
       updatedAt: Date.now(),
+    });
+    await ctx.db.patch(tokenDoc._id, {
+      usedAt: Date.now(),
     });
 
     // Create audit log
@@ -432,28 +485,33 @@ export const verifyEmail = mutation({
     token: v.string(),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    if (!identity.email) {
-      throw new Error("Email not found in identity");
-    }
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+    const tokenDoc = await ctx.db
+      .query("emailVerificationTokens")
+      .withIndex("by_token", (q) => q.eq("token", args.token))
       .first();
+    if (!tokenDoc) {
+      throw new Error("Invalid verification token");
+    }
+    if (tokenDoc.usedAt) {
+      throw new Error("Verification token already used");
+    }
+    if (tokenDoc.expiresAt < Date.now()) {
+      throw new Error("Verification token expired");
+    }
 
+    const user = await ctx.db.get(tokenDoc.userId);
     if (!user) {
       throw new Error("User not found");
     }
 
-    // TODO: Verify email token
-    // For now, just mark as verified
-    await ctx.db.patch(user._id, {
-      emailVerified: true,
-      updatedAt: Date.now(),
+    if (!user.emailVerified) {
+      await ctx.db.patch(user._id, {
+        emailVerified: true,
+        updatedAt: Date.now(),
+      });
+    }
+    await ctx.db.patch(tokenDoc._id, {
+      usedAt: Date.now(),
     });
 
     // Create audit log
@@ -478,20 +536,21 @@ export const verifyEmail = mutation({
  * Resend email verification
  */
 export const resendEmailVerification = mutation({
-  args: {},
+  args: {
+    sessionToken: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
+    let user: Doc<"users"> | null = null;
+    if (identity?.email) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
+    } else if (args.sessionToken) {
+      const sessionData = await getUserBySessionToken(ctx, args.sessionToken);
+      user = sessionData.user;
     }
-
-    if (!identity.email) {
-      throw new Error("Email not found in identity");
-    }
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
 
     if (!user) {
       throw new Error("User not found");
@@ -501,7 +560,31 @@ export const resendEmailVerification = mutation({
       throw new Error("Email already verified");
     }
 
-    // TODO: Send verification email
+    const now = Date.now();
+    const existingTokens = await ctx.db
+      .query("emailVerificationTokens")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    for (const token of existingTokens) {
+      if (!token.usedAt) {
+        await ctx.db.patch(token._id, { usedAt: now });
+      }
+    }
+
+    const verificationToken = generateToken("verify");
+    await ctx.db.insert("emailVerificationTokens", {
+      userId: user._id,
+      token: verificationToken,
+      expiresAt: now + EMAIL_VERIFICATION_EXPIRY_MS,
+      createdAt: now,
+    });
+    await ctx.scheduler.runAfter(0, sendVerificationEmailRef, {
+      userId: user._id,
+      email: user.email,
+      name: user.name,
+      token: verificationToken,
+    });
+
     return { success: true };
   },
 });

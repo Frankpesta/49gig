@@ -121,9 +121,6 @@ export const gradeWrittenResponse = action({
     writtenResponse: v.string(),
   },
   handler: async (ctx, args) => {
-    // TODO: Integrate with AI service (OpenAI, Anthropic, etc.)
-    // For now, using a placeholder scoring algorithm
-
     const score = await gradeWithAI(args.writtenResponse);
 
     // Update English proficiency score
@@ -151,9 +148,6 @@ export const executeCodingChallenge = action({
     ),
   },
   handler: async (ctx, args) => {
-    // TODO: Integrate with Judge0 API
-    // For now, using placeholder
-
     const results = await executeWithJudge0({
       code: args.code,
       language: args.language,
