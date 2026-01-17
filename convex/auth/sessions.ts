@@ -382,15 +382,13 @@ export const cleanupSessions = internalMutation({
       .withIndex("by_expires", (q) => q.lt("expiresAt", args.now))
       .collect();
 
-    const revokedSessionsAll = await ctx.db
+    const revokedSessions = await ctx.db
       .query("sessions")
       .withIndex("by_active", (q) => q.eq("isActive", false))
+      .filter((q) => q.lt(q.field("revokedAt"), args.revokeBefore))
       .collect();
-    const revokedSessions = revokedSessionsAll.filter((s) =>
-      s.revokedAt && s.revokedAt < args.revokeBefore
-    );
 
-    const toDelete = new Map();
+    const toDelete = new Map<string, typeof expiredSessions[number]>();
     for (const s of expiredSessions) {
       toDelete.set(s._id, s);
     }
