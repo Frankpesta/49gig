@@ -115,14 +115,12 @@ export const getPlatformAnalytics = query({
   },
 });
 
-
 /**
  * Admin dashboard charts (time series + distributions)
  */
 export const getAdminChartData = query({
   args: {
     userId: v.optional(v.id("users")),
-    rangeDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     let user: Doc<"users"> | null = null;
@@ -140,17 +138,13 @@ export const getAdminChartData = query({
     }
 
     const now = new Date();
-    const rangeDays = args.rangeDays === 90 || args.rangeDays === 365 || args.rangeDays === 30
-      ? args.rangeDays
-      : 180;
-    const monthsCount = rangeDays === 30 ? 1 : rangeDays === 90 ? 3 : rangeDays === 365 ? 12 : 6;
     const months: Array<{
       key: string;
       label: string;
       start: number;
       end: number;
     }> = [];
-    for (let i = monthsCount - 1; i >= 0; i -= 1) {
+    for (let i = 5; i >= 0; i -= 1) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const start = date.getTime();
       const end = new Date(date.getFullYear(), date.getMonth() + 1, 1).getTime();
@@ -202,46 +196,7 @@ export const getAdminChartData = query({
         month: month.label,
         created: monthProjects.length,
       };
-    });
-
-    const statusKeys = [
-      "draft",
-      "pending_funding",
-      "funded",
-      "matching",
-      "matched",
-      "in_progress",
-      "completed",
-      "cancelled",
-      "disputed",
-    ] as const;
-
-    const projectStatusByMonth = months.map((month) => {
-      const monthProjects = allProjects.filter(
-        (p) => p.createdAt >= month.start && p.createdAt < month.end
-      );
-      const counts: Record<string, number> = {};
-      for (const key of statusKeys) {
-        counts[key] = monthProjects.filter((p) => p.status === key).length;
-      }
-      return {
-        month: month.label,
-        ...counts,
-      } as {
-        month: string;
-        draft: number;
-        pending_funding: number;
-        funded: number;
-        matching: number;
-        matched: number;
-        in_progress: number;
-        completed: number;
-        cancelled: number;
-        disputed: number;
-      };
-    });
-
-    const projectStatusCounts: Record<string, number> = {};
+    });    const projectStatusCounts: Record<string, number> = {};
     for (const project of allProjects) {
       projectStatusCounts[project.status] =
         (projectStatusCounts[project.status] || 0) + 1;
@@ -257,7 +212,6 @@ export const getAdminChartData = query({
       usersByMonth,
       revenueByMonth,
       projectsByMonth,
-      projectStatusByMonth,
       projectStatus: Object.entries(projectStatusCounts).map(([name, value]) => ({
         name,
         value,

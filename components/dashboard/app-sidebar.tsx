@@ -15,6 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Logo } from "@/components/ui/logo";
@@ -41,6 +42,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuthStore();
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const navigationItems = React.useMemo(() => {
     if (!user) return [];
@@ -65,6 +67,39 @@ export function AppSidebar() {
       .slice(0, 2);
   };
 
+  const closeMobileSidebar = React.useCallback(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [isMobile, setOpenMobile]);
+
+  const iconColorMap: Record<string, string> = {
+    Dashboard: "text-indigo-500",
+    Projects: "text-emerald-500",
+    "Create Project": "text-amber-500",
+    Opportunities: "text-amber-500",
+    Messages: "text-sky-500",
+    Transactions: "text-green-500",
+    Disputes: "text-rose-500",
+    "Dispute Management": "text-rose-500",
+    Users: "text-violet-500",
+    Notifications: "text-orange-500",
+    Analytics: "text-cyan-500",
+    "Audit Logs": "text-slate-500",
+    Profile: "text-blue-500",
+    Settings: "text-zinc-500",
+    "Help & Support": "text-teal-500",
+    "All Projects": "text-emerald-500",
+    Active: "text-emerald-500",
+    Completed: "text-emerald-500",
+  };
+
+  const getIconClass = (title: string, isActive: boolean) =>
+    cn(
+      "transition-transform duration-200 group-hover/menu-item:-translate-y-0.5 group-hover/menu-item:scale-110",
+      isActive ? "text-primary" : iconColorMap[title] || "text-muted-foreground"
+    );
+
   if (!user) {
     return null;
   }
@@ -75,7 +110,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard" className="">
+              <Link href="/dashboard" onClick={closeMobileSidebar} className="">
                 <Logo 
                   width={32} 
                   height={32} 
@@ -118,8 +153,8 @@ export function AppSidebar() {
                             isActive={isChildActive}
                             tooltip={child.title}
                           >
-                            <Link href={child.url}>
-                              <ChildIcon />
+                            <Link href={child.url} onClick={closeMobileSidebar}>
+                              <ChildIcon className={getIconClass(child.title, isChildActive)} />
                               <span>{child.title}</span>
                             </Link>
                           </SidebarMenuButton>
@@ -142,8 +177,8 @@ export function AppSidebar() {
                       isActive={isActive}
                       tooltip={item.title}
                     >
-                      <Link href={item.url}>
-                        <Icon />
+                      <Link href={item.url} onClick={closeMobileSidebar}>
+                        <Icon className={getIconClass(item.title, isActive)} />
                         <span>{item.title}</span>
                         {item.badge !== undefined && item.badge > 0 && (
                           <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
