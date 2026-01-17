@@ -63,6 +63,21 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "transfer.created":
+      case "transfer.paid":
+      case "transfer.failed":
+      case "transfer.reversed":
+      case "payout.paid":
+      case "payout.failed":
+      case "payout.canceled": {
+        const stripeObject = event.data.object as Stripe.Transfer | Stripe.Payout;
+        await convex.action((api as any)["payments/actions"].handleStripeWebhook, {
+          eventType: event.type,
+          eventId: event.id,
+          data: stripeObject,
+        });
+        break;
+      }
       case "payment_intent.canceled": {
         const paymentIntentCanceled = event.data.object as Stripe.PaymentIntent;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

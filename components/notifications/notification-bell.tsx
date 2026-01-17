@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Doc } from "@/convex/_generated/dataModel";
 import { usePusherNotifications } from "@/hooks/use-pusher-notifications";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -49,7 +50,7 @@ export function NotificationBell() {
 
   const unreadCount = useMemo(() => {
     if (!inAppEnabled) return 0;
-    return (notifications || []).filter((n) => !n.readAt).length;
+    return (notifications || []).filter((n: Doc<"notifications">) => !n.readAt).length;
   }, [notifications, inAppEnabled]);
 
   const handleMarkAllRead = async () => {
@@ -97,7 +98,7 @@ export function NotificationBell() {
               You’re all caught up.
             </div>
           ) : (
-            (notifications || []).map((notification) => (
+            (notifications || []).map((notification: Doc<"notifications">) => (
               <DropdownMenuItem
                 key={notification._id}
                 className={cn(

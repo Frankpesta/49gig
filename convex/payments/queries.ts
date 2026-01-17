@@ -43,18 +43,53 @@ export const getPaymentByIntentId = internalQuery({
 });
 
 /**
- * Get webhook by event ID (for idempotency)
+ * Get payment by Stripe transfer ID
  * Internal query
  */
-export const getWebhookByEventId = internalQuery({
+export const getPaymentByTransferId = internalQuery({
   args: {
-    eventId: v.string(),
+    transferId: v.string(),
   },
   handler: async (ctx, args) => {
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_webhook", (q) => q.eq("webhookReceived", true))
-      .filter((q) => q.eq(q.field("webhookEventId"), args.eventId))
+      .withIndex("by_stripe_transfer", (q) => q.eq("stripeTransferId", args.transferId))
+      .first();
+
+    return payment;
+  },
+});
+
+/**
+ * Get payment by Stripe payout ID
+ * Internal query
+ */
+export const getPaymentByPayoutId = internalQuery({
+  args: {
+    payoutId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_stripe_payout", (q) => q.eq("stripePayoutId", args.payoutId))
+      .first();
+
+    return payment;
+  },
+});
+
+/**
+ * Get payment by Stripe refund ID
+ * Internal query
+ */
+export const getPaymentByRefundId = internalQuery({
+  args: {
+    refundId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db
+      .query("payments")
+      .withIndex("by_stripe_refund", (q) => q.eq("stripeRefundId", args.refundId))
       .first();
 
     return payment;

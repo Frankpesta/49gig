@@ -7,6 +7,7 @@ import type { FunctionReference } from "convex/server";
 const api = require("../_generated/api") as {
   api: {
     notifications: { actions: { sendSystemNotification: unknown } };
+    disputes: { actions: { releaseDisputeFunds: unknown } };
   };
 };
 
@@ -151,7 +152,9 @@ export const initiateDispute = mutation({
         "action",
         "internal"
       >;
-
+    const releaseDisputeFunds =
+      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
+    
     // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "dispute_initiated",
@@ -381,6 +384,8 @@ export const resolveDispute = mutation({
         "action",
         "internal"
       >;
+    const releaseDisputeFunds =
+      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
 
     // Update dispute
     await ctx.db.patch(args.disputeId, {
@@ -411,7 +416,9 @@ export const resolveDispute = mutation({
       updatedAt: now,
     });
 
-    // TODO: Release funds based on resolution
+    await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
+      disputeId: args.disputeId,
+    });
     // TODO: Handle freelancer replacement if needed
     const notifyUserIds = [project.clientId, project.matchedFreelancerId].filter(
       Boolean

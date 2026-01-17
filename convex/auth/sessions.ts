@@ -1,4 +1,4 @@
-import { mutation, query } from "../_generated/server";
+import { internalMutation, mutation, query } from "../_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -368,3 +368,42 @@ export const getActiveSessions = query({
   },
 });
 
+/**
+ * Cleanup expired or revoked sessions
+ */
+export const cleanupSessions = internalMutation({
+  args: {
+    now: v.number(),
+    revokeBefore: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const expiredSessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_expires", (q) => q.lt("expiresAt", args.now))
+      .collect();
+
+    const revokedSessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_active", (q) => q.eq("isActive", false))
+      .filter((q) => q.lt(q.field("revokedAt"), args.revokeBefore))
+      .collect();
+
+    const toDelete = new Map<string, typeof expiredSessions[number]>();
+    for (const s of expiredSessions) {
+      toDelete.set(s._id, s);
+    }
+    for (const s of revokedSessions) {
+      toDelete.set(s._id, s);
+    }
+
+    for (const session of toDelete.values()) {
+      await ctx.db.delete(session._id);
+    }
+
+    return {
+      expiredDeleted: expiredSessions.length,
+      revokedDeleted: revokedSessions.length,
+      totalDeleted: toDelete.size,
+    };
+  },
+});

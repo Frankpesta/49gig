@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -48,6 +49,12 @@ export default function AuditLogsPage() {
   const { user, isAuthenticated } = useAuth();
   const [actionTypeFilter, setActionTypeFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [actionTypeFilter, searchTerm]);
 
   const logs = useQuery(
     (api as any)["audit/queries"].getAuditLogs,
@@ -93,6 +100,11 @@ export default function AuditLogsPage() {
       log.targetType?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   }) || [];
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   return (
     <div className="space-y-6">
@@ -147,7 +159,7 @@ export default function AuditLogsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -167,7 +179,7 @@ export default function AuditLogsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredLogs.map((log: EnrichedAuditLog) => {
+                  paginatedLogs.map((log: EnrichedAuditLog) => {
                     const Icon = ACTION_TYPE_ICONS[log.actionType] || FileText;
                     return (
                       <TableRow key={log._id}>
@@ -187,7 +199,7 @@ export default function AuditLogsPage() {
                             {log.actionType}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-normal max-w-[220px] break-words">
                           <div className="space-y-1">
                             <div className="font-medium">{log.actor?.name || "Unknown"}</div>
                             <div className="text-xs text-muted-foreground">
@@ -198,7 +210,7 @@ export default function AuditLogsPage() {
                             </Badge>
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-normal max-w-[220px] break-words">
                           {log.targetType && log.targetId ? (
                             <div className="space-y-1">
                               <Badge variant="outline" className="text-xs">
@@ -212,13 +224,13 @@ export default function AuditLogsPage() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-normal max-w-[280px] break-words">
                           {log.details ? (
                             <details className="cursor-pointer">
                               <summary className="text-sm text-muted-foreground hover:text-foreground">
                                 View details
                               </summary>
-                              <pre className="mt-2 text-xs bg-muted p-2 rounded overflow-auto max-w-md">
+                              <pre className="mt-2 text-xs bg-muted p-2 rounded max-w-[320px] overflow-auto whitespace-pre-wrap break-words">
                                 {JSON.stringify(log.details, null, 2)}
                               </pre>
                             </details>
@@ -232,6 +244,29 @@ export default function AuditLogsPage() {
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

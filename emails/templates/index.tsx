@@ -842,6 +842,33 @@ export function PaymentReleasedEmail({
   );
 }
 
+export function PayoutSentEmail({
+  name = "there",
+  amount,
+  projectName,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { amount: string; projectName: string }) {
+  return (
+    <EmailLayout
+      title="Payout sent"
+      preview="Your payout is on the way."
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi {name}, a payout of {amount} for {projectName} has been sent to your
+        connected Stripe account.
+      </Text>
+      <EmailButton href={`${appUrl}/dashboard/transactions`}>
+        View transactions
+      </EmailButton>
+    </EmailLayout>
+  );
+}
+
 export function RefundIssuedEmail({
   name = "there",
   amount,
@@ -1106,6 +1133,34 @@ export function AdminKycDigestEmail({
       <EmailList items={items} />
       <EmailButton href={`${appUrl}/dashboard/verification`}>
         Open verification queue
+      </EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function PayoutFailedEmail({
+  name = "there",
+  amount,
+  currency,
+  reason,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { amount: string; currency: string; reason: string }) {
+  return (
+    <EmailLayout
+      title="Payout failed"
+      preview="We could not complete your payout."
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi {name}, we could not complete your payout of {amount} {currency}.
+      </Text>
+      <Text style={textStyle}>Reason: {reason}</Text>
+      <EmailButton href={`${appUrl}/dashboard/support`}>
+        Contact support
       </EmailButton>
     </EmailLayout>
   );

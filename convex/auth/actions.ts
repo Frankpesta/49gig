@@ -56,19 +56,22 @@ export const sendVerificationEmail = action({
     userId: v.id("users"),
     email: v.string(),
     name: v.optional(v.string()),
-    verifyUrl: v.string(),
+    token: v.string(),
+    verifyUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const appUrl = getAppUrl();
     const logoUrl = getLogoUrl(appUrl);
     const date = formatDate();
+    const verifyUrl =
+      args.verifyUrl || `${appUrl}/verify-email?token=${encodeURIComponent(args.token)}`;
 
     await sendEmail({
       to: args.email,
       subject: "Verify your email",
       react: React.createElement(VerificationEmail, {
         name: args.name || "there",
-        verifyUrl: args.verifyUrl,
+        verifyUrl,
         appUrl,
         logoUrl,
         date,

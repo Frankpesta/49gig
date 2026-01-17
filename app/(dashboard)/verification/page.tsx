@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Doc } from "@/convex/_generated/dataModel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -283,14 +284,19 @@ export default function VerificationPage() {
                   Your verification has been flagged for review. Please contact support.
                 </p>
                 <ul className="space-y-2">
-                  {vettingResult.fraudFlags.map((flag, index) => (
+                  {vettingResult.fraudFlags.map(
+                    (
+                      flag: NonNullable<Doc<"vettingResults">["fraudFlags"]>[number],
+                      index: number
+                    ) => (
                     <li key={index} className="text-sm">
                       <Badge variant="destructive" className="mr-2">
                         {flag.severity}
                       </Badge>
                       {flag.description}
                     </li>
-                  ))}
+                    )
+                  )}
                 </ul>
               </CardContent>
             </Card>

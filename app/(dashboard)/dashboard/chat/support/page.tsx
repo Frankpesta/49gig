@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import type { Doc } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +31,10 @@ export default function SupportChatPage() {
   useEffect(() => {
     // If user has an existing support chat, redirect to it
     if (chats) {
-      const supportChat = chats.find((chat) => chat.type === "support" && chat.status === "active");
+      const supportChat = chats.find(
+        (chat: Doc<"chats">) =>
+          chat.type === "support" && chat.status === "active"
+      );
       if (supportChat) {
         router.replace(`/dashboard/chat/${supportChat._id}`);
       }
@@ -73,7 +77,9 @@ export default function SupportChatPage() {
   }
 
   // If redirecting to existing chat, show loading
-  const supportChat = chats?.find((chat) => chat.type === "support" && chat.status === "active");
+  const supportChat = chats?.find(
+    (chat: Doc<"chats">) => chat.type === "support" && chat.status === "active"
+  );
   if (supportChat) {
     return (
       <div className="flex min-h-screen items-center justify-center">

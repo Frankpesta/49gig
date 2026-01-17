@@ -37,8 +37,6 @@ export const verifySession = query({
   },
 });
 
-
-
 /**
  * List sessions for the current user via session token (custom auth)
  */

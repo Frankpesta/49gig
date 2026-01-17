@@ -103,7 +103,7 @@ export default function TransactionsPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
+  const itemsPerPage = 50;
 
   // Fetch transactions
   const transactions = useQuery(

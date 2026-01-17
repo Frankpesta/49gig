@@ -26,6 +26,8 @@ export const completeResumeUpload = mutation({
     sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const resumeActions: any = require("../_generated/api").internal.resume.actions;
+    const authQueries: any = require("../_generated/api").api.auth?.queries || require("../_generated/api").api["auth/queries"];
     let user = null;
 
     // Try Convex Auth first
@@ -33,11 +35,7 @@ export const completeResumeUpload = mutation({
     
     // If no Convex Auth user and session token provided, verify session token
     if (!user && args.sessionToken) {
-      user = await ctx.runQuery(
-        // @ts-expect-error dynamic path casting
-        api["auth/queries"].verifySession as any,
-        { sessionToken: args.sessionToken }
-      );
+            user = await ctx.runQuery(authQueries.verifySession, { sessionToken: args.sessionToken });
     }
 
     if (!user) {
@@ -95,8 +93,7 @@ export const completeResumeUpload = mutation({
     // Kick off parsing asynchronously (LLM / parser hook)
     await ctx.scheduler.runAfter(
       0,
-      // @ts-expect-error Generated types can be deep; safe cast for internal action path
-      internal.resume.actions.parseResumeAndBuildBio as any,
+      resumeActions.parseResumeAndBuildBio,
       {
         userId: user._id,
         fileId: args.fileId,
