@@ -18,8 +18,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,20 +106,32 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="inset" className="bg-background">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-6">
-        <div className="flex flex-col items-center justify-center space-y-2">
-          <Link href="/dashboard" onClick={closeMobileSidebar} className="flex flex-col items-center">
-            <Logo 
-              width={64} 
-              height={64} 
-              className="h-16 w-16 shrink-0" 
-              priority 
-            />
-            <span className="mt-2 text-sm font-medium text-foreground">
-              Freelancer Marketplace
-            </span>
-          </Link>
-        </div>
+      <SidebarHeader className="border-b border-sidebar-border">
+        <Link 
+          href="/dashboard" 
+          onClick={closeMobileSidebar} 
+          className="flex flex-col items-center justify-center px-4 py-6 hover:opacity-80 transition-opacity"
+        >
+          <Image
+            src="/logo-light.png"
+            alt="49GIG Logo"
+            width={80}
+            height={80}
+            className="h-20 w-20 object-contain dark:hidden"
+            priority
+          />
+          <Image
+            src="/logo-dark.png"
+            alt="49GIG Logo"
+            width={80}
+            height={80}
+            className="h-20 w-20 object-contain hidden dark:block"
+            priority
+          />
+          <span className="mt-3 text-sm font-medium text-muted-foreground">
+            Freelancer Marketplace
+          </span>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="scrollbar-hide">
