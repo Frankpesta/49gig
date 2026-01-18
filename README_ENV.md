@@ -18,12 +18,13 @@ GOOGLE_REDIRECT_URI=https://your-domain.com/oauth/callback
 ```
 **Note:** These should be set in Convex dashboard, not in `.env.local`
 
-### Stripe (for payments)
+### Flutterwave (for payments)
 ```bash
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key_here
-STRIPE_SECRET_KEY=your_stripe_secret_key_here
-STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret_here
+FLUTTERWAVE_SECRET_KEY=your_flutterwave_secret_key_here
+FLUTTERWAVE_PUBLIC_KEY=your_flutterwave_public_key_here
+FLUTTERWAVE_WEBHOOK_SECRET=your_flutterwave_webhook_secret_here
 ```
+**Note:** These should be set in Convex dashboard and Next.js environment variables
 
 ## Optional Variables (Third-Party Services)
 
