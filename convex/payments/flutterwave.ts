@@ -177,7 +177,7 @@ export async function createRefund(
  * Transfer funds to a subaccount or bank account
  */
 export async function createTransfer(data: {
-  account_bank: string; // Bank code
+  account_bank: string; // Bank code (will be converted to number)
   account_number: string;
   amount: number;
   narration: string;
@@ -211,10 +211,31 @@ export async function createTransfer(data: {
     bank_name: string;
   };
 }> {
+  // Convert bank code to number as Flutterwave requires numeric account_bank
+  const account_bank_numeric = parseInt(data.account_bank, 10);
+  if (isNaN(account_bank_numeric)) {
+    throw new Error(`Invalid bank code: ${data.account_bank}. Bank code must be numeric.`);
+  }
+
+  const payload: any = {
+    account_number: data.account_number,
+    account_bank: account_bank_numeric, // Send as number
+    amount: data.amount,
+    narration: data.narration,
+    currency: data.currency,
+    reference: data.reference,
+  };
+
+  if (data.beneficiary_name) payload.beneficiary_name = data.beneficiary_name;
+  if (data.destination_branch_code) payload.destination_branch_code = data.destination_branch_code;
+  if (data.callback_url) payload.callback_url = data.callback_url;
+  if (data.debit_currency) payload.debit_currency = data.debit_currency;
+  if (data.subaccount) payload.subaccount = data.subaccount;
+
   const response = await fetch(`${FLUTTERWAVE_BASE_URL}/transfers`, {
     method: "POST",
     headers: getFlutterwaveHeaders(),
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -252,10 +273,25 @@ export async function createSubaccount(data: {
     created_at: string;
   };
 }> {
+  // Convert bank code to number as Flutterwave requires numeric account_bank
+  const account_bank_numeric = parseInt(data.account_bank, 10);
+  if (isNaN(account_bank_numeric)) {
+    throw new Error(`Invalid bank code: ${data.account_bank}. Bank code must be numeric.`);
+  }
+
   const response = await fetch(`${FLUTTERWAVE_BASE_URL}/subaccounts`, {
     method: "POST",
     headers: getFlutterwaveHeaders(),
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      business_name: data.business_name,
+      business_email: data.business_email,
+      business_mobile: data.business_mobile,
+      account_number: data.account_number,
+      account_bank: account_bank_numeric, // Send as number
+      country: data.country,
+      split_type: data.split_type,
+      split_value: data.split_value,
+    }),
   });
 
   if (!response.ok) {
@@ -368,12 +404,21 @@ export async function verifyAccountNumber(data: {
     bank_id: number;
   };
 }> {
+  // Convert bank code to number as Flutterwave requires numeric account_bank
+  const account_bank_numeric = parseInt(data.account_bank, 10);
+  if (isNaN(account_bank_numeric)) {
+    throw new Error(`Invalid bank code: ${data.account_bank}. Bank code must be numeric.`);
+  }
+
   const response = await fetch(
     `${FLUTTERWAVE_BASE_URL}/accounts/resolve`,
     {
       method: "POST",
       headers: getFlutterwaveHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        account_number: data.account_number,
+        account_bank: account_bank_numeric,
+      }),
     }
   );
 
