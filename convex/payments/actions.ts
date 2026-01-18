@@ -79,8 +79,9 @@ export const createPaymentIntent = action({
     // Generate unique transaction reference
     const txRef = `49gig-${args.projectId}-${Date.now()}`;
 
-    // Get redirect URL from environment or construct
-    const baseUrl = process.env.CONVEX_SITE_URL || "https://your-site.com";
+    // Get redirect URL - use FRONTEND_URL or NEXT_PUBLIC_BASE_URL, fallback to a sensible default
+    // CONVEX_SITE_URL points to Convex hosting, not the frontend app
+    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://your-site.com";
     const redirectUrl = `${baseUrl}/dashboard/projects/${args.projectId}/payment/callback`;
 
     // Initialize Flutterwave payment
@@ -417,9 +418,11 @@ export const createPayoutTransfer = action({
 export const createSubaccount = action({
   args: {
     freelancerId: v.id("users"),
-    accountName: v.string(), // Business/Account name
-    email: v.string(),
-    phoneNumber: v.string(),
+    businessName: v.string(), // Business name
+    businessEmail: v.string(),
+    businessMobile: v.string(),
+    accountNumber: v.string(), // Bank account number
+    accountBank: v.string(), // Bank code
     country: v.string(), // Country code like "NG", "KE", etc.
     splitType: v.union(v.literal("percentage"), v.literal("flat")),
     splitValue: v.number(), // Percentage or flat amount
@@ -435,9 +438,11 @@ export const createSubaccount = action({
     }
 
     const subaccountData = await flutterwave.createSubaccount({
-      account_name: args.accountName,
-      email: args.email,
-      mobilenumber: args.phoneNumber,
+      business_name: args.businessName,
+      business_email: args.businessEmail,
+      business_mobile: args.businessMobile,
+      account_number: args.accountNumber,
+      account_bank: args.accountBank,
       country: args.country,
       split_type: args.splitType,
       split_value: args.splitValue,
