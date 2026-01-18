@@ -1,35 +1,22 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import Stripe from "stripe";
 import { internal, api } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
+import * as flutterwave from "./flutterwave";
 
 /**
- * Get Stripe instance (lazy initialization)
- */
-function getStripe(): Stripe {
-  const apiKey = process.env.STRIPE_SECRET_KEY;
-  if (!apiKey) {
-    throw new Error("STRIPE_SECRET_KEY environment variable is not set. Please configure it in the Convex dashboard.");
-  }
-  return new Stripe(apiKey, {
-    apiVersion: "2025-12-15.clover",
-  });
-}
-
-/**
- * Create a Stripe Payment Intent for project pre-funding
- * This creates a payment intent that the client will pay
+ * Initialize a Flutterwave payment for project pre-funding
+ * Returns payment link that user will be redirected to
  */
 export const createPaymentIntent = action({
   args: {
     projectId: v.id("projects"),
-    amount: v.number(), // Amount in cents
-    currency: v.string(), // e.g., "usd"
+    amount: v.number(), // Amount in currency unit (e.g., dollars, not cents)
+    currency: v.string(), // e.g., "NGN", "USD", "KES"
     userId: v.id("users"),
   },
-  handler: async (ctx, args): Promise<{ clientSecret: string | null; paymentId: string }> => {
+  handler: async (ctx, args): Promise<{ paymentLink: string; paymentId: string; txRef: string }> => {
     // Verify user and project
     // @ts-expect-error - Type instantiation depth issue with internal API types
     const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
@@ -37,7 +24,7 @@ export const createPaymentIntent = action({
     });
 
     if (!user || user.role !== "client") {
-      throw new Error("Only clients can create payment intents");
+      throw new Error("Only clients can create payments");
     }
 
     const project = await ctx.runQuery(internal.payments.queries.getProject, {
@@ -57,8 +44,7 @@ export const createPaymentIntent = action({
       throw new Error("Project is not in a state that allows payment");
     }
 
-    // Check if payment already exists - CRITICAL: Check for ANY payment, not just succeeded
-    // This prevents duplicate payment creation
+    // Check if payment already exists
     const existingPayment = await ctx.runQuery(
       internal.payments.queries.getPaymentByProject,
       {
@@ -67,89 +53,60 @@ export const createPaymentIntent = action({
     );
 
     if (existingPayment) {
-      // If payment already succeeded, project is funded
       if (existingPayment.status === "succeeded") {
         throw new Error("Project is already funded");
       }
       
-      // If there's a pending payment intent, return its client secret
-      // This handles the case where user refreshes the page or navigates back
-      if (existingPayment.stripePaymentIntentId && 
+      // If there's a pending payment with a transaction reference, return its payment link
+      if (existingPayment.flutterwaveTransactionId && 
           (existingPayment.status === "pending" || existingPayment.status === "processing")) {
-        const stripe = getStripe();
-        try {
-          const paymentIntent = await stripe.paymentIntents.retrieve(
-            existingPayment.stripePaymentIntentId
-          );
-          
-          // Only return if payment intent is still in a valid state
-          if (paymentIntent.status === "requires_payment_method" || 
-              paymentIntent.status === "requires_confirmation" ||
-              paymentIntent.status === "requires_action") {
-            return {
-              clientSecret: paymentIntent.client_secret,
-              paymentId: existingPayment._id,
-            };
-          }
-          
-          // If payment intent is already succeeded/failed, we can create a new one
-          // But log this case for monitoring
-          console.warn(`Payment intent ${paymentIntent.id} is in state ${paymentIntent.status}, creating new payment`);
-        } catch (stripeError) {
-          // If retrieval fails, continue to create a new one
-          console.error("Failed to retrieve existing payment intent:", stripeError);
+        // For Flutterwave, we'd need to reconstruct the payment link or retrieve it
+        // Since we store tx_ref, we can regenerate the link or return existing
+        // For now, we'll create a new payment if the old one is stale
+        const now = Date.now();
+        const paymentAge = now - existingPayment.createdAt;
+        // If payment is less than 1 hour old, don't create duplicate
+        if (paymentAge < 60 * 60 * 1000) {
+          throw new Error("A payment is already being processed for this project. Please wait or contact support.");
         }
       }
       
-      // If there's a pending payment without a valid payment intent, don't create duplicate
-      // Wait for webhook to process or user to retry
-      if (existingPayment.status === "pending" && !existingPayment.stripePaymentIntentId) {
+      if (existingPayment.status === "pending" && !existingPayment.flutterwaveTransactionId) {
         throw new Error("A payment is already being processed for this project. Please wait or contact support.");
       }
     }
 
-    // Create or retrieve Stripe customer
-    const stripe = getStripe();
-    // User object from verifyUser query should have all fields including stripeCustomerId
-    // Type assertion needed because TypeScript doesn't know about optional fields
-    const userWithStripe = user as typeof user & { stripeCustomerId?: string };
-    let customerId: string | undefined = userWithStripe.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
+    // Generate unique transaction reference
+    const txRef = `49gig-${args.projectId}-${Date.now()}`;
+
+    // Get redirect URL from environment or construct
+    const baseUrl = process.env.CONVEX_SITE_URL || "https://your-site.com";
+    const redirectUrl = `${baseUrl}/dashboard/projects/${args.projectId}/payment/callback`;
+
+    // Initialize Flutterwave payment
+    const paymentData = await flutterwave.initializePayment({
+      tx_ref: txRef,
+      amount: args.amount,
+      currency: args.currency.toUpperCase(),
+      redirect_url: redirectUrl,
+      customer: {
         email: user.email,
         name: user.name,
-        metadata: {
-          userId: args.userId,
-        },
-      });
-      customerId = customer.id;
-
-      // Update user with Stripe customer ID
-      await ctx.runMutation(internal.payments.mutations.updateUserStripeId, {
-        userId: args.userId,
-        stripeCustomerId: customerId,
-      });
-    }
-
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: args.amount,
-      currency: args.currency,
-      customer: customerId,
-      metadata: {
+      },
+      customizations: {
+        title: "49GIG Project Funding",
+        description: `Project: ${project.intakeForm.title}`,
+      },
+      meta: {
         projectId: args.projectId,
         userId: args.userId,
         type: "pre_funding",
-      },
-      description: `Project funding: ${project.intakeForm.title}`,
-      automatic_payment_methods: {
-        enabled: true,
       },
     });
 
     // Create payment record in database
     const platformFee = project.platformFee || 10; // Default 10%
-    const platformFeeAmount = Math.round((args.amount * platformFee) / 100);
+    const platformFeeAmount = (args.amount * platformFee) / 100;
     const netAmount = args.amount - platformFeeAmount;
 
     const paymentId = await ctx.runMutation(
@@ -157,18 +114,18 @@ export const createPaymentIntent = action({
       {
         projectId: args.projectId,
         type: "pre_funding",
-        amount: args.amount / 100, // Convert cents to dollars
+        amount: args.amount,
         currency: args.currency,
-        platformFee: platformFeeAmount / 100,
-        netAmount: netAmount / 100,
-        stripePaymentIntentId: paymentIntent.id,
-        stripeCustomerId: customerId,
+        platformFee: platformFeeAmount,
+        netAmount: netAmount,
+        flutterwaveTransactionId: txRef, // Store tx_ref as transaction ID
+        flutterwaveCustomerEmail: user.email,
         userId: args.userId,
+        status: "pending",
       }
     );
 
     // Update project status to pending_funding only if still in draft
-    // This prevents race conditions from multiple simultaneous calls
     const currentProject = await ctx.runQuery(internal.payments.queries.getProject, {
       projectId: args.projectId,
       userId: args.userId,
@@ -182,94 +139,146 @@ export const createPaymentIntent = action({
     }
 
     return {
-      clientSecret: paymentIntent.client_secret,
+      paymentLink: paymentData.data.link,
       paymentId,
+      txRef,
     };
   },
 });
 
 /**
- * Handle Stripe webhook events
- * This is called by Stripe when payment events occur
+ * Verify a Flutterwave payment transaction
+ * Called after user returns from Flutterwave payment page
  */
-export const handleStripeWebhook = action({
+export const verifyPayment = action({
   args: {
-    eventType: v.string(),
-    eventId: v.string(),
-    paymentIntentId: v.optional(v.string()),
-    data: v.any(),
+    txRef: v.string(),
+    projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    // Note: Webhook idempotency check removed as getWebhookByEventId query doesn't exist
-    // Webhook events should be idempotent on Stripe's side via eventId
-    
-    // Process webhook based on event type
-    switch (args.eventType) {
-      case "payment_intent.succeeded":
-        if (args.paymentIntentId) {
-          await ctx.runMutation(
-            internal.payments.mutations.handlePaymentSuccess,
-            {
-              paymentIntentId: args.paymentIntentId,
-              eventId: args.eventId,
-              data: args.data,
-            }
-          );
+    // Verify payment with Flutterwave
+    const verification = await flutterwave.verifyPayment(args.txRef);
 
-          // Get payment to find project
+    if (verification.data.status !== "successful") {
+      throw new Error(`Payment verification failed: ${verification.data.status}`);
+    }
+
+    // Find payment record
+    const payment = await ctx.runQuery(
+      internal.payments.queries.getPaymentByTransactionId,
+      {
+        transactionId: args.txRef,
+      }
+    );
+
+    if (!payment) {
+      throw new Error("Payment record not found");
+    }
+
+    // Update payment status
+    await ctx.runMutation(internal.payments.mutations.handlePaymentSuccess, {
+      transactionId: args.txRef,
+      eventId: verification.data.id.toString(),
+      data: verification.data,
+    });
+
+    // Trigger matching if this is a pre-funding payment
+    if (payment.type === "pre_funding") {
+      try {
+        // @ts-expect-error - Type instantiation depth issue with API types
+        await ctx.runAction(api.matching.actions.generateMatches, {
+          projectId: payment.projectId,
+          limit: 5,
+        });
+      } catch (error) {
+        console.error("Failed to trigger matching:", error);
+      }
+    }
+
+    return { success: true, status: verification.data.status };
+  },
+});
+
+/**
+ * Handle Flutterwave webhook events
+ * This is called by Flutterwave when payment events occur
+ */
+export const handleFlutterwaveWebhook = action({
+  args: {
+    event: v.string(), // Event type: charge.completed, transfer.completed, etc.
+    data: v.any(), // Event data
+  },
+  handler: async (ctx, args) => {
+    // Flutterwave webhook events:
+    // - charge.completed: Payment completed
+    // - transfer.completed: Transfer completed
+    // - transfer.reversed: Transfer reversed
+    // - refund.completed: Refund completed
+
+    switch (args.event) {
+      case "charge.completed":
+        if (args.data.tx_ref) {
+          const txRef = args.data.tx_ref;
+          
+          // Find payment by transaction reference
           const payment = await ctx.runQuery(
-            internal.payments.queries.getPaymentByIntentId,
+            internal.payments.queries.getPaymentByTransactionId,
             {
-              paymentIntentId: args.paymentIntentId,
+              transactionId: txRef,
             }
           );
 
-          // If this is a pre-funding payment, trigger matching
-          if (payment && payment.type === "pre_funding") {
-            try {
-              // Generate matches for the funded project
-              // Call matching action directly
-              // @ts-expect-error - Type instantiation depth issue with API types
-              await ctx.runAction(api.matching.actions.generateMatches, {
-                projectId: payment.projectId,
-                limit: 5,
+          if (payment) {
+            if (args.data.status === "successful") {
+              await ctx.runMutation(internal.payments.mutations.handlePaymentSuccess, {
+                transactionId: txRef,
+                eventId: args.data.id?.toString() || txRef,
+                data: args.data,
               });
-            } catch (error) {
-              // Log error but don't fail the webhook
-              console.error("Failed to trigger matching:", error);
+
+              // Trigger matching if this is a pre-funding payment
+              if (payment.type === "pre_funding") {
+                try {
+                  await ctx.runAction(api.matching.actions.generateMatches, {
+                    projectId: payment.projectId,
+                    limit: 5,
+                  });
+                } catch (error) {
+                  console.error("Failed to trigger matching:", error);
+                }
+              }
+            } else {
+              await ctx.runMutation(internal.payments.mutations.handlePaymentFailure, {
+                transactionId: txRef,
+                eventId: args.data.id?.toString() || txRef,
+                errorMessage: args.data.processor_response || "Payment failed",
+              });
             }
           }
         }
         break;
 
-      case "payment_intent.payment_failed":
-        if (args.paymentIntentId) {
-          await ctx.runMutation(
-            internal.payments.mutations.handlePaymentFailure,
-            {
-              paymentIntentId: args.paymentIntentId,
-              eventId: args.eventId,
-              errorMessage: args.data?.last_payment_error?.message || "Payment failed",
-            }
-          );
+      case "transfer.completed":
+        if (args.data.reference) {
+          await ctx.runMutation(internal.payments.mutations.updatePaymentByTransferId, {
+            transferId: args.data.reference,
+            status: "succeeded",
+          });
         }
         break;
 
-      case "payment_intent.canceled":
-        if (args.paymentIntentId) {
-          await ctx.runMutation(
-            internal.payments.mutations.handlePaymentCancellation,
-            {
-              paymentIntentId: args.paymentIntentId,
-              eventId: args.eventId,
-            }
-          );
+      case "transfer.reversed":
+        if (args.data.reference) {
+          await ctx.runMutation(internal.payments.mutations.updatePaymentByTransferId, {
+            transferId: args.data.reference,
+            status: "failed",
+            errorMessage: "Transfer reversed",
+          });
         }
         break;
 
       default:
-        // Log unhandled event types
-        console.log(`Unhandled webhook event: ${args.eventType}`);
+        console.log(`Unhandled Flutterwave webhook event: ${args.event}`);
     }
 
     return { processed: true };
@@ -277,43 +286,42 @@ export const handleStripeWebhook = action({
 });
 
 /**
- * Refund a payment intent (full or partial) for dispute resolution
+ * Refund a payment (full or partial) for dispute resolution
  */
 export const refundPaymentIntent = action({
   args: {
     projectId: v.id("projects"),
-    amount: v.number(), // Amount in dollars
+    amount: v.number(), // Amount in currency unit
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: true; refundId: string }> => {
     const payment = await ctx.runQuery(internal.payments.queries.getPaymentByProject, {
       projectId: args.projectId,
     });
-    if (!payment || !payment.stripePaymentIntentId) {
-      throw new Error("No payment intent found for this project");
+    
+    if (!payment || !payment.flutterwaveTransactionId) {
+      throw new Error("No payment transaction found for this project");
     }
 
-    const stripe = getStripe();
-    const amountInCents = Math.round(args.amount * 100);
-    const paymentAmountInCents = Math.round(payment.amount * 100);
+    // Flutterwave requires transaction ID (numeric) for refunds
+    // We need to get the actual transaction ID from Flutterwave using tx_ref
+    // For now, we'll need to verify the payment to get the transaction ID
+    // In production, store both tx_ref and transaction ID
+    const verification = await flutterwave.verifyPayment(payment.flutterwaveTransactionId);
+    
+    if (!verification.data.id) {
+      throw new Error("Unable to retrieve transaction ID for refund");
+    }
 
-    const refund: Stripe.Refund = await stripe.refunds.create({
-      payment_intent: payment.stripePaymentIntentId,
-      amount: amountInCents < paymentAmountInCents ? amountInCents : undefined,
-      reason: "requested_by_customer",
-      metadata: {
-        projectId: args.projectId,
-        reason: args.reason || "dispute_resolution",
-      },
+    const refundData = await flutterwave.createRefund({
+      id: verification.data.id,
+      amount: args.amount < payment.amount ? args.amount : undefined, // Partial or full
     });
 
     // Get project to find clientId for the refund payment record
-    // Note: This is an internal action for dispute resolution, so we need the project's clientId.
-    // The getProject query requires userId for authorization, but we don't have it yet.
-    // We use a type cast here because this is an internal action that's authorized at a higher level.
     const project = await ctx.runQuery(internal.payments.queries.getProject, {
       projectId: args.projectId,
-      userId: args.projectId as unknown as Id<"users">, // Internal action: cast for authorization bypass
+      userId: args.projectId as unknown as Id<"users">,
     });
     const clientId: Id<"users"> | undefined = project?.clientId;
 
@@ -328,51 +336,60 @@ export const refundPaymentIntent = action({
       currency: payment.currency,
       platformFee: 0,
       netAmount: args.amount,
-      stripePaymentIntentId: payment.stripePaymentIntentId,
-      stripeRefundId: refund.id,
-      stripeCustomerId: payment.stripeCustomerId,
+      flutterwaveTransactionId: payment.flutterwaveTransactionId,
+      flutterwaveRefundId: refundData.data.id.toString(),
+      flutterwaveCustomerEmail: payment.flutterwaveCustomerEmail,
       userId: clientId,
       status: "refunded",
     });
 
-    return { success: true, refundId: refund.id };
+    return { success: true, refundId: refundData.data.id.toString() };
   },
 });
 
 /**
- * Create a Stripe Connect transfer to a freelancer
+ * Create a Flutterwave transfer/payout to a freelancer
  */
 export const createPayoutTransfer = action({
   args: {
     projectId: v.id("projects"),
     freelancerId: v.id("users"),
-    amount: v.number(), // Amount in dollars
+    amount: v.number(), // Amount in currency unit
     currency: v.string(),
     milestoneId: v.optional(v.id("milestones")),
+    bankCode: v.string(), // Flutterwave bank code
+    accountNumber: v.string(),
+    accountName: v.string(),
   },
   handler: async (ctx, args) => {
-    const stripe = getStripe();
     const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
       userId: args.freelancerId,
     });
+    
     if (!freelancer) {
       throw new Error("Freelancer not found");
     }
-    const freelancerDoc = freelancer as typeof freelancer & {
-      stripeAccountId?: string;
-    };
-    if (!freelancerDoc.stripeAccountId) {
-      throw new Error("Freelancer Stripe account not connected");
-    }
 
-    const transfer = await stripe.transfers.create({
-      amount: Math.round(args.amount * 100),
-      currency: args.currency,
-      destination: freelancerDoc.stripeAccountId,
-      metadata: {
-        projectId: args.projectId,
-        freelancerId: args.freelancerId,
-      },
+    const freelancerDoc = freelancer as typeof freelancer & {
+      flutterwaveSubaccountId?: string;
+    };
+
+    // Generate unique transfer reference
+    const transferRef = `49gig-payout-${args.projectId}-${Date.now()}`;
+
+    // Create transfer to freelancer
+    // If freelancer has subaccount, use that; otherwise transfer to bank
+    const transferData = await flutterwave.createTransfer({
+      account_bank: args.bankCode,
+      account_number: args.accountNumber,
+      amount: args.amount,
+      narration: `Milestone payout for project ${args.projectId}`,
+      currency: args.currency.toUpperCase(),
+      reference: transferRef,
+      beneficiary_name: args.accountName,
+      ...(freelancerDoc.flutterwaveSubaccountId && {
+        subaccount: freelancerDoc.flutterwaveSubaccountId,
+      }),
     });
 
     await ctx.runMutation(internal.payments.mutations.createPayment, {
@@ -383,12 +400,101 @@ export const createPayoutTransfer = action({
       currency: args.currency,
       platformFee: 0,
       netAmount: args.amount,
-      stripeTransferId: transfer.id,
-      stripeAccountId: freelancerDoc.stripeAccountId,
+      flutterwaveTransferId: transferRef,
+      flutterwaveSubaccountId: freelancerDoc.flutterwaveSubaccountId,
       userId: args.freelancerId,
-      status: "succeeded",
+      status: transferData.data.status === "NEW" ? "processing" : "succeeded",
     });
 
-    return { success: true, transferId: transfer.id };
+    return { success: true, transferId: transferRef };
+  },
+});
+
+/**
+ * Create a Flutterwave subaccount for a freelancer
+ * Equivalent to Stripe Connect account creation
+ */
+export const createSubaccount = action({
+  args: {
+    freelancerId: v.id("users"),
+    accountName: v.string(), // Business/Account name
+    email: v.string(),
+    phoneNumber: v.string(),
+    country: v.string(), // Country code like "NG", "KE", etc.
+    splitType: v.union(v.literal("percentage"), v.literal("flat")),
+    splitValue: v.number(), // Percentage or flat amount
+  },
+  handler: async (ctx, args) => {
+    // Verify freelancer
+    const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: args.freelancerId,
+    });
+
+    if (!freelancer || freelancer.role !== "freelancer") {
+      throw new Error("Only freelancers can create subaccounts");
+    }
+
+    const subaccountData = await flutterwave.createSubaccount({
+      account_name: args.accountName,
+      email: args.email,
+      mobilenumber: args.phoneNumber,
+      country: args.country,
+      split_type: args.splitType,
+      split_value: args.splitValue,
+    });
+
+    // Update user with subaccount ID
+    await ctx.runMutation(internal.payments.mutations.updateUserFlutterwaveSubaccountId, {
+      userId: args.freelancerId,
+      flutterwaveSubaccountId: subaccountData.data.id.toString(),
+    });
+
+    return {
+      success: true,
+      subaccountId: subaccountData.data.id.toString(),
+      accountReference: subaccountData.data.account_reference,
+      bankName: subaccountData.data.bank_name,
+    };
+  },
+});
+
+/**
+ * Get Flutterwave subaccount details for a freelancer
+ */
+export const getSubaccountStatus = action({
+  args: {
+    freelancerId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: args.freelancerId,
+    });
+
+    if (!freelancer) {
+      throw new Error("Freelancer not found");
+    }
+
+    const freelancerDoc = freelancer as typeof freelancer & {
+      flutterwaveSubaccountId?: string;
+    };
+
+    if (!freelancerDoc.flutterwaveSubaccountId) {
+      return { connected: false };
+    }
+
+    try {
+      const subaccountData = await flutterwave.getSubaccount(freelancerDoc.flutterwaveSubaccountId);
+      return {
+        connected: true,
+        subaccountId: subaccountData.data.id.toString(),
+        accountName: subaccountData.data.account_name,
+        accountReference: subaccountData.data.account_reference,
+        bankName: subaccountData.data.bank_name,
+        bankCode: subaccountData.data.bank_code,
+      };
+    } catch (error) {
+      console.error("Failed to get subaccount status:", error);
+      return { connected: false, error: "Failed to fetch subaccount details" };
+    }
   },
 });

@@ -37,6 +37,7 @@ import type * as notifications_actions from "../notifications/actions.js";
 import type * as notifications_mutations from "../notifications/mutations.js";
 import type * as notifications_queries from "../notifications/queries.js";
 import type * as payments_actions from "../payments/actions.js";
+import type * as payments_flutterwave from "../payments/flutterwave.js";
 import type * as payments_mutations from "../payments/mutations.js";
 import type * as payments_queries from "../payments/queries.js";
 import type * as projects_mutations from "../projects/mutations.js";
@@ -89,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   "notifications/mutations": typeof notifications_mutations;
   "notifications/queries": typeof notifications_queries;
   "payments/actions": typeof payments_actions;
+  "payments/flutterwave": typeof payments_flutterwave;
   "payments/mutations": typeof payments_mutations;
   "payments/queries": typeof payments_queries;
   "projects/mutations": typeof projects_mutations;

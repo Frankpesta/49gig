@@ -48,12 +48,11 @@ export const createPayment = internalMutation({
     currency: v.string(),
     platformFee: v.optional(v.number()),
     netAmount: v.number(),
-    stripePaymentIntentId: v.optional(v.string()),
-    stripeRefundId: v.optional(v.string()),
-    stripePayoutId: v.optional(v.string()),
-    stripeTransferId: v.optional(v.string()),
-    stripeCustomerId: v.optional(v.string()),
-    stripeAccountId: v.optional(v.string()),
+    flutterwaveTransactionId: v.optional(v.string()),
+    flutterwaveRefundId: v.optional(v.string()),
+    flutterwaveTransferId: v.optional(v.string()),
+    flutterwaveCustomerEmail: v.optional(v.string()),
+    flutterwaveSubaccountId: v.optional(v.string()),
     milestoneId: v.optional(v.id("milestones")),
     userId: v.id("users"),
     status: v.optional(
@@ -89,9 +88,9 @@ export const createPayment = internalMutation({
         .first();
 
       if (existingPayment) {
-        // If there's already a payment with the same payment intent ID, return that ID
-        if (args.stripePaymentIntentId && 
-            existingPayment.stripePaymentIntentId === args.stripePaymentIntentId) {
+        // If there's already a payment with the same transaction ID, return that ID
+        if (args.flutterwaveTransactionId && 
+            existingPayment.flutterwaveTransactionId === args.flutterwaveTransactionId) {
           return existingPayment._id;
         }
         
@@ -115,12 +114,11 @@ export const createPayment = internalMutation({
       currency: args.currency,
       platformFee: args.platformFee,
       netAmount: args.netAmount,
-      stripePaymentIntentId: args.stripePaymentIntentId,
-      stripeRefundId: args.stripeRefundId,
-      stripePayoutId: args.stripePayoutId,
-      stripeTransferId: args.stripeTransferId,
-      stripeCustomerId: args.stripeCustomerId,
-      stripeAccountId: args.stripeAccountId,
+      flutterwaveTransactionId: args.flutterwaveTransactionId,
+      flutterwaveRefundId: args.flutterwaveRefundId,
+      flutterwaveTransferId: args.flutterwaveTransferId,
+      flutterwaveCustomerEmail: args.flutterwaveCustomerEmail,
+      flutterwaveSubaccountId: args.flutterwaveSubaccountId,
       status: args.status || "pending",
       webhookReceived: false,
       createdAt: now,
@@ -148,33 +146,17 @@ export const createPayment = internalMutation({
 });
 
 /**
- * Update user's Stripe customer ID
+ * Update user's Flutterwave subaccount ID
  * Internal mutation
  */
-export const updateUserStripeId = internalMutation({
+export const updateUserFlutterwaveSubaccountId = internalMutation({
   args: {
     userId: v.id("users"),
-    stripeCustomerId: v.string(),
+    flutterwaveSubaccountId: v.string(),
   },
   handler: async (ctx, args): Promise<void> => {
     await ctx.db.patch(args.userId, {
-      stripeCustomerId: args.stripeCustomerId,
-    });
-  },
-});
-
-/**
- * Update user's Stripe Connect account ID
- * Internal mutation
- */
-export const updateUserStripeAccountId = internalMutation({
-  args: {
-    userId: v.id("users"),
-    stripeAccountId: v.string(),
-  },
-  handler: async (ctx, args): Promise<void> => {
-    await ctx.db.patch(args.userId, {
-      stripeAccountId: args.stripeAccountId,
+      flutterwaveSubaccountId: args.flutterwaveSubaccountId,
     });
   },
 });
@@ -199,7 +181,7 @@ export const updatePaymentByTransferId = internalMutation({
   handler: async (ctx, args) => {
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_stripe_transfer", (q) => q.eq("stripeTransferId", args.transferId))
+      .withIndex("by_flutterwave_transfer", (q) => q.eq("flutterwaveTransferId", args.transferId))
       .first();
     if (!payment) {
       return null;
@@ -215,41 +197,8 @@ export const updatePaymentByTransferId = internalMutation({
   },
 });
 
-/**
- * Update payment status by Stripe payout ID
- * Internal mutation
- */
-export const updatePaymentByPayoutId = internalMutation({
-  args: {
-    payoutId: v.string(),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("processing"),
-      v.literal("succeeded"),
-      v.literal("failed"),
-      v.literal("refunded"),
-      v.literal("cancelled")
-    ),
-    errorMessage: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const payment = await ctx.db
-      .query("payments")
-      .withIndex("by_stripe_payout", (q) => q.eq("stripePayoutId", args.payoutId))
-      .first();
-    if (!payment) {
-      return null;
-    }
-    const now = Date.now();
-    await ctx.db.patch(payment._id, {
-      status: args.status,
-      errorMessage: args.errorMessage,
-      processedAt: now,
-      updatedAt: now,
-    });
-    return payment._id;
-  },
-});
+// Note: Flutterwave uses transfers for payouts, not separate payout objects
+// The updatePaymentByTransferId function handles both transfers and payouts
 
 /**
  * Log a payment audit entry
@@ -289,21 +238,21 @@ export const logPaymentAudit = internalMutation({
  */
 export const handlePaymentSuccess = internalMutation({
   args: {
-    paymentIntentId: v.string(),
+    transactionId: v.string(), // Flutterwave tx_ref
     eventId: v.string(),
     data: v.any(),
   },
   handler: async (ctx, args) => {
-    // Find payment by Stripe payment intent ID
+    // Find payment by Flutterwave transaction ID (tx_ref)
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_stripe_payment_intent", (q) =>
-        q.eq("stripePaymentIntentId", args.paymentIntentId)
+      .withIndex("by_flutterwave_transaction", (q) =>
+        q.eq("flutterwaveTransactionId", args.transactionId)
       )
       .first();
 
     if (!payment) {
-      throw new Error(`Payment not found for intent: ${args.paymentIntentId}`);
+      throw new Error(`Payment not found for transaction: ${args.transactionId}`);
     }
 
     const sendSystemNotification =
@@ -364,7 +313,7 @@ export const handlePaymentSuccess = internalMutation({
         targetType: "payment",
         targetId: payment._id,
         details: {
-          paymentIntentId: args.paymentIntentId,
+          transactionId: args.transactionId,
           amount: payment.amount,
         },
         createdAt: now,
@@ -402,20 +351,20 @@ export const handlePaymentSuccess = internalMutation({
  */
 export const handlePaymentFailure = internalMutation({
   args: {
-    paymentIntentId: v.string(),
+    transactionId: v.string(), // Flutterwave tx_ref
     eventId: v.string(),
     errorMessage: v.string(),
   },
   handler: async (ctx, args) => {
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_stripe_payment_intent", (q) =>
-        q.eq("stripePaymentIntentId", args.paymentIntentId)
+      .withIndex("by_flutterwave_transaction", (q) =>
+        q.eq("flutterwaveTransactionId", args.transactionId)
       )
       .first();
 
     if (!payment) {
-      throw new Error(`Payment not found for intent: ${args.paymentIntentId}`);
+      throw new Error(`Payment not found for transaction: ${args.transactionId}`);
     }
 
     const now = Date.now();
@@ -447,7 +396,7 @@ export const handlePaymentFailure = internalMutation({
         targetType: "payment",
         targetId: payment._id,
         details: {
-          paymentIntentId: args.paymentIntentId,
+          transactionId: args.transactionId,
           error: args.errorMessage,
         },
         createdAt: now,
@@ -474,19 +423,19 @@ export const handlePaymentFailure = internalMutation({
  */
 export const handlePaymentCancellation = internalMutation({
   args: {
-    paymentIntentId: v.string(),
+    transactionId: v.string(), // Flutterwave tx_ref
     eventId: v.string(),
   },
   handler: async (ctx, args) => {
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_stripe_payment_intent", (q) =>
-        q.eq("stripePaymentIntentId", args.paymentIntentId)
+      .withIndex("by_flutterwave_transaction", (q) =>
+        q.eq("flutterwaveTransactionId", args.transactionId)
       )
       .first();
 
     if (!payment) {
-      throw new Error(`Payment not found for intent: ${args.paymentIntentId}`);
+      throw new Error(`Payment not found for transaction: ${args.transactionId}`);
     }
 
     const now = Date.now();
@@ -525,7 +474,7 @@ export const handlePaymentCancellation = internalMutation({
         targetType: "payment",
         targetId: payment._id,
         details: {
-          paymentIntentId: args.paymentIntentId,
+          transactionId: args.transactionId,
         },
         createdAt: now,
       });

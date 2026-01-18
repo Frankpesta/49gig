@@ -4,13 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { loadStripe } from "@stripe/stripe-js";
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,76 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, CheckCircle2, XCircle } from "lucide-react";
-
-// Initialize Stripe
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || ""
-);
-
-function PaymentForm({ projectId, amount, currency }: { projectId: string; amount: number; currency: string }) {
-  const stripe = useStripe();
-  const elements = useElements();
-  const router = useRouter();
-  const { user } = useAuth();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!stripe || !elements) {
-      return;
-    }
-
-    setIsProcessing(true);
-    setError(null);
-
-    const { error: submitError } = await elements.submit();
-    if (submitError) {
-      setError(submitError.message || "An error occurred");
-      setIsProcessing(false);
-      return;
-    }
-
-    const { error: confirmError } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/dashboard/projects/${projectId}/payment/success`,
-      },
-    });
-
-    if (confirmError) {
-      setError(confirmError.message || "Payment failed");
-      setIsProcessing(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <PaymentElement />
-      {error && (
-        <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-      <Button
-        type="submit"
-        disabled={!stripe || isProcessing}
-        className="w-full"
-      >
-        {isProcessing ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Processing...
-          </>
-        ) : (
-          `Pay $${amount.toFixed(2)} ${currency.toUpperCase()}`
-        )}
-      </Button>
-    </form>
-  );
-}
+import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -111,11 +35,12 @@ export default function PaymentPage() {
       : "skip"
   );
 
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentLink, setPaymentLink] = useState<string | null>(null);
+  const [txRef, setTxRef] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
-  const initializationRef = useRef(false); // Use ref to prevent multiple calls
+  const initializationRef = useRef(false);
 
   useEffect(() => {
     if (!user || user.role !== "client") {
@@ -133,22 +58,14 @@ export default function PaymentPage() {
       return;
     }
 
-    // Check if payment already exists and has a client secret
-    if (paymentStatus?.payment?.stripePaymentIntentId && !clientSecret && !isInitializing) {
-      // Payment intent exists, we need to retrieve it from Stripe
-      // The action will handle retrieving the existing payment intent
-    }
-
-    // CRITICAL: Prevent multiple simultaneous calls using ref
-    // This is more reliable than state for preventing race conditions
-    if (initializationRef.current || isInitializing || clientSecret) {
+    // Prevent multiple simultaneous calls
+    if (initializationRef.current || isInitializing || paymentLink) {
       return;
     }
 
-    // Create payment intent
+    // Create payment
     const initializePayment = async () => {
-      // Double-check with ref to prevent race conditions
-      if (initializationRef.current || isInitializing || clientSecret) {
+      if (initializationRef.current || isInitializing || paymentLink) {
         return;
       }
       
@@ -159,20 +76,19 @@ export default function PaymentPage() {
         
         const result = await createPaymentIntent({
           projectId: projectId as any,
-          amount: Math.round(project.totalAmount * 100), // Convert to cents
-          currency: project.currency || "usd",
+          amount: project.totalAmount, // Flutterwave uses currency units, not cents
+          currency: project.currency || "USD",
           userId: user._id,
         });
 
-        setClientSecret(result.clientSecret);
+        setPaymentLink(result.paymentLink);
+        setTxRef(result.txRef);
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : "Failed to initialize payment";
         setError(errorMessage);
       } finally {
         setIsLoading(false);
         setIsInitializing(false);
-        // Don't reset the ref here - let it stay true to prevent re-initialization
-        // Only reset if we need to retry after an error
         if (error) {
           initializationRef.current = false;
         }
@@ -182,6 +98,13 @@ export default function PaymentPage() {
     initializePayment();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?._id, project?._id, projectId, paymentStatus?.isFunded]);
+
+  const handlePayNow = () => {
+    if (paymentLink) {
+      // Redirect to Flutterwave payment page
+      window.location.href = paymentLink;
+    }
+  };
 
   if (!user || user.role !== "client") {
     return null;
@@ -228,16 +151,9 @@ export default function PaymentPage() {
     );
   }
 
-  if (!clientSecret || !project) {
+  if (!paymentLink || !project) {
     return null;
   }
-
-  const options = {
-    clientSecret,
-    appearance: {
-      theme: "stripe" as const,
-    },
-  };
 
   const platformFee = project.platformFee || 10;
   const platformFeeAmount = (project.totalAmount * platformFee) / 100;
@@ -283,18 +199,18 @@ export default function PaymentPage() {
             <div className="flex justify-between">
               <span className="text-muted-foreground">Project Budget</span>
               <span className="font-semibold">
-                ${totalAmount.toFixed(2)} {project.currency.toUpperCase()}
+                {totalAmount.toFixed(2)} {project.currency.toUpperCase()}
               </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Platform Fee ({platformFee}%)</span>
-              <span>${platformFeeAmount.toFixed(2)}</span>
+              <span>{platformFeeAmount.toFixed(2)}</span>
             </div>
             <div className="border-t pt-4">
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
                 <span>
-                  ${totalAmount.toFixed(2)} {project.currency.toUpperCase()}
+                  {totalAmount.toFixed(2)} {project.currency.toUpperCase()}
                 </span>
               </div>
             </div>
@@ -306,20 +222,37 @@ export default function PaymentPage() {
         <CardHeader>
           <CardTitle>Payment Information</CardTitle>
           <CardDescription>
-            Enter your payment details to complete the transaction.
+            Click the button below to proceed to Flutterwave's secure payment page.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Elements stripe={stripePromise} options={options}>
-            <PaymentForm
-              projectId={projectId}
-              amount={totalAmount}
-              currency={project.currency}
-            />
-          </Elements>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border border-border bg-muted/50 p-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 text-green-600" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">Secure Payment</p>
+                <p className="text-xs text-muted-foreground">
+                  Your payment will be processed securely through Flutterwave. 
+                  You'll be redirected to their payment page where you can choose from multiple payment methods.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={handlePayNow}
+            className="w-full"
+            size="lg"
+          >
+            <span>Proceed to Payment</span>
+            <ExternalLink className="ml-2 h-4 w-4" />
+          </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            Transaction Reference: {txRef}
+          </p>
         </CardContent>
       </Card>
     </div>
   );
 }
-
