@@ -18,8 +18,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,31 +107,29 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" variant="inset" className="bg-background">
       <SidebarHeader className="border-b border-sidebar-border">
-        <Link 
-          href="/dashboard" 
-          onClick={closeMobileSidebar} 
-          className="flex flex-col items-center justify-center px-4 py-3 hover:opacity-80 transition-opacity"
-        >
-          <Image
-            src="/logo-light.png"
-            alt="49GIG Logo"
-            width={40}
-            height={40}
-            className="h-10 w-10 object-contain dark:hidden"
-            priority
-          />
-          <Image
-            src="/logo-dark.png"
-            alt="49GIG Logo"
-            width={40}
-            height={40}
-            className="h-10 w-10 object-contain hidden dark:block"
-            priority
-          />
-          <span className="mt-1.5 text-xs font-medium text-muted-foreground">
-            Freelancer Marketplace
-          </span>
-        </Link>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" asChild>
+              <Link href="/dashboard" onClick={closeMobileSidebar} className="">
+                <Logo 
+                  width={32} 
+                  height={32} 
+                  className="h-8 w-8 shrink-0" 
+                  priority 
+                />
+                <div className={cn(
+                  "grid flex-1 text-left text-sm leading-tight min-w-0",
+                  "group-data-[collapsible=icon]:hidden"
+                )}>
+                  <span className="truncate font-semibold">49GIG</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    Freelance Marketplace
+                  </span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent className="scrollbar-hide">

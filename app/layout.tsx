@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Inter_Tight } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/lib/convex-provider";
+import { QueryProvider } from "@/lib/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
 
@@ -44,10 +45,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConvexClientProvider>
-            {children}
-            <Toaster richColors position="top-right" />
-          </ConvexClientProvider>
+          <QueryProvider>
+            <ConvexClientProvider>
+              {children}
+              <Toaster richColors position="top-right" />
+            </ConvexClientProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

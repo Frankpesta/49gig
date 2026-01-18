@@ -98,17 +98,18 @@ export async function verifyPayment(tx_ref: string): Promise<{
     };
     created_at: string;
     status: string;
-    account_id: number;
     customer: {
       id: number;
+      phone_number: string | null;
       name: string;
-      phone_number: string;
       email: string;
       created_at: string;
     };
-    meta: Record<string, any>;
+    account_id: number;
+    meta: any;
   };
 }> {
+  // Flutterwave verify payment endpoint uses tx_ref query parameter
   const response = await fetch(
     `${FLUTTERWAVE_BASE_URL}/transactions/verify_by_reference?tx_ref=${tx_ref}`,
     {
@@ -130,70 +131,36 @@ export async function verifyPayment(tx_ref: string): Promise<{
 /**
  * Create a refund
  */
-export async function createRefund(data: {
-  id: number; // Transaction ID
-  amount?: number; // Optional: partial refund amount
-}): Promise<{
+export async function createRefund(
+  transaction_id: string,
+  amount: number,
+  reason: string
+): Promise<{
   status: string;
   message: string;
   data: {
     id: number;
     wallet_id: number;
-    transaction_id: number;
-    tx_ref: string;
-    flw_ref: string;
-    wallet_updated: boolean;
-    created_at: string;
-    account_id: number;
+    charge_amount: number;
     status: string;
-    amount: number;
     destination: string;
-  };
-}> {
-  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/transactions/${data.id}/refund`, {
-    method: "POST",
-    headers: getFlutterwaveHeaders(),
-    body: JSON.stringify({ amount: data.amount }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(
-      error.message || `Flutterwave API error: ${response.statusText}`
-    );
-  }
-
-  return response.json();
-}
-
-/**
- * Create a subaccount (for freelancers - equivalent to Stripe Connect)
- */
-export async function createSubaccount(data: {
-  business_name: string;
-  business_email: string;
-  business_mobile: string;
-  account_number: string;
-  account_bank: string;
-  country: string;
-  split_type: "percentage" | "flat";
-  split_value: number; // Percentage or flat amount
-}): Promise<{
-  status: string;
-  message: string;
-  data: {
-    id: number;
-    account_name: string;
-    account_reference: string;
-    bank_name: string;
-    bank_code: string;
+    meta: any;
+    account_id: number;
+    customer: {
+      id: number;
+      customer_email: string;
+      customer_name: string;
+    };
     created_at: string;
   };
 }> {
-  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/subaccounts`, {
+  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/transactions/${transaction_id}/refund`, {
     method: "POST",
     headers: getFlutterwaveHeaders(),
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      amount,
+      comments: reason,
+    }),
   });
 
   if (!response.ok) {
@@ -245,6 +212,47 @@ export async function createTransfer(data: {
   };
 }> {
   const response = await fetch(`${FLUTTERWAVE_BASE_URL}/transfers`, {
+    method: "POST",
+    headers: getFlutterwaveHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(
+      error.message || `Flutterwave API error: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Create a Flutterwave subaccount
+ * Equivalent to Stripe Connect account creation
+ */
+export async function createSubaccount(data: {
+  business_name: string;
+  business_email: string;
+  business_mobile: string;
+  account_number: string;
+  account_bank: string;
+  country: string;
+  split_type: "percentage" | "flat";
+  split_value: number; // Percentage or flat amount
+}): Promise<{
+  status: string;
+  message: string;
+  data: {
+    id: number;
+    account_name: string;
+    account_reference: string;
+    bank_name: string;
+    bank_code: string;
+    created_at: string;
+  };
+}> {
+  const response = await fetch(`${FLUTTERWAVE_BASE_URL}/subaccounts`, {
     method: "POST",
     headers: getFlutterwaveHeaders(),
     body: JSON.stringify(data),
@@ -328,6 +336,37 @@ export async function getTransfer(transferId: string): Promise<{
 }> {
   const response = await fetch(
     `${FLUTTERWAVE_BASE_URL}/transfers/${transferId}`,
+    {
+      method: "GET",
+      headers: getFlutterwaveHeaders(),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(
+      error.message || `Flutterwave API error: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
+ * Get list of banks for a country
+ * Returns banks with their codes for subaccount creation
+ */
+export async function getBanks(country: string): Promise<{
+  status: string;
+  message: string;
+  data: Array<{
+    id: number;
+    code: string;
+    name: string;
+  }>;
+}> {
+  const response = await fetch(
+    `${FLUTTERWAVE_BASE_URL}/banks/${country}`,
     {
       method: "GET",
       headers: getFlutterwaveHeaders(),

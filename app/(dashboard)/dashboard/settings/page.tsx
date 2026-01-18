@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { useQuery as useTanStackQuery } from "@tanstack/react-query";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useAuthStore } from "@/stores/authStore";
@@ -11,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Settings, Lock, Bell, Shield, Trash2, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -100,6 +108,23 @@ export default function SettingsPage() {
   const getSubaccountStatus = useAction(
     (api as any)["payments/actions"].getSubaccountStatus
   );
+  const getBanksAction = useAction(
+    (api as any)["payments/actions"].getBanks
+  );
+
+  // Fetch banks using TanStack Query
+  const {
+    data: banksData,
+    isLoading: isLoadingBanks,
+    error: banksError,
+  } = useTanStackQuery({
+    queryKey: ["flutterwave-banks", subaccountForm.country],
+    queryFn: async () => {
+      const result = await getBanksAction({ country: subaccountForm.country });
+      return result.banks;
+    },
+    enabled: showSubaccountForm && !!subaccountForm.country,
+  });
 
   const sessionsData = useQuery(
     (api as any)["auth/queries"].listSessionsForToken,
@@ -701,18 +726,44 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="accountBank">Bank Code *</Label>
-                      <Input
-                        id="accountBank"
-                        placeholder="e.g., 044 for Access Bank (Nigeria)"
+                      <Label htmlFor="accountBank">Bank *</Label>
+                      <Select
                         value={subaccountForm.accountBank}
-                        onChange={(e) =>
-                          setSubaccountForm((prev) => ({ ...prev, accountBank: e.target.value }))
-                        }
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Get bank codes from Flutterwave's Get Banks API or documentation
-                      </p>
+                        onValueChange={(value) => {
+                          setSubaccountForm((prev) => ({ ...prev, accountBank: value }));
+                        }}
+                        disabled={isLoadingBanks}
+                      >
+                        <SelectTrigger id="accountBank" className="w-full">
+                          <SelectValue placeholder={isLoadingBanks ? "Loading banks..." : "Select your bank"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {banksError ? (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                              Error loading banks
+                            </div>
+                          ) : isLoadingBanks ? (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                              Loading banks...
+                            </div>
+                          ) : banksData && Array.isArray(banksData) && banksData.length > 0 ? (
+                            banksData.map((bank: { code: string; name: string }) => (
+                              <SelectItem key={bank.code} value={bank.code}>
+                                {bank.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                              No banks available
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {banksError && (
+                        <p className="text-xs text-destructive">
+                          Failed to load banks. Please try again.
+                        </p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="accountNumber">Bank Account Number *</Label>
