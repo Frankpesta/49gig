@@ -65,41 +65,43 @@ export default function SettingsPage() {
   const [isStripeStatusLoading, setIsStripeStatusLoading] = useState(false);
   const [stripeNoticeHandled, setStripeNoticeHandled] = useState(false);
 
-  const changePassword = useMutation(api["auth/mutations"].changePassword);
+  const changePassword = useMutation(
+    (api as any)["auth/mutations"].changePassword
+  );
   const updateNotificationPreferences = useMutation(
     api.users.mutations.updateNotificationPreferences
   );
   const requestTwoFactorEnable = useMutation(
-    api["auth/mutations"].requestTwoFactorEnable
+    (api as any)["auth/mutations"].requestTwoFactorEnable
   );
   const confirmTwoFactorEnable = useMutation(
-    api["auth/mutations"].confirmTwoFactorEnable
+    (api as any)["auth/mutations"].confirmTwoFactorEnable
   );
   const requestTwoFactorDisable = useMutation(
-    api["auth/mutations"].requestTwoFactorDisable
+    (api as any)["auth/mutations"].requestTwoFactorDisable
   );
   const confirmTwoFactorDisable = useMutation(
-    api["auth/mutations"].confirmTwoFactorDisable
+    (api as any)["auth/mutations"].confirmTwoFactorDisable
   );
   const revokeSessionById = useMutation(
-    api["auth/mutations"].revokeSessionById
+    (api as any)["auth/mutations"].revokeSessionById
   );
   const revokeOtherSessions = useMutation(
-    api["auth/mutations"].revokeOtherSessions
+    (api as any)["auth/mutations"].revokeOtherSessions
   );
   const deleteAccount = useMutation(api.users.mutations.deleteAccount);
   const createConnectLoginLink = useAction(
-    api["payments/actions"].createConnectLoginLink
+    (api as any)["payments/actions"].createConnectLoginLink
   );
   const createConnectAccountLink = useAction(
-    api["payments/actions"].createConnectAccountLink
+    (api as any)["payments/actions"].createConnectAccountLink
   );
   const getConnectAccountStatus = useAction(
-    api["payments/actions"].getConnectAccountStatus
+    (api as any)["payments/actions"].getConnectAccountStatus
   );
 
   const sessionsData = useQuery(
-    api["auth/queries"].listSessionsForToken,
+    (api as any)["auth/queries"].listSessionsForToken,
     sessionToken ? { sessionToken } : "skip"
   );
   const currentUser = useQuery(
