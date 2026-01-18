@@ -273,22 +273,19 @@ export async function createSubaccount(data: {
     created_at: string;
   };
 }> {
-  // Convert bank code to number as Flutterwave requires numeric account_bank
-  // Remove leading zeros first, then parse (e.g., "044" -> 44)
-  const account_bank_cleaned = data.account_bank.trim().replace(/^0+/, '') || data.account_bank;
-  const account_bank_numeric = parseInt(account_bank_cleaned, 10);
-  
-  if (isNaN(account_bank_numeric) || account_bank_numeric <= 0) {
-    throw new Error(`Invalid bank code: ${data.account_bank}. Bank code must be a valid numeric value.`);
+  // Flutterwave expects bank code as string with leading zeros preserved (e.g., "044")
+  // Ensure it's a valid bank code string
+  const account_bank_str = data.account_bank.trim();
+  if (!account_bank_str || !/^\d+$/.test(account_bank_str)) {
+    throw new Error(`Invalid bank code: ${data.account_bank}. Bank code must be numeric.`);
   }
 
-  // Ensure it's sent as a number (not string) in JSON
   const payload = {
     business_name: data.business_name,
     business_email: data.business_email,
     business_mobile: data.business_mobile,
     account_number: data.account_number,
-    account_bank: account_bank_numeric, // Explicitly numeric
+    account_bank: account_bank_str, // Send as string (e.g., "044")
     country: data.country,
     split_type: data.split_type,
     split_value: data.split_value,
@@ -410,9 +407,9 @@ export async function verifyAccountNumber(data: {
     bank_id: number;
   };
 }> {
-  // Convert bank code to number as Flutterwave requires numeric account_bank
-  const account_bank_numeric = parseInt(data.account_bank, 10);
-  if (isNaN(account_bank_numeric)) {
+  // Flutterwave expects bank code as string with leading zeros preserved (e.g., "044")
+  const account_bank_str = data.account_bank.trim();
+  if (!account_bank_str || !/^\d+$/.test(account_bank_str)) {
     throw new Error(`Invalid bank code: ${data.account_bank}. Bank code must be numeric.`);
   }
 
@@ -423,7 +420,7 @@ export async function verifyAccountNumber(data: {
       headers: getFlutterwaveHeaders(),
       body: JSON.stringify({
         account_number: data.account_number,
-        account_bank: account_bank_numeric,
+        account_bank: account_bank_str, // Send as string (e.g., "044")
       }),
     }
   );
