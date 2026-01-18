@@ -106,30 +106,20 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" variant="inset" className="bg-background">
-      <SidebarHeader className="border-b border-sidebar-border">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard" onClick={closeMobileSidebar} className="">
-                <Logo 
-                  width={32} 
-                  height={32} 
-                  className="h-8 w-8 shrink-0" 
-                  priority 
-                />
-                <div className={cn(
-                  "grid flex-1 text-left text-sm leading-tight min-w-0",
-                  "group-data-[collapsible=icon]:hidden"
-                )}>
-                  <span className="truncate font-semibold">49GIG</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    Freelance Marketplace
-                  </span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-6">
+        <div className="flex flex-col items-center justify-center space-y-2">
+          <Link href="/dashboard" onClick={closeMobileSidebar} className="flex flex-col items-center">
+            <Logo 
+              width={64} 
+              height={64} 
+              className="h-16 w-16 shrink-0" 
+              priority 
+            />
+            <span className="mt-2 text-sm font-medium text-foreground">
+              Freelancer Marketplace
+            </span>
+          </Link>
+        </div>
       </SidebarHeader>
 
       <SidebarContent className="scrollbar-hide">
