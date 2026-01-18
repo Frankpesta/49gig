@@ -50,20 +50,21 @@ export default function SettingsPage() {
   const [twoFactorMode, setTwoFactorMode] = useState<"enable" | "disable" | null>(
     null
   );
-  const [stripeStatus, setStripeStatus] = useState<{
-    chargesEnabled: boolean;
-    payoutsEnabled: boolean;
-    detailsSubmitted: boolean;
-    requirements: {
-      currently_due: string[];
-      past_due: string[];
-      eventually_due: string[];
-      pending_verification: string[];
-      disabled_reason?: string | null;
-    };
+  const [flutterwaveStatus, setFlutterwaveStatus] = useState<{
+    connected: boolean;
+    subaccountId?: string;
+    accountName?: string;
+    accountReference?: string;
+    bankName?: string;
+    bankCode?: string;
   } | null>(null);
-  const [isStripeStatusLoading, setIsStripeStatusLoading] = useState(false);
-  const [stripeNoticeHandled, setStripeNoticeHandled] = useState(false);
+  const [isFlutterwaveStatusLoading, setIsFlutterwaveStatusLoading] = useState(false);
+  const [showSubaccountForm, setShowSubaccountForm] = useState(false);
+  const [subaccountForm, setSubaccountForm] = useState({
+    accountName: "",
+    phoneNumber: "",
+    country: "NG", // Default to Nigeria
+  });
 
   const changePassword = useMutation(
     (api as any)["auth/mutations"].changePassword
@@ -90,14 +91,11 @@ export default function SettingsPage() {
     (api as any)["auth/mutations"].revokeOtherSessions
   );
   const deleteAccount = useMutation(api.users.mutations.deleteAccount);
-  const createConnectLoginLink = useAction(
-    (api as any)["payments/actions"].createConnectLoginLink
+  const createSubaccount = useAction(
+    (api as any)["payments/actions"].createSubaccount
   );
-  const createConnectAccountLink = useAction(
-    (api as any)["payments/actions"].createConnectAccountLink
-  );
-  const getConnectAccountStatus = useAction(
-    (api as any)["payments/actions"].getConnectAccountStatus
+  const getSubaccountStatus = useAction(
+    (api as any)["payments/actions"].getSubaccountStatus
   );
 
   const sessionsData = useQuery(
@@ -131,7 +129,7 @@ export default function SettingsPage() {
   }
 
   const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
-  const stripeAccountId = (currentUser as any)?.stripeAccountId;
+  const flutterwaveSubaccountId = (currentUser as any)?.flutterwaveSubaccountId;
   const isFreelancer = user.role === "freelancer";
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -226,117 +224,79 @@ export default function SettingsPage() {
     }
   };
 
-  const handleStripeConnect = async () => {
+  const handleCreateSubaccount = async () => {
+    if (!subaccountForm.accountName || !subaccountForm.phoneNumber) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+    setIsSaving(true);
     try {
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      if (stripeAccountId) {
-        const needsOnboarding =
-          stripeStatus &&
-          (stripeStatus.requirements.past_due.length > 0 ||
-            stripeStatus.requirements.currently_due.length > 0 ||
-            stripeStatus.requirements.pending_verification.length > 0 ||
-            !stripeStatus.detailsSubmitted);
-
-        if (needsOnboarding) {
-          const result = await createConnectAccountLink({
-            userId: user._id,
-            returnUrl: `${origin}/dashboard/settings?stripe=connected`,
-            refreshUrl: `${origin}/dashboard/settings?stripe=refresh`,
-          });
-          if (result?.url) {
-            window.location.href = result.url;
-          }
-          return;
-        }
-
-        const attemptLogin = async () =>
-          createConnectLoginLink({
-            userId: user._id,
-            returnUrl: `${origin}/dashboard/settings?stripe=manage`,
-          });
-        let result = await attemptLogin();
-        if (!result?.url) {
-          result = await attemptLogin();
-        }
-        if (result?.url) {
-          window.location.href = result.url;
-        }
-        return;
-      }
-      const returnUrl = `${origin}/dashboard/settings?stripe=connected`;
-      const refreshUrl = `${origin}/dashboard/settings?stripe=refresh`;
-      const result = await createConnectAccountLink({
-        userId: user._id,
-        returnUrl,
-        refreshUrl,
+      const result = await createSubaccount({
+        freelancerId: user._id,
+        accountName: subaccountForm.accountName,
+        email: user.email,
+        phoneNumber: subaccountForm.phoneNumber,
+        country: subaccountForm.country,
+        splitType: "percentage",
+        splitValue: 0, // Platform keeps 100% initially, can adjust split later
       });
-      if (result?.url) {
-        window.location.href = result.url;
+      
+      if (result.success) {
+        toast.success("Flutterwave subaccount created successfully");
+        setShowSubaccountForm(false);
+        setSubaccountForm({ accountName: "", phoneNumber: "", country: "NG" });
+        // Refresh status
+        handleRefreshFlutterwaveStatus();
       }
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to start Stripe onboarding"
+        error instanceof Error ? error.message : "Failed to create subaccount"
       );
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleRefreshStripeStatus = async () => {
-    if (!stripeAccountId) return;
-    setIsStripeStatusLoading(true);
+  const handleRefreshFlutterwaveStatus = async () => {
+    setIsFlutterwaveStatusLoading(true);
     try {
-      const result = await getConnectAccountStatus({ userId: user._id });
-      setStripeStatus(result?.connected ? result : null);
+      const result = await getSubaccountStatus({ freelancerId: user._id });
+      setFlutterwaveStatus(result || null);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to refresh Stripe status"
+        error instanceof Error ? error.message : "Failed to refresh status"
       );
     } finally {
-      setIsStripeStatusLoading(false);
+      setIsFlutterwaveStatusLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!stripeAccountId) {
-      setStripeStatus(null);
+    if (!isFreelancer) {
       return;
     }
     let isMounted = true;
-    setIsStripeStatusLoading(true);
-    getConnectAccountStatus({ userId: user._id })
+    setIsFlutterwaveStatusLoading(true);
+    getSubaccountStatus({ freelancerId: user._id })
       .then((result) => {
         if (isMounted) {
-          setStripeStatus(result?.connected ? result : null);
+          setFlutterwaveStatus(result || null);
         }
       })
       .catch(() => {
         if (isMounted) {
-          setStripeStatus(null);
+          setFlutterwaveStatus(null);
         }
       })
       .finally(() => {
         if (isMounted) {
-          setIsStripeStatusLoading(false);
+          setIsFlutterwaveStatusLoading(false);
         }
       });
     return () => {
       isMounted = false;
     };
-  }, [getConnectAccountStatus, stripeAccountId, user._id]);
-
-  useEffect(() => {
-    if (stripeNoticeHandled) return;
-    const notice = searchParams.get("stripe");
-    if (!notice) return;
-    setStripeNoticeHandled(true);
-    if (notice === "connected") {
-      toast.success("Stripe connected");
-    } else if (notice === "refresh") {
-      toast.error("Stripe session expired. Refreshing...");
-      handleStripeConnect();
-    } else if (notice === "manage") {
-      toast.success("Stripe dashboard opened");
-    }
-  }, [searchParams, stripeNoticeHandled]);
+  }, [getSubaccountStatus, user._id, isFreelancer]);
 
   const handleRevokeSession = async (sessionId: string) => {
     if (!sessionToken) return;
@@ -630,97 +590,155 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payouts
+              Payouts (Flutterwave)
             </CardTitle>
             <CardDescription>
-              Connect your Stripe account to receive payouts.
+              Set up your Flutterwave subaccount to receive payouts.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap items-start justify-between gap-4">
+          <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">
-                {stripeAccountId ? "Stripe connected" : "Stripe not connected"}
+                {flutterwaveStatus?.connected ? "Flutterwave connected" : "Flutterwave not connected"}
               </p>
               <p className="text-xs text-muted-foreground">
-                {stripeAccountId
-                  ? "Your payouts will be sent to your connected bank account."
-                  : "Complete onboarding to enable payouts."}
+                {flutterwaveStatus?.connected
+                  ? "Your payouts will be sent to your Flutterwave subaccount."
+                  : "Create a subaccount to enable payouts."}
               </p>
-              {stripeAccountId && (
-                <div className="text-xs text-muted-foreground">
-                  {isStripeStatusLoading ? (
-                    <span>Checking payout status...</span>
-                  ) : stripeStatus ? (
+              {flutterwaveStatus?.connected && (
+                <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1 text-xs text-muted-foreground">
+                  {isFlutterwaveStatusLoading ? (
+                    <span>Loading details...</span>
+                  ) : flutterwaveStatus ? (
                     <div className="space-y-1">
-                      <div>
-                        Payouts:{" "}
-                        <span className="font-medium">
-                          {stripeStatus.payoutsEnabled ? "enabled" : "disabled"}
-                        </span>
-                      </div>
-                      <div>
-                        Charges:{" "}
-                        <span className="font-medium">
-                          {stripeStatus.chargesEnabled ? "enabled" : "disabled"}
-                        </span>
-                      </div>
-                      <div>
-                        Details submitted:{" "}
-                        <span className="font-medium">
-                          {stripeStatus.detailsSubmitted ? "yes" : "no"}
-                        </span>
-                      </div>
-                      {stripeStatus.requirements.past_due.length > 0 && (
-                        <div className="text-destructive">
-                          Action required:{" "}
-                          {stripeStatus.requirements.past_due.join(", ")}
-                        </div>
-                      )}
-                      {stripeStatus.requirements.currently_due.length > 0 && (
+                      {flutterwaveStatus.accountName && (
                         <div>
-                          Pending: {stripeStatus.requirements.currently_due.join(", ")}
+                          Account Name: <span className="font-medium text-foreground">{flutterwaveStatus.accountName}</span>
                         </div>
                       )}
-                      {stripeStatus.requirements.eventually_due.length > 0 && (
+                      {flutterwaveStatus.bankName && (
                         <div>
-                          Eventually due: {stripeStatus.requirements.eventually_due.join(", ")}
+                          Bank: <span className="font-medium text-foreground">{flutterwaveStatus.bankName}</span>
                         </div>
                       )}
-                      {stripeStatus.requirements.pending_verification.length > 0 && (
+                      {flutterwaveStatus.accountReference && (
                         <div>
-                          Verification pending:{" "}
-                          {stripeStatus.requirements.pending_verification.join(", ")}
-                        </div>
-                      )}
-                      {stripeStatus.requirements.disabled_reason && (
-                        <div className="text-destructive">
-                          Disabled: {stripeStatus.requirements.disabled_reason}
+                          Account Reference: <span className="font-medium text-foreground font-mono">{flutterwaveStatus.accountReference}</span>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <span>Unable to load Stripe status.</span>
+                    <span>Unable to load Flutterwave status.</span>
                   )}
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              {stripeAccountId && (
+
+            {!flutterwaveStatus?.connected && (
+              <div className="space-y-4">
+                {!showSubaccountForm ? (
+                  <Button
+                    onClick={() => setShowSubaccountForm(true)}
+                    className="w-full"
+                  >
+                    Create Flutterwave Subaccount
+                  </Button>
+                ) : (
+                  <div className="space-y-4 rounded-lg border border-border p-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="accountName">Account Name *</Label>
+                      <Input
+                        id="accountName"
+                        placeholder="Your business or account name"
+                        value={subaccountForm.accountName}
+                        onChange={(e) =>
+                          setSubaccountForm((prev) => ({ ...prev, accountName: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phoneNumber">Phone Number *</Label>
+                      <Input
+                        id="phoneNumber"
+                        type="tel"
+                        placeholder="+234 800 000 0000"
+                        value={subaccountForm.phoneNumber}
+                        onChange={(e) =>
+                          setSubaccountForm((prev) => ({ ...prev, phoneNumber: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country *</Label>
+                      <select
+                        id="country"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={subaccountForm.country}
+                        onChange={(e) =>
+                          setSubaccountForm((prev) => ({ ...prev, country: e.target.value }))
+                        }
+                      >
+                        <option value="NG">Nigeria</option>
+                        <option value="KE">Kenya</option>
+                        <option value="GH">Ghana</option>
+                        <option value="ZA">South Africa</option>
+                        <option value="UG">Uganda</option>
+                        <option value="TZ">Tanzania</option>
+                        <option value="RW">Rwanda</option>
+                        <option value="ZM">Zambia</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowSubaccountForm(false);
+                          setSubaccountForm({ accountName: "", phoneNumber: "", country: "NG" });
+                        }}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleCreateSubaccount}
+                        disabled={isSaving}
+                        className="flex-1"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Subaccount"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {flutterwaveStatus?.connected && (
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={handleRefreshStripeStatus}
-                  disabled={isStripeStatusLoading}
+                  onClick={handleRefreshFlutterwaveStatus}
+                  disabled={isFlutterwaveStatusLoading}
+                  className="flex-1"
                 >
-                  Refresh status
+                  {isFlutterwaveStatusLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Refreshing...
+                    </>
+                  ) : (
+                    "Refresh Status"
+                  )}
                 </Button>
-              )}
-              <Button
-                onClick={handleStripeConnect}
-                variant={stripeAccountId ? "outline" : "default"}
-              >
-                {stripeAccountId ? "Manage Stripe" : "Connect Stripe"}
-              </Button>
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

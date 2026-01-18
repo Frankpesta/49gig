@@ -23,18 +23,18 @@ export const getPaymentByProject = internalQuery({
 });
 
 /**
- * Get payment by Stripe payment intent ID
+ * Get payment by Flutterwave transaction ID (tx_ref)
  * Internal query
  */
-export const getPaymentByIntentId = internalQuery({
+export const getPaymentByTransactionId = internalQuery({
   args: {
-    paymentIntentId: v.string(),
+    transactionId: v.string(),
   },
   handler: async (ctx, args) => {
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_stripe_payment_intent", (q) =>
-        q.eq("stripePaymentIntentId", args.paymentIntentId)
+      .withIndex("by_flutterwave_transaction", (q) =>
+        q.eq("flutterwaveTransactionId", args.transactionId)
       )
       .first();
 
@@ -43,7 +43,7 @@ export const getPaymentByIntentId = internalQuery({
 });
 
 /**
- * Get payment by Stripe transfer ID
+ * Get payment by Flutterwave transfer ID
  * Internal query
  */
 export const getPaymentByTransferId = internalQuery({
@@ -53,7 +53,7 @@ export const getPaymentByTransferId = internalQuery({
   handler: async (ctx, args) => {
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_stripe_transfer", (q) => q.eq("stripeTransferId", args.transferId))
+      .withIndex("by_flutterwave_transfer", (q) => q.eq("flutterwaveTransferId", args.transferId))
       .first();
 
     return payment;
@@ -61,25 +61,7 @@ export const getPaymentByTransferId = internalQuery({
 });
 
 /**
- * Get payment by Stripe payout ID
- * Internal query
- */
-export const getPaymentByPayoutId = internalQuery({
-  args: {
-    payoutId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const payment = await ctx.db
-      .query("payments")
-      .withIndex("by_stripe_payout", (q) => q.eq("stripePayoutId", args.payoutId))
-      .first();
-
-    return payment;
-  },
-});
-
-/**
- * Get payment by Stripe refund ID
+ * Get payment by Flutterwave refund ID
  * Internal query
  */
 export const getPaymentByRefundId = internalQuery({
@@ -89,7 +71,7 @@ export const getPaymentByRefundId = internalQuery({
   handler: async (ctx, args) => {
     const payment = await ctx.db
       .query("payments")
-      .withIndex("by_stripe_refund", (q) => q.eq("stripeRefundId", args.refundId))
+      .withIndex("by_flutterwave_refund", (q) => q.eq("flutterwaveRefundId", args.refundId))
       .first();
 
     return payment;

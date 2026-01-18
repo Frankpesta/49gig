@@ -99,9 +99,9 @@ export default defineSchema({
     ),
     verificationCompletedAt: v.optional(v.number()),
 
-    // Stripe
-    stripeCustomerId: v.optional(v.string()),
-    stripeAccountId: v.optional(v.string()),
+    // Flutterwave
+    flutterwaveCustomerEmail: v.optional(v.string()), // Flutterwave uses email as customer identifier
+    flutterwaveSubaccountId: v.optional(v.string()), // Freelancer's Flutterwave Subaccount ID
 
     // Audit
     createdAt: v.number(),
@@ -204,9 +204,9 @@ export default defineSchema({
     platformFee: v.number(), // Percentage (e.g., 10)
     currency: v.string(), // "usd"
 
-    // Stripe
-    stripePaymentIntentId: v.optional(v.string()),
-    stripeCustomerId: v.optional(v.string()),
+    // Flutterwave
+    flutterwaveTransactionId: v.optional(v.string()),
+    flutterwaveCustomerEmail: v.optional(v.string()),
 
     // Audit
     createdAt: v.number(),
@@ -260,9 +260,9 @@ export default defineSchema({
     approvedAt: v.optional(v.number()),
     rejectionReason: v.optional(v.string()),
 
-    // Stripe
-    stripePaymentIntentId: v.optional(v.string()),
-    stripePayoutId: v.optional(v.string()),
+    // Flutterwave
+    flutterwaveTransactionId: v.optional(v.string()),
+    flutterwaveTransferId: v.optional(v.string()),
 
     // Dates
     dueDate: v.number(),
@@ -693,13 +693,12 @@ export default defineSchema({
     platformFee: v.optional(v.number()),
     netAmount: v.number(), // After platform fee
 
-    // Stripe
-    stripePaymentIntentId: v.optional(v.string()),
-    stripeRefundId: v.optional(v.string()),
-    stripePayoutId: v.optional(v.string()),
-    stripeTransferId: v.optional(v.string()),
-    stripeCustomerId: v.optional(v.string()),
-    stripeAccountId: v.optional(v.string()), // Freelancer's Stripe Connect account
+    // Flutterwave
+    flutterwaveTransactionId: v.optional(v.string()), // Payment transaction reference
+    flutterwaveRefundId: v.optional(v.string()),
+    flutterwaveTransferId: v.optional(v.string()), // Transfer/payout reference
+    flutterwaveCustomerEmail: v.optional(v.string()),
+    flutterwaveSubaccountId: v.optional(v.string()), // Freelancer's Flutterwave Subaccount ID
 
     // Status
     status: v.union(
@@ -727,10 +726,9 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_milestone", ["milestoneId"])
     .index("by_status", ["status"])
-    .index("by_stripe_payment_intent", ["stripePaymentIntentId"])
-    .index("by_stripe_transfer", ["stripeTransferId"])
-    .index("by_stripe_refund", ["stripeRefundId"])
-    .index("by_stripe_payout", ["stripePayoutId"])
+    .index("by_flutterwave_transaction", ["flutterwaveTransactionId"])
+    .index("by_flutterwave_transfer", ["flutterwaveTransferId"])
+    .index("by_flutterwave_refund", ["flutterwaveRefundId"])
     .index("by_webhook", ["webhookReceived"]),
 
   auditLogs: defineTable({

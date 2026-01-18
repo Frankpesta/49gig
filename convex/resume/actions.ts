@@ -94,31 +94,46 @@ export const parseResumeAndBuildBio = action({
       const pdfBuffer = await pdfResponse.arrayBuffer();
       const pdfBlob = Buffer.from(pdfBuffer);
 
-      // Step 2: Upload PDF to OpenAI and use it directly in completion
-      // OpenAI's API can process PDFs when uploaded as files
-      const pdfFile = new File([pdfBlob], "resume.pdf", { type: "application/pdf" });
-      
-      // Upload file to OpenAI
-      // OpenAI SDK expects File, Blob, or FileData type
-      const uploadedFile = await openai.files.create({
-        file: pdfFile as File,
-        purpose: "assistants",
-      });
-
+      // Step 2: Extract text from PDF using pdf-parse
       let resumeText = "";
       try {
-        // Try to get file content (may not work for PDFs depending on OpenAI support)
-        const fileContent = await openai.files.content(uploadedFile.id);
-        resumeText = await fileContent.text();
-      } catch {
-        throw new Error(
-          "PDF text extraction failed. Please ensure your resume PDF contains selectable text (not just images)."
-        );
+        // Dynamic import for pdf-parse (Node.js only)
+        const pdfParse = require("pdf-parse");
+        const pdfData = await pdfParse(pdfBlob);
+        resumeText = pdfData.text;
+        
+        // Clean up the extracted text
+        resumeText = resumeText
+          .replace(/\s+/g, " ") // Replace multiple whitespace with single space
+          .replace(/\n\s*\n/g, "\n") // Replace multiple newlines with single newline
+          .trim();
+      } catch (parseError) {
+        const errorMessage = parseError instanceof Error ? parseError.message : String(parseError);
+        console.error("PDF parsing error:", errorMessage);
+        
+        // Provide more specific error messages
+        if (errorMessage.includes("Invalid PDF") || errorMessage.includes("corrupt")) {
+          throw new Error(
+            "The uploaded file is not a valid PDF or is corrupted. Please upload a valid PDF file."
+          );
+        } else if (errorMessage.includes("password") || errorMessage.includes("encrypted")) {
+          throw new Error(
+            "The PDF is password-protected. Please remove the password and upload again."
+          );
+        } else {
+          throw new Error(
+            "PDF text extraction failed. Please ensure your resume PDF contains selectable text (not just images). If your resume is a scanned image, please convert it to a text-based PDF using OCR first."
+          );
+        }
       }
 
       // Validate extracted text
       if (!resumeText || resumeText.trim().length < 50) {
-        throw new Error("Could not extract text from PDF. Please ensure your resume PDF contains selectable text (not just images).");
+        throw new Error(
+          "Could not extract sufficient text from PDF (minimum 50 characters required). " +
+          "Please ensure your resume PDF contains selectable text. " +
+          "If your resume is a scanned image, please convert it to a text-based PDF using OCR first."
+        );
       }
 
       // Step 4: Parse with OpenAI GPT-4o-mini
