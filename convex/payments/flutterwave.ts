@@ -353,6 +353,41 @@ export async function getTransfer(transferId: string): Promise<{
 }
 
 /**
+ * Verify bank account number
+ * Use this before creating subaccounts to ensure account number is valid
+ */
+export async function verifyAccountNumber(data: {
+  account_number: string;
+  account_bank: string; // Bank code
+}): Promise<{
+  status: string;
+  message: string;
+  data: {
+    account_number: string;
+    account_name: string;
+    bank_id: number;
+  };
+}> {
+  const response = await fetch(
+    `${FLUTTERWAVE_BASE_URL}/accounts/resolve`,
+    {
+      method: "POST",
+      headers: getFlutterwaveHeaders(),
+      body: JSON.stringify(data),
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(
+      error.message || `Flutterwave API error: ${response.statusText}`
+    );
+  }
+
+  return response.json();
+}
+
+/**
  * Get list of banks for a country
  * Returns banks with their codes for subaccount creation
  */
