@@ -61,8 +61,11 @@ export default function SettingsPage() {
   const [isFlutterwaveStatusLoading, setIsFlutterwaveStatusLoading] = useState(false);
   const [showSubaccountForm, setShowSubaccountForm] = useState(false);
   const [subaccountForm, setSubaccountForm] = useState({
-    accountName: "",
-    phoneNumber: "",
+    businessName: "",
+    businessEmail: "",
+    businessMobile: "",
+    accountNumber: "",
+    accountBank: "",
     country: "NG", // Default to Nigeria
   });
 
@@ -225,7 +228,9 @@ export default function SettingsPage() {
   };
 
   const handleCreateSubaccount = async () => {
-    if (!subaccountForm.accountName || !subaccountForm.phoneNumber) {
+    if (!subaccountForm.businessName || !subaccountForm.businessEmail || 
+        !subaccountForm.businessMobile || !subaccountForm.accountNumber || 
+        !subaccountForm.accountBank) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -233,9 +238,11 @@ export default function SettingsPage() {
     try {
       const result = await createSubaccount({
         freelancerId: user._id,
-        accountName: subaccountForm.accountName,
-        email: user.email,
-        phoneNumber: subaccountForm.phoneNumber,
+        businessName: subaccountForm.businessName,
+        businessEmail: subaccountForm.businessEmail || user.email,
+        businessMobile: subaccountForm.businessMobile,
+        accountNumber: subaccountForm.accountNumber,
+        accountBank: subaccountForm.accountBank,
         country: subaccountForm.country,
         splitType: "percentage",
         splitValue: 0, // Platform keeps 100% initially, can adjust split later
@@ -244,7 +251,14 @@ export default function SettingsPage() {
       if (result.success) {
         toast.success("Flutterwave subaccount created successfully");
         setShowSubaccountForm(false);
-        setSubaccountForm({ accountName: "", phoneNumber: "", country: "NG" });
+        setSubaccountForm({ 
+          businessName: "", 
+          businessEmail: "", 
+          businessMobile: "", 
+          accountNumber: "", 
+          accountBank: "", 
+          country: "NG" 
+        });
         // Refresh status
         handleRefreshFlutterwaveStatus();
       }
@@ -647,25 +661,67 @@ export default function SettingsPage() {
                 ) : (
                   <div className="space-y-4 rounded-lg border border-border p-4">
                     <div className="space-y-2">
-                      <Label htmlFor="accountName">Account Name *</Label>
+                      <Label htmlFor="businessName">Business Name *</Label>
                       <Input
-                        id="accountName"
+                        id="businessName"
                         placeholder="Your business or account name"
-                        value={subaccountForm.accountName}
+                        value={subaccountForm.businessName}
                         onChange={(e) =>
-                          setSubaccountForm((prev) => ({ ...prev, accountName: e.target.value }))
+                          setSubaccountForm((prev) => ({ ...prev, businessName: e.target.value }))
                         }
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="phoneNumber">Phone Number *</Label>
+                      <Label htmlFor="businessEmail">Business Email *</Label>
                       <Input
-                        id="phoneNumber"
+                        id="businessEmail"
+                        type="email"
+                        placeholder={user.email || "your@email.com"}
+                        value={subaccountForm.businessEmail}
+                        onChange={(e) =>
+                          setSubaccountForm((prev) => ({ ...prev, businessEmail: e.target.value }))
+                        }
+                      />
+                      {user.email && (
+                        <p className="text-xs text-muted-foreground">
+                          Defaults to your account email if not provided
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="businessMobile">Phone Number *</Label>
+                      <Input
+                        id="businessMobile"
                         type="tel"
                         placeholder="+234 800 000 0000"
-                        value={subaccountForm.phoneNumber}
+                        value={subaccountForm.businessMobile}
                         onChange={(e) =>
-                          setSubaccountForm((prev) => ({ ...prev, phoneNumber: e.target.value }))
+                          setSubaccountForm((prev) => ({ ...prev, businessMobile: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accountBank">Bank Code *</Label>
+                      <Input
+                        id="accountBank"
+                        placeholder="e.g., 044 for Access Bank (Nigeria)"
+                        value={subaccountForm.accountBank}
+                        onChange={(e) =>
+                          setSubaccountForm((prev) => ({ ...prev, accountBank: e.target.value }))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Get bank codes from Flutterwave's Get Banks API or documentation
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="accountNumber">Bank Account Number *</Label>
+                      <Input
+                        id="accountNumber"
+                        placeholder="Your bank account number"
+                        value={subaccountForm.accountNumber}
+                        onChange={(e) =>
+                          setSubaccountForm((prev) => ({ ...prev, accountNumber: e.target.value }))
                         }
                       />
                     </div>
@@ -694,7 +750,14 @@ export default function SettingsPage() {
                         variant="outline"
                         onClick={() => {
                           setShowSubaccountForm(false);
-                          setSubaccountForm({ accountName: "", phoneNumber: "", country: "NG" });
+                          setSubaccountForm({ 
+                            businessName: "", 
+                            businessEmail: "", 
+                            businessMobile: "", 
+                            accountNumber: "", 
+                            accountBank: "", 
+                            country: "NG" 
+                          });
                         }}
                         className="flex-1"
                       >

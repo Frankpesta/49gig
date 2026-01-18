@@ -170,9 +170,11 @@ export async function createRefund(data: {
  * Create a subaccount (for freelancers - equivalent to Stripe Connect)
  */
 export async function createSubaccount(data: {
-  account_name: string;
-  email: string;
-  mobilenumber: string;
+  business_name: string;
+  business_email: string;
+  business_mobile: string;
+  account_number: string;
+  account_bank: string;
   country: string;
   split_type: "percentage" | "flat";
   split_value: number; // Percentage or flat amount

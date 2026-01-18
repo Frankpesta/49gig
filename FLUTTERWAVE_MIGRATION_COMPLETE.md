@@ -83,7 +83,8 @@ Update your `.env` or Convex environment variables:
 FLUTTERWAVE_SECRET_KEY=your_secret_key
 FLUTTERWAVE_PUBLIC_KEY=your_public_key
 FLUTTERWAVE_WEBHOOK_SECRET=your_webhook_secret
-CONVEX_SITE_URL=https://your-site.com  # Required for redirect URLs
+FRONTEND_URL=https://your-site.com  # Frontend app URL for payment redirects (required)
+# OR use NEXT_PUBLIC_BASE_URL if preferred
 ```
 
 ### Webhook Configuration
