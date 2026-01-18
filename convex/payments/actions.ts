@@ -454,6 +454,28 @@ export const createSubaccount = action({
       throw new Error("Only freelancers can create subaccounts");
     }
 
+    // Verify account number before creating subaccount
+    // This ensures the account number is valid and belongs to the specified bank
+    try {
+      const accountVerification = await flutterwave.verifyAccountNumber({
+        account_number: args.accountNumber,
+        account_bank: args.accountBank,
+      });
+
+      if (!accountVerification.data || !accountVerification.data.account_name) {
+        throw new Error("Unable to verify account number. Please check your account number and bank selection.");
+      }
+    } catch (error) {
+      // Re-throw with user-friendly message
+      if (error instanceof Error) {
+        if (error.message.includes("couldn't verify") || error.message.includes("verify")) {
+          throw new Error("Invalid account number. Please ensure the account number matches the selected bank.");
+        }
+        throw error;
+      }
+      throw new Error("Account verification failed. Please check your account details and try again.");
+    }
+
     const subaccountData = await flutterwave.createSubaccount({
       business_name: args.businessName,
       business_email: args.businessEmail,
