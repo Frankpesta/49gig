@@ -31,9 +31,11 @@ export default function LoginPage() {
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const signin = useMutation(api["auth/mutations"].signin);
+  const signin = useMutation(
+    (api as any)["auth/mutations"].signin
+  );
   const verifyTwoFactorSignin = useMutation(
-    api["auth/mutations"].verifyTwoFactorSignin
+    (api as any)["auth/mutations"].verifyTwoFactorSignin
   );
   const { setUser } = useAuthStore();
   const { setRefreshToken } = useSessionRotation();
