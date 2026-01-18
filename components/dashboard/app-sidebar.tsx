@@ -110,25 +110,25 @@ export function AppSidebar() {
         <Link 
           href="/dashboard" 
           onClick={closeMobileSidebar} 
-          className="flex flex-col items-center justify-center px-4 py-6 hover:opacity-80 transition-opacity"
+          className="flex flex-col items-center justify-center px-4 py-3 hover:opacity-80 transition-opacity"
         >
           <Image
             src="/logo-light.png"
             alt="49GIG Logo"
-            width={80}
-            height={80}
-            className="h-20 w-20 object-contain dark:hidden"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain dark:hidden"
             priority
           />
           <Image
             src="/logo-dark.png"
             alt="49GIG Logo"
-            width={80}
-            height={80}
-            className="h-20 w-20 object-contain hidden dark:block"
+            width={40}
+            height={40}
+            className="h-10 w-10 object-contain hidden dark:block"
             priority
           />
-          <span className="mt-3 text-sm font-medium text-muted-foreground">
+          <span className="mt-1.5 text-xs font-medium text-muted-foreground">
             Freelancer Marketplace
           </span>
         </Link>
