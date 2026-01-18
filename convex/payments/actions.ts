@@ -210,13 +210,20 @@ export const handleFlutterwaveWebhook = action({
     data: v.any(), // Event data
   },
   handler: async (ctx, args) => {
-    // Flutterwave webhook events:
-    // - charge.completed: Payment completed
-    // - transfer.completed: Transfer completed
-    // - transfer.reversed: Transfer reversed
-    // - refund.completed: Refund completed
+    try {
+      // Flutterwave webhook events:
+      // - charge.completed: Payment completed
+      // - transfer.completed: Transfer completed
+      // - transfer.reversed: Transfer reversed
+      // - refund.completed: Refund completed
 
-    switch (args.event) {
+      console.log(`Processing Flutterwave webhook event: ${args.event}`, {
+        hasData: !!args.data,
+        txRef: args.data?.tx_ref,
+        status: args.data?.status,
+      });
+
+      switch (args.event) {
       case "charge.completed":
         if (args.data.tx_ref) {
           const txRef = args.data.tx_ref;
@@ -279,10 +286,18 @@ export const handleFlutterwaveWebhook = action({
         break;
 
       default:
-        console.log(`Unhandled Flutterwave webhook event: ${args.event}`);
+        console.log(`Unhandled Flutterwave webhook event: ${args.event}`, {
+          eventData: args.data,
+        });
     }
 
-    return { processed: true };
+    return { processed: true, event: args.event };
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error(`Error handling Flutterwave webhook (${args.event}):`, errorMessage, error);
+      // Re-throw to let the webhook route handle it
+      throw new Error(`Webhook processing failed: ${errorMessage}`);
+    }
   },
 });
 
