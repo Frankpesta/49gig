@@ -329,10 +329,12 @@ export const refundPaymentIntent = action({
       throw new Error("Unable to retrieve transaction ID for refund");
     }
 
-    const refundData = await flutterwave.createRefund({
-      id: verification.data.id,
-      amount: args.amount < payment.amount ? args.amount : undefined, // Partial or full
-    });
+    const refundAmount = args.amount < payment.amount ? args.amount : payment.amount;
+    const refundData = await flutterwave.createRefund(
+      verification.data.id.toString(),
+      refundAmount,
+      args.reason || "Customer refund request"
+    );
 
     // Get project to find clientId for the refund payment record
     const project = await ctx.runQuery(internal.payments.queries.getProject, {
@@ -516,5 +518,23 @@ export const getSubaccountStatus = action({
       console.error("Failed to get subaccount status:", error);
       return { connected: false, error: "Failed to fetch subaccount details" };
     }
+  },
+});
+
+/**
+ * Get list of banks for a country (for subaccount creation)
+ */
+export const getBanks = action({
+  args: {
+    country: v.string(), // Country code like "NG", "KE", etc.
+  },
+  handler: async (ctx, args) => {
+    const banksData = await flutterwave.getBanks(args.country);
+    return {
+      banks: banksData.data.map((bank) => ({
+        code: bank.code,
+        name: bank.name,
+      })),
+    };
   },
 });
