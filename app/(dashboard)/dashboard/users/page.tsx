@@ -49,18 +49,18 @@ export default function UsersPage() {
   const itemsPerPage = 50;
 
   const users = useQuery(
-    (api as any)["users/queries"].getAllUsersAdmin,
+    api.users.queries.getAllUsersAdmin,
     isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
       ? {
           userId: user._id,
-          role: roleFilter !== "all" ? (roleFilter as any) : undefined,
-          status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+          role: roleFilter !== "all" ? (roleFilter as "client" | "freelancer" | "moderator" | "admin") : undefined,
+          status: statusFilter !== "all" ? (statusFilter as "active" | "suspended" | "deleted") : undefined,
         }
       : "skip"
   );
 
-  const updateUserRole = useMutation((api as any)["users/mutations"].updateUserRole);
-  const updateUserStatus = useMutation((api as any)["users/mutations"].updateUserStatus);
+  const updateUserRole = useMutation(api.users.mutations.updateUserRole);
+  const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
 
   if (!isAuthenticated || !user) {
     return (
@@ -86,7 +86,16 @@ export default function UsersPage() {
     );
   }
 
-  const filteredUsers = users?.filter((u: Doc<"users">) => {
+  // Handle case where query returns null or error
+  if (users === null || !Array.isArray(users)) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-muted-foreground">Failed to load users. Please try again.</p>
+      </div>
+    );
+  }
+
+  const filteredUsers = users.filter((u: Doc<"users">) => {
     const matchesSearch =
       u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       u.email.toLowerCase().includes(searchTerm.toLowerCase());
