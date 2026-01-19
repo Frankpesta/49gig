@@ -23,6 +23,7 @@ import type * as chat_queries from "../chat/queries.js";
 import type * as contracts_actions from "../contracts/actions.js";
 import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_queries from "../contracts/queries.js";
+import type * as cron_milestones from "../cron/milestones.js";
 import type * as cron_sessions from "../cron/sessions.js";
 import type * as dashboard_queries from "../dashboard/queries.js";
 import type * as disputes_actions from "../disputes/actions.js";
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   "contracts/actions": typeof contracts_actions;
   "contracts/mutations": typeof contracts_mutations;
   "contracts/queries": typeof contracts_queries;
+  "cron/milestones": typeof cron_milestones;
   "cron/sessions": typeof cron_sessions;
   "dashboard/queries": typeof dashboard_queries;
   "disputes/actions": typeof disputes_actions;

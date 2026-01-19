@@ -1,4 +1,4 @@
-import { mutation } from "../_generated/server";
+import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -364,3 +364,55 @@ export const startMilestone = mutation({
   },
 });
 
+/**
+ * Update milestone payment status (internal mutation)
+ */
+export const updateMilestonePaymentStatus = internalMutation({
+  args: {
+    milestoneId: v.id("milestones"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in_progress"),
+      v.literal("submitted"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("paid"),
+      v.literal("disputed")
+    ),
+    paidAt: v.optional(v.number()),
+    flutterwaveTransferId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    await ctx.db.patch(args.milestoneId, {
+      status: args.status,
+      paidAt: args.paidAt,
+      flutterwaveTransferId: args.flutterwaveTransferId,
+      updatedAt: now,
+    });
+  },
+});
+
+/**
+ * Revert milestone payment release on error (internal mutation)
+ */
+export const revertMilestonePaymentRelease = internalMutation({
+  args: {
+    milestoneId: v.id("milestones"),
+  },
+  handler: async (ctx, args) => {
+    const milestone = await ctx.db.get(args.milestoneId);
+    if (!milestone) {
+      return;
+    }
+
+    // Revert to approved status if it was changed to paid
+    if (milestone.status === "paid") {
+      await ctx.db.patch(args.milestoneId, {
+        status: "approved",
+        paidAt: undefined,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+});
