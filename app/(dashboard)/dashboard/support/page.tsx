@@ -10,7 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, HelpCircle, MessageSquare, Send, CheckCircle2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, HelpCircle, MessageSquare, Send, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function SupportPage() {
   const { user, isAuthenticated } = useAuth();
@@ -19,6 +28,11 @@ export default function SupportPage() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorDialog, setErrorDialog] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: "",
+    message: "",
+  });
 
   const createSupportChat = useMutation((api as any)["chat/mutations"].createSupportChat);
 
@@ -49,7 +63,12 @@ export default function SupportPage() {
       }, 2000);
     } catch (error) {
       console.error("Failed to create support chat:", error);
-      alert("Failed to create support request. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to create support request. Please try again.";
+      setErrorDialog({
+        open: true,
+        title: "Request Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsSubmitting(false);
     }

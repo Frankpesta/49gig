@@ -84,21 +84,41 @@ export const getAllUsersAdmin = query({
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    // Get user
-    let user: Doc<"users"> | null = null;
-    if (args.userId) {
-      const userDoc = await ctx.db.get(args.userId);
-      if (userDoc && (userDoc as Doc<"users">).status === "active") {
-        user = userDoc as Doc<"users">;
+    try {
+      // Get user - try both userId and Convex Auth
+      let user: Doc<"users"> | null = null;
+      
+      if (args.userId) {
+        const userDoc = await ctx.db.get(args.userId);
+        if (userDoc && (userDoc as Doc<"users">).status === "active") {
+          user = userDoc as Doc<"users">;
+        }
       }
-    }
+      
+      // Fallback to Convex Auth if userId not provided or not found
+      if (!user) {
+        const identity = await ctx.auth.getUserIdentity();
+        if (identity?.email) {
+          const userDoc = await ctx.db
+            .query("users")
+            .withIndex("by_email", (q) => q.eq("email", identity.email!))
+            .first();
+          if (userDoc && (userDoc as Doc<"users">).status === "active") {
+            user = userDoc as Doc<"users">;
+          }
+        }
+      }
 
-    if (!user) {
-      return [];
-    }
+      if (!user) {
+        return [];
+      }
 
-    // Only admin or moderator can view all users
-    if (user.role !== "admin" && user.role !== "moderator") {
+      // Only admin or moderator can view all users
+      if (user.role !== "admin" && user.role !== "moderator") {
+        return [];
+      }
+    } catch (error) {
+      console.error("Error in getAllUsersAdmin:", error);
       return [];
     }
 

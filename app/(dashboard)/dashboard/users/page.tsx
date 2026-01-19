@@ -29,14 +29,25 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Users, Shield, Ban, CheckCircle2, Search } from "lucide-react";
+import { Loader2, Users, Shield, Ban, CheckCircle2, Search, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 export default function UsersPage() {
   const { user, isAuthenticated } = useAuth();
@@ -47,6 +58,11 @@ export default function UsersPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
+  const [errorDialog, setErrorDialog] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: "",
+    message: "",
+  });
 
   const users = useQuery(
     api.users.queries.getAllUsersAdmin,
@@ -122,9 +138,15 @@ export default function UsersPage() {
         adminUserId: user._id,
       });
       setSelectedUser(null);
+      toast.success("User role updated successfully");
     } catch (error) {
       console.error("Failed to update role:", error);
-      alert("Failed to update user role");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update user role";
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -141,9 +163,15 @@ export default function UsersPage() {
         adminUserId: user._id,
       });
       setSelectedUser(null);
+      toast.success("User status updated successfully");
     } catch (error) {
       console.error("Failed to update status:", error);
-      alert("Failed to update user status");
+      const errorMessage = error instanceof Error ? error.message : "Failed to update user status";
+      setErrorDialog({
+        open: true,
+        title: "Update Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsUpdating(false);
     }
@@ -381,6 +409,26 @@ export default function UsersPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Error Dialog */}
+      <AlertDialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog({ ...errorDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              {errorDialog.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {errorDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorDialog({ open: false, title: "", message: "" })}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
