@@ -21,6 +21,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Loader2,
   ArrowLeft,
   CheckCircle2,
@@ -30,9 +39,11 @@ import {
   Calendar,
   DollarSign,
   Clock,
+  AlertCircle,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { toast } from "sonner";
 
 export default function MilestoneDetailPage() {
   const params = useParams();
@@ -48,6 +59,11 @@ export default function MilestoneDetailPage() {
   const [deliverables, setDeliverables] = useState<
     Array<{ name: string; url: string }>
   >([{ name: "", url: "" }]);
+  const [errorDialog, setErrorDialog] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: "",
+    message: "",
+  });
 
   const milestone = useQuery(
     (api as any)["projects/queries"].getMilestoneById,
@@ -131,7 +147,11 @@ export default function MilestoneDetailPage() {
     );
 
     if (validDeliverables.length === 0) {
-      alert("Please add at least one deliverable");
+      setErrorDialog({
+        open: true,
+        title: "Validation Error",
+        message: "Please add at least one deliverable",
+      });
       return;
     }
 
@@ -143,9 +163,15 @@ export default function MilestoneDetailPage() {
         userId: user._id,
       });
       router.refresh();
+      toast.success("Milestone submitted successfully");
     } catch (error) {
       console.error("Failed to submit milestone:", error);
-      alert("Failed to submit milestone");
+      const errorMessage = error instanceof Error ? error.message : "Failed to submit milestone";
+      setErrorDialog({
+        open: true,
+        title: "Submission Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -161,9 +187,15 @@ export default function MilestoneDetailPage() {
         userId: user._id,
       });
       router.refresh();
+      toast.success("Milestone approved successfully");
     } catch (error) {
       console.error("Failed to approve milestone:", error);
-      alert("Failed to approve milestone");
+      const errorMessage = error instanceof Error ? error.message : "Failed to approve milestone";
+      setErrorDialog({
+        open: true,
+        title: "Approval Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsApproving(false);
     }
@@ -180,9 +212,15 @@ export default function MilestoneDetailPage() {
         userId: user._id,
       });
       router.refresh();
+      toast.success("Milestone rejected");
     } catch (error) {
       console.error("Failed to reject milestone:", error);
-      alert("Failed to reject milestone");
+      const errorMessage = error instanceof Error ? error.message : "Failed to reject milestone";
+      setErrorDialog({
+        open: true,
+        title: "Rejection Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsRejecting(false);
     }
@@ -197,9 +235,15 @@ export default function MilestoneDetailPage() {
         userId: user._id,
       });
       router.refresh();
+      toast.success("Milestone started successfully");
     } catch (error) {
       console.error("Failed to start milestone:", error);
-      alert("Failed to start milestone");
+      const errorMessage = error instanceof Error ? error.message : "Failed to start milestone";
+      setErrorDialog({
+        open: true,
+        title: "Start Failed",
+        message: errorMessage,
+      });
     }
   };
 
@@ -482,7 +526,28 @@ export default function MilestoneDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* Error Dialog */}
+      <AlertDialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog({ ...errorDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              {errorDialog.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {errorDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorDialog({ open: false, title: "", message: "" })}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+
 

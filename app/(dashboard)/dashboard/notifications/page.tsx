@@ -10,8 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Bell, Send } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Bell, Send, AlertCircle } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 const roleOptions = ["client", "freelancer", "moderator", "admin"] as const;
 
@@ -25,6 +35,11 @@ export default function AdminNotificationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [errorDialog, setErrorDialog] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: "",
+    message: "",
+  });
 
   const users = useQuery(
     (api as any)["users/queries"].getAllUsersAdmin,
@@ -83,12 +98,20 @@ export default function AdminNotificationsPage() {
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) {
-      alert("Please provide a title and message.");
+      setErrorDialog({
+        open: true,
+        title: "Validation Error",
+        message: "Please provide a title and message.",
+      });
       return;
     }
 
     if (!sendToAll && selectedRoles.length === 0 && selectedUserIds.length === 0) {
-      alert("Select a target group (all, roles, or specific users).");
+      setErrorDialog({
+        open: true,
+        title: "Validation Error",
+        message: "Select a target group (all, roles, or specific users).",
+      });
       return;
     }
 
@@ -110,10 +133,15 @@ export default function AdminNotificationsPage() {
       setSendToAll(false);
       setSelectedRoles([]);
       setSelectedUserIds([]);
-      alert("Notification sent.");
+      toast.success("Notification sent successfully");
     } catch (error) {
       console.error("Failed to send notification:", error);
-      alert("Failed to send notification.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to send notification.";
+      setErrorDialog({
+        open: true,
+        title: "Send Failed",
+        message: errorMessage,
+      });
     } finally {
       setIsSending(false);
     }
@@ -234,6 +262,26 @@ export default function AdminNotificationsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Error Dialog */}
+      <AlertDialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog({ ...errorDialog, open })}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              {errorDialog.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {errorDialog.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorDialog({ open: false, title: "", message: "" })}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
