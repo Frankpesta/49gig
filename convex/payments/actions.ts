@@ -18,7 +18,6 @@ export const createPaymentIntent = action({
   },
   handler: async (ctx, args): Promise<{ paymentLink: string; paymentId: string; txRef: string }> => {
     // Verify user and project
-    // @ts-expect-error - Type instantiation depth issue with internal API types
     const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
       userId: args.userId,
     });
@@ -181,12 +180,11 @@ export const verifyPayment = action({
       transactionId: args.txRef,
       eventId: verification.data.id.toString(),
       data: verification.data,
-    });
+              });
 
-    // Trigger matching if this is a pre-funding payment
+              // Trigger matching if this is a pre-funding payment
     if (payment.type === "pre_funding") {
       try {
-        // @ts-expect-error - Type instantiation depth issue with API types
         await ctx.runAction(api.matching.actions.generateMatches, {
           projectId: payment.projectId,
           limit: 5,
@@ -245,12 +243,12 @@ export const handleFlutterwaveWebhook = action({
               });
 
               // Trigger matching if this is a pre-funding payment
-              if (payment.type === "pre_funding") {
-                try {
-                  await ctx.runAction(api.matching.actions.generateMatches, {
-                    projectId: payment.projectId,
-                    limit: 5,
-                  });
+    if (payment.type === "pre_funding") {
+      try {
+        await ctx.runAction(api.matching.actions.generateMatches, {
+          projectId: payment.projectId,
+          limit: 5,
+        });
                 } catch (error) {
                   console.error("Failed to trigger matching:", error);
                 }
@@ -557,6 +555,216 @@ export const getBanks = action({
         code: bank.code,
         name: bank.name,
       })),
+    };
+  },
+});
+
+/**
+ * Release milestone payment manually (client action)
+ * Calculates platform fee and creates transfer to freelancer
+ */
+export const releaseMilestonePayment = action({
+  args: {
+    milestoneId: v.id("milestones"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    paymentId: string;
+    transferId: string;
+    amount: number;
+    netAmount: number;
+    platformFee: number;
+  }> => {
+    // Verify user
+    const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: args.userId,
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Get milestone
+    const milestone = await ctx.runQuery(internal.projects.queries.getMilestoneByIdInternal, {
+      milestoneId: args.milestoneId,
+    });
+
+    if (!milestone) {
+      throw new Error("Milestone not found");
+    }
+
+    // Only approved milestones can be released
+    if (milestone.status !== "approved") {
+      throw new Error(`Milestone is not approved (status: ${milestone.status})`);
+    }
+
+    // Get project
+    const project = await ctx.runQuery(internal.payments.queries.getProject, {
+      projectId: milestone.projectId,
+      userId: args.userId,
+    });
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Only client who owns project or admin can release
+    if (project.clientId !== user._id && user.role !== "admin") {
+      throw new Error("Not authorized to release this milestone payment");
+    }
+
+    // Get freelancer
+    if (!project.matchedFreelancerId) {
+      throw new Error("Project has no matched freelancer");
+    }
+
+    const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+      userId: project.matchedFreelancerId,
+    });
+
+    if (!freelancer) {
+      throw new Error("Freelancer not found");
+    }
+
+    const freelancerDoc: typeof freelancer & {
+      flutterwaveSubaccountId?: string;
+    } = freelancer as typeof freelancer & {
+      flutterwaveSubaccountId?: string;
+    };
+
+    // Check if freelancer has subaccount
+    if (!freelancerDoc.flutterwaveSubaccountId) {
+      throw new Error("Freelancer has not set up payout account. Please contact the freelancer to set up their payout details.");
+    }
+
+    // Get subaccount details to extract bank info
+    let subaccountDetails: {
+      status: string;
+      message: string;
+      data: {
+        id: number;
+        account_name: string;
+        account_reference: string;
+        bank_name: string;
+        bank_code: string;
+        account_number?: string;
+      };
+    };
+    try {
+      subaccountDetails = await flutterwave.getSubaccount(freelancerDoc.flutterwaveSubaccountId);
+    } catch (error) {
+      console.error("Failed to get subaccount details:", error);
+      throw new Error("Failed to retrieve freelancer payout account details. Please contact support.");
+    }
+
+    // Calculate platform fee
+    const platformFee: number = project.platformFee || 10; // Default 10%
+    const platformFeeAmount: number = (milestone.amount * platformFee) / 100;
+    const netAmount: number = milestone.amount - platformFeeAmount;
+
+    // Generate unique transfer reference
+    const transferRef = `49gig-milestone-${args.milestoneId}-${Date.now()}`;
+
+    // Create transfer to freelancer using subaccount
+    // Note: Flutterwave requires account_number even with subaccount
+    // We need to store account_number when creating subaccount
+    let transferData: {
+      status: string;
+      message: string;
+      data: {
+        id: number;
+        account_number: string;
+        bank_code: string;
+        full_name: string;
+        created_at: string;
+        currency: string;
+        debit_currency: string;
+        amount: number;
+        fee: number;
+        status: string;
+        reference: string;
+        meta: Record<string, unknown>;
+        narration: string;
+        complete_message: string;
+        requires_approval: number;
+        is_approved: number;
+        bank_name: string;
+      };
+    };
+    try {
+      transferData = await flutterwave.createTransfer({
+        account_bank: subaccountDetails.data.bank_code,
+        account_number: subaccountDetails.data.account_number || "0000000000", // Placeholder - should be stored when subaccount is created
+        amount: netAmount,
+        narration: `Milestone payout: ${milestone.title} - Project: ${project.intakeForm.title}`,
+        currency: milestone.currency.toUpperCase(),
+        reference: transferRef,
+        beneficiary_name: subaccountDetails.data.account_name,
+        subaccount: freelancerDoc.flutterwaveSubaccountId,
+      });
+    } catch (error) {
+      console.error("Failed to create transfer:", error);
+      throw new Error(`Failed to create transfer: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+
+    // Create payment record
+    const paymentId: string = await ctx.runMutation(internal.payments.mutations.createPayment, {
+      projectId: milestone.projectId,
+      milestoneId: args.milestoneId,
+      type: "milestone_release",
+      amount: milestone.amount,
+      currency: milestone.currency,
+      platformFee: platformFeeAmount,
+      netAmount: netAmount,
+      flutterwaveTransferId: transferRef,
+      flutterwaveSubaccountId: freelancerDoc.flutterwaveSubaccountId,
+      userId: project.matchedFreelancerId,
+      status: transferData.data.status === "NEW" ? "processing" : "succeeded",
+    });
+
+    // Update milestone status
+    const now = Date.now();
+    await ctx.runMutation(internal.milestones.mutations.updateMilestonePaymentStatus, {
+      milestoneId: args.milestoneId,
+      status: "paid",
+      paidAt: now,
+      flutterwaveTransferId: transferRef,
+    });
+
+    // Log audit
+    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+      action: "milestone_payment_released_manual",
+      actorId: args.userId,
+      actorRole: user.role,
+      targetId: paymentId,
+      details: {
+        milestoneId: args.milestoneId,
+        projectId: milestone.projectId,
+        freelancerId: project.matchedFreelancerId,
+        amount: milestone.amount,
+        netAmount: netAmount,
+        platformFee: platformFeeAmount,
+        transferRef,
+      },
+    });
+
+    // Send notifications
+    await ctx.scheduler.runAfter(0, internal.notifications.actions.sendSystemNotification, {
+      userIds: [project.matchedFreelancerId],
+      title: "Milestone payment released",
+      message: `Payment of ${netAmount} ${milestone.currency.toUpperCase()} has been released for milestone: ${milestone.title}`,
+      type: "payment",
+      data: { milestoneId: args.milestoneId, projectId: milestone.projectId, paymentId },
+    });
+
+    return {
+      success: true,
+      paymentId,
+      transferId: transferRef,
+      amount: milestone.amount,
+      netAmount,
+      platformFee: platformFeeAmount,
     };
   },
 });

@@ -124,6 +124,7 @@ export default function MilestoneDetailPage() {
   const canSubmit = isFreelancer && milestone.status === "in_progress";
   const canApprove = (isClient || isAdmin) && milestone.status === "submitted";
   const canReject = (isClient || isAdmin) && milestone.status === "submitted";
+  const canRelease = (isClient || isAdmin) && milestone.status === "approved" && milestone.status !== "paid";
 
   const addDeliverable = () => {
     setDeliverables([...deliverables, { name: "", url: "" }]);

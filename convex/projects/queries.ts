@@ -346,3 +346,15 @@ export const getProjectMilestonesInternal = internalQuery({
   },
 });
 
+/**
+ * Get milestone by ID (internal - no auth required)
+ */
+export const getMilestoneByIdInternal = internalQuery({
+  args: {
+    milestoneId: v.id("milestones"),
+  },
+  handler: async (ctx, args) => {
+    const milestone = await ctx.db.get(args.milestoneId);
+    return milestone;
+  },
+});
