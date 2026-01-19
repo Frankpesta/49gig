@@ -101,7 +101,7 @@ export default function PaymentPage() {
 
   const handlePayNow = () => {
     if (paymentLink) {
-      // Redirect to Flutterwave payment page
+      // Redirect to payment page
       window.location.href = paymentLink;
     }
   };
@@ -222,7 +222,7 @@ export default function PaymentPage() {
         <CardHeader>
           <CardTitle>Payment Information</CardTitle>
           <CardDescription>
-            Click the button below to proceed to Flutterwave's secure payment page.
+            Click the button below to proceed to the secure payment page.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -232,8 +232,8 @@ export default function PaymentPage() {
               <div className="flex-1 space-y-1">
                 <p className="text-sm font-medium">Secure Payment</p>
                 <p className="text-xs text-muted-foreground">
-                  Your payment will be processed securely through Flutterwave. 
-                  You'll be redirected to their payment page where you can choose from multiple payment methods.
+                  Your payment will be processed securely. 
+                  You'll be redirected to the payment page where you can choose from multiple payment methods.
                 </p>
               </div>
             </div>

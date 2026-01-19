@@ -274,7 +274,7 @@ export default function SettingsPage() {
       });
       
       if (result.success) {
-        toast.success("Flutterwave subaccount created successfully");
+        toast.success("Account details submitted successfully");
         setShowSubaccountForm(false);
         setSubaccountForm({ 
           businessName: "", 
@@ -629,21 +629,21 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CreditCard className="h-5 w-5" />
-              Payouts (Flutterwave)
+              Payout Account
             </CardTitle>
             <CardDescription>
-              Set up your Flutterwave subaccount to receive payouts.
+              Submit your account details for payout processing.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">
-                {flutterwaveStatus?.connected ? "Flutterwave connected" : "Flutterwave not connected"}
+                {flutterwaveStatus?.connected ? "Account details submitted" : "Account details not submitted"}
               </p>
               <p className="text-xs text-muted-foreground">
                 {flutterwaveStatus?.connected
-                  ? "Your payouts will be sent to your Flutterwave subaccount."
-                  : "Create a subaccount to enable payouts."}
+                  ? "Your payouts will be processed to your submitted account."
+                  : "Submit your account details to enable payouts."}
               </p>
               {flutterwaveStatus?.connected && (
                 <div className="rounded-lg border border-border bg-muted/50 p-3 space-y-1 text-xs text-muted-foreground">
@@ -668,7 +668,7 @@ export default function SettingsPage() {
                       )}
                     </div>
                   ) : (
-                    <span>Unable to load Flutterwave status.</span>
+                    <span>Unable to load account status.</span>
                   )}
                 </div>
               )}
@@ -681,7 +681,7 @@ export default function SettingsPage() {
                     onClick={() => setShowSubaccountForm(true)}
                     className="w-full"
                   >
-                    Create Flutterwave Subaccount
+                    Submit Account Details
                   </Button>
                 ) : (
                   <div className="space-y-4 rounded-lg border border-border p-4">
