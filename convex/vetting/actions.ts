@@ -121,15 +121,26 @@ export const gradeWrittenResponse = action({
     writtenResponse: v.string(),
   },
   handler: async (ctx, args) => {
-    const score = await gradeWithAI(args.writtenResponse);
+    try {
+      const score = await gradeWithAI(args.writtenResponse);
 
-    // Update English proficiency score
-    await ctx.runMutation(api.vetting.mutations.updateEnglishWrittenScore, {
-      vettingResultId: args.vettingResultId,
-      writtenResponseScore: score,
-    });
+      // Update English proficiency score
+      await ctx.runMutation(api.vetting.mutations.updateEnglishWrittenScore, {
+        vettingResultId: args.vettingResultId,
+        writtenResponseScore: score,
+      });
 
-    return { score };
+      return { score };
+    } catch (error) {
+      console.error("Failed to grade written response:", error);
+      // Use fallback score if AI fails
+      const fallbackScore = calculateFallbackScore(args.writtenResponse);
+      await ctx.runMutation(api.vetting.mutations.updateEnglishWrittenScore, {
+        vettingResultId: args.vettingResultId,
+        writtenResponseScore: fallbackScore,
+      });
+      return { score: fallbackScore };
+    }
   },
 });
 

@@ -49,11 +49,36 @@ export const updateProfile = mutation({
   args: {
     name: v.optional(v.string()),
     profile: v.object({
+      // Client profile fields
       companyName: v.optional(v.string()),
       companySize: v.optional(v.string()),
       industry: v.optional(v.string()),
+      workEmail: v.optional(v.string()),
+      phoneNumber: v.optional(v.string()),
+      companyWebsite: v.optional(v.string()),
+      country: v.optional(v.string()),
+      // Freelancer profile fields
       bio: v.optional(v.string()),
       skills: v.optional(v.array(v.string())),
+      techField: v.optional(
+        v.union(
+          v.literal("development"),
+          v.literal("data_science"),
+          v.literal("technical_writing"),
+          v.literal("design"),
+          v.literal("marketing"),
+          v.literal("other")
+        )
+      ),
+      experienceLevel: v.optional(
+        v.union(
+          v.literal("junior"),
+          v.literal("mid"),
+          v.literal("senior"),
+          v.literal("expert")
+        )
+      ),
+      languagesWritten: v.optional(v.array(v.string())),
       hourlyRate: v.optional(v.number()),
       availability: v.optional(
         v.union(

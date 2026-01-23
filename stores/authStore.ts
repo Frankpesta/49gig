@@ -11,11 +11,20 @@ export interface User {
   authProvider: "email" | "google" | "magic_link";
   role: UserRole;
   profile?: {
+    // Client profile fields
     companyName?: string;
     companySize?: string;
     industry?: string;
+    workEmail?: string;
+    phoneNumber?: string;
+    companyWebsite?: string;
+    country?: string;
+    // Freelancer profile fields
     bio?: string;
     skills?: string[];
+    techField?: "development" | "data_science" | "technical_writing" | "design" | "marketing" | "other";
+    experienceLevel?: "junior" | "mid" | "senior" | "expert";
+    languagesWritten?: string[];
     hourlyRate?: number;
     availability?: "available" | "busy" | "unavailable";
     timezone?: string;
