@@ -346,7 +346,10 @@ export default function LoginPage() {
                 variant="outline"
                 className="w-full h-11 text-base font-medium border-2"
                 disabled={isLoading}
-                onClick={() => signInWithGoogle(undefined)}
+                onClick={() => {
+                  // Login OAuth should not allow signup - only existing users
+                  signInWithGoogle(undefined);
+                }}
               >
                 <svg
                   className="mr-2 h-5 w-5"
@@ -360,7 +363,7 @@ export default function LoginPage() {
                 </svg>
                 Sign in with Google
               </Button>
-              <p className="text-center text-sm text-muted-foreground pt-2">
+              <p className="text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
                 <Link
                   href="/signup"

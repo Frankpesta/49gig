@@ -60,6 +60,7 @@ export const handleGoogleCallback = action({
   handler: async (ctx, args): Promise<{
     success: boolean;
     needsRoleSelection?: boolean;
+    needsOnboarding?: boolean;
     oauthData?: {
       email: string;
       name: string;
@@ -125,26 +126,15 @@ export const handleGoogleCallback = action({
       }
     );
 
-    // If user doesn't exist and no role provided, return needsRoleSelection flag
+    // If user doesn't exist and no role provided (from login), they need to signup first
     if (!existingUser && !role) {
-      return {
-        success: true,
-        needsRoleSelection: true,
-        oauthData: {
-          email: googleUser.email,
-          name: googleUser.name || googleUser.email.split("@")[0],
-          googleId: googleUser.id,
-          picture: googleUser.picture,
-          emailVerified: googleUser.verified_email || false,
-        },
-        userId: null,
-        sessionToken: "",
-        refreshToken: "",
-        expiresAt: 0,
-        isNewUser: true,
-        userRole: "client" as const,
-      };
+      throw new Error(
+        "Account not found. Please sign up first at /signup"
+      );
     }
+
+    // If user doesn't exist but role is provided (from signup), create user and mark for onboarding
+    const isNewUserFromSignup = !existingUser && role;
 
     // Create or update user via internal mutation
     const userId: any = await ctx.runMutation(
@@ -187,11 +177,12 @@ export const handleGoogleCallback = action({
     return {
       success: true,
       needsRoleSelection: false,
+      needsOnboarding: isNewUserFromSignup || false,
       userId,
       sessionToken: session.sessionToken,
       refreshToken: session.refreshToken,
       expiresAt: session.expiresAt,
-      isNewUser: session.isNewUser,
+      isNewUser: session.isNewUser || isNewUserFromSignup,
       userRole: userRoleFromDb || userRole,
     };
   },

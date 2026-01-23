@@ -120,6 +120,51 @@ export const getDashboardMetrics = query({
           ? Math.round((satisfiedCount / completedProjects.length) * 100)
           : 0;
 
+      // Calculate trends (compare current period with previous period)
+      const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+      const sixtyDaysAgo = now - 60 * 24 * 60 * 60 * 1000;
+
+      // Active Projects trend (30 days) - count projects that were active 30 days ago
+      // We need to check projects that existed 30 days ago and were active then
+      const activeProjects30DaysAgo = projects.filter(
+        (p) =>
+          p.createdAt < thirtyDaysAgo &&
+          ACTIVE_PROJECT_STATUSES.has(p.status) &&
+          (p.matchedAt === undefined || p.matchedAt < thirtyDaysAgo)
+      ).length;
+      const activeProjectsTrend = activeProjects30DaysAgo > 0
+        ? Math.round(((activeProjects.length - activeProjects30DaysAgo) / activeProjects30DaysAgo) * 100)
+        : activeProjects.length > 0 ? 100 : 0;
+
+      // Proposals trend (7 days)
+      const proposals7DaysAgo = matches.filter(
+        (m) => projectIds.has(m.projectId) && m.createdAt < sevenDaysAgo
+      ).length;
+      const proposalsTrend = proposals7DaysAgo > 0
+        ? Math.round(((proposals.length - proposals7DaysAgo) / proposals7DaysAgo) * 100)
+        : proposals.length > 0 ? 100 : 0;
+
+      // Escrow trend (30 days)
+      const escrowed30DaysAgo = projects
+        .filter((p) => p.createdAt < thirtyDaysAgo)
+        .reduce((sum, project) => sum + (project.escrowedAmount || 0), 0);
+      const escrowedTrend = escrowed30DaysAgo > 0
+        ? Math.round(((escrowed - escrowed30DaysAgo) / escrowed30DaysAgo) * 100)
+        : escrowed > 0 ? 100 : 0;
+
+      // Total Spend trend (30 days)
+      const totalSpend30DaysAgo = payments
+        .filter(
+          (payment) =>
+            projectIds.has(payment.projectId) &&
+            (payment.type === "pre_funding" || payment.type === "milestone_release") &&
+            payment.createdAt < thirtyDaysAgo
+        )
+        .reduce((sum, payment) => sum + payment.amount, 0);
+      const totalSpendTrend = totalSpend30DaysAgo > 0
+        ? Math.round(((totalSpend - totalSpend30DaysAgo) / totalSpend30DaysAgo) * 100)
+        : totalSpend > 0 ? 100 : 0;
+
       return {
         role: "client",
         metrics: {
@@ -129,6 +174,12 @@ export const getDashboardMetrics = query({
           totalSpend,
           avgMatchHours,
           satisfactionRate,
+          trends: {
+            activeProjects: { value: Math.abs(activeProjectsTrend), isPositive: activeProjectsTrend >= 0, label: "30d" },
+            proposals: { value: Math.abs(proposalsTrend), isPositive: proposalsTrend >= 0, label: "7d" },
+            escrowed: { value: Math.abs(escrowedTrend), isPositive: escrowedTrend >= 0, label: "30d" },
+            totalSpend: { value: Math.abs(totalSpendTrend), isPositive: totalSpendTrend >= 0, label: "30d" },
+          },
         },
       };
     }
@@ -190,6 +241,32 @@ export const getDashboardMetrics = query({
           ? Math.round((respondedMatches.length / matches.length) * 100)
           : 0;
 
+      // Calculate trends (compare current period with previous period)
+      const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+
+      // Active Projects trend (30 days)
+      const activeProjects30DaysAgo = projects.filter(
+        (p) =>
+          p.matchedAt && p.matchedAt < thirtyDaysAgo &&
+          ACTIVE_PROJECT_STATUSES.has(p.status)
+      ).length;
+      const activeProjectsTrend = activeProjects30DaysAgo > 0
+        ? Math.round(((activeProjects.length - activeProjects30DaysAgo) / activeProjects30DaysAgo) * 100)
+        : activeProjects.length > 0 ? 100 : 0;
+
+      // Earnings trend (30 days)
+      const earnings30DaysAgo = payments
+        .filter(
+          (payment) =>
+            projectIds.has(payment.projectId) &&
+            (payment.type === "payout" || payment.type === "milestone_release") &&
+            payment.createdAt < thirtyDaysAgo
+        )
+        .reduce((sum, payment) => sum + payment.netAmount, 0);
+      const earningsTrend = earnings30DaysAgo > 0
+        ? Math.round(((earnings - earnings30DaysAgo) / earnings30DaysAgo) * 100)
+        : earnings > 0 ? 100 : 0;
+
       return {
         role: "freelancer",
         metrics: {
@@ -199,6 +276,10 @@ export const getDashboardMetrics = query({
           estimatedHours,
           pendingReviews: pendingReviews.length,
           responseRate,
+          trends: {
+            activeProjects: { value: Math.abs(activeProjectsTrend), isPositive: activeProjectsTrend >= 0, label: "30d" },
+            earnings: { value: Math.abs(earningsTrend), isPositive: earningsTrend >= 0, label: "30d" },
+          },
         },
       };
     }

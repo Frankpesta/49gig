@@ -29,6 +29,7 @@ export const createMatch = internalMutation({
     }),
     explanation: v.string(),
     expiresAt: v.optional(v.number()),
+    teamRole: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -78,6 +79,7 @@ export const createMatch = internalMutation({
       explanation: args.explanation,
       status: "pending",
       expiresAt: args.expiresAt,
+      teamRole: args.teamRole,
       createdAt: now,
       updatedAt: now,
     });

@@ -192,7 +192,7 @@ export default function ProjectsPage() {
                     </div>
                   </div>
 
-                  {project.intakeForm.requiredSkills.length > 0 && (
+                  {project.intakeForm.requiredSkills && project.intakeForm.requiredSkills.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {project.intakeForm.requiredSkills.slice(0, 3).map((skill: string) => (
                         <Badge key={skill} variant="outline" className="text-xs">

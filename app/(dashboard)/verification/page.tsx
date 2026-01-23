@@ -9,6 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { IdentityUpload } from "@/components/vetting/identity-upload";
+import { EnglishTest } from "@/components/vetting/english-test";
+import { SkillSelection } from "@/components/vetting/skill-selection";
 
 export default function VerificationPage() {
   const { user, isAuthenticated } = useAuth();
@@ -302,17 +305,44 @@ export default function VerificationPage() {
             </Card>
           )}
 
-          {/* Action Buttons */}
+          {/* Step Components */}
           {status === "in_progress" && (
-            <div className="flex gap-4">
-              {currentStep === "identity" && (
-                <Button className="flex-1">Start Identity Verification</Button>
+            <div className="space-y-6">
+              {currentStep === "identity" && !stepsCompleted.includes("identity") && (
+                <IdentityUpload
+                  onComplete={() => {
+                    // Refresh verification status
+                    window.location.reload();
+                  }}
+                />
               )}
-              {currentStep === "english" && (
-                <Button className="flex-1">Start English Test</Button>
+              {currentStep === "english" && !stepsCompleted.includes("english") && (
+                <EnglishTest
+                  onComplete={() => {
+                    // Refresh verification status
+                    window.location.reload();
+                  }}
+                />
               )}
-              {currentStep === "skills" && (
-                <Button className="flex-1">Start Skill Assessment</Button>
+              {currentStep === "skills" && !stepsCompleted.includes("skills") && user && (
+                <SkillSelection
+                  skills={user.profile?.skills || []}
+                  experienceLevel={
+                    (user.profile?.experienceLevel as "junior" | "mid" | "senior" | "expert") ||
+                    "mid"
+                  }
+                  completedAssessments={
+                    vettingResult?.skillAssessments?.map((sa) => ({
+                      skillId: sa.skillId,
+                      skillName: sa.skillName,
+                      score: sa.score,
+                    })) || []
+                  }
+                  onAssessmentComplete={(skillName, score) => {
+                    // Assessment completed, refresh to update status
+                    window.location.reload();
+                  }}
+                />
               )}
             </div>
           )}

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -25,95 +26,113 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { X, Plus, ArrowRight, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  calculateProjectBudget,
+  formatBudget,
+  type ExperienceLevel,
+  type ProjectType,
+  type HireType,
+  type TeamSize,
+} from "@/lib/budget-calculator";
 
-const PROJECT_CATEGORIES = [
-  "Web Development",
-  "Mobile Development",
-  "Design",
-  "Writing",
-  "Marketing",
-  "Data Science",
-  "DevOps",
-  "Other",
-];
+const TALENT_CATEGORIES = [
+  "Software Development",
+  "UI/UX & Product Design",
+  "Data & Analytics",
+  "Digital Marketing",
+  "Writing & Content",
+] as const;
 
-const COMMON_SKILLS = [
-  "React",
-  "Next.js",
-  "TypeScript",
-  "Node.js",
-  "Python",
-  "JavaScript",
-  "UI/UX Design",
-  "Graphic Design",
-  "Content Writing",
-  "SEO",
-  "Marketing",
-  "Data Analysis",
-  "Machine Learning",
-  "DevOps",
-  "AWS",
-  "Docker",
-  "Kubernetes",
-];
+const EXPERIENCE_LEVELS = [
+  { value: "junior", label: "Junior" },
+  { value: "mid", label: "Mid-level" },
+  { value: "senior", label: "Senior" },
+  { value: "expert", label: "Expert" },
+] as const;
 
-const TEAM_STACK_OPTIONS = Array.from(
-  new Set([
+const TEAM_SIZES = [
+  { value: "2-3", label: "2–3" },
+  { value: "4-6", label: "4–6" },
+  { value: "7+", label: "7+" },
+  { value: "not_sure", label: "Not sure (let 49GIG recommend)" },
+] as const;
+
+const PROJECT_TYPES = [
+  { value: "one_time", label: "One-time / clearly defined → Milestone-based" },
+  { value: "ongoing", label: "Ongoing / long-term → Hourly / monthly" },
+  { value: "not_sure", label: "Not sure (let 49GIG decide)" },
+] as const;
+
+const COMMON_SKILLS_BY_CATEGORY: Record<string, string[]> = {
+  "Software Development": [
     "React",
+    "Next.js",
+    "TypeScript",
     "Node.js",
     "Python",
     "Java",
-    "PHP",
+    "C++",
     "Go",
     "Rust",
-    "Mobile Dev",
-    "UI Design",
-    "UX Research",
-    "Prototyping",
+    "PHP",
+    "Ruby",
+    "Swift",
+    "Kotlin",
+    "Docker",
+    "Kubernetes",
+    "AWS",
+    "Azure",
+    "GCP",
+  ],
+  "UI/UX & Product Design": [
     "Figma",
     "Adobe XD",
-    "Brand Design",
+    "Sketch",
+    "InVision",
+    "Prototyping",
+    "User Research",
+    "Wireframing",
+    "Visual Design",
+    "Design Systems",
+    "Framer",
+  ],
+  "Data & Analytics": [
+    "Python",
+    "R",
     "SQL",
     "Tableau",
     "Power BI",
+    "Excel",
     "Machine Learning",
+    "Data Visualization",
     "Statistics",
+    "Pandas",
+    "NumPy",
+  ],
+  "Digital Marketing": [
     "SEO",
     "PPC",
-    "Social Media",
+    "Google Ads",
+    "Facebook Ads",
+    "Social Media Marketing",
     "Content Marketing",
     "Email Marketing",
     "Analytics",
+    "Google Analytics",
+    "Marketing Automation",
+  ],
+  "Writing & Content": [
     "Copywriting",
     "Blog Writing",
     "Technical Writing",
     "SEO Content",
     "Creative Writing",
-    "Agile",
-    "Scrum",
-    "Product Strategy",
-    "Project Planning",
-    "Team Leadership",
-    "DevOps",
-    "AWS",
-    "Docker",
-    "Kubernetes",
-  ])
-);
-
-const INDIVIDUAL_PRICING = {
-  starter: 25,
-  professional: 50,
-  enterprise: 100,
-} as const;
-
-const TEAM_PRICING_TIERS = [
-  { tier: "startup", min: 3, max: 5, monthly: 2500 },
-  { tier: "growth", min: 6, max: 8, monthly: 5000 },
-  { tier: "enterprise", min: 9, max: 999, monthly: null },
-] as const;
-
-const DEFAULT_HOURS_PER_WEEK = 40;
+    "Content Strategy",
+    "Editing",
+    "Proofreading",
+    "Ghostwriting",
+  ],
+};
 
 export default function CreateProjectPage() {
   const router = useRouter();
@@ -128,129 +147,75 @@ export default function CreateProjectPage() {
 
   // Form state
   const [formData, setFormData] = useState({
+    // Section 1: Hire Type
+    hireType: "single" as HireType,
+    teamSize: undefined as TeamSize | undefined,
+    // Section 2: Project Overview
     title: "",
     description: "",
-    category: "",
+    startDate: "",
+    endDate: "",
+    timelineFlexible: false,
+    projectType: "one_time" as ProjectType,
+    // Section 3: Talent Requirements
+    talentCategory: "" as string,
+    experienceLevel: "mid" as ExperienceLevel,
     requiredSkills: [] as string[],
-    engagementType: "individual" as "individual" | "team",
-    durationValue: "4",
-    durationUnit: "week" as "week" | "month" | "year",
-    hoursPerWeek: DEFAULT_HOURS_PER_WEEK,
-    pricingPlan: "professional" as "starter" | "professional" | "enterprise",
-    teamSize: "3",
-    teamPricingTier: "startup" as "startup" | "growth" | "enterprise" | "custom",
-    budget: "",
-    timeline: "",
-    deliverables: [] as string[],
-    additionalRequirements: "",
+    // Section 4: Budget / Notes
+    specialRequirements: "",
   });
 
   const [newSkill, setNewSkill] = useState("");
-  const [newDeliverable, setNewDeliverable] = useState("");
 
-  const durationValueNumber = useMemo(() => {
-    const value = parseInt(formData.durationValue, 10);
-    return Number.isNaN(value) ? 0 : value;
-  }, [formData.durationValue]);
-
-  const durationWeeks = useMemo(() => {
-    if (durationValueNumber <= 0) return 0;
-    if (formData.durationUnit === "week") return durationValueNumber;
-    if (formData.durationUnit === "month") return durationValueNumber * 4;
-    return durationValueNumber * 52;
-  }, [durationValueNumber, formData.durationUnit]);
-
-  const durationMonths = useMemo(() => {
-    if (durationValueNumber <= 0) return 0;
-    if (formData.durationUnit === "month") return durationValueNumber;
-    if (formData.durationUnit === "week") return durationValueNumber / 4;
-    return durationValueNumber * 12;
-  }, [durationValueNumber, formData.durationUnit]);
-
-  const timelineLabel = useMemo(() => {
-    if (!durationValueNumber) return "";
-    const unitLabel = formData.durationUnit;
-    return `${durationValueNumber} ${unitLabel}${durationValueNumber === 1 ? "" : "s"}`;
-  }, [durationValueNumber, formData.durationUnit]);
-
-  const derivedTeamTier = useMemo(() => {
-    if (formData.engagementType !== "team") return undefined;
-    const teamSize = parseInt(formData.teamSize, 10);
-    if (Number.isNaN(teamSize) || teamSize < 3) return undefined;
-    const tier = TEAM_PRICING_TIERS.find(
-      (t) => teamSize >= t.min && teamSize <= t.max
-    );
-    return tier?.tier ?? "custom";
-  }, [formData.engagementType, formData.teamSize]);
-
-  const calculatedBudget = useMemo(() => {
-    if (formData.engagementType === "individual") {
-      if (!durationWeeks || !formData.pricingPlan) return 0;
-      const hourlyRate = INDIVIDUAL_PRICING[formData.pricingPlan];
-      return Math.round(hourlyRate * formData.hoursPerWeek * durationWeeks);
+  // Calculate budget based on form data
+  const budgetCalculation = useMemo(() => {
+    if (
+      !formData.startDate ||
+      !formData.endDate ||
+      !formData.experienceLevel ||
+      !formData.projectType
+    ) {
+      return null;
     }
 
-    const teamSize = parseInt(formData.teamSize, 10);
-    if (Number.isNaN(teamSize) || teamSize < 3) return 0;
-    const tier = TEAM_PRICING_TIERS.find(
-      (t) => teamSize >= t.min && teamSize <= t.max
-    );
-    if (!tier || !tier.monthly) return 0;
-    return Math.round(tier.monthly * durationMonths);
+    try {
+      const startDate = new Date(formData.startDate);
+      const endDate = new Date(formData.endDate);
+
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        return null;
+      }
+
+      if (endDate <= startDate) {
+        return null;
+      }
+
+      return calculateProjectBudget({
+        hireType: formData.hireType,
+        teamSize: formData.teamSize,
+        experienceLevel: formData.experienceLevel,
+        projectType: formData.projectType,
+        startDate,
+        endDate,
+        timelineFlexible: formData.timelineFlexible,
+      });
+    } catch (err) {
+      return null;
+    }
   }, [
-    formData.engagementType,
-    formData.pricingPlan,
-    formData.hoursPerWeek,
+    formData.hireType,
     formData.teamSize,
-    durationWeeks,
-    durationMonths,
+    formData.startDate,
+    formData.endDate,
+    formData.experienceLevel,
+    formData.projectType,
+    formData.timelineFlexible,
   ]);
 
-  const estimatedHours = useMemo(() => {
-    if (formData.engagementType !== "individual") return undefined;
-    if (!durationWeeks) return undefined;
-    return formData.hoursPerWeek * durationWeeks;
-  }, [formData.engagementType, formData.hoursPerWeek, durationWeeks]);
-
-  const handleNext = () => {
-    if (step === 1) {
-      if (!formData.title || !formData.description || !formData.category) {
-        setError("Please fill in all required fields");
-        return;
-      }
-    } else if (step === 2) {
-      if (formData.requiredSkills.length === 0) {
-        setError("Please select required skills or stack");
-        return;
-      }
-      if (!formData.durationValue) {
-        setError("Please set the project duration");
-        return;
-      }
-      if (formData.engagementType === "team") {
-        const teamSize = parseInt(formData.teamSize, 10);
-        if (Number.isNaN(teamSize) || teamSize < 3) {
-          setError("Team size must be at least 3 members");
-          return;
-        }
-      }
-      if (!calculatedBudget) {
-        setError("Unable to calculate pricing. Please review your selections.");
-        return;
-      }
-      if (formData.engagementType === "team" && derivedTeamTier === "enterprise") {
-        setError("Enterprise team pricing is custom. Please contact sales.");
-        return;
-      }
-    }
-    setError(null);
-    setStep(step + 1);
-  };
-
-  const handleBack = () => {
-    setError(null);
-    setStep(step - 1);
-  };
+  const availableSkills = useMemo(() => {
+    if (!formData.talentCategory) return [];
+    return COMMON_SKILLS_BY_CATEGORY[formData.talentCategory] || [];
+  }, [formData.talentCategory]);
 
   const handleAddSkill = () => {
     if (newSkill.trim() && !formData.requiredSkills.includes(newSkill.trim())) {
@@ -269,29 +234,78 @@ export default function CreateProjectPage() {
     });
   };
 
-  const handleAddDeliverable = () => {
-    if (
-      newDeliverable.trim() &&
-      !formData.deliverables.includes(newDeliverable.trim())
-    ) {
-      setFormData({
-        ...formData,
-        deliverables: [...formData.deliverables, newDeliverable.trim()],
-      });
-      setNewDeliverable("");
+  const handleNext = () => {
+    setError(null);
+
+    if (step === 1) {
+      // Validate Section 1: Hire Type
+      if (!formData.hireType) {
+        setError("Please select hire type");
+        return;
+      }
+      if (formData.hireType === "team" && !formData.teamSize) {
+        setError("Please select team size");
+        return;
+      }
+    } else if (step === 2) {
+      // Validate Section 2: Project Overview
+      if (!formData.title.trim()) {
+        setError("Project title is required");
+        return;
+      }
+      if (!formData.description.trim()) {
+        setError("Project description is required");
+        return;
+      }
+      if (!formData.startDate) {
+        setError("Start date is required");
+        return;
+      }
+      if (!formData.endDate) {
+        setError("End date is required");
+        return;
+      }
+      const startDate = new Date(formData.startDate);
+      const endDate = new Date(formData.endDate);
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+        setError("Invalid date format");
+        return;
+      }
+      if (endDate <= startDate) {
+        setError("End date must be after start date");
+        return;
+      }
+      if (!formData.projectType) {
+        setError("Please select project type");
+        return;
+      }
+    } else if (step === 3) {
+      // Validate Section 3: Talent Requirements
+      if (!formData.talentCategory) {
+        setError("Please select a talent category");
+        return;
+      }
+      if (!formData.experienceLevel) {
+        setError("Please select experience level");
+        return;
+      }
+      if (!budgetCalculation) {
+        setError("Unable to calculate budget. Please check your dates.");
+        return;
+      }
     }
+
+    setStep(step + 1);
   };
 
-  const handleRemoveDeliverable = (deliverable: string) => {
-    setFormData({
-      ...formData,
-      deliverables: formData.deliverables.filter((d) => d !== deliverable),
-    });
+  const handleBack = () => {
+    setError(null);
+    setStep(step - 1);
   };
 
   const handleSubmit = async () => {
-    if (formData.deliverables.length === 0) {
-      setError("Please add at least one deliverable");
+    if (!budgetCalculation) {
+      setError("Unable to calculate budget. Please check your dates.");
       return;
     }
 
@@ -299,34 +313,32 @@ export default function CreateProjectPage() {
     setError(null);
 
     try {
-      const budget = calculatedBudget;
-      if (isNaN(budget) || budget <= 0) {
-        throw new Error("Invalid budget amount");
-      }
+      const startDate = new Date(formData.startDate);
+      const endDate = new Date(formData.endDate);
 
-      // Platform fee is 10% (can be made configurable later)
+      // Platform fee is 10%
       const platformFee = 10;
-      const totalAmount = budget;
+      const totalAmount = budgetCalculation.estimatedBudget;
 
       const projectId = await createProject({
         intakeForm: {
+          hireType: formData.hireType,
+          teamSize: formData.teamSize,
           title: formData.title,
           description: formData.description,
-          category: formData.category,
+          startDate: startDate.getTime(),
+          endDate: endDate.getTime(),
+          timelineFlexible: formData.timelineFlexible,
+          projectType: formData.projectType,
+          talentCategory: formData.talentCategory,
+          experienceLevel: formData.experienceLevel,
           requiredSkills: formData.requiredSkills,
           budget: totalAmount,
-          timeline: timelineLabel,
-          engagementType: formData.engagementType,
-          durationValue: parseInt(formData.durationValue, 10),
-          durationUnit: formData.durationUnit,
-          hoursPerWeek: formData.engagementType === "individual" ? formData.hoursPerWeek : undefined,
-          pricingPlan: formData.engagementType === "individual" ? formData.pricingPlan : undefined,
-          teamSize: formData.engagementType === "team" ? parseInt(formData.teamSize, 10) : undefined,
-          teamPricingTier: formData.engagementType === "team" ? derivedTeamTier : undefined,
-          estimatedHours,
+          specialRequirements: formData.specialRequirements || undefined,
+          // Legacy fields for backward compatibility
+          timeline: `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
+          category: formData.talentCategory,
           estimatedBudget: totalAmount,
-          deliverables: formData.deliverables,
-          additionalRequirements: formData.additionalRequirements || undefined,
         },
         totalAmount,
         platformFee,
@@ -334,7 +346,7 @@ export default function CreateProjectPage() {
         ...(user?._id ? { userId: user._id } : {}),
       });
 
-      // Redirect to payment page - project is only created after payment
+      // Redirect to payment page
       router.push(`/dashboard/projects/${projectId}/payment`);
     } catch (err: any) {
       setError(err.message || "Failed to create project");
@@ -370,7 +382,7 @@ export default function CreateProjectPage() {
 
       {/* Progress Indicator */}
       <div className="flex items-center gap-2">
-        {[1, 2, 3].map((s) => (
+        {[1, 2, 3, 4].map((s) => (
           <div key={s} className="flex items-center gap-2">
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
@@ -383,7 +395,7 @@ export default function CreateProjectPage() {
             >
               {s}
             </div>
-            {s < 3 && (
+            {s < 4 && (
               <div
                 className={`h-1 w-16 ${
                   s < step ? "bg-primary" : "bg-muted"
@@ -405,22 +417,109 @@ export default function CreateProjectPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {step === 1 && "Project Details"}
-            {step === 2 && "Skills & Budget"}
-            {step === 3 && "Deliverables"}
+            {step === 1 && "Section 1: Hire Type"}
+            {step === 2 && "Section 2: Project Overview"}
+            {step === 3 && "Section 3: Talent Requirements"}
+            {step === 4 && "Section 4: Budget / Notes"}
           </CardTitle>
           <CardDescription>
-            {step === 1 && "Tell us about your project"}
-            {step === 2 && "Specify required skills and budget"}
-            {step === 3 && "Define what you expect to receive"}
+            {step === 1 && "What would you like to hire?"}
+            {step === 2 && "Tell us about your project"}
+            {step === 3 && "Specify talent requirements"}
+            {step === 4 && "Review budget and add notes"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Step 1: Project Details */}
+          {/* Step 1: Hire Type */}
           {step === 1 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Project Title *</Label>
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  1. What would you like to hire?
+                </Label>
+                <div className="space-y-3">
+                  <label className="flex items-center space-x-3 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="hireType"
+                      value="single"
+                      checked={formData.hireType === "single"}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          hireType: e.target.value as HireType,
+                          teamSize: undefined,
+                        })
+                      }
+                      className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
+                    />
+                    <span className="text-sm font-medium text-foreground group-hover:text-primary">
+                      A single talent
+                    </span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="hireType"
+                      value="team"
+                      checked={formData.hireType === "team"}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          hireType: e.target.value as HireType,
+                        })
+                      }
+                      className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
+                    />
+                    <span className="text-sm font-medium text-foreground group-hover:text-primary">
+                      A team
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              {formData.hireType === "team" && (
+                <div className="space-y-3 pt-4 border-t">
+                  <Label className="text-base font-semibold">
+                    2. If a team, how many people do you need?
+                  </Label>
+                  <div className="space-y-3">
+                    {TEAM_SIZES.map((size) => (
+                      <label
+                        key={size.value}
+                        className="flex items-center space-x-3 cursor-pointer group"
+                      >
+                        <input
+                          type="radio"
+                          name="teamSize"
+                          value={size.value}
+                          checked={formData.teamSize === size.value}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              teamSize: e.target.value as TeamSize,
+                            })
+                          }
+                          className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-foreground group-hover:text-primary">
+                          {size.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Project Overview */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="title" className="text-base font-semibold">
+                  3. Project title
+                </Label>
                 <Input
                   id="title"
                   placeholder="e.g., Build a modern e-commerce website"
@@ -428,11 +527,14 @@ export default function CreateProjectPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
+                  className="h-11"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Description *</Label>
+              <div className="space-y-3">
+                <Label htmlFor="description" className="text-base font-semibold">
+                  4. Brief description of your project and expected outcome
+                </Label>
                 <Textarea
                   id="description"
                   placeholder="Describe your project in detail..."
@@ -444,19 +546,112 @@ export default function CreateProjectPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  5. Project timeline:
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate">Start date</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, startDate: e.target.value })
+                      }
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endDate">End date</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, endDate: e.target.value })
+                      }
+                      min={formData.startDate}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="timelineFlexible"
+                    checked={formData.timelineFlexible}
+                    onCheckedChange={(checked) =>
+                      setFormData({
+                        ...formData,
+                        timelineFlexible: checked === true,
+                      })
+                    }
+                  />
+                  <Label
+                    htmlFor="timelineFlexible"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Timeline flexible
+                  </Label>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  6. Project type:
+                </Label>
+                <div className="space-y-3">
+                  {PROJECT_TYPES.map((type) => (
+                    <label
+                      key={type.value}
+                      className="flex items-center space-x-3 cursor-pointer group"
+                    >
+                      <input
+                        type="radio"
+                        name="projectType"
+                        value={type.value}
+                        checked={formData.projectType === type.value}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            projectType: e.target.value as ProjectType,
+                          })
+                        }
+                        className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
+                      />
+                      <span className="text-sm font-medium text-foreground group-hover:text-primary">
+                        {type.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Talent Requirements */}
+          {step === 3 && (
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  7. Which talent category do you need?
+                </Label>
                 <Select
-                  value={formData.category}
+                  value={formData.talentCategory}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, category: value })
+                    setFormData({
+                      ...formData,
+                      talentCategory: value,
+                      requiredSkills: [], // Reset skills when category changes
+                    })
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a category" />
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select talent category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROJECT_CATEGORIES.map((cat) => (
+                    {TALENT_CATEGORIES.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>
@@ -465,43 +660,40 @@ export default function CreateProjectPage() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Engagement Type *</Label>
-                <div className="flex flex-wrap gap-3">
-                  <Button
-                    type="button"
-                    variant={formData.engagementType === "individual" ? "default" : "outline"}
-                    onClick={() =>
-                      setFormData({ ...formData, engagementType: "individual" })
-                    }
-                  >
-                    Individual Talent
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={formData.engagementType === "team" ? "default" : "outline"}
-                    onClick={() =>
-                      setFormData({ ...formData, engagementType: "team" })
-                    }
-                  >
-                    Dedicated Team
-                  </Button>
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  8. Required level of experience:
+                </Label>
+                <div className="space-y-3">
+                  {EXPERIENCE_LEVELS.map((level) => (
+                    <label
+                      key={level.value}
+                      className="flex items-center space-x-3 cursor-pointer group"
+                    >
+                      <input
+                        type="radio"
+                        name="experienceLevel"
+                        value={level.value}
+                        checked={formData.experienceLevel === level.value}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            experienceLevel: e.target.value as ExperienceLevel,
+                          })
+                        }
+                        className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
+                      />
+                      <span className="text-sm font-medium text-foreground group-hover:text-primary">
+                        {level.label}
+                      </span>
+                    </label>
+                  ))}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Choose whether you want an individual freelancer or a full team.
-                </p>
               </div>
-            </div>
-          )}
 
-          {/* Step 2: Skills & Budget */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>
-                  {formData.engagementType === "team"
-                    ? "Team Stack Requirements *"
-                    : "Required Skills *"}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  9. Key skills or tools required (optional)
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -514,42 +706,42 @@ export default function CreateProjectPage() {
                         handleAddSkill();
                       }
                     }}
+                    className="h-11 flex-1"
                   />
                   <Button type="button" onClick={handleAddSkill}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {(formData.engagementType === "team"
-                    ? TEAM_STACK_OPTIONS
-                    : COMMON_SKILLS
-                  ).map((skill) => (
-                    <Badge
-                      key={skill}
-                      variant={
-                        formData.requiredSkills.includes(skill)
-                          ? "default"
-                          : "outline"
-                      }
-                      className="cursor-pointer"
-                      onClick={() => {
-                        if (formData.requiredSkills.includes(skill)) {
-                          handleRemoveSkill(skill);
-                        } else {
-                          setFormData({
-                            ...formData,
-                            requiredSkills: [
-                              ...formData.requiredSkills,
-                              skill,
-                            ],
-                          });
+                {availableSkills.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {availableSkills.map((skill) => (
+                      <Badge
+                        key={skill}
+                        variant={
+                          formData.requiredSkills.includes(skill)
+                            ? "default"
+                            : "outline"
                         }
-                      }}
-                    >
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
+                        className="cursor-pointer"
+                        onClick={() => {
+                          if (formData.requiredSkills.includes(skill)) {
+                            handleRemoveSkill(skill);
+                          } else {
+                            setFormData({
+                              ...formData,
+                              requiredSkills: [
+                                ...formData.requiredSkills,
+                                skill,
+                              ],
+                            });
+                          }
+                        }}
+                      >
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
                 {formData.requiredSkills.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-2">
                     {formData.requiredSkills.map((skill) => (
@@ -568,199 +760,124 @@ export default function CreateProjectPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Duration *</Label>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  <Input
-                    type="number"
-                    min="1"
-                    placeholder="e.g., 4"
-                    value={formData.durationValue}
-                    onChange={(e) =>
-                      setFormData({ ...formData, durationValue: e.target.value })
-                    }
-                  />
-                  <Select
-                    value={formData.durationUnit}
-                    onValueChange={(value) =>
-                      setFormData({
-                        ...formData,
-                        durationUnit: value as "week" | "month" | "year",
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="week">Weeks</SelectItem>
-                      <SelectItem value="month">Months</SelectItem>
-                      <SelectItem value="year">Years</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="flex items-center rounded-md border px-3 text-sm text-muted-foreground">
-                    {timelineLabel || "Timeline"}
+              {/* Budget Preview */}
+              {budgetCalculation && (
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Estimated Budget</span>
+                    <span className="text-lg font-bold">
+                      {formatBudget(budgetCalculation.estimatedBudget)}
+                    </span>
                   </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Duration can be weeks, months, or years. Use internationally accepted work hours.
-                </p>
-              </div>
-
-              {formData.engagementType === "individual" && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Pricing Plan *</Label>
-                    <Select
-                      value={formData.pricingPlan}
-                      onValueChange={(value) =>
-                        setFormData({
-                          ...formData,
-                          pricingPlan: value as "starter" | "professional" | "enterprise",
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a plan" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="starter">Starter ($25/hr)</SelectItem>
-                        <SelectItem value="professional">Professional ($50/hr)</SelectItem>
-                        <SelectItem value="enterprise">Enterprise ($100/hr)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">
-                      Pricing matches the marketing page hourly rates.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Work Hours Per Week</Label>
-                    <Select
-                      value={String(formData.hoursPerWeek)}
-                      onValueChange={(value) =>
-                        setFormData({
-                          ...formData,
-                          hoursPerWeek: parseInt(value, 10),
-                        })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select hours" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="20">20 hours/week</SelectItem>
-                        <SelectItem value="30">30 hours/week</SelectItem>
-                        <SelectItem value="40">40 hours/week (standard)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div>
+                      Base rate: {formatBudget(budgetCalculation.breakdown.baseRate)}
+                      {budgetCalculation.breakdown.totalHours && (
+                        <span> × {budgetCalculation.breakdown.totalHours} hours</span>
+                      )}
+                      {budgetCalculation.breakdown.totalDays && (
+                        <span> × {budgetCalculation.breakdown.totalDays} days</span>
+                      )}
+                    </div>
+                    <div>
+                      Timeline multiplier:{" "}
+                      {(budgetCalculation.breakdown.timelineMultiplier * 100).toFixed(0)}%
+                    </div>
+                    <div>
+                      Project type multiplier:{" "}
+                      {(budgetCalculation.breakdown.projectTypeMultiplier * 100).toFixed(0)}%
+                    </div>
+                    {budgetCalculation.breakdown.teamMultiplier && (
+                      <div>
+                        Team size: {budgetCalculation.breakdown.teamMultiplier} members
+                      </div>
+                    )}
+                    <div className="pt-2 border-t">
+                      Platform fee (10%):{" "}
+                      {formatBudget(
+                        budgetCalculation.estimatedBudget * 0.1
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
-
-              {formData.engagementType === "team" && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="teamSize">Team Size *</Label>
-                    <Input
-                      id="teamSize"
-                      type="number"
-                      min="3"
-                      placeholder="e.g., 5"
-                      value={formData.teamSize}
-                      onChange={(e) =>
-                        setFormData({ ...formData, teamSize: e.target.value })
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Team pricing is based on number of members from the marketing team plans.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold">Estimated Budget</span>
-                  <span className="text-lg font-bold">
-                    {calculatedBudget
-                      ? `$${calculatedBudget.toLocaleString()}`
-                      : "Custom pricing"}
-                  </span>
-                </div>
-                <div className="mt-2 text-xs text-muted-foreground">
-                  Platform fee: 10% (${(calculatedBudget * 0.1 || 0).toFixed(2)})
-                </div>
-                {estimatedHours && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Estimated hours: {estimatedHours}
-                  </div>
-                )}
-                {formData.engagementType === "team" && derivedTeamTier && (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Team tier: {derivedTeamTier}
-                  </div>
-                )}
-              </div>
             </div>
           )}
 
-          {/* Step 3: Deliverables */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Deliverables *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add a deliverable"
-                    value={newDeliverable}
-                    onChange={(e) => setNewDeliverable(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddDeliverable();
-                      }
-                    }}
-                  />
-                  <Button type="button" onClick={handleAddDeliverable}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {formData.deliverables.length > 0 && (
-                  <div className="space-y-2 pt-2">
-                    {formData.deliverables.map((deliverable, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between rounded-md border p-2"
-                      >
-                        <span>{deliverable}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveDeliverable(deliverable)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+          {/* Step 4: Budget / Notes */}
+          {step === 4 && (
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  10. Estimated budget range:
+                </Label>
+                {budgetCalculation ? (
+                  <div className="rounded-lg border bg-primary/5 p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-semibold">
+                        Total Project Budget
+                      </span>
+                      <span className="text-3xl font-bold text-primary">
+                        {formatBudget(budgetCalculation.estimatedBudget)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Base amount:</span>
+                        <div className="font-semibold">
+                          {formatBudget(
+                            budgetCalculation.estimatedBudget /
+                              budgetCalculation.breakdown.timelineMultiplier /
+                              budgetCalculation.breakdown.projectTypeMultiplier
+                          )}
+                        </div>
                       </div>
-                    ))}
+                      <div>
+                        <span className="text-muted-foreground">Platform fee (10%):</span>
+                        <div className="font-semibold">
+                          {formatBudget(budgetCalculation.estimatedBudget * 0.1)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t text-xs text-muted-foreground space-y-1">
+                      <p>
+                        <strong>Experience Level:</strong> {formData.experienceLevel.charAt(0).toUpperCase() + formData.experienceLevel.slice(1)}
+                      </p>
+                      <p>
+                        <strong>Project Type:</strong>{" "}
+                        {formData.projectType === "one_time"
+                          ? "One-time / Milestone-based"
+                          : formData.projectType === "ongoing"
+                          ? "Ongoing / Hourly-Monthly"
+                          : "Let 49GIG decide"}
+                      </p>
+                      {formData.timelineFlexible && (
+                        <p>
+                          <strong>Timeline:</strong> Flexible (10% discount applied)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+                    Unable to calculate budget. Please check your project dates.
                   </div>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="additionalRequirements">
-                  Additional Requirements (Optional)
+              <div className="space-y-3">
+                <Label htmlFor="specialRequirements" className="text-base font-semibold">
+                  11. Any special requirements or notes? (optional)
                 </Label>
                 <Textarea
-                  id="additionalRequirements"
+                  id="specialRequirements"
                   placeholder="Any additional requirements or notes..."
                   rows={4}
-                  value={formData.additionalRequirements}
+                  value={formData.specialRequirements}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      additionalRequirements: e.target.value,
+                      specialRequirements: e.target.value,
                     })
                   }
                 />
@@ -780,13 +897,13 @@ export default function CreateProjectPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        {step < 3 ? (
+        {step < 4 ? (
           <Button onClick={handleNext}>
             Next
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !budgetCalculation}>
             {isSubmitting ? "Creating..." : "Create Project"}
           </Button>
         )}
@@ -794,4 +911,3 @@ export default function CreateProjectPage() {
     </div>
   );
 }
-

@@ -65,6 +65,16 @@ function OAuthCallbackContent() {
             localStorage.setItem("sessionToken", result.sessionToken);
           }
 
+          // If new user needs onboarding, redirect to onboarding page
+          if (result.needsOnboarding) {
+            if (result.userRole === "freelancer") {
+              router.replace("/onboarding/freelancer");
+            } else {
+              router.replace("/onboarding/client");
+            }
+            return;
+          }
+
           // CRITICAL: Check user role and redirect accordingly
           // Freelancers: go to resume upload, then verification
           if (result.userRole === "freelancer") {

@@ -127,6 +127,29 @@ export const initializeVerification = mutation({
 });
 
 /**
+ * Generate upload URL for identity documents
+ */
+export const generateIdentityUploadUrl = mutation({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    if (user.role !== "freelancer") {
+      throw new Error("Only freelancers can upload verification documents");
+    }
+
+    const url = await ctx.storage.generateUploadUrl();
+    return { url };
+  },
+});
+
+/**
  * Submit identity verification documents
  */
 export const submitIdentityVerification = mutation({
@@ -136,6 +159,8 @@ export const submitIdentityVerification = mutation({
     documentImageId: v.id("_storage"),
     selfieImageId: v.id("_storage"),
     provider: v.union(v.literal("smile_identity"), v.literal("dojah")),
+    browserFingerprint: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -185,12 +210,28 @@ export const submitIdentityVerification = mutation({
       details: {
         provider: args.provider,
         documentType: args.documentType,
+        browserFingerprint: args.browserFingerprint,
+        ipAddress: args.ipAddress,
       },
       createdAt: Date.now(),
     });
 
-    // Trigger identity verification action (will be handled by action)
-    return { success: true, message: "Identity verification submitted. Processing..." };
+    // Trigger identity verification action
+    const processIdentity = (api as any).vetting.actions.processIdentityVerification;
+    await ctx.scheduler.runAfter(0, processIdentity, {
+      vettingResultId: vettingResult._id,
+      documentImageId: args.documentImageId,
+      selfieImageId: args.selfieImageId,
+      documentType: args.documentType,
+      documentNumber: args.documentNumber,
+      provider: args.provider,
+    });
+
+    return { 
+      success: true, 
+      message: "Identity verification submitted. Processing...",
+      vettingResultId: vettingResult._id,
+    };
   },
 });
 

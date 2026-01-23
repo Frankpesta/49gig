@@ -33,6 +33,7 @@ import type * as email_send from "../email/send.js";
 import type * as matching_actions from "../matching/actions.js";
 import type * as matching_mutations from "../matching/mutations.js";
 import type * as matching_queries from "../matching/queries.js";
+import type * as matching_teamMatching from "../matching/teamMatching.js";
 import type * as milestones_mutations from "../milestones/mutations.js";
 import type * as notifications_actions from "../notifications/actions.js";
 import type * as notifications_mutations from "../notifications/mutations.js";
@@ -53,7 +54,11 @@ import type * as users_queries from "../users/queries.js";
 import type * as vetting_actions from "../vetting/actions.js";
 import type * as vetting_engine from "../vetting/engine.js";
 import type * as vetting_mutations from "../vetting/mutations.js";
+import type * as vetting_portfolioScoring from "../vetting/portfolioScoring.js";
 import type * as vetting_queries from "../vetting/queries.js";
+import type * as vetting_questions from "../vetting/questions.js";
+import type * as vetting_skillTestComplexity from "../vetting/skillTestComplexity.js";
+import type * as vetting_testSessions from "../vetting/testSessions.js";
 
 import type {
   ApiFromModules,
@@ -87,6 +92,7 @@ declare const fullApi: ApiFromModules<{
   "matching/actions": typeof matching_actions;
   "matching/mutations": typeof matching_mutations;
   "matching/queries": typeof matching_queries;
+  "matching/teamMatching": typeof matching_teamMatching;
   "milestones/mutations": typeof milestones_mutations;
   "notifications/actions": typeof notifications_actions;
   "notifications/mutations": typeof notifications_mutations;
@@ -107,7 +113,11 @@ declare const fullApi: ApiFromModules<{
   "vetting/actions": typeof vetting_actions;
   "vetting/engine": typeof vetting_engine;
   "vetting/mutations": typeof vetting_mutations;
+  "vetting/portfolioScoring": typeof vetting_portfolioScoring;
   "vetting/queries": typeof vetting_queries;
+  "vetting/questions": typeof vetting_questions;
+  "vetting/skillTestComplexity": typeof vetting_skillTestComplexity;
+  "vetting/testSessions": typeof vetting_testSessions;
 }>;
 
 /**

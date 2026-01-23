@@ -351,3 +351,174 @@ export const generateMatches = action({
   },
 });
 
+/**
+ * Generate team matches for a project
+ * Matches multiple freelancers with different specializations
+ */
+export const generateTeamMatches = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    // Get project
+    const project = await ctx.runQuery(internal.projects.queries.getProjectInternal, {
+      projectId: args.projectId,
+    });
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    if (project.status !== "funded") {
+      throw new Error("Project must be funded before matching");
+    }
+
+    // Check if project requires a team
+    const intakeForm = project.intakeForm;
+    if (intakeForm.hireType !== "team") {
+      throw new Error("This project does not require a team");
+    }
+
+    // Import team matching utilities
+    const { determineTeamComposition, matchFreelancerToRole } = await import(
+      "../../lib/team-matching"
+    );
+
+    // Determine team composition
+    const teamComposition = determineTeamComposition({
+      teamSize: intakeForm.teamSize || "not_sure",
+      description: intakeForm.description,
+      skills: intakeForm.requiredSkills || [],
+      category: intakeForm.talentCategory as any,
+      experienceLevel: intakeForm.experienceLevel as any,
+    });
+
+    // Get all verified freelancers
+    const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
+    
+    const verifiedFreelancers = (allUsers || []).filter(
+      (u: any) =>
+        u.role === "freelancer" &&
+        u.status === "active" &&
+        u.verificationStatus === "approved"
+    );
+
+    if (verifiedFreelancers.length === 0) {
+      return [];
+    }
+
+    // Get vetting results
+    const approvedFreelancers = await Promise.all(
+      verifiedFreelancers.map(async (freelancer: any) => {
+        const vettingResult = await ctx.runQuery(
+          internal.vetting.queries.getVettingResultByFreelancer,
+          { freelancerId: freelancer._id }
+        );
+        return { freelancer, vettingResult, overallScore: vettingResult?.overallScore || 0 };
+      })
+    );
+
+    // Match freelancers to each role
+    const teamMatches: Array<{
+      role: string;
+      freelancer: Doc<"users">;
+      score: number;
+      matchReasons: string[];
+    }> = [];
+
+    for (const [role, count] of Object.entries(teamComposition)) {
+      const roleMatches: Array<{
+        freelancer: Doc<"users">;
+        score: number;
+        matchReasons: string[];
+        vettingScore: number;
+      }> = [];
+
+      for (const { freelancer, vettingResult } of approvedFreelancers) {
+        // Skip if already matched to this project
+        const existingMatch = await ctx.runQuery(
+          internal.matching.queries.getMatch,
+          {
+            projectId: args.projectId,
+            freelancerId: freelancer._id,
+          }
+        );
+
+        if (existingMatch) continue;
+
+        // Match freelancer to role
+        const matchResult = matchFreelancerToRole(
+          freelancer,
+          role,
+          intakeForm.requiredSkills || [],
+          intakeForm.experienceLevel as any
+        );
+
+        // Combine with vetting score
+        const vettingScore = vettingResult?.overallScore || 0;
+        const combinedScore = matchResult.score * 0.7 + vettingScore * 0.3;
+
+        roleMatches.push({
+          freelancer,
+          score: combinedScore,
+          matchReasons: matchResult.matchReasons,
+          vettingScore,
+        });
+      }
+
+      // Sort by score and take top N for this role
+      roleMatches.sort((a, b) => b.score - a.score);
+      const topMatches = roleMatches.slice(0, count);
+
+      for (const match of topMatches) {
+        teamMatches.push({
+          role,
+          freelancer: match.freelancer,
+          score: match.score,
+          matchReasons: match.matchReasons,
+        });
+      }
+    }
+
+    // Create match records for each team member
+    const matchIds: string[] = [];
+    const now = Date.now();
+    const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    for (const teamMatch of teamMatches) {
+      const explanation = `${teamMatch.freelancer.name} is matched for the ${teamMatch.role} role. ${teamMatch.matchReasons.join(". ")}.`;
+
+      const confidence = teamMatch.score >= 80 ? "high" : teamMatch.score >= 60 ? "medium" : "low";
+
+      const matchId = await ctx.runMutation(
+        internal.matching.mutations.createMatch,
+        {
+          projectId: args.projectId,
+          freelancerId: teamMatch.freelancer._id,
+          score: teamMatch.score,
+          confidence,
+          scoringBreakdown: {
+            skillOverlap: teamMatch.score * 0.4,
+            vettingScore: teamMatch.score * 0.3,
+            ratings: 50,
+            availability: 50,
+            pastPerformance: 50,
+            timezoneCompatibility: 50,
+          },
+          explanation,
+          expiresAt,
+          // Add team-specific metadata
+          teamRole: teamMatch.role,
+        }
+      );
+
+      matchIds.push(matchId);
+    }
+
+    return {
+      teamSize: teamMatches.length,
+      composition: teamComposition,
+      matchIds,
+    };
+  },
+});

@@ -63,7 +63,7 @@ export default function DashboardPage() {
           description: "Live projects being worked on",
           icon: Briefcase,
           variant: "primary" as const,
-          trend: { value: 12, label: "30d", isPositive: true },
+          trend: dashboardMetrics?.metrics?.trends?.activeProjects,
           progress: { value: 15, label: "Delivery" },
           badge: "Client",
         },
@@ -74,7 +74,7 @@ export default function DashboardPage() {
           description: "Freelancer offers received",
           icon: Target,
           variant: "default" as const,
-          trend: { value: 5, label: "7d", isPositive: true },
+          trend: dashboardMetrics?.metrics?.trends?.proposals,
           badge: "Inbox",
         },
         {
@@ -84,7 +84,7 @@ export default function DashboardPage() {
           description: "Funds protected for milestones",
           icon: Wallet,
           variant: "success" as const,
-          trend: { value: 2, label: "30d", isPositive: true },
+          trend: dashboardMetrics?.metrics?.trends?.escrowed,
           badge: "Secure",
         },
         {
@@ -94,7 +94,7 @@ export default function DashboardPage() {
           description: "Cumulative project spend",
           icon: DollarSign,
           variant: "success" as const,
-          trend: { value: 0, label: "30d", isPositive: true },
+          trend: dashboardMetrics?.metrics?.trends?.totalSpend,
           badge: "Lifetime",
         },
         {
@@ -126,7 +126,7 @@ export default function DashboardPage() {
           description: "Projects you’re working on",
           icon: Briefcase,
           variant: "primary" as const,
-          trend: { value: 8, label: "30d", isPositive: true },
+          trend: dashboardMetrics?.metrics?.trends?.activeProjects,
           badge: "Freelancer",
         },
         {
@@ -136,7 +136,7 @@ export default function DashboardPage() {
           description: "Payouts and approved milestones",
           icon: DollarSign,
           variant: "success" as const,
-          trend: { value: 6, label: "30d", isPositive: true },
+          trend: dashboardMetrics?.metrics?.trends?.earnings,
           badge: "MTD",
         },
         {

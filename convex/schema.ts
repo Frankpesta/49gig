@@ -35,10 +35,33 @@ export default defineSchema({
         companyName: v.optional(v.string()),
         companySize: v.optional(v.string()),
         industry: v.optional(v.string()),
+        workEmail: v.optional(v.string()),
+        phoneNumber: v.optional(v.string()),
+        companyWebsite: v.optional(v.string()),
+        country: v.optional(v.string()),
 
         // Freelancer profile
         bio: v.optional(v.string()),
         skills: v.optional(v.array(v.string())),
+        techField: v.optional(
+          v.union(
+            v.literal("development"),
+            v.literal("data_science"),
+            v.literal("technical_writing"),
+            v.literal("design"),
+            v.literal("marketing"),
+            v.literal("other")
+          )
+        ),
+        experienceLevel: v.optional(
+          v.union(
+            v.literal("junior"),
+            v.literal("mid"),
+            v.literal("senior"),
+            v.literal("expert")
+          )
+        ),
+        languagesWritten: v.optional(v.array(v.string())),
         hourlyRate: v.optional(v.number()),
         availability: v.optional(
           v.union(
@@ -142,12 +165,48 @@ export default defineSchema({
 
     // Intake Form Data
     intakeForm: v.object({
+      // Section 1: Hire Type
+      hireType: v.union(v.literal("single"), v.literal("team")),
+      teamSize: v.optional(
+        v.union(
+          v.literal("2-3"),
+          v.literal("4-6"),
+          v.literal("7+"),
+          v.literal("not_sure")
+        )
+      ),
+      // Section 2: Project Overview
       title: v.string(),
       description: v.string(),
-      category: v.string(),
-      requiredSkills: v.array(v.string()),
-      budget: v.number(),
-      timeline: v.string(),
+      startDate: v.number(), // Timestamp
+      endDate: v.number(), // Timestamp
+      timelineFlexible: v.optional(v.boolean()),
+      projectType: v.union(
+        v.literal("one_time"),
+        v.literal("ongoing"),
+        v.literal("not_sure")
+      ),
+      // Section 3: Talent Requirements
+      talentCategory: v.union(
+        v.literal("Software Development"),
+        v.literal("UI/UX & Product Design"),
+        v.literal("Data & Analytics"),
+        v.literal("Digital Marketing"),
+        v.literal("Writing & Content")
+      ),
+      experienceLevel: v.union(
+        v.literal("junior"),
+        v.literal("mid"),
+        v.literal("senior"),
+        v.literal("expert")
+      ),
+      requiredSkills: v.optional(v.array(v.string())),
+      // Section 4: Budget / Notes
+      budget: v.number(), // Calculated budget
+      specialRequirements: v.optional(v.string()),
+      // Legacy fields (kept for backward compatibility)
+      category: v.optional(v.string()),
+      timeline: v.optional(v.string()),
       engagementType: v.optional(v.union(v.literal("individual"), v.literal("team"))),
       durationValue: v.optional(v.number()),
       durationUnit: v.optional(
@@ -161,7 +220,6 @@ export default defineSchema({
           v.literal("enterprise")
         )
       ),
-      teamSize: v.optional(v.number()),
       teamPricingTier: v.optional(
         v.union(
           v.literal("startup"),
@@ -172,7 +230,7 @@ export default defineSchema({
       ),
       estimatedHours: v.optional(v.number()),
       estimatedBudget: v.optional(v.number()),
-      deliverables: v.array(v.string()),
+      deliverables: v.optional(v.array(v.string())),
       additionalRequirements: v.optional(v.string()),
     }),
 
@@ -534,6 +592,9 @@ export default defineSchema({
 
     // Explanation
     explanation: v.string(), // Human-readable explanation
+
+    // Team matching (optional)
+    teamRole: v.optional(v.string()), // Role in team (e.g., "backend_dev", "mobile_dev")
 
     // Status
     status: v.union(

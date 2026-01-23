@@ -133,6 +133,37 @@ export const signup = mutation({
       v.literal("client"),
       v.literal("freelancer")
     ),
+    profile: v.optional(
+      v.object({
+        // Client profile fields
+        companyName: v.optional(v.string()),
+        workEmail: v.optional(v.string()),
+        phoneNumber: v.optional(v.string()),
+        companyWebsite: v.optional(v.string()),
+        country: v.optional(v.string()),
+        // Freelancer profile fields
+        techField: v.optional(
+          v.union(
+            v.literal("development"),
+            v.literal("data_science"),
+            v.literal("technical_writing"),
+            v.literal("design"),
+            v.literal("marketing"),
+            v.literal("other")
+          )
+        ),
+        experienceLevel: v.optional(
+          v.union(
+            v.literal("junior"),
+            v.literal("mid"),
+            v.literal("senior"),
+            v.literal("expert")
+          )
+        ),
+        skills: v.optional(v.array(v.string())),
+        languagesWritten: v.optional(v.array(v.string())),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     // Rate limiting: 5 signups per hour per email
@@ -174,6 +205,7 @@ export const signup = mutation({
       },
       role: args.role,
       status: "active",
+      profile: args.profile || undefined,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
