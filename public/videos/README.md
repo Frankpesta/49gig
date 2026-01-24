@@ -1,6 +1,6 @@
 # Hero video
 
-Place `hero.mp4` here for the homepage video background.
+Place `hero.mp4` here for the homepage video background. The hero tries this file first; if it’s missing or fails to load, it falls back to a CDN video.
 
 **Suggested free sources (coding / African tech):**
 

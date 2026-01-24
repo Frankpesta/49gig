@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { HoverButton } from "@/components/ui/hover-button";
@@ -41,11 +42,48 @@ import {
   Layers,
   Workflow
 } from "lucide-react";
+import { heroPoster } from "@/lib/african-tech-images";
 
 const HERO_VIDEO_SRC =
   "https://videos.pexels.com/video-files/3130284/3130284-sd_640_360_24fps.mp4";
-const HERO_VIDEO_POSTER =
-  "https://images.unsplash.com/photo-1522071820081-00f0181e34a7?w=1920&q=80";
+const HERO_VIDEO_POSTER = heroPoster;
+
+function HeroVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [src, setSrc] = useState<string>("/videos/hero.mp4");
+
+  const play = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    const p = v.play();
+    if (p?.catch) p.catch(() => {});
+  };
+
+  useEffect(() => {
+    play();
+  }, [src]);
+
+  const handleError = () => {
+    if (src === "/videos/hero.mp4") setSrc(HERO_VIDEO_SRC);
+  };
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      poster={HERO_VIDEO_POSTER}
+      src={src}
+      className="absolute inset-0 h-full w-full object-cover"
+      onCanPlay={play}
+      onLoadedData={play}
+      onError={handleError}
+    />
+  );
+}
 
 export default function Home() {
 
@@ -164,16 +202,7 @@ export default function Home() {
         className="relative min-h-[88vh] overflow-hidden border-b border-transparent -mt-14 md:-mt-16 pt-14 md:pt-16"
         aria-label="Hero"
       >
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          poster={HERO_VIDEO_POSTER}
-          className="absolute inset-0 h-full w-full object-cover"
-        >
-          <source src={HERO_VIDEO_SRC} type="video/mp4" />
-        </video>
+        <HeroVideo />
         <div
           className="absolute inset-0 bg-linear-to-b from-black/70 via-black/50 to-black/70"
           aria-hidden

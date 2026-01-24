@@ -34,6 +34,11 @@ import {
   type HireType,
   type TeamSize,
 } from "@/lib/budget-calculator";
+import {
+  calculatePayment,
+  type PaymentBreakdown,
+} from "@/lib/payment-calculator";
+import { PaymentBreakdownDisplay } from "@/components/payments/payment-breakdown";
 
 const TALENT_CATEGORIES = [
   "Software Development",
@@ -187,6 +192,29 @@ export default function CreateProjectPage() {
     formData.timelineFlexible,
   ]);
 
+  // Calculate payment breakdown
+  const paymentBreakdown = useMemo<PaymentBreakdown | null>(() => {
+    if (!budgetCalculation) return null;
+
+    try {
+      const startDate = new Date(formData.startDate);
+      const endDate = new Date(formData.endDate);
+
+      return calculatePayment({
+        totalAmount: budgetCalculation.estimatedBudget,
+        projectType: formData.projectType,
+        hireType: formData.hireType,
+        experienceLevel: formData.experienceLevel,
+        startDate,
+        endDate,
+        deliverables: formData.requiredSkills.length > 0 ? formData.requiredSkills : undefined,
+        estimatedHours: budgetCalculation.breakdown.totalHours,
+      });
+    } catch (err) {
+      return null;
+    }
+  }, [budgetCalculation, formData]);
+
   const availableSkills = useMemo(() => {
     if (!formData.talentCategory) return [];
     return COMMON_SKILLS_BY_CATEGORY[formData.talentCategory] || [];
@@ -287,13 +315,18 @@ export default function CreateProjectPage() {
     setIsSubmitting(true);
     setError(null);
 
+    if (!paymentBreakdown) {
+      setError("Unable to calculate payment breakdown");
+      return;
+    }
+
     try {
       const startDate = new Date(formData.startDate);
       const endDate = new Date(formData.endDate);
 
-      // Platform fee is 10%
-      const platformFee = 10;
-      const totalAmount = budgetCalculation.estimatedBudget;
+      // Use payment breakdown for platform fee
+      const totalAmount = paymentBreakdown.totalAmount;
+      const platformFee = paymentBreakdown.platformFeePercentage;
 
       const projectId = await createProject({
         intakeForm: {
@@ -314,6 +347,7 @@ export default function CreateProjectPage() {
           timeline: `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
           category: formData.talentCategory,
           estimatedBudget: totalAmount,
+          deliverables: formData.requiredSkills.length > 0 ? formData.requiredSkills : undefined,
         },
         totalAmount,
         platformFee,
@@ -784,9 +818,11 @@ export default function CreateProjectPage() {
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  10. Estimated budget range:
+                  10. Payment breakdown:
                 </Label>
-                {budgetCalculation ? (
+                {paymentBreakdown ? (
+                  <PaymentBreakdownDisplay breakdown={paymentBreakdown} />
+                ) : budgetCalculation ? (
                   <div className="rounded-lg border bg-primary/5 p-6 space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-semibold">
@@ -808,29 +844,11 @@ export default function CreateProjectPage() {
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Platform fee (10%):</span>
+                        <span className="text-muted-foreground">Platform fee:</span>
                         <div className="font-semibold">
                           {formatBudget(budgetCalculation.estimatedBudget * 0.1)}
                         </div>
                       </div>
-                    </div>
-                    <div className="pt-4 border-t text-xs text-muted-foreground space-y-1">
-                      <p>
-                        <strong>Experience Level:</strong> {formData.experienceLevel.charAt(0).toUpperCase() + formData.experienceLevel.slice(1)}
-                      </p>
-                      <p>
-                        <strong>Project Type:</strong>{" "}
-                        {formData.projectType === "one_time"
-                          ? "One-time / Milestone-based"
-                          : formData.projectType === "ongoing"
-                          ? "Ongoing / Hourly-Monthly"
-                          : "Let 49GIG decide"}
-                      </p>
-                      {formData.timelineFlexible && (
-                        <p>
-                          <strong>Timeline:</strong> Flexible (10% discount applied)
-                        </p>
-                      )}
                     </div>
                   </div>
                 ) : (

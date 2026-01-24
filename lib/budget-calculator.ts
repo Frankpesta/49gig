@@ -121,6 +121,51 @@ function getTeamSizeMultiplier(teamSize: TeamSize): number {
 }
 
 /**
+ * Determine project complexity based on duration and requirements
+ */
+function determineComplexity(
+  durationDays: number,
+  hireType: HireType,
+  teamSize?: TeamSize
+): "simple" | "moderate" | "complex" {
+  if (hireType === "team") {
+    return "complex";
+  }
+
+  if (durationDays <= 7) {
+    return "simple";
+  } else if (durationDays <= 30) {
+    return "moderate";
+  } else {
+    return "complex";
+  }
+}
+
+/**
+ * Calculate minimum project value (ensures projects are viable)
+ */
+function calculateMinimumProjectValue(
+  experienceLevel: ExperienceLevel,
+  durationDays: number
+): number {
+  const baseMinimums: Record<ExperienceLevel, number> = {
+    junior: 200,
+    mid: 400,
+    senior: 800,
+    expert: 1200,
+  };
+
+  const baseMinimum = baseMinimums[experienceLevel];
+  
+  // For very short projects (< 3 days), ensure minimum viable amount
+  if (durationDays < 3) {
+    return Math.max(baseMinimum, 300);
+  }
+
+  return baseMinimum;
+}
+
+/**
  * Calculate budget for a project
  */
 export function calculateProjectBudget(
@@ -142,6 +187,7 @@ export function calculateProjectBudget(
     : getTimelineMultiplier(durationDays);
 
   const projectTypeMultiplier = PROJECT_TYPE_MULTIPLIERS[projectType];
+  const complexity = determineComplexity(durationDays, hireType, teamSize);
 
   if (hireType === "team" && teamSize) {
     // Team pricing
@@ -221,14 +267,30 @@ export function calculateProjectBudget(
   }
 
   // One-time: milestone-based
-  // Estimate hours based on duration (assuming 8 hours/day)
-  const estimatedHours = Math.max(8, durationDays * 8);
-  const estimatedBudget = Math.round(
+  // For simple projects, use a more conservative hour estimate
+  let estimatedHours: number;
+  
+  if (complexity === "simple") {
+    // Simple projects: 4-6 hours/day (less intensive)
+    estimatedHours = Math.max(8, Math.ceil(durationDays * 5));
+  } else if (complexity === "moderate") {
+    // Moderate: 6-7 hours/day
+    estimatedHours = Math.max(16, Math.ceil(durationDays * 6.5));
+  } else {
+    // Complex: 8 hours/day (full-time)
+    estimatedHours = Math.max(24, durationDays * 8);
+  }
+
+  let estimatedBudget = Math.round(
     baseHourlyRate *
       estimatedHours *
       timelineMultiplier *
       projectTypeMultiplier
   );
+
+  // Ensure minimum project value
+  const minimumValue = calculateMinimumProjectValue(experienceLevel, durationDays);
+  estimatedBudget = Math.max(estimatedBudget, minimumValue);
 
   return {
     estimatedBudget,

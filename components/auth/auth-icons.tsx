@@ -7,6 +7,8 @@ import {
   Users,
   DollarSign,
   Briefcase,
+  Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import type { AuthFeature } from "./auth-two-column-layout";
 
@@ -71,5 +73,23 @@ export const freelancerSignupFeatures: AuthFeature[] = [
     icon: <Briefcase className={iconClass} />,
     title: "Quality Projects",
     description: "Access vetted clients and well-scoped projects.",
+  },
+];
+
+export const resumeUploadFeatures: AuthFeature[] = [
+  {
+    icon: <CheckCircle2 className={iconClass} />,
+    title: "PDF only, max 10MB",
+    description: "Upload a single PDF resume for parsing.",
+  },
+  {
+    icon: <Sparkles className={iconClass} />,
+    title: "Bio generated automatically",
+    description: "We extract key info and build your profile.",
+  },
+  {
+    icon: <ShieldCheck className={iconClass} />,
+    title: "Secure and private",
+    description: "Stored securely and used only for your profile.",
   },
 ];
