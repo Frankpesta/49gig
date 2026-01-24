@@ -102,7 +102,7 @@ function VerifyEmailContent() {
     return (
       <AuthTwoColumnLayout
         leftTitle="Email verification"
-        leftDescription="We've sent a new verification link to your inbox. Check your email to continue."
+        leftDescription="We&apos;ve sent a new verification link to your inbox. Check your email to continue."
         features={loginFeatures}
         heading="Verification sent"
         subline="Check your inbox for the verification email."
@@ -113,7 +113,7 @@ function VerifyEmailContent() {
               Email sent
             </CardTitle>
             <CardDescription>
-              We've sent a new verification email. Please check your inbox.
+              We&apos;ve sent a new verification email. Please check your inbox.
             </CardDescription>
           </CardHeader>
           <CardFooter className="px-4 pb-6 pt-0 sm:px-6 lg:px-8 sm:pb-8">
@@ -135,7 +135,7 @@ function VerifyEmailContent() {
     return (
       <AuthTwoColumnLayout
         leftTitle="Email verified"
-        leftDescription="Your email has been verified successfully. You're all set to use 49GIG."
+        leftDescription="Your email has been verified successfully. You&apos;re all set to use 49GIG."
         features={loginFeatures}
         heading="Verification complete"
         subline="Your email has been verified successfully."

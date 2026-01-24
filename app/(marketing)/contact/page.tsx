@@ -67,7 +67,7 @@ export default function ContactPage() {
     {
       icon: Mail,
       title: "Email Us",
-      description: "Send us an email and we'll respond within 24 hours",
+      description: "Send us an email and we&apos;ll respond within 24 hours",
       contact: "support@49gig.com",
       href: "mailto:support@49gig.com",
     },
@@ -91,12 +91,12 @@ export default function ContactPage() {
     {
       icon: Briefcase,
       question: "How do I hire talent?",
-      answer: "Click 'Hire Talent' and complete the project form. We'll match you with vetted professionals.",
+      answer: "Click &apos;Hire Talent&apos; and complete the project form. We&apos;ll match you with vetted professionals.",
     },
     {
       icon: Users,
       question: "How do I join as a freelancer?",
-      answer: "Click 'Join as Freelancer' to apply. You'll go through our automated vetting process.",
+      answer: "Click &apos;Join as Freelancer&apos; to apply. You&apos;ll go through our automated vetting process.",
     },
     {
       icon: Clock,
@@ -119,7 +119,7 @@ export default function ContactPage() {
           text: "Contact Us"
         }}
         title="Get in Touch With 49GIG"
-        description="Have questions about hiring talent, joining as a freelancer, or anything else? We're here to help. Reach out to our team and we'll get back to you as soon as possible."
+        description="Have questions about hiring talent, joining as a freelancer, or anything else? We&apos;re here to help. Reach out to our team and we&apos;ll get back to you as soon as possible."
       />
 
       {/* CONTACT FORM & INFO */}
@@ -147,7 +147,7 @@ export default function ContactPage() {
                       Message Sent Successfully!
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Thank you for contacting us. We'll get back to you within 24 hours.
+                      Thank you for contacting us. We&apos;ll get back to you within 24 hours.
                     </p>
                   </CardContent>
                 </Card>

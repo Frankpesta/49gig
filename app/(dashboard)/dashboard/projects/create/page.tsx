@@ -26,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { X, Plus, ArrowRight, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { DatePicker } from "@/components/ui/date-picker";
 import {
   calculateProjectBudget,
   formatBudget,
@@ -562,27 +563,44 @@ export default function CreateProjectPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="startDate">Start date</Label>
-                    <Input
+                    <DatePicker
                       id="startDate"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, startDate: e.target.value })
+                      date={
+                        formData.startDate
+                          ? new Date(formData.startDate)
+                          : undefined
                       }
-                      className="h-11"
+                      onDateChange={(date) =>
+                        setFormData({
+                          ...formData,
+                          startDate: date ? date.toISOString().split("T")[0] : "",
+                        })
+                      }
+                      placeholder="Select start date"
+                      minDate={new Date()}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="endDate">End date</Label>
-                    <Input
+                    <DatePicker
                       id="endDate"
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, endDate: e.target.value })
+                      date={
+                        formData.endDate
+                          ? new Date(formData.endDate)
+                          : undefined
                       }
-                      min={formData.startDate}
-                      className="h-11"
+                      onDateChange={(date) =>
+                        setFormData({
+                          ...formData,
+                          endDate: date ? date.toISOString().split("T")[0] : "",
+                        })
+                      }
+                      placeholder="Select end date"
+                      minDate={
+                        formData.startDate
+                          ? new Date(formData.startDate)
+                          : new Date()
+                      }
                     />
                   </div>
                 </div>

@@ -1,20 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/marketing/page-header";
-import { AnimatedCard } from "@/components/ui/animated-card";
-import { InteractiveStats } from "@/components/ui/interactive-stats";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
   Users,
   Briefcase,
   Shield,
-  ChevronRight,
   Target,
   Award,
   FileCheck,
@@ -208,27 +202,18 @@ export default function ForClientsPage() {
           {/* Enhanced CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <SectionTransition variant="slide" direction="left" delay={300}>
-              <HoverButton size="lg" glow className="text-lg h-16 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0 group">
-                <Link href="/hire-talent" className="flex items-center gap-3">
-                  <Briefcase className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                  Hire Vetted Talent
-                  <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                </Link>
-              </HoverButton>
+              <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                <Briefcase className="h-6 w-6" />
+                Hire Vetted Talent
+                <ArrowRight className="h-6 w-6" />
+              </CTAButton>
             </SectionTransition>
-
             <SectionTransition variant="slide" direction="right" delay={400}>
-              <HoverButton
-                size="lg"
-                variant="outline"
-                className="text-lg h-16 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl group"
-              >
-                <Link href="/hire-team" className="flex items-center gap-3">
-                  <Users className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                  Hire a Team
-                  <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                </Link>
-              </HoverButton>
+              <CTAButton href="/hire-team" variant="secondary" className="gap-3">
+                <Users className="h-6 w-6" />
+                Hire a Team
+                <ArrowRight className="h-6 w-6" />
+              </CTAButton>
             </SectionTransition>
           </div>
 
@@ -750,7 +735,7 @@ export default function ForClientsPage() {
       </section>
 
       {/* MODERN WHY AFRICA SECTION */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-primary via-primary/95 to-secondary text-primary-foreground relative overflow-hidden">
+      <section className="py-20 sm:py-24 lg:py-32 bg-linear-to-br from-primary via-primary/95 to-secondary text-primary-foreground relative overflow-hidden">
         {/* Enhanced Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{
@@ -775,7 +760,7 @@ export default function ForClientsPage() {
                     Why Africa
                   </div>
                   <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight">
-                    Unlocking Africa's <br className="hidden lg:block" />
+                    Unlocking Africa&apos;s <br className="hidden lg:block" />
                     <span className="text-secondary">World-Class Talent</span>
                   </h2>
                   <p className="text-xl text-primary-foreground/90 leading-relaxed">
@@ -923,48 +908,29 @@ export default function ForClientsPage() {
               {/* Enhanced CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <div className="group">
-                    <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0 group-hover:scale-105 transition-all duration-300">
-                      <Link href="/hire-talent" className="flex items-center gap-3">
-                        <Briefcase className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        Hire Vetted Talent
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Briefcase className="h-6 w-6" />
+                    Hire Vetted Talent
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <div className="group">
-                    <HoverButton
-                      size="lg"
-                      variant="outline"
-                      className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl group-hover:scale-105 transition-all duration-300"
-                    >
-                      <Link href="/hire-team" className="flex items-center gap-3">
-                        <Users className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        Hire a Team
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/hire-team" variant="secondary" className="gap-3">
+                    <Users className="h-6 w-6" />
+                    Hire a Team
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
 
               {/* Additional CTA */}
               <SectionTransition variant="fade" delay={800}>
                 <div className="pt-8">
-                  <HoverButton
-                    size="lg"
-                    variant="ghost"
-                    className="text-lg h-16 px-12 bg-background/50 backdrop-blur-xl border-2 border-primary/20 hover:bg-primary/5 hover:border-primary shadow-xl"
-                  >
-                    <Link href="/contact" className="flex items-center gap-3">
-                      <MessageCircle className="h-6 w-6" />
-                      Have Questions? Let's Talk
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/contact" variant="secondary" className="gap-3 border-primary/20 hover:bg-primary/5 hover:border-primary">
+                    <MessageCircle className="h-6 w-6" />
+                    Have Questions? Let&apos;s Talk
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </div>
               </SectionTransition>
 

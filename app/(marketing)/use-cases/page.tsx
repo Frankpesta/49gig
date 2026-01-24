@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { PageHeader } from "@/components/marketing/page-header";
 import {
   CheckCircle2,
@@ -136,7 +136,7 @@ export default function UseCasesPage() {
           text: "Use Cases"
         }}
         title="How 49GIG Helps Businesses and Freelancers Succeed"
-        description="49GIG is more than a freelance marketplace. It's a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients. Here's how our platform can be applied across different projects, industries, and scenarios."
+        description="49GIG is more than a freelance marketplace. It&apos;s a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients. Here&apos;s how our platform can be applied across different projects, industries, and scenarios."
       />
 
       {/* FOR CLIENTS */}
@@ -308,29 +308,18 @@ export default function UseCasesPage() {
             Whether you are a business looking to hire talent or build a team, or a freelancer seeking global opportunities, 49GIG has a use case tailored for you
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="secondary" asChild className="text-base h-12 px-8 shadow-lg">
-              <Link href="/hire-talent">
-                Hire Talent
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="secondary" asChild className="text-base h-12 px-8 shadow-lg bg-secondary hover:bg-secondary/90">
-              <Link href="/hire-team">
-                Hire a Team
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline" 
-              asChild 
-              className="text-base h-12 px-8 bg-primary-foreground/10 border-2 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/20"
-            >
-              <Link href="/signup">
-                Join as a Freelancer
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+            <CTAButton href="/hire-talent" variant="primary" className="bg-white text-primary hover:bg-white/90 border-0 gap-2">
+              Hire Talent
+              <ChevronRight className="h-4 w-4" />
+            </CTAButton>
+            <CTAButton href="/hire-team" variant="primary" className="bg-white text-primary hover:bg-white/90 border-0 gap-2">
+              Hire a Team
+              <ChevronRight className="h-4 w-4" />
+            </CTAButton>
+            <CTAButton href="/signup" variant="secondary" className="border-2 border-white/80 bg-transparent text-white hover:bg-white/20 hover:border-white gap-2">
+              Join as a Freelancer
+              <ChevronRight className="h-4 w-4" />
+            </CTAButton>
           </div>
         </div>
       </section>

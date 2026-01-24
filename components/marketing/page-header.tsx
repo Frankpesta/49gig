@@ -34,37 +34,37 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        "w-full border-b border-border/50 bg-background",
+        "w-full border-b border-border/40 bg-gradient-to-b from-background via-background to-muted/20",
         className
       )}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-        <div className="max-w-3xl space-y-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20">
+        <div className="max-w-4xl space-y-6">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <nav
-              className="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs sm:text-sm text-muted-foreground"
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-muted-foreground"
               aria-label="Breadcrumb"
             >
               <Link
                 href="/"
-                className="flex items-center gap-1.5 rounded py-0.5 transition-colors hover:text-foreground"
+                className="flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:text-foreground hover:bg-muted/50"
               >
                 <Home className="h-3.5 w-3.5" />
                 <span>Home</span>
               </Link>
               {breadcrumbs.map((item, index) => (
-                <span key={index} className="flex items-center gap-1.5">
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />
+                <span key={index} className="flex items-center gap-2">
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40" />
                   {item.href ? (
                     <Link
                       href={item.href}
-                      className="flex items-center gap-1.5 rounded py-0.5 transition-colors hover:text-foreground"
+                      className="flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:text-foreground hover:bg-muted/50"
                     >
                       {item.icon && <item.icon className="h-3.5 w-3.5" />}
                       <span>{item.label}</span>
                     </Link>
                   ) : (
-                    <span className="flex items-center gap-1.5 font-medium text-foreground">
+                    <span className="flex items-center gap-1.5 font-medium text-foreground px-1.5 py-1">
                       {item.icon && <item.icon className="h-3.5 w-3.5" />}
                       <span>{item.label}</span>
                     </span>
@@ -75,23 +75,25 @@ export function PageHeader({
           )}
 
           {badge && (
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-4 py-1.5 text-xs font-semibold text-primary">
               {badge.icon && <badge.icon className="h-3.5 w-3.5" />}
               <span>{badge.text}</span>
             </div>
           )}
 
-          <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl lg:text-3xl">
-            {title}
-          </h1>
+          <div className="space-y-4">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold tracking-tight text-foreground leading-tight">
+              {title}
+            </h1>
 
-          {description && (
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl sm:text-base">
-              {description}
-            </p>
-          )}
+            {description && (
+              <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-3xl">
+                {description}
+              </p>
+            )}
+          </div>
 
-          {children && <div className="pt-2">{children}</div>}
+          {children && <div className="pt-6">{children}</div>}
         </div>
       </div>
     </header>

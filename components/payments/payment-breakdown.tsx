@@ -145,7 +145,7 @@ export function PaymentBreakdownDisplay({
             </div>
             <div className="text-xs text-muted-foreground pt-2 border-t">
               <Info className="h-3 w-3 inline mr-1" />
-              You'll be billed based on actual hours worked, tracked through the platform.
+              You&apos;ll be billed based on actual hours worked, tracked through the platform.
             </div>
           </div>
         )}

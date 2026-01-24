@@ -109,10 +109,10 @@ export function Navbar() {
               key={logoSrc}
               src={logoSrc}
               alt="49GIG"
-              width={280}
-              height={92}
+              width={100}
+              height={100}
               className={cn(
-                "h-12 w-auto md:h-14 object-contain object-left transition-opacity hover:opacity-90",
+                "h-auto w-auto md:h-auto object-contain object-left transition-opacity hover:opacity-90",
                 isOverHero && "brightness-0 invert"
               )}
               priority

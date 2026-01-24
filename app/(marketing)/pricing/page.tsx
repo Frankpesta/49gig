@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/marketing/page-header";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
@@ -207,8 +206,8 @@ export default function PricingPage() {
       answer: "Yes, you can upgrade, downgrade, or cancel your subscription at any time. For individual hires, you only pay for hours worked."
     },
     {
-      question: "What if I'm not satisfied with the work?",
-      answer: "We offer a 30-day money-back guarantee. If you're not satisfied, we'll work to resolve the issue or provide a full refund."
+      question: "What if I&apos;m not satisfied with the work?",
+      answer: "We offer a 30-day money-back guarantee. If you&apos;re not satisfied, we&apos;ll work to resolve the issue or provide a full refund."
     },
     {
       question: "Do you offer custom pricing for large projects?",
@@ -323,12 +322,10 @@ export default function PricingPage() {
                       ))}
                     </div>
 
-                    <HoverButton className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" size="lg">
-                      <Link href="/hire-talent" className="flex items-center justify-center gap-2">
-                        Get Started
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </HoverButton>
+                    <CTAButton href="/hire-talent" variant="primary" size="lg" className="w-full justify-center gap-2">
+                      Get Started
+                      <ArrowRight className="h-4 w-4" />
+                    </CTAButton>
                   </div>
                 </div>
               </SectionTransition>
@@ -401,12 +398,15 @@ export default function PricingPage() {
                       ))}
                     </div>
 
-                    <HoverButton className={`w-full ${plan.popular ? 'bg-gradient-to-r from-secondary to-primary hover:from-secondary/90 hover:to-primary/90 text-white border-0' : 'bg-secondary hover:bg-secondary/90 text-secondary-foreground'}`} size="lg">
-                      <Link href="/hire-team" className="flex items-center justify-center gap-2">
-                        {plan.price === "Custom" ? "Contact Sales" : "Get Started"}
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </HoverButton>
+                    <CTAButton
+                      href={plan.price === "Custom" ? "/contact" : "/hire-team"}
+                      variant="primary"
+                      size="lg"
+                      className={`w-full justify-center gap-2 ${plan.popular ? "bg-gradient-to-r from-secondary to-primary hover:from-secondary/90 hover:to-primary/90 border-0" : ""}`}
+                    >
+                      {plan.price === "Custom" ? "Contact Sales" : "Get Started"}
+                      <ArrowRight className="h-4 w-4" />
+                    </CTAButton>
                   </div>
                 </div>
               </SectionTransition>
@@ -527,27 +527,18 @@ export default function PricingPage() {
 
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0">
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Users className="h-6 w-6" />
-                      Hire Individual Talent
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Users className="h-6 w-6" />
+                    Hire Individual Talent
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl"
-                  >
-                    <Link href="/hire-team" className="flex items-center gap-3">
-                      <Briefcase className="h-6 w-6" />
-                      Hire a Full Team
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-team" variant="secondary" className="gap-3">
+                    <Briefcase className="h-6 w-6" />
+                    Hire a Full Team
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
 

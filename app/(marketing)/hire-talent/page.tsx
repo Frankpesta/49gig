@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/marketing/page-header";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
@@ -235,24 +235,16 @@ export default function HireTalentPage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <HoverButton size="lg" glow className="text-lg h-16 px-12 shadow-2xl">
-              <Link href="#pricing" className="flex items-center gap-3">
-                <Briefcase className="h-5 w-5" />
-                Start Hiring Now
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-            </HoverButton>
-            <HoverButton
-              size="lg"
-              variant="outline"
-              className="text-lg h-16 px-12 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 shadow-xl"
-            >
-              <Link href="#talent" className="flex items-center gap-3">
-                <Users className="h-5 w-5" />
-                Browse Talent
-                <ArrowRight className="h-5 w-5" />
-              </Link>
-            </HoverButton>
+            <CTAButton href="#pricing" variant="primary" className="gap-3">
+              <Briefcase className="h-5 w-5" />
+              Start Hiring Now
+              <ArrowRight className="h-5 w-5" />
+            </CTAButton>
+            <CTAButton href="#talent" variant="secondary" className="gap-3">
+              <Users className="h-5 w-5" />
+              Browse Talent
+              <ArrowRight className="h-5 w-5" />
+            </CTAButton>
           </div>
         </div>
       </PageHeader>
@@ -322,15 +314,15 @@ export default function HireTalentPage() {
                     </div>
 
                     {/* CTA */}
-                    <HoverButton
-                      className={`w-full ${plan.popular ? 'bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white border-0' : 'bg-primary hover:bg-primary/90 text-primary-foreground'}`}
+                    <CTAButton
+                      href="/signup"
+                      variant="primary"
                       size="lg"
+                      className="w-full justify-center gap-2"
                     >
-                      <Link href="/hire-talent" className="flex items-center justify-center gap-2">
-                        Get Started
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
-                    </HoverButton>
+                      Get Started
+                      <ArrowRight className="h-4 w-4" />
+                    </CTAButton>
                   </div>
                 </div>
               </SectionTransition>
@@ -458,12 +450,10 @@ export default function HireTalentPage() {
 
                       {/* CTA */}
                       <div className="mt-6">
-                        <HoverButton size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                          <Link href="/hire-talent" className="flex items-center justify-center gap-2">
-                            View Profile
-                            <ArrowRight className="h-3 w-3" />
-                          </Link>
-                        </HoverButton>
+                        <CTAButton href="/talent-categories" variant="primary" size="sm" className="w-full justify-center gap-2">
+                          View Profile
+                          <ArrowRight className="h-3 w-3" />
+                        </CTAButton>
                       </div>
                     </div>
                   </div>
@@ -483,24 +473,16 @@ export default function HireTalentPage() {
                   Browse through thousands of verified professionals across all skill categories and experience levels.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <HoverButton size="lg" glow className="text-lg h-16 px-12 shadow-2xl">
-                    <Link href="/talent-categories" className="flex items-center gap-3">
-                      <Search className="h-5 w-5" />
-                      Browse All Talent
-                      <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </HoverButton>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-16 px-12 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 shadow-xl"
-                  >
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Filter className="h-5 w-5" />
-                      Advanced Search
-                      <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/talent-categories" variant="primary" className="gap-3">
+                    <Search className="h-5 w-5" />
+                    Browse All Talent
+                    <ArrowRight className="h-5 w-5" />
+                  </CTAButton>
+                  <CTAButton href="/hire-talent" variant="secondary" className="gap-3">
+                    <Filter className="h-5 w-5" />
+                    Advanced Search
+                    <ArrowRight className="h-5 w-5" />
+                  </CTAButton>
                 </div>
               </div>
             </div>
@@ -666,27 +648,18 @@ export default function HireTalentPage() {
 
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0">
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Briefcase className="h-6 w-6" />
-                      Hire Individual Talent
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Briefcase className="h-6 w-6" />
+                    Hire Individual Talent
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl"
-                  >
-                    <Link href="/hire-team" className="flex items-center gap-3">
-                      <Users className="h-6 w-6" />
-                      Hire a Full Team
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-team" variant="secondary" className="gap-3">
+                    <Users className="h-6 w-6" />
+                    Hire a Full Team
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
 
