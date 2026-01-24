@@ -17,10 +17,13 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useOAuth } from "@/hooks/use-oauth";
-import { AuthMobileLogo } from "@/components/auth/auth-branding";
-import { Logo } from "@/components/ui/logo";
+import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
+import { clientSignupFeatures } from "@/components/auth/auth-icons";
 import { CountrySelector } from "@/components/ui/country-selector";
-import { countries, getCountryByCode } from "@/lib/countries";
+import { getCountryByCode } from "@/lib/countries";
+
+const authCardClass =
+  "rounded-xl border border-border/60 bg-card shadow-lg";
 
 export default function ClientSignupPage() {
   const router = useRouter();
@@ -105,76 +108,30 @@ export default function ClientSignupPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-linear-to-br from-background via-primary/5 to-background">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -left-12 top-8 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
-        <div className="absolute right-0 bottom-10 h-96 w-96 rounded-full bg-secondary/20 blur-3xl" />
-      </div>
-
-      <div className="relative flex min-h-screen">
-        {/* Left Column - Branding */}
-        <div className="hidden lg:flex lg:flex-1 lg:flex-col lg:justify-between bg-gradient-to-br from-primary/10 via-primary/5 to-background p-12">
-          <div className="space-y-8">
-            <Logo width={140} height={45} priority />
-          </div>
-
-          <div className="space-y-6 max-w-md">
-            <div className="space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight">
-                Hire top talent
-              </h2>
-              <p className="text-lg text-muted-foreground">
-                Connect with verified freelancers and build your team on 49GIG.
-              </p>
-            </div>
-          </div>
-
-          <div className="text-sm text-muted-foreground">
-            © 2025 49GIG. All rights reserved.
-          </div>
-        </div>
-
-        {/* Right Column - Form */}
-        <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-md space-y-10">
-            <AuthMobileLogo />
-
-            {/* Header */}
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
-                <span className="h-2 w-2 rounded-full bg-primary" />
-                Client signup
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-                Create your account
-              </h1>
-              <p className="text-muted-foreground leading-relaxed">
-                Get started by creating a client account
-              </p>
-            </div>
-
-            {/* Card */}
-            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-              <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-                <CardTitle className="text-2xl font-heading font-semibold">
-                  Sign Up as Client
-                </CardTitle>
-                <CardDescription>
-                  Enter your information to create your account
-                </CardDescription>
+    <AuthTwoColumnLayout
+      leftTitle="Hire top talent"
+      leftDescription="Connect with verified freelancers and build your team on 49GIG."
+      features={clientSignupFeatures}
+      badge="Client signup"
+      heading="Create your account"
+      subline="Get started by creating a client account."
+    >
+      <Card className={authCardClass}>
+              <CardHeader className="space-y-1 px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+                <CardTitle className="text-xl font-semibold">Sign up as client</CardTitle>
+                <CardDescription>Enter your information to create your account</CardDescription>
               </CardHeader>
               <form onSubmit={handleSubmit}>
-                <CardContent className="space-y-6 px-8 pb-8 pt-0">
+                <CardContent className="space-y-5 px-6 sm:px-8 pb-6 pt-0">
                   {error && (
-                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
+                    <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                       {error}
                     </div>
                   )}
 
-                  {/* Section 1: Personal Information */}
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Section 1: Personal Information
+                      Personal information
                     </h3>
                     <div className="space-y-3">
                       <Label htmlFor="name" className="text-sm font-medium">
@@ -190,7 +147,7 @@ export default function ClientSignupPage() {
                         }
                         required
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                     <div className="space-y-3">
@@ -207,7 +164,7 @@ export default function ClientSignupPage() {
                         }
                         required
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                     <div className="space-y-3">
@@ -225,7 +182,7 @@ export default function ClientSignupPage() {
                         required
                         disabled={isLoading}
                         minLength={8}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                       <p className="text-xs text-muted-foreground pt-1">
                         Must be at least 8 characters
@@ -251,15 +208,14 @@ export default function ClientSignupPage() {
                         }
                         required
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                   </div>
 
-                  {/* Section 2: Company & Contact Information */}
-                  <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-4 pt-4 border-t border-border/60">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Section 2: Company & Contact Information
+                      Company & contact
                     </h3>
                     <div className="space-y-3">
                       <Label
@@ -281,7 +237,7 @@ export default function ClientSignupPage() {
                         }
                         required
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                     <div className="space-y-3">
@@ -300,7 +256,7 @@ export default function ClientSignupPage() {
                           })
                         }
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                     <div className="space-y-3">
@@ -333,7 +289,7 @@ export default function ClientSignupPage() {
                             })
                           }
                           disabled={isLoading || !formData.country}
-                          className="h-11 flex-1"
+                          className="h-11 flex-1 rounded-lg"
                         />
                       </div>
                     </div>
@@ -356,7 +312,7 @@ export default function ClientSignupPage() {
                           })
                         }
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                     <div className="space-y-3">
@@ -374,10 +330,10 @@ export default function ClientSignupPage() {
                     </div>
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <Button
                       type="submit"
-                      className="w-full h-11 text-base font-medium"
+                      className="w-full h-11 rounded-lg text-sm font-medium"
                       disabled={isLoading}
                     >
                       {isLoading ? "Creating account..." : "Create Account"}
@@ -385,13 +341,13 @@ export default function ClientSignupPage() {
                   </div>
                 </CardContent>
               </form>
-              <CardFooter className="flex flex-col space-y-6 pt-8 pb-8 px-8 border-t">
+              <CardFooter className="flex flex-col gap-5 border-t border-border/60 px-6 sm:px-8 py-6">
                 <div className="relative w-full">
                   <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
+                    <span className="w-full border-t border-border/60" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-3 text-muted-foreground font-medium">
+                  <div className="relative flex justify-center">
+                    <span className="bg-card px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Or continue with
                     </span>
                   </div>
@@ -399,7 +355,7 @@ export default function ClientSignupPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-11 text-base font-medium border-2"
+                  className="w-full h-11 rounded-lg text-sm font-medium border-border/80"
                   disabled={isLoading}
                   onClick={() => signInWithGoogle("client")}
                 >
@@ -429,18 +385,12 @@ export default function ClientSignupPage() {
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}
-                  <Link
-                    href="/login"
-                    className="font-semibold text-primary hover:underline"
-                  >
+                  <Link href="/login" className="font-semibold text-primary hover:underline">
                     Sign in
                   </Link>
                 </p>
               </CardFooter>
             </Card>
-          </div>
-        </div>
-      </div>
-    </div>
+    </AuthTwoColumnLayout>
   );
 }

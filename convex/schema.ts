@@ -49,7 +49,6 @@ export default defineSchema({
             v.literal("data_science"),
             v.literal("technical_writing"),
             v.literal("design"),
-            v.literal("marketing"),
             v.literal("other")
           )
         ),
@@ -190,9 +189,7 @@ export default defineSchema({
       talentCategory: v.union(
         v.literal("Software Development"),
         v.literal("UI/UX & Product Design"),
-        v.literal("Data & Analytics"),
-        v.literal("Digital Marketing"),
-        v.literal("Writing & Content")
+        v.literal("Data & Analytics")
       ),
       experienceLevel: v.union(
         v.literal("junior"),

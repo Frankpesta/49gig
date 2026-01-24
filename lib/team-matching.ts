@@ -12,8 +12,6 @@ export type TalentCategory =
   | "Software Development"
   | "UI/UX & Product Design"
   | "Data & Analytics"
-  | "Digital Marketing"
-  | "Writing & Content";
 
 export type ExperienceLevel = "junior" | "mid" | "senior" | "expert";
 
@@ -75,23 +73,7 @@ const SKILL_TO_ROLE: Record<string, string[]> = {
   "Pandas": ["data_scientist", "data_analyst"],
   "NumPy": ["data_scientist"],
   
-  // Digital Marketing
-  "SEO": ["seo_specialist"],
-  "PPC": ["ppc_specialist"],
-  "Google Ads": ["ppc_specialist"],
-  "Facebook Ads": ["social_media_specialist"],
-  "Social Media Marketing": ["social_media_specialist"],
-  "Content Marketing": ["content_marketer"],
-  "Email Marketing": ["email_marketer"],
-  "Analytics": ["marketing_analyst"],
-  
-  // Writing & Content
-  "Copywriting": ["copywriter"],
-  "Blog Writing": ["content_writer"],
   "Technical Writing": ["technical_writer"],
-  "SEO Content": ["seo_writer"],
-  "Creative Writing": ["creative_writer"],
-  "Content Strategy": ["content_strategist"],
 };
 
 /**
@@ -114,12 +96,6 @@ const ROLE_DISTRIBUTIONS: Record<string, Record<string, number>> = {
     data_engineer: 2,
     backend_dev: 1,
     cloud_engineer: 1,
-  },
-  "marketing_campaign": {
-    seo_specialist: 1,
-    content_writer: 2,
-    social_media_specialist: 1,
-    ppc_specialist: 1,
   },
   "default": {
     backend_dev: 1,
@@ -167,15 +143,7 @@ function inferProjectType(
     return "data_platform";
   }
   
-  // Marketing indicators
-  if (
-    category === "Digital Marketing" ||
-    descLower.includes("marketing") ||
-    descLower.includes("campaign")
-  ) {
-    return "marketing_campaign";
-  }
-  
+  // Marketing category removed - return default
   return "default";
 }
 
@@ -267,10 +235,6 @@ export function determineTeamComposition(params: {
       composition["ux_designer"] = (composition["ux_designer"] || 0) + Math.floor(remaining / 2);
     } else if (category === "Data & Analytics") {
       composition["data_scientist"] = (composition["data_scientist"] || 0) + remaining;
-    } else if (category === "Digital Marketing") {
-      composition["content_marketer"] = (composition["content_marketer"] || 0) + remaining;
-    } else if (category === "Writing & Content") {
-      composition["content_writer"] = (composition["content_writer"] || 0) + remaining;
     }
   }
   

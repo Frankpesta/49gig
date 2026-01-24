@@ -12,9 +12,7 @@ import { internal } from "../_generated/api";
 export type PortfolioCategory =
   | "technical_writing"
   | "data_science"
-  | "ui_ux_design"
-  | "digital_marketing"
-  | "content_writing";
+  | "ui_ux_design";
 
 interface PortfolioItem {
   title: string;

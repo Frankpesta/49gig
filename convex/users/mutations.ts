@@ -12,11 +12,14 @@ const api = require("../_generated/api") as {
 
 /**
  * Helper to get current user in mutations
+ * Supports Convex Auth, session tokens, and direct userId
  */
 async function getCurrentUserInMutation(
   ctx: any,
-  userId?: string
+  userId?: string,
+  sessionToken?: string
 ): Promise<Doc<"users"> | null> {
+  // If userId is provided directly, use it
   if (userId) {
     const user = await ctx.db.get(userId as any as Doc<"users">["_id"]);
     if (!user) {
@@ -27,6 +30,25 @@ async function getCurrentUserInMutation(
       return null;
     }
     return userDoc;
+  }
+
+  // If session token is provided, validate it
+  if (sessionToken) {
+    const now = Date.now();
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_token", (q: any) => q.eq("sessionToken", sessionToken))
+      .first();
+
+    if (!session || !session.isActive || session.expiresAt < now || session.revokedAt) {
+      return null;
+    }
+
+    const user = await ctx.db.get(session.userId);
+    if (!user || user.status !== "active") {
+      return null;
+    }
+    return user;
   }
 
   // Fall back to Convex Auth
@@ -66,7 +88,6 @@ export const updateProfile = mutation({
           v.literal("data_science"),
           v.literal("technical_writing"),
           v.literal("design"),
-          v.literal("marketing"),
           v.literal("other")
         )
       ),
@@ -91,9 +112,10 @@ export const updateProfile = mutation({
       portfolioUrl: v.optional(v.string()),
     }),
     userId: v.optional(v.id("users")),
+    sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUserInMutation(ctx, args.userId);
+    const user = await getCurrentUserInMutation(ctx, args.userId, args.sessionToken);
     if (!user) {
       throw new Error("Not authenticated");
     }

@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Menu, X, ChevronDown, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { gsap } from "gsap";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
-import { Logo } from "@/components/ui/logo";
 
 interface NavLink {
   label: string;
@@ -27,18 +27,9 @@ const navLinks: NavLink[] = [
       { label: "Talent Categories", href: "/talent-categories" },
     ],
   },
-  {
-    label: "How It Works",
-    href: "/how-it-works",
-  },
-  {
-    label: "For Clients",
-    href: "/for-clients",
-  },
-  {
-    label: "For Freelancers",
-    href: "/for-freelancers",
-  },
+  { label: "How It Works", href: "/how-it-works" },
+  { label: "For Clients", href: "/for-clients" },
+  { label: "For Freelancers", href: "/for-freelancers" },
   {
     label: "Resources",
     href: "/resources",
@@ -58,136 +49,136 @@ export function Navbar() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
+  const { resolvedTheme } = useTheme();
+
+  const isHome = pathname === "/";
+  const isOverHero = isHome && !isScrolled;
+  const logoSrc = resolvedTheme === "dark" ? "/logo-dark.png" : "/logo-light.png";
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-
+    const handleScroll = () => setIsScrolled(window.scrollY > 24);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    // Animate navbar on mount
-    if (typeof window !== "undefined") {
-      gsap.from(".navbar-content", {
-        y: -20,
-        opacity: 0,
-        duration: 0.6,
-        ease: "power3.out",
-      });
-    }
-  }, []);
-
-  // Close mobile menu when route changes
   const prevPathnameRef = useRef(pathname);
   useEffect(() => {
-    // Only close menu if pathname actually changed
     if (prevPathnameRef.current !== pathname) {
       prevPathnameRef.current = pathname;
-      // Use setTimeout to defer state updates and avoid cascading renders
-      const timeoutId = setTimeout(() => {
+      const t = setTimeout(() => {
         setIsMobileMenuOpen(false);
         setOpenDropdown(null);
       }, 0);
-      return () => clearTimeout(timeoutId);
+      return () => clearTimeout(t);
     }
   }, [pathname]);
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
-    if (isMobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
+    document.body.style.overflow = isMobileMenuOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
   }, [isMobileMenuOpen]);
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  const toggleMobileMenu = () => setIsMobileMenuOpen((o) => !o);
+
+  const linkBase =
+    "relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 whitespace-nowrap";
+  const linkDefault = isOverHero
+    ? "text-white/90 hover:text-white hover:bg-white/10"
+    : "text-muted-foreground hover:text-foreground hover:bg-muted/80";
+  const linkActive = isOverHero
+    ? "text-white font-semibold hover:text-white after:absolute after:inset-x-1.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-white after:content-['']"
+    : "text-primary font-semibold hover:text-primary after:absolute after:inset-x-1.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary after:content-['']";
 
   return (
     <nav
       className={cn(
-        "navbar fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled
-          ? "bg-background/80 dark:bg-background/80 backdrop-blur-xl shadow-md border-b border-border/50"
-          : "bg-background/60 dark:bg-background/20 backdrop-blur-sm"
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+        isOverHero
+          ? "bg-transparent"
+          : "bg-background/95 dark:bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
       )}
     >
-      <div className="navbar-content mx-auto max-w-7xl px-4 sm:px-5 md:px-6 lg:px-8">
-        <div className="flex h-16 md:h-20 items-center justify-between gap-4">
-          {/* Logo */}
-          <Link 
-            href="/" 
-            className="flex items-center shrink-0 group"
+      <div className="mx-auto max-w-7xl px-4 sm:px-5 md:px-6 lg:px-8">
+        <div className="flex h-14 md:h-16 items-center justify-between gap-4">
+          <Link
+            href="/"
+            className="flex shrink-0 items-center"
             onClick={() => setIsMobileMenuOpen(false)}
           >
-            <Logo 
-              width={400} 
-              height={84} 
-              className="h-24 md:h-32 w-auto transition-opacity group-hover:opacity-80" 
+            <Image
+              key={logoSrc}
+              src={logoSrc}
+              alt="49GIG"
+              width={280}
+              height={92}
+              className={cn(
+                "h-12 w-auto md:h-14 object-contain object-left transition-opacity hover:opacity-90",
+                isOverHero && "brightness-0 invert"
+              )}
               priority
             />
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden lg:flex lg:items-center lg:gap-3 xl:gap-4 flex-1 justify-center">
-            {navLinks.map((link) => (
-              <div
-                key={link.href}
-                className="relative group"
-                onMouseEnter={() => link.children && setOpenDropdown(link.label)}
-                onMouseLeave={() => setOpenDropdown(null)}
-              >
-                <Link
-                  href={link.href}
-                  className={cn(
-                    "relative px-3 xl:px-4 py-2 text-sm font-medium transition-all rounded-md whitespace-nowrap",
-                    pathname === link.href
-                      ? "text-primary font-semibold"
-                      : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                  )}
+          <nav className="hidden lg:flex lg:flex-1 lg:items-center lg:justify-center lg:gap-0.5 xl:gap-1">
+            {navLinks.map((link) => {
+              const isActive =
+                pathname === link.href ||
+                link.children?.some((c) => c.href === pathname);
+              return (
+                <div
+                  key={link.href}
+                  className="group relative"
+                  onMouseEnter={() =>
+                    link.children && setOpenDropdown(link.label)
+                  }
+                  onMouseLeave={() => setOpenDropdown(null)}
                 >
-                  <span className="flex items-center gap-1.5">
+                  <Link
+                    href={link.href}
+                    className={cn(
+                      linkBase,
+                      isActive ? linkActive : linkDefault
+                    )}
+                  >
                     {link.label}
                     {link.children && (
-                      <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-180" />
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0 transition-transform duration-200",
+                          openDropdown === link.label && "rotate-180"
+                        )}
+                      />
                     )}
-                  </span>
-                  {pathname === link.href && (
-                    <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
+                  </Link>
+                  {link.children && openDropdown === link.label && (
+                    <div className="absolute left-0 top-full pt-1">
+                      <div className="min-w-[200px] rounded-lg border border-border bg-background py-1 shadow-lg">
+                        {link.children.map((child) => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={cn(
+                              "block px-4 py-2.5 text-sm transition-colors",
+                              pathname === child.href
+                                ? "bg-primary/10 text-primary font-medium"
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                            )}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </Link>
-
-                {/* Dropdown Menu */}
-                {link.children && openDropdown === link.label && (
-                  <div className="absolute left-0 top-full mt-2 w-56 rounded-lg border border-border bg-background/95 dark:bg-background/95 backdrop-blur-xl shadow-lg py-1.5 animate-in fade-in-0 zoom-in-95 duration-200">
-                    {link.children.map((child) => (
-                      <Link
-                        key={child.href}
-                        href={child.href}
-                        className="block px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors rounded-md mx-1"
-                      >
-                        {child.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </nav>
 
-          {/* CTA Buttons */}
-          <div className="hidden lg:flex lg:items-center lg:gap-3 shrink-0">
+          <div className="hidden lg:flex lg:items-center lg:gap-2 shrink-0">
             <ThemeToggle />
             {isAuthenticated ? (
-              <Button size="sm" asChild className="text-sm">
+              <Button size="sm" asChild className="rounded-md text-sm font-medium">
                 <Link href="/dashboard">
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   Dashboard
@@ -195,79 +186,90 @@ export function Navbar() {
               </Button>
             ) : (
               <>
-                <Button variant="ghost" size="sm" asChild className="text-sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  asChild
+                  className={cn(
+                    "rounded-md text-sm font-medium",
+                    isOverHero && "text-white/90 hover:bg-white/10 hover:text-white border-0"
+                  )}
+                >
                   <Link href="/login">Sign In</Link>
                 </Button>
-                <Button size="sm" asChild className="text-sm">
-                  <Link href="/get-started">Get Started</Link>
+                <Button
+                  size="sm"
+                  asChild
+                  className={cn(
+                    "rounded-md text-sm font-medium",
+                    isOverHero && "border-white/80 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                  )}
+                >
+                  <Link href="/signup">Get Started</Link>
                 </Button>
               </>
             )}
           </div>
 
-          {/* Mobile Menu Button */}
           <button
             onClick={toggleMobileMenu}
-            className="lg:hidden p-2 -mr-2 text-foreground hover:bg-accent rounded-md transition-colors touch-manipulation"
+            className={cn(
+              "lg:hidden p-2 -mr-2 rounded-md transition-colors touch-manipulation",
+              isOverHero ? "text-white hover:bg-white/10" : "text-foreground hover:bg-muted"
+            )}
             aria-label="Toggle menu"
             aria-expanded={isMobileMenuOpen}
           >
-            {isMobileMenuOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
-            )}
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
 
-        {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-border bg-background/95 dark:bg-background/95 backdrop-blur-xl animate-in slide-in-from-top duration-200">
-            <div className="px-4 py-4 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <div className="lg:hidden border-t border-border/50 bg-background">
+            <div className="max-h-[calc(100vh-4rem)] overflow-y-auto py-4 space-y-0.5">
               {navLinks.map((link) => (
                 <div key={link.href}>
                   <Link
                     href={link.href}
                     onClick={() => !link.children && setIsMobileMenuOpen(false)}
                     className={cn(
-                      "block px-4 py-3 text-base font-medium rounded-lg transition-all touch-manipulation",
+                      "flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg mx-2 transition-colors",
                       pathname === link.href
-                        ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary"
-                        : "text-muted-foreground hover:text-primary hover:bg-primary/10 active:bg-primary/20"
+                        ? "bg-primary/10 text-primary"
+                        : "text-foreground hover:bg-muted"
                     )}
                   >
-                    <div className="flex items-center justify-between">
-                      <span>{link.label}</span>
-                      {link.children && (
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setOpenDropdown(
-                              openDropdown === link.label ? null : link.label
-                            );
-                          }}
-                          className="p-1 -mr-2 touch-manipulation"
-                          aria-label={openDropdown === link.label ? "Collapse" : "Expand"}
-                        >
-                          <ChevronDown
-                            className={cn(
-                              "h-4 w-4 transition-transform duration-200",
-                              openDropdown === link.label && "rotate-180"
-                            )}
-                          />
-                        </button>
-                      )}
-                    </div>
+                    <span>{link.label}</span>
+                    {link.children && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setOpenDropdown(openDropdown === link.label ? null : link.label);
+                        }}
+                        className="p-1 -mr-2 rounded touch-manipulation"
+                        aria-label={openDropdown === link.label ? "Collapse" : "Expand"}
+                      >
+                        <ChevronDown
+                          className={cn("h-4 w-4 transition-transform", openDropdown === link.label && "rotate-180")}
+                        />
+                      </button>
+                    )}
                   </Link>
                   {link.children && openDropdown === link.label && (
-                    <div className="ml-4 mt-1 mb-1 space-y-1 animate-in slide-in-from-top duration-200">
+                    <div className="ml-4 mt-0.5 mb-1 space-y-0.5">
                       {link.children.map((child) => (
                         <Link
                           key={child.href}
                           href={child.href}
                           onClick={() => setIsMobileMenuOpen(false)}
-                          className="block px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors touch-manipulation active:bg-accent/80"
+                          className={cn(
+                            "block px-4 py-2.5 text-sm rounded-lg mx-2 transition-colors",
+                            pathname === child.href
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          )}
                         >
                           {child.label}
                         </Link>
@@ -276,35 +278,27 @@ export function Navbar() {
                   )}
                 </div>
               ))}
-              
-              {/* Mobile CTA Buttons */}
-              <div className="pt-4 mt-4 space-y-3 border-t border-border">
-                <div className="flex items-center justify-between px-4 py-2">
-                  <span className="text-sm font-medium text-muted-foreground">Theme</span>
+              <div className="mt-3 pt-3 border-t border-border px-4 space-y-2">
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm text-muted-foreground">Theme</span>
                   <ThemeToggle />
                 </div>
                 {isAuthenticated ? (
-                  <Button className="w-full" size="lg" asChild>
-                    <Link
-                      href="/dashboard"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
+                  <Button className="w-full rounded-md" size="sm" asChild>
+                    <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
                       <LayoutDashboard className="mr-2 h-4 w-4" />
                       Dashboard
                     </Link>
                   </Button>
                 ) : (
                   <>
-                    <Button variant="outline" className="w-full" size="lg" asChild>
+                    <Button variant="outline" className="w-full rounded-md" size="sm" asChild>
                       <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
                         Sign In
                       </Link>
                     </Button>
-                    <Button className="w-full" size="lg" asChild>
-                      <Link
-                        href="/get-started"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
+                    <Button className="w-full rounded-md" size="sm" asChild>
+                      <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
                         Get Started
                       </Link>
                     </Button>

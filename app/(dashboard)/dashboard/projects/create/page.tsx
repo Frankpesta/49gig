@@ -39,8 +39,6 @@ const TALENT_CATEGORIES = [
   "Software Development",
   "UI/UX & Product Design",
   "Data & Analytics",
-  "Digital Marketing",
-  "Writing & Content",
 ] as const;
 
 const EXPERIENCE_LEVELS = [
@@ -108,29 +106,6 @@ const COMMON_SKILLS_BY_CATEGORY: Record<string, string[]> = {
     "Statistics",
     "Pandas",
     "NumPy",
-  ],
-  "Digital Marketing": [
-    "SEO",
-    "PPC",
-    "Google Ads",
-    "Facebook Ads",
-    "Social Media Marketing",
-    "Content Marketing",
-    "Email Marketing",
-    "Analytics",
-    "Google Analytics",
-    "Marketing Automation",
-  ],
-  "Writing & Content": [
-    "Copywriting",
-    "Blog Writing",
-    "Technical Writing",
-    "SEO Content",
-    "Creative Writing",
-    "Content Strategy",
-    "Editing",
-    "Proofreading",
-    "Ghostwriting",
   ],
 };
 

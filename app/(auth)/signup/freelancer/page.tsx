@@ -24,8 +24,11 @@ import {
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useOAuth } from "@/hooks/use-oauth";
-import { AuthMobileLogo } from "@/components/auth/auth-branding";
-import { Logo } from "@/components/ui/logo";
+import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
+import { freelancerSignupFeatures } from "@/components/auth/auth-icons";
+
+const authCardClass =
+  "rounded-xl border border-border/60 bg-card shadow-lg";
 
 const TECH_FIELDS = [
   { value: "development", label: "Software Development" },
@@ -60,12 +63,6 @@ const EXPERIENCE_LEVELS = {
     { value: "mid", label: "Mid-Level Designer" },
     { value: "senior", label: "Senior Designer" },
     { value: "expert", label: "Expert Designer" },
-  ],
-  marketing: [
-    { value: "junior", label: "Junior Marketer" },
-    { value: "mid", label: "Mid-Level Marketer" },
-    { value: "senior", label: "Senior Marketer" },
-    { value: "expert", label: "Expert Marketer" },
   ],
   other: [
     { value: "junior", label: "Junior" },
@@ -220,77 +217,31 @@ export default function FreelancerSignupPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-linear-to-br from-background via-primary/5 to-background">
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -left-12 top-8 h-80 w-80 rounded-full bg-primary/15 blur-3xl" />
-        <div className="absolute right-0 bottom-10 h-96 w-96 rounded-full bg-secondary/20 blur-3xl" />
-      </div>
-
-      <div className="relative flex min-h-screen">
-        {/* Left Column - Branding */}
-        <div className="hidden lg:flex lg:flex-1 lg:flex-col lg:justify-between bg-gradient-to-br from-primary/10 via-primary/5 to-background p-12">
-          <div className="space-y-8">
-            <Logo width={140} height={45} priority />
-          </div>
-
-          <div className="space-y-6 max-w-md">
-            <div className="space-y-4">
-              <h2 className="text-3xl font-bold tracking-tight">
-                Start your freelance journey
-              </h2>
-              <p className="text-lg text-muted-foreground">
-                Join verified freelancers and get matched with quality projects.
-              </p>
-            </div>
-          </div>
-
-          <div className="text-sm text-muted-foreground">
-            © 2025 49GIG. All rights reserved.
-          </div>
-        </div>
-
-        {/* Right Column - Form */}
-        <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-md space-y-10">
-            <AuthMobileLogo />
-
-            {/* Header */}
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
-                <span className="h-2 w-2 rounded-full bg-primary" />
-                Freelancer signup
+    <AuthTwoColumnLayout
+      leftTitle="Start your freelance journey"
+      leftDescription="Join verified freelancers and get matched with quality projects."
+      features={freelancerSignupFeatures}
+      badge="Freelancer signup"
+      heading="Create your account"
+      subline="Get started by creating a freelancer account."
+    >
+      <Card className={authCardClass}>
+        <form onSubmit={handleSubmit}>
+          <CardHeader className="space-y-1 px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+            <CardTitle className="text-xl font-semibold">Sign up as freelancer</CardTitle>
+            <CardDescription>Enter your information to create your account</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5 px-6 sm:px-8 pb-6 pt-0">
+            {error && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
               </div>
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-foreground">
-                Create your account
-              </h1>
-              <p className="text-muted-foreground leading-relaxed">
-                Get started by creating a freelancer account
-              </p>
-            </div>
+            )}
 
-            {/* Card */}
-            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-              <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-                <CardTitle className="text-2xl font-heading font-semibold">
-                  Sign Up as Freelancer
-                </CardTitle>
-                <CardDescription>
-                  Enter your information to create your account
-                </CardDescription>
-              </CardHeader>
-              <form onSubmit={handleSubmit}>
-                <CardContent className="space-y-6 px-8 pb-8 pt-0">
-                  {error && (
-                    <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
-                      {error}
-                    </div>
-                  )}
-
-                  {/* Personal Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-foreground">
-                      Personal Information
-                    </h3>
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">
+                Personal information
+              </h3>
                     <div className="space-y-3">
                       <Label htmlFor="name" className="text-sm font-medium">
                         Full Name
@@ -305,7 +256,7 @@ export default function FreelancerSignupPage() {
                         }
                         required
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                     <div className="space-y-3">
@@ -322,7 +273,7 @@ export default function FreelancerSignupPage() {
                         }
                         required
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                     <div className="space-y-3">
@@ -343,7 +294,7 @@ export default function FreelancerSignupPage() {
                         required
                         disabled={isLoading}
                         minLength={8}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                       <p className="text-xs text-muted-foreground pt-1">
                         Must be at least 8 characters
@@ -369,15 +320,14 @@ export default function FreelancerSignupPage() {
                         }
                         required
                         disabled={isLoading}
-                        className="h-11"
+                        className="h-11 rounded-lg"
                       />
                     </div>
                   </div>
 
-                  {/* Professional Information */}
-                  <div className="space-y-4 pt-4 border-t">
+                  <div className="space-y-4 pt-4 border-t border-border/60">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Professional Information
+                      Professional information
                     </h3>
                     <div className="space-y-3">
                       <Label htmlFor="techField" className="text-sm font-medium">
@@ -394,7 +344,7 @@ export default function FreelancerSignupPage() {
                         }}
                         disabled={isLoading}
                       >
-                        <SelectTrigger className="h-11">
+                        <SelectTrigger className="h-11 rounded-lg">
                           <SelectValue placeholder="Select your tech field" />
                         </SelectTrigger>
                         <SelectContent>
@@ -424,7 +374,7 @@ export default function FreelancerSignupPage() {
                           }
                           disabled={isLoading}
                         >
-                          <SelectTrigger className="h-11">
+                          <SelectTrigger className="h-11 rounded-lg">
                             <SelectValue placeholder="Select your experience level" />
                           </SelectTrigger>
                           <SelectContent>
@@ -462,7 +412,7 @@ export default function FreelancerSignupPage() {
                           variant="outline"
                           onClick={handleAddSkill}
                           disabled={isLoading || !skillInput.trim()}
-                          className="h-11"
+                          className="h-11 rounded-lg"
                         >
                           Add
                         </Button>
@@ -514,24 +464,24 @@ export default function FreelancerSignupPage() {
                     </div>
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <Button
                       type="submit"
-                      className="w-full h-11 text-base font-medium"
+                      className="w-full h-11 rounded-lg text-sm font-medium"
                       disabled={isLoading}
                     >
-                      {isLoading ? "Creating account..." : "Create Account"}
+                      {isLoading ? "Creating account..." : "Create account"}
                     </Button>
                   </div>
                 </CardContent>
               </form>
-              <CardFooter className="flex flex-col space-y-6 pt-8 pb-8 px-8 border-t">
+              <CardFooter className="flex flex-col gap-5 border-t border-border/60 px-6 sm:px-8 py-6">
                 <div className="relative w-full">
                   <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
+                    <span className="w-full border-t border-border/60" />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-3 text-muted-foreground font-medium">
+                  <div className="relative flex justify-center">
+                    <span className="bg-card px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Or continue with
                     </span>
                   </div>
@@ -539,7 +489,7 @@ export default function FreelancerSignupPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-11 text-base font-medium border-2"
+                  className="w-full h-11 rounded-lg text-sm font-medium border-border/80"
                   disabled={isLoading}
                   onClick={() => signInWithGoogle("freelancer")}
                 >
@@ -569,18 +519,12 @@ export default function FreelancerSignupPage() {
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}
-                  <Link
-                    href="/login"
-                    className="font-semibold text-primary hover:underline"
-                  >
+                  <Link href="/login" className="font-semibold text-primary hover:underline">
                     Sign in
                   </Link>
                 </p>
               </CardFooter>
             </Card>
-          </div>
-        </div>
-      </div>
-    </div>
+    </AuthTwoColumnLayout>
   );
 }

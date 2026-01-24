@@ -98,7 +98,6 @@ export default function ForFreelancersPage() {
     { icon: Code, title: "Software Development", color: "primary" },
     { icon: Palette, title: "UI/UX & Product Design", color: "primary" },
     { icon: Database, title: "Data & Analytics", color: "primary" },
-    { icon: TrendingUp, title: "Digital Marketing", color: "secondary" },
     { icon: PenTool, title: "Writing & Content", color: "secondary" },
     { icon: Users, title: "Product & Project Management", color: "secondary" },
     { icon: HeadphonesIcon, title: "Customer Support", color: "secondary" },
@@ -201,7 +200,7 @@ export default function ForFreelancersPage() {
           {/* Enhanced CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <HoverButton size="lg" glow className="text-lg h-16 px-12 shadow-2xl bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary border-0 group">
-              <Link href="/get-started" className="flex items-center gap-3">
+              <Link href="/signup" className="flex items-center gap-3">
                 <Rocket className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
                 Apply as Freelancer
                 <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
@@ -487,7 +486,7 @@ export default function ForFreelancersPage() {
                   We support hundreds of specialized skills. Apply anyway—we might have opportunities that match your expertise.
                 </p>
                 <HoverButton size="lg" className="text-lg h-16 px-10 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-2xl">
-                  <Link href="/get-started" className="flex items-center gap-3">
+                  <Link href="/signup" className="flex items-center gap-3">
                     <Rocket className="h-5 w-5" />
                     Apply for Any Skill
                     <ArrowRight className="h-5 w-5" />
@@ -936,7 +935,7 @@ export default function ForFreelancersPage() {
                 <SectionTransition variant="slide" direction="left" delay={600}>
                   <div className="group">
                     <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 border-0 group-hover:scale-105 transition-all duration-300">
-                      <Link href="/get-started" className="flex items-center gap-3">
+                      <Link href="/signup" className="flex items-center gap-3">
                         <Play className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
                         Apply as Freelancer
                         <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />

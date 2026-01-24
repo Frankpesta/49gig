@@ -74,9 +74,7 @@ export const createProject = mutation({
       talentCategory: v.union(
         v.literal("Software Development"),
         v.literal("UI/UX & Product Design"),
-        v.literal("Data & Analytics"),
-        v.literal("Digital Marketing"),
-        v.literal("Writing & Content")
+        v.literal("Data & Analytics")
       ),
       experienceLevel: v.union(
         v.literal("junior"),
