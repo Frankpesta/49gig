@@ -109,9 +109,8 @@ export function AuthTwoColumnLayout({
         {/* Right column – form */}
         <div
           className={cn(
-            "flex flex-col justify-center",
-            "px-4 sm:px-6 lg:px-10 xl:px-14 py-10 sm:py-12",
-            "lg:overflow-y-auto",
+            "flex min-h-0 flex-col justify-center overflow-y-auto",
+            "px-4 sm:px-6 lg:px-10 xl:px-14 py-8 sm:py-10 lg:py-12",
             rightClassName
           )}
         >

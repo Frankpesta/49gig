@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/card";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { AuthBranding, AuthMobileLogo } from "@/components/auth/auth-branding";
+import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
+import { loginFeatures } from "@/components/auth/auth-icons";
+
+const authCardClass =
+  "rounded-xl border border-border/60 bg-card shadow-lg";
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -33,8 +37,7 @@ function VerifyEmailContent() {
   const resendVerification = useMutation(
     (api as any)["auth/mutations"].resendEmailVerification
   );
-  
-  // Query user profile after successful verification to check role
+
   const userProfile = useQuery(
     api.users.queries.getCurrentUserProfile,
     success ? {} : "skip"
@@ -51,43 +54,30 @@ function VerifyEmailContent() {
     }
   }, [searchParams]);
 
-  // Handle redirect after successful verification and user profile is loaded
   useEffect(() => {
     if (!success || !userProfile) return;
 
-    // Check if user is a freelancer - freelancers always need resume upload after email verification
     const isFreelancer = userProfile.role === "freelancer";
-    const hasPendingFlag = typeof window !== "undefined" && localStorage.getItem("pending_resume_upload");
-    
-    // For freelancers, always redirect to resume upload (manual signup or OAuth)
+    const hasPendingFlag =
+      typeof window !== "undefined" &&
+      localStorage.getItem("pending_resume_upload");
+
     if (isFreelancer || hasPendingFlag) {
-      // Ensure flag is set for consistency
       if (typeof window !== "undefined" && isFreelancer) {
         localStorage.setItem("pending_resume_upload", "freelancer");
       }
-      setTimeout(() => {
-        router.replace("/resume-upload");
-      }, 1200);
+      setTimeout(() => router.replace("/resume-upload"), 1200);
     } else {
-      // Client or other roles: go to dashboard
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 1200);
+      setTimeout(() => router.push("/dashboard"), 1200);
     }
   }, [success, userProfile, router]);
 
   const handleVerify = async (verifyToken: string) => {
     setIsLoading(true);
     setError("");
-
     try {
       const result = await verifyEmail({ token: verifyToken });
-
-      if (result.success) {
-        setSuccess(true);
-        // Note: We'll check user role via userProfile query after verification
-        // The redirect logic is handled in useEffect below
-      }
+      if (result.success) setSuccess(true);
     } catch (err: any) {
       setError(err.message || "Failed to verify email");
     } finally {
@@ -98,7 +88,6 @@ function VerifyEmailContent() {
   const handleResend = async () => {
     setIsResending(true);
     setError("");
-
     try {
       await resendVerification({ sessionToken: sessionToken || undefined });
       setSuccess(true);
@@ -111,168 +100,145 @@ function VerifyEmailContent() {
 
   if (success && !token) {
     return (
-      <div className="flex min-h-screen">
-        <AuthBranding />
-        <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-md space-y-8">
-            <AuthMobileLogo />
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Verification sent
-              </h1>
-              <p className="text-muted-foreground">
-                Check your inbox for the verification email
-              </p>
-            </div>
-            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-            <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-              <CardTitle className="text-2xl font-heading font-semibold">
-                Email Sent
-              </CardTitle>
-              <CardDescription>
-                We've sent a new verification email. Please check your inbox.
-              </CardDescription>
-            </CardHeader>
-            <CardFooter className="px-8 pb-8 pt-0">
-              <Link href="/login" className="w-full">
-                <Button variant="outline" className="w-full h-11 text-base font-medium border-2">
-                  Back to Sign In
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
-          </div>
-        </div>
-      </div>
+      <AuthTwoColumnLayout
+        leftTitle="Email verification"
+        leftDescription="We've sent a new verification link to your inbox. Check your email to continue."
+        features={loginFeatures}
+        heading="Verification sent"
+        subline="Check your inbox for the verification email."
+      >
+        <Card className={authCardClass}>
+          <CardHeader className="space-y-2 px-4 pt-6 pb-4 sm:px-6 lg:px-8 sm:pt-8 sm:pb-6">
+            <CardTitle className="text-xl font-semibold sm:text-2xl">
+              Email sent
+            </CardTitle>
+            <CardDescription>
+              We've sent a new verification email. Please check your inbox.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="px-4 pb-6 pt-0 sm:px-6 lg:px-8 sm:pb-8">
+            <Link href="/login" className="w-full">
+              <Button
+                variant="outline"
+                className="w-full h-11 rounded-lg text-base font-medium border-2"
+              >
+                Back to Sign In
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      </AuthTwoColumnLayout>
     );
   }
 
   if (success && token) {
     return (
-      <div className="flex min-h-screen">
-        <AuthBranding />
-        <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-md space-y-8">
-            <AuthMobileLogo />
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Email verified
-              </h1>
-              <p className="text-muted-foreground">
-                Your email has been verified successfully
-              </p>
-            </div>
-            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-            <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-              <CardTitle className="text-2xl font-heading font-semibold">
-                Verification Complete
-              </CardTitle>
-              <CardDescription>
-                Your email has been verified successfully
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-8 pb-8 pt-0">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Redirecting to dashboard...
-              </p>
-            </CardContent>
-            <CardFooter className="px-8 pb-8">
-              <Link href="/dashboard" className="w-full">
-                <Button className="w-full h-11 text-base font-medium">
-                  Go to Dashboard
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
-          </div>
-        </div>
-      </div>
+      <AuthTwoColumnLayout
+        leftTitle="Email verified"
+        leftDescription="Your email has been verified successfully. You're all set to use 49GIG."
+        features={loginFeatures}
+        heading="Verification complete"
+        subline="Your email has been verified successfully."
+      >
+        <Card className={authCardClass}>
+          <CardHeader className="space-y-2 px-4 pt-6 pb-4 sm:px-6 lg:px-8 sm:pt-8 sm:pb-6">
+            <CardTitle className="text-xl font-semibold sm:text-2xl">
+              All set
+            </CardTitle>
+            <CardDescription>
+              Redirecting you to the next step…
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 sm:px-6 lg:px-8 sm:pb-6">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Redirecting to dashboard…
+            </p>
+          </CardContent>
+          <CardFooter className="px-4 pb-6 sm:px-6 lg:px-8 sm:pb-8 border-t pt-6">
+            <Link href="/dashboard" className="w-full">
+              <Button className="w-full h-11 rounded-lg text-base font-medium">
+                Go to Dashboard
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      </AuthTwoColumnLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      <AuthBranding />
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-md space-y-8">
-          <AuthMobileLogo />
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Verify your email
-            </h1>
-            <p className="text-muted-foreground">
-              Enter the verification token from your email
-            </p>
+    <AuthTwoColumnLayout
+      leftTitle="Verify your email"
+      leftDescription="Enter the verification token we sent to your email to complete sign-up."
+      features={loginFeatures}
+      heading="Verify your email"
+      subline="Enter the verification token from your email."
+    >
+      <Card className={authCardClass}>
+        <CardHeader className="space-y-2 px-4 pt-6 pb-4 sm:px-6 lg:px-8 sm:pt-8 sm:pb-6">
+          <CardTitle className="text-xl font-semibold sm:text-2xl">
+            Email verification
+          </CardTitle>
+          <CardDescription>
+            Enter the verification token sent to your email.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 px-4 pb-6 pt-0 sm:px-6 lg:px-8 sm:pb-8">
+          {error && (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive sm:p-4">
+              {error}
+            </div>
+          )}
+          <div className="space-y-3">
+            <Label htmlFor="token" className="text-sm font-medium">
+              Verification token
+            </Label>
+            <Input
+              id="token"
+              type="text"
+              placeholder="Enter verification token"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              disabled={isLoading}
+              className="h-11 rounded-lg"
+            />
           </div>
-          <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-          <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-            <CardTitle className="text-2xl font-heading font-semibold">
-              Email Verification
-            </CardTitle>
-            <CardDescription>
-              Enter the verification token sent to your email
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 px-8 pb-8 pt-0">
-            {error && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
-                {error}
-              </div>
-            )}
-            <div className="space-y-3">
-              <Label htmlFor="token" className="text-sm font-medium">
-                Verification Token
-              </Label>
-              <Input
-                id="token"
-                type="text"
-                placeholder="Enter verification token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                disabled={isLoading}
-                className="h-11"
-              />
+          <Button
+            onClick={() => handleVerify(token)}
+            className="w-full h-11 rounded-lg text-base font-medium"
+            disabled={isLoading || !token}
+          >
+            {isLoading ? "Verifying…" : "Verify email"}
+          </Button>
+          <div className="relative pt-2">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
             </div>
-            <div className="pt-2">
-              <Button
-                onClick={() => handleVerify(token)}
-                className="w-full h-11 text-base font-medium"
-                disabled={isLoading || !token}
-              >
-                {isLoading ? "Verifying..." : "Verify Email"}
-              </Button>
+            <div className="relative flex justify-center">
+              <span className="bg-card px-4 text-xs font-medium uppercase text-muted-foreground">
+                Or
+              </span>
             </div>
-            <div className="relative pt-2">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-4 text-muted-foreground font-medium">
-                  Or
-                </span>
-              </div>
-            </div>
-            <Button
-              onClick={handleResend}
-              variant="outline"
-              className="w-full h-11 text-base font-medium border-2"
-              disabled={isResending}
-            >
-              {isResending ? "Sending..." : "Resend Verification Email"}
-            </Button>
-          </CardContent>
-          <CardFooter className="pt-8 pb-8 px-8 border-t">
-            <Link
-              href="/login"
-              className="text-center text-sm text-primary hover:underline font-semibold w-full"
-            >
-              Back to Sign In
-            </Link>
-          </CardFooter>
-        </Card>
-        </div>
-      </div>
-    </div>
+          </div>
+          <Button
+            onClick={handleResend}
+            variant="outline"
+            className="w-full h-11 rounded-lg border-2 text-base font-medium"
+            disabled={isResending}
+          >
+            {isResending ? "Sending…" : "Resend verification email"}
+          </Button>
+        </CardContent>
+        <CardFooter className="border-t px-4 pb-6 pt-6 sm:px-6 lg:px-8 sm:pb-8">
+          <Link
+            href="/login"
+            className="w-full text-center text-sm font-semibold text-primary hover:underline"
+          >
+            Back to Sign In
+          </Link>
+        </CardFooter>
+      </Card>
+    </AuthTwoColumnLayout>
   );
 }
 
@@ -280,25 +246,22 @@ export default function VerifyEmailPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen">
-          <AuthBranding />
-          <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-            <div className="mx-auto w-full max-w-md space-y-8">
-              <AuthMobileLogo />
-              <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-                <CardContent className="px-8 py-8">
-                  <div className="flex items-center justify-center py-8">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
+        <AuthTwoColumnLayout
+          leftTitle="Verify your email"
+          leftDescription="Enter the verification token we sent to your email."
+          features={loginFeatures}
+          heading="Loading…"
+          subline="Please wait."
+        >
+          <Card className={authCardClass}>
+            <CardContent className="flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </CardContent>
+          </Card>
+        </AuthTwoColumnLayout>
       }
     >
       <VerifyEmailContent />
     </Suspense>
   );
 }
-

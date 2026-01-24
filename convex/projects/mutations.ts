@@ -548,6 +548,174 @@ export const createMilestones = mutation({
 });
 
 /**
+ * Auto-create milestones based on payment breakdown
+ * This is called after project is funded to automatically create milestones
+ */
+export const autoCreateMilestones = mutation({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    // Only client or admin can auto-create milestones
+    if (user.role !== "admin" && project.clientId !== user._id) {
+      throw new Error("Not authorized to create milestones for this project");
+    }
+
+    // Check if milestones already exist
+    const existingMilestones = await ctx.db
+      .query("milestones")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    if (existingMilestones.length > 0) {
+      throw new Error("Milestones already exist for this project");
+    }
+
+    // Only create milestones for milestone-based or fixed-price projects
+    // For hourly projects, milestones are not needed
+    const projectType = project.intakeForm.projectType;
+    if (projectType === "ongoing") {
+      // Ongoing projects don't need milestones (hourly billing)
+      return [];
+    }
+
+    // Auto-split milestones based on project characteristics
+    const deliverables = project.intakeForm.deliverables || [];
+    const durationDays = Math.ceil(
+      (project.intakeForm.endDate - project.intakeForm.startDate) / (1000 * 60 * 60 * 24)
+    );
+
+    let milestones: Array<{
+      title: string;
+      description: string;
+      order: number;
+      amount: number;
+      dueDate: number;
+    }> = [];
+
+    if (deliverables.length > 0 && deliverables.length <= 5) {
+      // Split by deliverables
+      const milestoneCount = deliverables.length;
+      const amountPerMilestone = project.totalAmount / milestoneCount;
+      const intervalMs = (project.intakeForm.endDate - project.intakeForm.startDate) / milestoneCount;
+
+      milestones = deliverables.map((deliverable, index) => {
+        const dueDate = project.intakeForm.startDate + (index + 1) * intervalMs;
+        return {
+          title: deliverable,
+          description: `Deliverable: ${deliverable}`,
+          order: index + 1,
+          amount: Math.round(amountPerMilestone * 100) / 100,
+          dueDate,
+        };
+      });
+    } else {
+      // Split by phases
+      let phases: Array<{ name: string; percentage: number }>;
+
+      if (durationDays <= 7) {
+        phases = [
+          { name: "Initial Development", percentage: 50 },
+          { name: "Final Delivery", percentage: 50 },
+        ];
+      } else if (durationDays <= 30) {
+        phases = [
+          { name: "Planning & Setup", percentage: 30 },
+          { name: "Development", percentage: 40 },
+          { name: "Testing & Delivery", percentage: 30 },
+        ];
+      } else if (durationDays <= 90) {
+        phases = [
+          { name: "Planning & Design", percentage: 20 },
+          { name: "Core Development", percentage: 30 },
+          { name: "Integration & Testing", percentage: 30 },
+          { name: "Final Delivery", percentage: 20 },
+        ];
+      } else {
+        phases = [
+          { name: "Planning & Design", percentage: 15 },
+          { name: "Initial Development", percentage: 20 },
+          { name: "Core Development", percentage: 25 },
+          { name: "Advanced Features", percentage: 25 },
+          { name: "Final Delivery", percentage: 15 },
+        ];
+      }
+
+      const intervalMs = (project.intakeForm.endDate - project.intakeForm.startDate) / phases.length;
+
+      milestones = phases.map((phase, index) => {
+        const dueDate = project.intakeForm.startDate + (index + 1) * intervalMs;
+        const amount = (project.totalAmount * phase.percentage) / 100;
+        return {
+          title: phase.name,
+          description: `Phase ${index + 1}: ${phase.name}`,
+          order: index + 1,
+          amount: Math.round(amount * 100) / 100,
+          dueDate,
+        };
+      });
+    }
+
+    // Ensure total matches (adjust last milestone if needed)
+    const total = milestones.reduce((sum, m) => sum + m.amount, 0);
+    const difference = project.totalAmount - total;
+    if (Math.abs(difference) > 0.01 && milestones.length > 0) {
+      milestones[milestones.length - 1].amount += difference;
+      milestones[milestones.length - 1].amount = Math.round(milestones[milestones.length - 1].amount * 100) / 100;
+    }
+
+    // Create milestones
+    const now = Date.now();
+    const milestoneIds = [];
+
+    for (const milestone of milestones) {
+      const milestoneId = await ctx.db.insert("milestones", {
+        projectId: args.projectId,
+        title: milestone.title,
+        description: milestone.description,
+        order: milestone.order,
+        amount: milestone.amount,
+        currency: project.currency,
+        status: "pending",
+        dueDate: milestone.dueDate,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      milestoneIds.push(milestoneId);
+    }
+
+    // Log audit
+    await ctx.db.insert("auditLogs", {
+      action: "milestones_auto_created",
+      actionType: "admin",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "project",
+      targetId: args.projectId,
+      details: {
+        milestoneCount: milestones.length,
+        totalAmount: project.totalAmount,
+      },
+      createdAt: now,
+    });
+
+    return milestoneIds;
+  },
+});
+
+/**
  * Internal mutation to update project status (for use by payment system)
  */
 export const updateProjectStatusInternal = internalMutation({
