@@ -91,32 +91,6 @@ export default function TalentCategoriesPage() {
       startingPrice: 50
     },
     {
-      id: "marketing",
-      name: "Digital Marketing",
-      icon: TrendingUp,
-      description: "Marketing experts driving growth through digital channels and strategies",
-      color: "from-orange-500 to-orange-600",
-      bgColor: "from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900",
-      skills: ["SEO", "PPC", "Social Media", "Content Marketing", "Email Marketing", "Analytics"],
-      image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
-      freelancerCount: 720,
-      avgRating: 4.6,
-      startingPrice: 30
-    },
-    {
-      id: "writing",
-      name: "Writing & Content",
-      icon: PenTool,
-      description: "Professional writers creating compelling content for every need",
-      color: "from-pink-500 to-pink-600",
-      bgColor: "from-pink-50 to-pink-100 dark:from-pink-950 dark:to-pink-900",
-      skills: ["Copywriting", "Blog Writing", "Technical Writing", "SEO Content", "Creative Writing"],
-      image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800&q=80",
-      freelancerCount: 950,
-      avgRating: 4.7,
-      startingPrice: 25
-    },
-    {
       id: "management",
       name: "Product & Project Management",
       icon: Users,

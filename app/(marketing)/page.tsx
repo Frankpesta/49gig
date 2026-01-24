@@ -42,6 +42,11 @@ import {
   Workflow
 } from "lucide-react";
 
+const HERO_VIDEO_SRC =
+  "https://videos.pexels.com/video-files/3130284/3130284-sd_640_360_24fps.mp4";
+const HERO_VIDEO_POSTER =
+  "https://images.unsplash.com/photo-1522071820081-00f0181e34a7?w=1920&q=80";
+
 export default function Home() {
 
   const stats = [
@@ -78,8 +83,8 @@ export default function Home() {
     },
     {
       icon: PenTool,
-      title: "Content & Writing",
-      description: "Technical writing, copywriting, and content strategy",
+      title: "Technical Writing",
+      description: "Technical documentation and writing services",
       image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800&q=80",
     },
     {
@@ -154,275 +159,184 @@ export default function Home() {
 
   return (
     <div className="w-full">
-      {/* CLEAN HERO SECTION */}
-      <section className="relative overflow-hidden bg-background">
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-linear-to-br from-primary/8 via-background to-secondary/8" />
-          <div className="absolute inset-0 opacity-[0.05] bg-[radial-gradient(circle_at_1px_1px,rgba(52,84,120,0.2)_1px,transparent_0)] bg-size-[24px_24px]" />
-          <div className="absolute top-0 left-1/2 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
-        </div>
-
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
-          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-12 lg:gap-16 items-center">
-            <SectionTransition variant="slide" direction="left" delay={150}>
-              <div className="space-y-8">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/40 bg-background/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <Crown className="h-4 w-4 text-primary" />
-                  Africa&apos;s Premier Freelance Network
-                </div>
-
-                <div className="space-y-5">
-                  <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-tight text-foreground">
-                    Hire world-class African talent, faster.
-                  </h1>
-                  <p className="text-lg sm:text-xl text-muted-foreground leading-relaxed max-w-2xl">
-                    Connect with the top 3% of vetted professionals across engineering, design, and growth. Build exceptional teams with confidence.
-                  </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <HoverButton size="lg" glow className="h-12 px-7 text-base bg-linear-to-r from-primary to-primary/90 border-0">
-                    <Link href="/hire-talent" className="flex items-center gap-2">
-                      Hire Talent
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </HoverButton>
-                  <HoverButton size="lg" variant="outline" className="h-12 px-7 text-base bg-background/90 border-border/50">
-                    <Link href="/get-started" className="flex items-center gap-2">
-                      Apply as Freelancer
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </HoverButton>
-                </div>
-
-                <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    100% vetted talent
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    Secure payments
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Star className="h-4 w-4 text-secondary-foreground fill-secondary-foreground" />
-                    4.9/5 average rating
-                  </div>
-                </div>
-              </div>
-            </SectionTransition>
-
-            <SectionTransition variant="slide" direction="right" delay={250}>
-              <div className="relative">
-                <div className="relative aspect-4/5 overflow-hidden rounded-3xl border border-border/40 bg-muted/30 shadow-2xl">
-                  <Image
-                    src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=1200&q=80"
-                    alt="Team collaboration"
-                    fill
-                    className="object-cover"
-                    priority
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-background/80 via-transparent to-transparent" />
-                </div>
-
-                <div className="absolute -left-6 bottom-6 rounded-2xl border border-border/40 bg-background/95 px-5 py-4 shadow-xl">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Average match time</div>
-                  <div className="text-2xl font-semibold text-foreground">48 hours</div>
-                </div>
-                <div className="absolute -right-4 top-6 rounded-2xl border border-border/40 bg-background/95 px-5 py-4 shadow-xl">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Top talent</div>
-                  <div className="text-2xl font-semibold text-foreground">3%</div>
-                </div>
-              </div>
-            </SectionTransition>
+      {/* Hero – Hostinger-style: full-bleed video background */}
+      <section
+        className="relative min-h-[88vh] overflow-hidden border-b border-transparent -mt-14 md:-mt-16 pt-14 md:pt-16"
+        aria-label="Hero"
+      >
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          poster={HERO_VIDEO_POSTER}
+          className="absolute inset-0 h-full w-full object-cover"
+        >
+          <source src={HERO_VIDEO_SRC} type="video/mp4" />
+        </video>
+        <div
+          className="absolute inset-0 bg-linear-to-b from-black/70 via-black/50 to-black/70"
+          aria-hidden
+        />
+        <div className="relative z-10 flex min-h-[88vh] flex-col justify-center px-4 pt-14 md:pt-16 sm:px-6 lg:px-8">
+          <div className="mx-auto w-full max-w-3xl">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
+              <Crown className="h-3.5 w-3.5" />
+              Africa&apos;s premier freelance network
+            </div>
+            <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">
+              Hire world-class African talent, faster.
+            </h1>
+            <p className="mt-4 max-w-xl text-base leading-relaxed text-white/90 sm:text-lg">
+              Connect with the top 3% of vetted professionals across engineering, design, and growth. Build exceptional teams with confidence.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-4">
+              <Link
+                href="/hire-talent"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-white px-6 text-sm font-semibold text-primary transition-colors hover:bg-white/95"
+              >
+                Hire Talent
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border-2 border-white/80 bg-white/10 px-6 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20 hover:border-white"
+              >
+                Apply as Freelancer
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-1 text-sm text-white/85">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                100% vetted talent
+              </span>
+              <span className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-emerald-400" />
+                Secure payments
+              </span>
+              <span className="flex items-center gap-2">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                4.9/5 rating
+              </span>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* TRUSTED BY MARQUEE */}
-      <section className="bg-muted/30 py-8 border-b border-border/50 overflow-hidden">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-4">
-          <p className="text-center text-sm text-muted-foreground font-medium">
-            Trusted by leading companies worldwide
-          </p>
+      {/* Trusted by – Hostinger-style */}
+      <section className="border-b border-border/40 bg-muted/20 py-6 overflow-hidden">
+        <p className="text-center text-xs font-medium uppercase tracking-wider text-muted-foreground mb-4">
+          Trusted by leading companies worldwide
+        </p>
+        <div className="flex animate-marquee whitespace-nowrap">
+          {[...trustedCompanies, ...trustedCompanies].map((company, index) => (
+            <div key={index} className="mx-6 flex items-center justify-center">
+              <span className="text-base font-semibold text-muted-foreground/50">
+                {company}
+              </span>
+            </div>
+          ))}
         </div>
-        <div className="relative">
-          <div className="flex animate-marquee whitespace-nowrap">
-            {[...trustedCompanies, ...trustedCompanies].map((company, index) => (
+      </section>
+
+      {/* Stats – Hostinger-style: clean, aligned */}
+      <section className="py-16 sm:py-20 border-b border-border/40 bg-background">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary mb-3">
+              <BarChart3 className="h-3.5 w-3.5" />
+              Proven results
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-semibold text-foreground mb-3">
+              Trusted by professionals worldwide
+            </h2>
+            <p className="text-base text-muted-foreground max-w-xl mx-auto">
+              Join thousands of successful projects powered by Africa&apos;s top talent.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            {stats.map((stat, index) => (
               <div
                 key={index}
-                className="mx-8 flex items-center justify-center"
+                className="rounded-xl border border-border/50 bg-card p-6 text-center shadow-sm transition-shadow hover:shadow-md"
               >
-                <span className="text-xl font-semibold text-muted-foreground/60">
-                  {company}
-              </span>
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mx-auto mb-3">
+                  <stat.icon className="h-6 w-6" />
+                </div>
+                <div className="text-2xl lg:text-3xl font-bold text-foreground">
+                  {stat.prefix && <span className="text-lg">{stat.prefix}</span>}
+                  {stat.value}
+                  {stat.suffix && <span className="text-base font-medium">{stat.suffix}</span>}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {stat.label}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* MODERN INTERACTIVE STATS SECTION */}
-      <section className="bg-linear-to-br from-muted/20 via-background to-muted/20 py-20 sm:py-24 border-b border-border/30 relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-        </div>
-
-        {/* Floating Elements */}
-        <div className="absolute top-10 right-10 w-32 h-32 bg-primary/5 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-10 left-10 w-40 h-40 bg-secondary/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
-
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-16">
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary mb-4">
-                <BarChart3 className="h-4 w-4" />
-                Proven Results
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-                Trusted by Professionals Worldwide
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Join thousands of successful projects powered by Africa&apos;s top talent
-              </p>
+      {/* Why Choose 49GIG – Hostinger-style: clean grid */}
+      <section className="py-16 sm:py-20 lg:py-24 border-b border-border/40 bg-muted/20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary mb-3">
+              <Lightbulb className="h-3.5 w-3.5" />
+              Why Choose 49GIG
             </div>
-          </SectionTransition>
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-foreground mb-3">
+              Why businesses choose us
+            </h2>
+            <p className="text-base text-muted-foreground max-w-2xl mx-auto">
+              We make hiring exceptional African talent simple, secure, and successful.
+            </p>
+          </div>
 
-          <SectionTransition variant="slide" direction="up" delay={300}>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-              {stats.map((stat, index) => (
-                <div key={index} className="group relative">
-                  <div className="absolute inset-0 bg-linear-to-br from-primary/10 to-secondary/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
-                  <div className="relative bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:scale-105 group-hover:border-primary/30">
-                    <div className="flex flex-col items-center text-center space-y-4">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-300 shadow-lg group-hover:shadow-primary/20">
-                        <stat.icon className="h-8 w-8 text-primary group-hover:scale-110 transition-transform duration-300" />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="text-3xl lg:text-4xl font-black text-foreground group-hover:text-primary transition-colors duration-300">
-                          {stat.prefix && <span className="text-2xl">{stat.prefix}</span>}
-                          {stat.value}
-                          {stat.suffix && <span className="text-lg font-medium">{stat.suffix}</span>}
-                        </div>
-                        <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground/80 transition-colors duration-300">
-                          {stat.label}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Animated border */}
-                    <div className="absolute inset-0 rounded-3xl bg-linear-to-br from-primary/20 via-transparent to-secondary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10 blur-sm" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionTransition>
-        </div>
-      </section>
-
-      {/* MODERN WHY CHOOSE 49GIG SECTION */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-linear-to-br from-background via-muted/10 to-background relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-linear-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-linear-to-r from-primary/20 to-secondary/20">
-                  <Lightbulb className="h-3.5 w-3.5 text-primary" />
-                </div>
-                Why Choose 49GIG
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
-                Why Businesses <span className="bg-linear-to-r from-primary to-secondary bg-clip-text text-transparent">Choose Us</span>
-              </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                We make hiring exceptional African talent simple, secure, and successful with our proven platform
-              </p>
-            </div>
-          </SectionTransition>
-
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {whyChoose.map((item, index) => (
-              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative h-full">
-                  {/* Hover Glow Effect */}
-                  <div className="absolute inset-0 bg-linear-to-br from-primary/10 to-secondary/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl scale-110" />
-
-                  <div className="relative h-full bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
-                    {/* Animated Background */}
-                    <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="relative space-y-8">
-                      {/* Icon with Enhanced Design */}
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20 group-hover:scale-110">
-                        <item.icon className="h-8 w-8 text-primary group-hover:scale-110 transition-transform duration-300" />
-                      </div>
-
-                      {/* Content */}
-                      <div className="space-y-4">
-                        <h3 className="text-xl lg:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
-                          {item.title}
-                        </h3>
-                        <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
-                          {item.description}
-                        </p>
-                      </div>
-
-                      {/* Progress Bar Animation */}
-                      <div className="space-y-2">
-                        <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
-                          <div className="h-full w-0 bg-linear-to-r from-primary to-secondary rounded-full group-hover:w-full transition-all duration-700 ease-out" />
-                        </div>
-                      </div>
-
-                      {/* Call to Action */}
-                      <div className="flex items-center justify-between pt-2">
-                        <span className="text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          Learn more
-                        </span>
-                        <ArrowRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:translate-x-1" />
-                      </div>
-                    </div>
-                  </div>
+              <div
+                key={index}
+                className="rounded-xl border border-border/50 bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary mb-4">
+                  <item.icon className="h-6 w-6" />
                 </div>
-              </SectionTransition>
+                <h3 className="text-lg font-semibold text-foreground mb-2">
+                  {item.title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {item.description}
+                </p>
+              </div>
             ))}
           </div>
 
-          {/* Additional Trust Indicators */}
-          <SectionTransition variant="fade" delay={600}>
-            <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-              <div className="flex flex-col items-center space-y-3 p-6 rounded-2xl bg-background/50 backdrop-blur-sm border border-border/30">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/10">
-                  <Check className="h-6 w-6 text-green-600" />
-                </div>
-                <h4 className="text-lg font-bold text-foreground">99.9% Uptime</h4>
-                <p className="text-sm text-muted-foreground">Reliable platform you can count on</p>
+          <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+            <div className="rounded-xl border border-border/50 bg-card p-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 text-green-600 mx-auto mb-2">
+                <Check className="h-5 w-5" />
               </div>
-              <div className="flex flex-col items-center space-y-3 p-6 rounded-2xl bg-background/50 backdrop-blur-sm border border-border/30">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <MessageCircle className="h-6 w-6 text-primary" />
-                </div>
-                <h4 className="text-lg font-bold text-foreground">24/7 Support</h4>
-                <p className="text-sm text-muted-foreground">Always here to help you succeed</p>
-              </div>
-              <div className="flex flex-col items-center space-y-3 p-6 rounded-2xl bg-background/50 backdrop-blur-sm border border-border/30">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary/10">
-                  <ThumbsUp className="h-6 w-6 text-secondary-foreground" />
-                </div>
-                <h4 className="text-lg font-bold text-foreground">100% Satisfaction</h4>
-                <p className="text-sm text-muted-foreground">Your success is our priority</p>
-              </div>
+              <h4 className="font-semibold text-foreground">99.9% Uptime</h4>
+              <p className="text-sm text-muted-foreground mt-1">Reliable platform</p>
             </div>
-          </SectionTransition>
+            <div className="rounded-xl border border-border/50 bg-card p-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary mx-auto mb-2">
+                <MessageCircle className="h-5 w-5" />
+              </div>
+              <h4 className="font-semibold text-foreground">24/7 Support</h4>
+              <p className="text-sm text-muted-foreground mt-1">Always here to help</p>
+            </div>
+            <div className="rounded-xl border border-border/50 bg-card p-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary/10 text-secondary-foreground mx-auto mb-2">
+                <ThumbsUp className="h-5 w-5" />
+              </div>
+              <h4 className="font-semibold text-foreground">100% Satisfaction</h4>
+              <p className="text-sm text-muted-foreground mt-1">Your success is our priority</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -798,7 +712,7 @@ export default function Home() {
 
                 <SectionTransition variant="slide" direction="up" delay={800}>
                   <HoverButton size="lg" variant="secondary" className="text-base h-14 px-10 shadow-2xl bg-white text-primary hover:bg-white/90">
-                    <Link href="/get-started">
+                    <Link href="/signup">
                       Join as Freelancer
                     </Link>
                   </HoverButton>
@@ -983,7 +897,7 @@ export default function Home() {
                       variant="outline"
                       className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 hover:border-primary shadow-2xl group-hover:scale-105 transition-all duration-300"
                     >
-                      <Link href="/get-started" className="flex items-center gap-3">
+                      <Link href="/signup" className="flex items-center gap-3">
                         <Rocket className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
                         Become a Freelancer
                         <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />

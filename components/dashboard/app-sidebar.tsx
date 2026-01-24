@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import {
   Sidebar,
   SidebarContent,
@@ -18,7 +20,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -43,6 +44,9 @@ export function AppSidebar() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { isMobile, setOpenMobile } = useSidebar();
+  const { resolvedTheme } = useTheme();
+
+  const logoSrc = resolvedTheme === "dark" ? "/logo-dark.png" : "/logo-light.png";
 
   const navigationItems = React.useMemo(() => {
     if (!user) return [];
@@ -110,12 +114,15 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard" onClick={closeMobileSidebar} className="">
-                <Logo 
-                  width={32} 
-                  height={32} 
-                  className="h-8 w-8 shrink-0" 
-                  priority 
+              <Link href="/dashboard" onClick={closeMobileSidebar} className="flex items-center gap-3">
+                <Image
+                  key={logoSrc}
+                  src={logoSrc}
+                  alt="49GIG"
+                  width={180}
+                  height={60}
+                  className="h-10 w-auto shrink-0 object-contain object-left"
+                  priority
                 />
                 <div className={cn(
                   "grid flex-1 text-left text-sm leading-tight min-w-0",

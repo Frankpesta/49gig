@@ -45,10 +45,8 @@ function getAssessmentType(skillName: string): "mcq" | "coding" | "portfolio" {
   
   // Writing/content skills use portfolio
   const portfolioSkills = [
-    "writing", "content", "copywriting", "technical writing", "blog",
-    "seo content", "creative writing", "content strategy", "data science",
-    "data analyst", "ui/ux", "design", "figma", "sketch", "marketing",
-    "digital marketing", "seo", "ppc", "social media"
+    "technical writing", "data science",
+    "data analyst", "ui/ux", "design", "figma", "sketch"
   ];
   
   if (portfolioSkills.some(s => skillLower.includes(s))) {

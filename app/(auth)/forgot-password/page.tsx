@@ -15,7 +15,10 @@ import {
 } from "@/components/ui/card";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Logo } from "@/components/ui/logo";
+import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
+
+const authCardClass =
+  "rounded-xl border border-border/60 bg-card shadow-lg";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -46,141 +49,90 @@ export default function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen">
-        {/* Left Column - Branding */}
-        <div className="hidden lg:flex lg:flex-1 lg:flex-col lg:justify-between bg-gradient-to-br from-primary/10 via-primary/5 to-background p-12">
-          <div className="space-y-8">
-            <Logo width={140} height={45} priority />
-          </div>
-          <div className="text-sm text-muted-foreground">
-            © 2025 49GIG. All rights reserved.
-          </div>
-        </div>
-
-        {/* Right Column - Form */}
-        <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-md space-y-8">
-            {/* Mobile Logo */}
-            <div className="lg:hidden flex items-center justify-center pb-8">
-              <Logo width={120} height={38} priority />
-            </div>
-
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                Check your email
-              </h1>
-              <p className="text-muted-foreground">
-                We've sent a password reset link
-              </p>
-            </div>
-            <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-            <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-              <CardTitle className="text-2xl font-heading font-semibold">
-                Email Sent
-              </CardTitle>
-              <CardDescription>
-                We've sent a password reset link to {email}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="px-8 pb-8 pt-0">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                If an account exists with this email, you'll receive instructions
-                to reset your password. Please check your spam folder if you don't
-                see it.
-              </p>
-            </CardContent>
-            <CardFooter className="px-8 pb-8">
-              <Link href="/login" className="w-full">
-                <Button variant="outline" className="w-full h-11 text-base font-medium border-2">
-                  Back to Sign In
-                </Button>
-              </Link>
-            </CardFooter>
-          </Card>
-          </div>
-        </div>
-      </div>
+      <AuthTwoColumnLayout
+        leftTitle="Reset your password"
+        leftDescription="We'll send you a secure link to create a new password. Keep it safe."
+        badge="Email sent"
+        heading="Check your email"
+        subline={`We've sent a password reset link to ${email}`}
+      >
+        <Card className={authCardClass}>
+          <CardHeader className="space-y-1 px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+            <CardTitle className="text-xl font-semibold">Email sent</CardTitle>
+            <CardDescription>
+              If an account exists with this email, you&apos;ll receive instructions to
+              reset your password. Check your spam folder if you don&apos;t see it.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="border-t border-border/60 px-6 sm:px-8 py-6">
+            <Link href="/login" className="w-full">
+              <Button
+                variant="outline"
+                className="w-full h-11 rounded-lg text-sm font-medium border-border/80"
+              >
+                Back to sign in
+              </Button>
+            </Link>
+          </CardFooter>
+        </Card>
+      </AuthTwoColumnLayout>
     );
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Column - Branding */}
-      <div className="hidden lg:flex lg:flex-1 lg:flex-col lg:justify-between bg-gradient-to-br from-primary/10 via-primary/5 to-background p-12">
-        <div className="space-y-8">
-          <Logo width={140} height={45} priority />
-        </div>
-        <div className="text-sm text-muted-foreground">
-          © 2025 49GIG. All rights reserved.
-        </div>
-      </div>
-
-      {/* Right Column - Form */}
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-md space-y-8">
-          {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center justify-center pb-8">
-            <Logo width={120} height={38} priority />
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">
-              Reset your password
-            </h1>
-            <p className="text-muted-foreground">
-              Enter your email to receive a reset link
-            </p>
-          </div>
-          <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
-          <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-            <CardTitle className="text-2xl font-heading font-semibold">
-              Forgot Password
-            </CardTitle>
+    <AuthTwoColumnLayout
+      leftTitle="Reset your password"
+      leftDescription="We'll send you a secure link to create a new password. Keep it safe."
+      heading="Reset your password"
+      subline="Enter your email to receive a reset link."
+    >
+      <Card className={authCardClass}>
+        <form onSubmit={handleSubmit}>
+          <CardHeader className="space-y-1 px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
+            <CardTitle className="text-xl font-semibold">Forgot password</CardTitle>
             <CardDescription>
-              Enter your email address and we'll send you a link to reset your password
+              Enter your email address and we&apos;ll send you a link to reset your password.
             </CardDescription>
           </CardHeader>
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-6 px-8 pb-8 pt-0">
-              {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-              <div className="space-y-3">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email address
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={isLoading}
-                  className="h-11"
-                />
+          <CardContent className="space-y-5 px-6 sm:px-8 pb-6 pt-0">
+            {error && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
               </div>
-              <div className="pt-2">
-                <Button type="submit" className="w-full h-11 text-base font-medium" disabled={isLoading}>
-                  {isLoading ? "Sending..." : "Send Reset Link"}
-                </Button>
-              </div>
-            </CardContent>
-          </form>
-          <CardFooter className="pt-8 pb-8 px-8 border-t">
-            <Link
-              href="/login"
-              className="text-center text-sm text-primary hover:underline font-semibold w-full"
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={isLoading}
+                className="h-11 rounded-lg"
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full h-11 rounded-lg text-sm font-medium"
+              disabled={isLoading}
             >
-              Back to Sign In
-            </Link>
-          </CardFooter>
-        </Card>
-        </div>
-      </div>
-    </div>
+              {isLoading ? "Sending…" : "Send reset link"}
+            </Button>
+          </CardContent>
+        </form>
+        <CardFooter className="border-t border-border/60 px-6 sm:px-8 py-6">
+          <Link
+            href="/login"
+            className="text-center text-sm font-semibold text-primary hover:underline w-full block"
+          >
+            Back to sign in
+          </Link>
+        </CardFooter>
+      </Card>
+    </AuthTwoColumnLayout>
   );
 }
-

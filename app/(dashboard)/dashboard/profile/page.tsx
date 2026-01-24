@@ -69,6 +69,7 @@ export default function ProfilePage() {
 
     setIsSaving(true);
     try {
+      const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
       await updateProfile({
         name: formData.name,
         profile: {
@@ -83,6 +84,7 @@ export default function ProfilePage() {
           portfolioUrl: formData.portfolioUrl || undefined,
         },
         userId: user._id,
+        sessionToken: sessionToken || undefined,
       });
       // Show success message (you can add a toast here)
     } catch (error) {

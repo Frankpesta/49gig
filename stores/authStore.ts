@@ -22,7 +22,7 @@ export interface User {
     // Freelancer profile fields
     bio?: string;
     skills?: string[];
-    techField?: "development" | "data_science" | "technical_writing" | "design" | "marketing" | "other";
+    techField?: "development" | "data_science" | "technical_writing" | "design" | "other";
     experienceLevel?: "junior" | "mid" | "senior" | "expert";
     languagesWritten?: string[];
     hourlyRate?: number;

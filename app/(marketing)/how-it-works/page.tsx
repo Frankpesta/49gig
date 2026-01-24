@@ -502,7 +502,7 @@ export default function HowItWorksPage() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-6 justify-center">
                   <HoverButton size="lg" glow className="text-lg h-16 px-10 shadow-2xl bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary">
-                    <Link href="/get-started" className="flex items-center gap-3">
+                    <Link href="/signup" className="flex items-center gap-3">
                       <Rocket className="h-5 w-5" />
                       Apply as Freelancer
                       <ArrowRight className="h-5 w-5" />
@@ -513,7 +513,7 @@ export default function HowItWorksPage() {
                     variant="outline"
                     className="text-lg h-16 px-10 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-xl"
                   >
-                    <Link href="/get-started" className="flex items-center gap-3">
+                    <Link href="/signup" className="flex items-center gap-3">
                       <Users className="h-5 w-5" />
                       Join 49GIG Community
                       <ArrowRight className="h-5 w-5" />
@@ -751,7 +751,7 @@ export default function HowItWorksPage() {
                       variant="outline"
                       className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl group-hover:scale-105 transition-all duration-300"
                     >
-                      <Link href="/get-started" className="flex items-center gap-3">
+                      <Link href="/signup" className="flex items-center gap-3">
                         <Rocket className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
                         Become a Freelancer
                         <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />

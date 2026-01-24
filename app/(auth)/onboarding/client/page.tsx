@@ -76,6 +76,7 @@ export default function ClientOnboardingPage() {
     setIsLoading(true);
 
     try {
+      const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
       await updateProfile({
         profile: {
           companyName: formData.companyName,
@@ -86,6 +87,7 @@ export default function ClientOnboardingPage() {
           companyWebsite: formData.companyWebsite || undefined,
           country: formData.country,
         },
+        sessionToken: sessionToken || undefined,
       });
 
       toast.success("Profile updated successfully");

@@ -46,18 +46,6 @@ export default function UseCasesPage() {
       ],
     },
     {
-      icon: TrendingUp,
-      title: "Digital Marketing Campaigns",
-      description: "Engage digital marketers, social media managers, and content strategists for SEO, SEM, email marketing, and social campaigns. Monitor campaign performance and pay based on milestones.",
-      example: "An e-commerce brand can hire a marketing team to launch a 3-month social media campaign targeting international audiences.",
-      features: [
-        "SEO, SEM, and social campaigns",
-        "Performance monitoring",
-        "Milestone-based payments",
-        "Scale without full-time hires",
-      ],
-    },
-    {
       icon: Database,
       title: "Data Analytics & Insights",
       description: "Hire data analysts, data scientists, and BI experts to interpret business data and provide actionable insights. Use data to improve product decisions, marketing strategies, and operational efficiency.",
@@ -338,7 +326,7 @@ export default function UseCasesPage() {
               asChild 
               className="text-base h-12 px-8 bg-primary-foreground/10 border-2 border-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/20"
             >
-              <Link href="/get-started">
+              <Link href="/signup">
                 Join as a Freelancer
                 <ChevronRight className="ml-2 h-4 w-4" />
               </Link>

@@ -485,7 +485,7 @@ export default function AboutPage() {
                     variant="outline"
                     className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl"
                   >
-                    <Link href="/get-started" className="flex items-center gap-3">
+                    <Link href="/signup" className="flex items-center gap-3">
                       <Users className="h-6 w-6" />
                       Join as Freelancer
                       <ArrowRight className="h-6 w-6" />

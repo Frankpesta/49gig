@@ -148,7 +148,6 @@ export const signup = mutation({
             v.literal("data_science"),
             v.literal("technical_writing"),
             v.literal("design"),
-            v.literal("marketing"),
             v.literal("other")
           )
         ),

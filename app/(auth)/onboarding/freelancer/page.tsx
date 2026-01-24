@@ -30,7 +30,6 @@ const TECH_FIELDS = [
   { value: "data_science", label: "Data Science" },
   { value: "technical_writing", label: "Technical Writing" },
   { value: "design", label: "Design" },
-  { value: "marketing", label: "Marketing" },
   { value: "other", label: "Other" },
 ] as const;
 
@@ -184,6 +183,7 @@ export default function FreelancerOnboardingPage() {
     setIsLoading(true);
 
     try {
+      const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
       await updateProfile({
         profile: {
           techField: formData.techField as any,
@@ -191,6 +191,7 @@ export default function FreelancerOnboardingPage() {
           skills: formData.skills,
           languagesWritten: formData.languagesWritten,
         },
+        sessionToken: sessionToken || undefined,
       });
 
       toast.success("Profile updated successfully");
