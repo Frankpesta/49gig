@@ -5,10 +5,11 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/marketing/page-header";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
+  CheckCircle,
   Users,
   Briefcase,
   Shield,
@@ -45,7 +46,9 @@ import {
   Rocket,
   Workflow,
   MapPin,
-  Heart
+  Heart,
+  Brain,
+  Cloud
 } from "lucide-react";
 
 export default function ForFreelancersPage() {
@@ -98,9 +101,10 @@ export default function ForFreelancersPage() {
     { icon: Code, title: "Software Development", color: "primary" },
     { icon: Palette, title: "UI/UX & Product Design", color: "primary" },
     { icon: Database, title: "Data & Analytics", color: "primary" },
-    { icon: PenTool, title: "Writing & Content", color: "secondary" },
-    { icon: Users, title: "Product & Project Management", color: "secondary" },
-    { icon: HeadphonesIcon, title: "Customer Support", color: "secondary" },
+    { icon: Cloud, title: "DevOps & Cloud Engineering", color: "primary" },
+    { icon: Shield, title: "Cybersecurity & IT Infrastructure", color: "primary" },
+    { icon: Brain, title: "AI, Machine Learning & Blockchain", color: "primary" },
+    { icon: CheckCircle2, title: "Quality Assurance & Testing", color: "primary" },
   ];
 
   const howItWorksSteps = [
@@ -199,24 +203,16 @@ export default function ForFreelancersPage() {
 
           {/* Enhanced CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <HoverButton size="lg" glow className="text-lg h-16 px-12 shadow-2xl bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary border-0 group">
-              <Link href="/signup" className="flex items-center gap-3">
-                <Rocket className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                Apply as Freelancer
-                <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-              </Link>
-            </HoverButton>
-            <HoverButton
-              size="lg"
-              variant="outline"
-              className="text-lg h-16 px-12 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 hover:border-primary shadow-xl group"
-            >
-              <Link href="/how-it-works#freelancers" className="flex items-center gap-3">
-                <Workflow className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                See How It Works
-                <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-              </Link>
-            </HoverButton>
+            <CTAButton href="/signup" variant="primary" className="gap-3">
+              <Rocket className="h-6 w-6" />
+              Apply as Freelancer
+              <ArrowRight className="h-6 w-6" />
+            </CTAButton>
+            <CTAButton href="/how-it-works#freelancers" variant="secondary" className="gap-3">
+              <Workflow className="h-6 w-6" />
+              See How It Works
+              <ArrowRight className="h-6 w-6" />
+            </CTAButton>
           </div>
 
           {/* Trust Indicators */}
@@ -480,18 +476,16 @@ export default function ForFreelancersPage() {
             <div className="mt-20 text-center">
               <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-3xl p-8 border border-border/30">
                 <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
-                  Don't See Your Skill?
+                  Don&apos;t See Your Skill?
                 </h3>
                 <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
                   We support hundreds of specialized skills. Apply anyway—we might have opportunities that match your expertise.
                 </p>
-                <HoverButton size="lg" className="text-lg h-16 px-10 bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-2xl">
-                  <Link href="/signup" className="flex items-center gap-3">
-                    <Rocket className="h-5 w-5" />
-                    Apply for Any Skill
-                    <ArrowRight className="h-5 w-5" />
-                  </Link>
-                </HoverButton>
+                <CTAButton href="/signup" variant="primary" className="gap-3">
+                  <Rocket className="h-5 w-5" />
+                  Apply for Any Skill
+                  <ArrowRight className="h-5 w-5" />
+                </CTAButton>
               </div>
             </div>
           </SectionTransition>
@@ -933,31 +927,18 @@ export default function ForFreelancersPage() {
               {/* Enhanced CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <div className="group">
-                    <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 border-0 group-hover:scale-105 transition-all duration-300">
-                      <Link href="/signup" className="flex items-center gap-3">
-                        <Play className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        Apply as Freelancer
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/signup" variant="primary" className="gap-3">
+                    <Play className="h-6 w-6" />
+                    Apply as Freelancer
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <div className="group">
-                    <HoverButton
-                      size="lg"
-                      variant="outline"
-                      className="text-lg h-18 px-12 bg-secondary-foreground/10 backdrop-blur-xl border-2 border-secondary-foreground/30 hover:bg-secondary-foreground/5 hover:border-secondary shadow-2xl group-hover:scale-105 transition-all duration-300"
-                    >
-                      <Link href="/how-it-works#freelancers" className="flex items-center gap-3">
-                        <Workflow className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        See How It Works
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/how-it-works#freelancers" variant="secondary" className="gap-3">
+                    <Workflow className="h-6 w-6" />
+                    See How It Works
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
 

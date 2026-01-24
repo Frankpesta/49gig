@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/marketing/page-header";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   Users,
@@ -127,7 +127,7 @@ export default function AboutPage() {
     <div className="w-full">
       <PageHeader
         title="Our Story"
-        description="We're on a mission to unlock Africa's vast talent potential by connecting skilled, vetted professionals with global opportunities—delivering exceptional value, trust, and results for companies while empowering freelancers to thrive internationally."
+        description="We&apos;re on a mission to unlock Africa&apos;s vast talent potential by connecting skilled, vetted professionals with global opportunities—delivering exceptional value, trust, and results for companies while empowering freelancers to thrive internationally."
         badge={{
           icon: Building2,
           text: "About 49GIG"
@@ -430,8 +430,8 @@ export default function AboutPage() {
                       </div>
 
                       <div className="pt-4">
-                        <Button variant="outline" size="sm" className="border-primary/30 hover:bg-primary/5">
-                          <Link href={member.linkedin} className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild className="border-primary/30 hover:bg-primary/5">
+                          <Link href={member.linkedin} className="flex items-center gap-2" target="_blank" rel="noopener noreferrer">
                             LinkedIn
                             <ArrowRight className="h-3 w-3" />
                           </Link>
@@ -470,27 +470,18 @@ export default function AboutPage() {
 
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0">
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Briefcase className="h-6 w-6" />
-                      Hire Top Talent
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Briefcase className="h-6 w-6" />
+                    Hire Top Talent
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl"
-                  >
-                    <Link href="/signup" className="flex items-center gap-3">
-                      <Users className="h-6 w-6" />
-                      Join as Freelancer
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/signup" variant="secondary" className="gap-3">
+                    <Users className="h-6 w-6" />
+                    Join as Freelancer
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
             </div>

@@ -51,10 +51,10 @@ export default function ForgotPasswordPage() {
     return (
       <AuthTwoColumnLayout
         leftTitle="Reset your password"
-        leftDescription="We'll send you a secure link to create a new password. Keep it safe."
+        leftDescription="We&apos;ll send you a secure link to create a new password. Keep it safe."
         badge="Email sent"
         heading="Check your email"
-        subline={`We've sent a password reset link to ${email}`}
+        subline={`We&apos;ve sent a password reset link to ${email}`}
       >
         <Card className={authCardClass}>
           <CardHeader className="space-y-1 px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
@@ -82,7 +82,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthTwoColumnLayout
       leftTitle="Reset your password"
-      leftDescription="We'll send you a secure link to create a new password. Keep it safe."
+      leftDescription="We&apos;ll send you a secure link to create a new password. Keep it safe."
       heading="Reset your password"
       subline="Enter your email to receive a reset link."
     >

@@ -6,10 +6,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/marketing/page-header";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
+  CheckCircle,
   Users,
   Briefcase,
   Search,
@@ -28,12 +29,14 @@ import {
   ThumbsUp,
   Crown,
   Layers,
+  Shield,
+  Brain,
   Workflow,
   Code,
   Palette,
   Database,
-  PenTool,
-  HeadphonesIcon,
+  Cloud,
+  Cpu,
   UserCheck,
   FileText,
   Settings,
@@ -91,17 +94,56 @@ export default function TalentCategoriesPage() {
       startingPrice: 50
     },
     {
-      id: "management",
-      name: "Product & Project Management",
-      icon: Users,
-      description: "Experienced managers leading projects from concept to successful delivery",
-      color: "from-indigo-500 to-indigo-600",
-      bgColor: "from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900",
-      skills: ["Agile", "Scrum", "Product Strategy", "Project Planning", "Team Leadership"],
-      image: "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80",
-      freelancerCount: 480,
+      id: "devops",
+      name: "DevOps & Cloud Engineering",
+      icon: Cloud,
+      description: "Infrastructure experts automating deployments and managing cloud infrastructure",
+      color: "from-orange-500 to-orange-600",
+      bgColor: "from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900",
+      skills: ["Docker", "Kubernetes", "AWS", "Azure", "Terraform", "CI/CD", "Linux"],
+      image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80",
+      freelancerCount: 420,
       avgRating: 4.8,
       startingPrice: 55
+    },
+    {
+      id: "cybersecurity",
+      name: "Cybersecurity & IT Infrastructure",
+      icon: Shield,
+      description: "Security specialists protecting systems and infrastructure from threats",
+      color: "from-red-500 to-red-600",
+      bgColor: "from-red-50 to-red-100 dark:from-red-950 dark:to-red-900",
+      skills: ["Network Security", "Penetration Testing", "SIEM", "Compliance", "Risk Assessment"],
+      image: "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&q=80",
+      freelancerCount: 380,
+      avgRating: 4.9,
+      startingPrice: 60
+    },
+    {
+      id: "ai-ml",
+      name: "AI, Machine Learning & Blockchain",
+      icon: Brain,
+      description: "AI/ML engineers and blockchain developers building next-generation solutions",
+      color: "from-indigo-500 to-indigo-600",
+      bgColor: "from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900",
+      skills: ["Machine Learning", "Deep Learning", "TensorFlow", "Blockchain", "Smart Contracts", "Web3"],
+      image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80",
+      freelancerCount: 520,
+      avgRating: 4.8,
+      startingPrice: 65
+    },
+    {
+      id: "qa",
+      name: "Quality Assurance & Testing",
+      icon: CheckCircle,
+      description: "QA engineers ensuring software quality through comprehensive testing",
+      color: "from-teal-500 to-teal-600",
+      bgColor: "from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900",
+      skills: ["Test Automation", "Selenium", "Cypress", "QA", "Performance Testing", "API Testing"],
+      image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
+      freelancerCount: 310,
+      avgRating: 4.7,
+      startingPrice: 40
     }
   ];
 
@@ -303,12 +345,15 @@ export default function TalentCategoriesPage() {
                               <span>{category.avgRating}</span>
                             </div>
                           </div>
-                          <HoverButton size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                            <Link href={`/hire-talent?category=${category.id}`} className="flex items-center gap-2">
-                              Explore
-                              <ArrowRight className="h-3 w-3" />
-                            </Link>
-                          </HoverButton>
+                          <CTAButton
+                            href={`/hire-talent?category=${category.id}`}
+                            variant="primary"
+                            size="sm"
+                            className="gap-2"
+                          >
+                            Explore
+                            <ArrowRight className="h-3 w-3" />
+                          </CTAButton>
                         </div>
                       </div>
                     </div>
@@ -419,12 +464,10 @@ export default function TalentCategoriesPage() {
 
                       {/* CTA */}
                       <div className="mt-6">
-                        <HoverButton size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                          <Link href="/hire-talent" className="flex items-center justify-center gap-2">
-                            View Profile
-                            <ArrowRight className="h-3 w-3" />
-                          </Link>
-                        </HoverButton>
+                        <CTAButton href="/hire-talent" variant="primary" size="sm" className="w-full justify-center gap-2">
+                          View Profile
+                          <ArrowRight className="h-3 w-3" />
+                        </CTAButton>
                       </div>
                     </div>
                   </div>
@@ -551,27 +594,18 @@ export default function TalentCategoriesPage() {
 
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <HoverButton size="lg" glow className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0">
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Briefcase className="h-6 w-6" />
-                      Browse All Talent
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Briefcase className="h-6 w-6" />
+                    Browse All Talent
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl"
-                  >
-                    <Link href="/hire-team" className="flex items-center gap-3">
-                      <Users className="h-6 w-6" />
-                      Hire a Full Team
-                      <ArrowRight className="h-6 w-6" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-team" variant="secondary" className="gap-3">
+                    <Users className="h-6 w-6" />
+                    Hire a Full Team
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
 

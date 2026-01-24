@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
@@ -13,7 +13,6 @@ import {
   Palette,
   Database,
   TrendingUp,
-  PenTool,
   ArrowRight,
   Globe,
   Award,
@@ -40,7 +39,9 @@ import {
   TrendingUp as TrendingUpIcon,
   Crown,
   Layers,
-  Workflow
+  Workflow,
+  Cloud,
+  Brain
 } from "lucide-react";
 import { heroPoster } from "@/lib/african-tech-images";
 
@@ -103,15 +104,9 @@ export default function Home() {
     },
     {
       icon: Palette,
-      title: "Design & Creative",
-      description: "UI/UX, graphic design, and creative direction",
+      title: "UI/UX & Product Design",
+      description: "Creative designers crafting intuitive user experiences",
       image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80",
-    },
-    {
-      icon: TrendingUp,
-      title: "Marketing & Growth",
-      description: "Digital marketing, SEO, and growth strategy",
-      image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
     },
     {
       icon: Database,
@@ -120,16 +115,28 @@ export default function Home() {
       image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
     },
     {
-      icon: PenTool,
-      title: "Technical Writing",
-      description: "Technical documentation and writing services",
-      image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?w=800&q=80",
+      icon: Cloud,
+      title: "DevOps & Cloud Engineering",
+      description: "Infrastructure experts automating deployments",
+      image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80",
     },
     {
-      icon: Users,
-      title: "Product & Project Management",
-      description: "Product managers, scrum masters, and project leads",
-      image: "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80",
+      icon: Shield,
+      title: "Cybersecurity & IT Infrastructure",
+      description: "Security specialists protecting systems",
+      image: "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&q=80",
+    },
+    {
+      icon: Brain,
+      title: "AI, Machine Learning & Blockchain",
+      description: "AI/ML engineers and blockchain developers",
+      image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80",
+    },
+    {
+      icon: CheckCircle2,
+      title: "Quality Assurance & Testing",
+      description: "QA engineers ensuring software quality",
+      image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
     },
   ];
 
@@ -220,20 +227,22 @@ export default function Home() {
               Connect with the top 3% of vetted professionals across engineering, design, and growth. Build exceptional teams with confidence.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-4">
-              <Link
+              <CTAButton
                 href="/hire-talent"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-white px-6 text-sm font-semibold text-primary transition-colors hover:bg-white/95"
+                variant="primary"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-6 text-sm text-primary hover:bg-white/95 border-0"
               >
                 Hire Talent
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
+              </CTAButton>
+              <CTAButton
                 href="/signup"
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border-2 border-white/80 bg-white/10 px-6 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20 hover:border-white"
+                variant="secondary"
+                className="inline-flex h-11 items-center gap-2 rounded-lg border-2 border-white/80 bg-white/10 px-6 text-sm text-white backdrop-blur-sm hover:bg-white/20 hover:border-white hover:text-white"
               >
                 Apply as Freelancer
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </CTAButton>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-6 gap-y-1 text-sm text-white/85">
               <span className="flex items-center gap-2">
@@ -405,7 +414,7 @@ export default function Home() {
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 mb-16">
             {categories.map((category, index) => (
               <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative h-full cursor-pointer">
+                <Link href="/talent-categories" className="group relative h-full cursor-pointer block">
                   {/* Enhanced Hover Glow Effect */}
                   <div className="absolute inset-0 bg-linear-to-br from-primary/20 to-secondary/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl scale-110" />
 
@@ -463,7 +472,7 @@ export default function Home() {
                     {/* Hover Effect Overlay */}
                     <div className="absolute inset-0 bg-linear-to-br from-primary/0 via-secondary/0 to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
                   </div>
-                </div>
+                </Link>
               </SectionTransition>
             ))}
           </div>
@@ -479,18 +488,14 @@ export default function Home() {
                   Our platform supports hundreds of specialized skills. Tell us your requirements and we&apos;ll find the perfect match.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <HoverButton size="lg" className="text-base h-14 px-8 bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-2xl">
-                    <Link href="/hire-talent" className="flex items-center gap-2">
-                      <Search className="h-5 w-5" />
-                      Hire Custom Talent
-                    </Link>
-                  </HoverButton>
-                  <HoverButton size="lg" variant="outline" className="text-base h-14 px-8 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 hover:border-primary shadow-xl">
-                    <Link href="/talent-categories" className="flex items-center gap-2">
-                      <Layers className="h-5 w-5" />
-                      View All Categories
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+                    <Search className="h-5 w-5" />
+                    Hire Custom Talent
+                  </CTAButton>
+                  <CTAButton href="/talent-categories" variant="secondary" className="gap-2">
+                    <Layers className="h-5 w-5" />
+                    View All Categories
+                  </CTAButton>
                 </div>
               </div>
             </div>
@@ -663,23 +668,15 @@ export default function Home() {
                   Join thousands of successful projects. Start your journey today and experience the difference quality makes.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <HoverButton size="lg" glow className="text-lg h-16 px-10 shadow-2xl bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary">
-                    <Link href="/how-it-works" className="flex items-center gap-3">
-                      <Play className="h-5 w-5" />
-                      Learn More About Our Process
-                      <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </HoverButton>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-16 px-10 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 hover:border-primary shadow-xl"
-                  >
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Rocket className="h-5 w-5" />
-                      Start Your Project Now
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/how-it-works" variant="primary" className="gap-3">
+                    <Play className="h-5 w-5" />
+                    Learn More About Our Process
+                    <ArrowRight className="h-5 w-5" />
+                  </CTAButton>
+                  <CTAButton href="/hire-talent" variant="secondary" className="gap-3">
+                    <Rocket className="h-5 w-5" />
+                    Start Your Project Now
+                  </CTAButton>
                 </div>
               </div>
             </div>
@@ -740,11 +737,9 @@ export default function Home() {
                 </div>
 
                 <SectionTransition variant="slide" direction="up" delay={800}>
-                  <HoverButton size="lg" variant="secondary" className="text-base h-14 px-10 shadow-2xl bg-white text-primary hover:bg-white/90">
-                    <Link href="/signup">
-                      Join as Freelancer
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/signup" variant="secondary" className="bg-white text-primary hover:bg-white/90 border-0 hover:border-0">
+                    Join as Freelancer
+                  </CTAButton>
                 </SectionTransition>
               </div>
 
@@ -904,35 +899,18 @@ export default function Home() {
               {/* Enhanced CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <div className="group">
-                    <HoverButton
-                      size="lg"
-                      glow
-                      className="text-lg h-18 px-12 shadow-2xl bg-linear-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0 group-hover:scale-105 transition-all duration-300"
-                    >
-                      <Link href="/hire-talent" className="flex items-center gap-3">
-                        <Briefcase className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        Hire World-Class Talent
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Briefcase className="h-6 w-6" />
+                    Hire World-Class Talent
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <div className="group">
-                    <HoverButton
-                      size="lg"
-                      variant="outline"
-                      className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 hover:border-primary shadow-2xl group-hover:scale-105 transition-all duration-300"
-                    >
-                      <Link href="/signup" className="flex items-center gap-3">
-                        <Rocket className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        Become a Freelancer
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/signup" variant="secondary" className="gap-3">
+                    <Rocket className="h-6 w-6" />
+                    Become a Freelancer
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
 

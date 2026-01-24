@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { useTheme } from "next-themes";
 import { Facebook, Twitter, Linkedin, Instagram, Youtube } from "lucide-react";
-import { Logo } from "@/components/ui/logo";
 
 const footerLinks = {
   platform: {
@@ -79,6 +80,8 @@ const socialLinks = [
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const { resolvedTheme } = useTheme();
+  const logoSrc = resolvedTheme === "dark" ? "/logo-dark.png" : "/logo-light.png";
 
   return (
     <footer className="border-t border-border bg-background">
@@ -87,8 +90,16 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12">
           {/* Brand Column */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-block mb-3">
-              <Logo width={180} height={50} className="h-10 w-auto" priority />
+            <Link href="/" className="inline-block" aria-label="49GIG Home">
+              <Image
+                key={logoSrc}
+                src={logoSrc}
+                alt="49GIG"
+                width={100}
+                height={50}
+                className="h-auto w-auto object-contain object-left"
+                priority
+              />
             </Link>
             <p className="text-sm text-muted-foreground mb-6 max-w-xs">
               Connecting businesses with vetted, top-tier freelance talent. 

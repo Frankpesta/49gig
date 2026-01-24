@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/marketing/page-header";
-import { HoverButton } from "@/components/ui/hover-button";
+import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
   CheckCircle2,
@@ -71,24 +71,16 @@ export default function HowItWorksPage() {
 
         {/* Enhanced CTA Buttons with Better Design */}
         <div className="flex flex-col sm:flex-row gap-6 justify-center">
-          <HoverButton size="lg" glow className="text-lg h-16 px-10 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary">
-            <Link href="#clients" className="flex items-center gap-3">
-              <Briefcase className="h-5 w-5" />
-              For Clients
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-          </HoverButton>
-          <HoverButton
-            size="lg"
-            variant="outline"
-            className="text-lg h-16 px-10 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-xl"
-          >
-            <Link href="#freelancers" className="flex items-center gap-3">
-              <Users className="h-5 w-5" />
-              For Freelancers
-              <ArrowRight className="h-5 w-5" />
-            </Link>
-          </HoverButton>
+          <CTAButton href="#clients" variant="primary" className="gap-3">
+            <Briefcase className="h-5 w-5" />
+            For Clients
+            <ArrowRight className="h-5 w-5" />
+          </CTAButton>
+          <CTAButton href="#freelancers" variant="secondary" className="gap-3">
+            <Users className="h-5 w-5" />
+            For Freelancers
+            <ArrowRight className="h-5 w-5" />
+          </CTAButton>
         </div>
 
         {/* Trust Indicators */}
@@ -295,24 +287,16 @@ export default function HowItWorksPage() {
                   Start your project today and get matched with vetted African professionals who deliver exceptional results.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <HoverButton size="lg" glow className="text-lg h-16 px-10 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary">
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Play className="h-5 w-5" />
-                      Start a Project
-                      <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </HoverButton>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-16 px-10 bg-background/95 backdrop-blur-xl border-2 border-primary/30 hover:bg-primary/5 hover:border-primary shadow-xl"
-                  >
-                    <Link href="/hire-talent" className="flex items-center gap-3">
-                      <Users className="h-5 w-5" />
-                      Hire Vetted Talent
-                      <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Play className="h-5 w-5" />
+                    Start a Project
+                    <ArrowRight className="h-5 w-5" />
+                  </CTAButton>
+                  <CTAButton href="/hire-team" variant="secondary" className="gap-3">
+                    <Users className="h-5 w-5" />
+                    Hire a Team
+                    <ArrowRight className="h-5 w-5" />
+                  </CTAButton>
                 </div>
               </div>
             </div>
@@ -501,24 +485,16 @@ export default function HowItWorksPage() {
                   Join 49GIG today and get matched with serious international clients who value your skills.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <HoverButton size="lg" glow className="text-lg h-16 px-10 shadow-2xl bg-gradient-to-r from-secondary to-secondary/90 hover:from-secondary/90 hover:to-secondary">
-                    <Link href="/signup" className="flex items-center gap-3">
-                      <Rocket className="h-5 w-5" />
-                      Apply as Freelancer
-                      <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </HoverButton>
-                  <HoverButton
-                    size="lg"
-                    variant="outline"
-                    className="text-lg h-16 px-10 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-xl"
-                  >
-                    <Link href="/signup" className="flex items-center gap-3">
-                      <Users className="h-5 w-5" />
-                      Join 49GIG Community
-                      <ArrowRight className="h-5 w-5" />
-                    </Link>
-                  </HoverButton>
+                  <CTAButton href="/signup" variant="primary" className="gap-3">
+                    <Rocket className="h-5 w-5" />
+                    Apply as Freelancer
+                    <ArrowRight className="h-5 w-5" />
+                  </CTAButton>
+                  <CTAButton href="/for-freelancers" variant="secondary" className="gap-3">
+                    <Users className="h-5 w-5" />
+                    Learn More for Freelancers
+                    <ArrowRight className="h-5 w-5" />
+                  </CTAButton>
                 </div>
               </div>
             </div>
@@ -729,35 +705,18 @@ export default function HowItWorksPage() {
               {/* Enhanced CTA Buttons */}
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <div className="group">
-                    <HoverButton
-                      size="lg"
-                      glow
-                      className="text-lg h-18 px-12 shadow-2xl bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary border-0 group-hover:scale-105 transition-all duration-300"
-                    >
-                      <Link href="/hire-talent" className="flex items-center gap-3">
-                        <Briefcase className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        Hire World-Class Talent
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                    <Briefcase className="h-6 w-6" />
+                    Hire World-Class Talent
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
-
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <div className="group">
-                    <HoverButton
-                      size="lg"
-                      variant="outline"
-                      className="text-lg h-18 px-12 bg-background/95 backdrop-blur-xl border-2 border-secondary/30 hover:bg-secondary/5 hover:border-secondary shadow-2xl group-hover:scale-105 transition-all duration-300"
-                    >
-                      <Link href="/signup" className="flex items-center gap-3">
-                        <Rocket className="h-6 w-6 group-hover:rotate-12 transition-transform duration-300" />
-                        Become a Freelancer
-                        <ArrowRight className="h-6 w-6 group-hover:translate-x-2 transition-transform duration-300" />
-                      </Link>
-                    </HoverButton>
-                  </div>
+                  <CTAButton href="/signup" variant="secondary" className="gap-3">
+                    <Rocket className="h-6 w-6" />
+                    Become a Freelancer
+                    <ArrowRight className="h-6 w-6" />
+                  </CTAButton>
                 </SectionTransition>
               </div>
 

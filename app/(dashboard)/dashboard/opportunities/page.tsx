@@ -64,7 +64,7 @@ export default function OpportunitiesPage() {
             <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No opportunities yet</h3>
             <p className="text-sm text-muted-foreground text-center max-w-md">
-              We're working on finding the perfect projects for you. Check back soon!
+              We&apos;re working on finding the perfect projects for you. Check back soon!
             </p>
           </CardContent>
         </Card>
