@@ -48,14 +48,20 @@ export const executeCodingChallenge = action({
       v.object({
         input: v.string(),
         expectedOutput: v.string(),
+        isHidden: v.optional(v.boolean()),
       })
     ),
   },
   handler: async (ctx, args) => {
+    // Judge0 only needs input/expectedOutput; strip isHidden
+    const testCasesForJudge0 = args.testCases.map(({ input, expectedOutput }) => ({
+      input,
+      expectedOutput,
+    }));
     const results = await executeWithJudge0({
       code: args.code,
       language: args.language,
-      testCases: args.testCases,
+      testCases: testCasesForJudge0,
     });
 
     return results;
