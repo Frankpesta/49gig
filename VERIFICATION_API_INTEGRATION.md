@@ -38,13 +38,21 @@ Set in Convex Dashboard → Settings → Environment Variables.
 **Purpose:** Execute coding challenges for skill assessments
 
 **Configuration:**
+- **Direct Judge0** (ce.judge0.com or api.judge0.com): use `X-Auth-Token` (set `JUDGE0_API_KEY`).
+- **RapidAPI**: use `JUDGE0_RAPIDAPI_KEY` and `JUDGE0_RAPIDAPI_HOST`.
+
 ```bash
-JUDGE0_API_URL=https://api.judge0.com
-JUDGE0_API_KEY=your_api_key
+# Direct Judge0 (Judge0 CE or official) — auth header: X-Auth-Token
+JUDGE0_API_URL=https://ce.judge0.com
+JUDGE0_API_KEY=your_judge0_auth_token
+
 # OR RapidAPI:
+JUDGE0_API_URL=https://judge0-ce.p.rapidapi.com
 JUDGE0_RAPIDAPI_KEY=your_rapidapi_key
 JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
 ```
+
+When `wait=true` is not supported (e.g. official api.judge0.com), the integration automatically submits without wait and polls for the result.
 
 **Usage:** Action `executeCodingChallenge`; used by skill assessments.
 

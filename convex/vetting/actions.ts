@@ -244,6 +244,9 @@ async function executeWithJudge0(params: {
 
 /**
  * Submit code to Judge0 API
+ * - Direct Judge0 (ce.judge0.com / api.judge0.com): use X-Auth-Token
+ * - RapidAPI: use X-RapidAPI-Key and X-RapidAPI-Host
+ * - When wait=true is not supported (e.g. official api.judge0.com), poll for result
  */
 async function submitToJudge0(params: {
   code: string;
@@ -258,49 +261,100 @@ async function submitToJudge0(params: {
     "Content-Type": "application/json",
   };
 
-  // Use RapidAPI if available, otherwise use direct API
+  // Direct Judge0 API uses X-Auth-Token; RapidAPI uses X-RapidAPI-Key + X-RapidAPI-Host
   if (params.rapidApiKey && params.rapidApiHost) {
     headers["X-RapidAPI-Key"] = params.rapidApiKey;
     headers["X-RapidAPI-Host"] = params.rapidApiHost;
   } else if (params.apiKey) {
-    headers["X-RapidAPI-Key"] = params.apiKey;
+    headers["X-Auth-Token"] = params.apiKey;
   }
 
-  // Submit code
-  const submitResponse = await fetch(`${params.apiUrl}/submissions`, {
+  const baseUrl = params.apiUrl.replace(/\/$/, "");
+  const submitUrl = `${baseUrl}/submissions?wait=true`;
+
+  let submitResponse = await fetch(submitUrl, {
     method: "POST",
     headers,
     body: JSON.stringify({
       source_code: params.code,
       language_id: params.languageId,
       stdin: params.input,
-      wait: true, // Wait for execution to complete
     }),
   });
 
-  if (!submitResponse.ok) {
+  let submission: any;
+
+  // If wait is not allowed (e.g. official api.judge0.com), submit without wait and poll
+  if (submitResponse.status === 400) {
+    const errBody = await submitResponse.text();
+    if (errBody.includes("wait not allowed") || errBody.includes("wait")) {
+      const noWaitResponse = await fetch(`${baseUrl}/submissions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          source_code: params.code,
+          language_id: params.languageId,
+          stdin: params.input,
+        }),
+      });
+      if (!noWaitResponse.ok) {
+        const errorText = await noWaitResponse.text();
+        throw new Error(`Judge0 submission failed: ${errorText}`);
+      }
+      const created = await noWaitResponse.json();
+      const token = created.token;
+      if (!token) throw new Error("Judge0 did not return submission token");
+      submission = await pollJudge0Submission(baseUrl, token, headers);
+    } else {
+      throw new Error(`Judge0 submission failed: ${errBody}`);
+    }
+  } else if (submitResponse.ok) {
+    submission = await submitResponse.json();
+  } else {
     const errorText = await submitResponse.text();
     throw new Error(`Judge0 submission failed: ${errorText}`);
   }
 
-  const submission = await submitResponse.json();
-
-  // Check if execution completed successfully
-  if (submission.status?.id === 3) {
-    // Accepted
-    return submission;
-  } else if (submission.status?.id === 6) {
-    // Compilation Error
-    throw new Error(`Compilation error: ${submission.compile_output}`);
-  } else if (submission.status?.id === 5) {
-    // Time Limit Exceeded
-    throw new Error("Time limit exceeded");
-  } else if (submission.status?.id === 4) {
-    // Runtime Error
-    throw new Error(`Runtime error: ${submission.stderr}`);
-  } else {
-    throw new Error(`Execution failed with status: ${submission.status?.description}`);
+  // If we got a token but no status (async submit), poll
+  if (submission.token && (submission.status?.id === undefined || submission.status?.id === 1 || submission.status?.id === 2)) {
+    submission = await pollJudge0Submission(baseUrl, submission.token, headers);
   }
+
+  if (submission.status?.id === 3) {
+    return submission;
+  }
+  if (submission.status?.id === 6) {
+    throw new Error(`Compilation error: ${submission.compile_output || "Unknown"}`);
+  }
+  if (submission.status?.id === 5) {
+    throw new Error("Time limit exceeded");
+  }
+  if (submission.status?.id === 4) {
+    throw new Error(`Wrong answer or runtime: ${submission.stderr || submission.message || "Unknown"}`);
+  }
+  if (submission.status?.id >= 7) {
+    throw new Error(`Runtime error: ${submission.stderr || submission.message || submission.status?.description || "Unknown"}`);
+  }
+  throw new Error(`Execution failed: ${submission.status?.description || "Unknown status"}`);
+}
+
+/** Poll Judge0 until submission is no longer In Queue (1) or Processing (2) */
+async function pollJudge0Submission(
+  baseUrl: string,
+  token: string,
+  headers: Record<string, string>,
+  maxAttempts = 30,
+  intervalMs = 1000
+): Promise<any> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const res = await fetch(`${baseUrl}/submissions/${token}`, { headers });
+    if (!res.ok) throw new Error(`Judge0 get submission failed: ${await res.text()}`);
+    const submission = await res.json();
+    const statusId = submission.status?.id;
+    if (statusId !== 1 && statusId !== 2) return submission;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  throw new Error("Judge0 execution timed out while polling");
 }
 
 /**
