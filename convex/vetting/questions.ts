@@ -802,40 +802,406 @@ The most effective approach appears to be a collaborative model where AI augment
       },
     ],
   },
-  // Add more passages to reach 20+
-  ...Array.from({ length: 18 }, (_: unknown, i: number) => ({
-    id: `comp_${String(i + 3).padStart(3, "0")}`,
-    title: `Comprehension Passage ${i + 3}`,
-    passage: `Sample passage text ${i + 3}. Replace with actual comprehension passages covering various topics like technology, business, science, culture, etc.`,
-    wordCount: 150 + (i * 10),
-    difficulty: (["easy", "medium", "hard", "expert"] as QuestionDifficulty[])[i % 4],
+  {
+    id: "comp_003",
+    title: "The Gig Economy",
+    passage: `The gig economy refers to a labour market characterised by short-term contracts and freelance work rather than permanent jobs. Platforms like Uber, Fiverr, and Upwork have made it easier for people to offer their skills on a project-by-project basis. For workers, the appeal often lies in flexibility and the ability to choose when and where to work.
+
+Critics argue that gig workers lack job security, benefits such as health insurance, and stable income. Regulations vary widely by country; some governments are introducing laws to extend minimum wage and benefits to gig workers. The long-term impact of the gig economy on traditional employment remains a subject of debate among economists and policymakers.`,
+    wordCount: 130,
+    difficulty: "medium",
     questions: [
       {
-        id: `comp_${String(i + 3).padStart(3, "0")}_q1`,
-        question: "Sample question 1",
-        options: ["A", "B", "C", "D"],
-        correctAnswer: 0,
-        explanation: "Explanation",
-        difficulty: "medium" as QuestionDifficulty,
-      },
-      {
-        id: `comp_${String(i + 3).padStart(3, "0")}_q2`,
-        question: "Sample question 2",
-        options: ["A", "B", "C", "D"],
+        id: "comp_003_q1",
+        question: "What is the main characteristic of the gig economy?",
+        options: [
+          "Permanent employment with benefits.",
+          "Short-term contracts and freelance work.",
+          "Government-regulated minimum wage only.",
+          "Work limited to technology companies.",
+        ],
         correctAnswer: 1,
-        explanation: "Explanation",
-        difficulty: "medium" as QuestionDifficulty,
+        explanation: "The passage states that the gig economy is 'characterised by short-term contracts and freelance work rather than permanent jobs.'",
+        difficulty: "easy",
       },
       {
-        id: `comp_${String(i + 3).padStart(3, "0")}_q3`,
-        question: "Sample question 3",
-        options: ["A", "B", "C", "D"],
-        correctAnswer: 2,
-        explanation: "Explanation",
-        difficulty: "medium" as QuestionDifficulty,
+        id: "comp_003_q2",
+        question: "According to the passage, what do critics say about gig workers?",
+        options: [
+          "They earn more than traditional employees.",
+          "They lack job security and benefits such as health insurance.",
+          "They have too much flexibility.",
+          "They are over-regulated.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says critics argue that 'gig workers lack job security, benefits such as health insurance, and stable income.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_003_q3",
+        question: "What does the passage suggest about the future of the gig economy?",
+        options: [
+          "It will replace all traditional employment.",
+          "Its long-term impact is still debated.",
+          "All countries have agreed on regulations.",
+          "Gig workers will soon receive no benefits.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that 'The long-term impact of the gig economy on traditional employment remains a subject of debate.'",
+        difficulty: "medium",
       },
     ],
-  })),
+  },
+  {
+    id: "comp_004",
+    title: "Effective Communication in Teams",
+    passage: `Effective communication is essential for successful teamwork. When team members share information clearly and listen actively, projects move forward with fewer misunderstandings. Best practices include setting clear goals, holding regular check-ins, and using the right channels—whether email, chat, or video calls—for different types of messages.
+
+Barriers to effective communication can include cultural differences, unclear roles, and poor feedback habits. Teams that invest in communication skills often see higher productivity and better morale. In remote or hybrid settings, written communication and asynchronous updates become even more important to keep everyone aligned.`,
+    wordCount: 115,
+    difficulty: "medium",
+    questions: [
+      {
+        id: "comp_004_q1",
+        question: "What does the passage recommend for effective teamwork?",
+        options: [
+          "Avoiding regular meetings.",
+          "Setting clear goals and holding regular check-ins.",
+          "Using only email for all messages.",
+          "Limiting communication to reduce noise.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage lists 'setting clear goals, holding regular check-ins' as best practices.",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_004_q2",
+        question: "Which of the following is mentioned as a barrier to communication?",
+        options: [
+          "Too many video calls.",
+          "Cultural differences and unclear roles.",
+          "Excessive written documentation.",
+          "Lack of technology.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that barriers 'can include cultural differences, unclear roles, and poor feedback habits.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_004_q3",
+        question: "Why does the passage say written communication matters in remote settings?",
+        options: [
+          "It replaces all other forms of communication.",
+          "It keeps everyone aligned when work is asynchronous.",
+          "It is required by law.",
+          "It is faster than video calls.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says 'written communication and asynchronous updates become even more important to keep everyone aligned' in remote or hybrid settings.",
+        difficulty: "medium",
+      },
+    ],
+  },
+  {
+    id: "comp_005",
+    title: "Climate Change and Business",
+    passage: `Climate change is increasingly influencing how businesses operate. Many companies now set carbon reduction targets, invest in renewable energy, and report their environmental impact to stakeholders. Consumers and investors are paying closer attention to sustainability, which has led to a rise in green products and responsible investing.
+
+Adapting to a low-carbon economy involves both risks and opportunities. Businesses that fail to prepare may face regulatory penalties and reputational damage. Those that innovate—for example, by improving supply chain efficiency or developing sustainable products—can gain a competitive advantage and attract talent who care about environmental issues.`,
+    wordCount: 115,
+    difficulty: "hard",
+    questions: [
+      {
+        id: "comp_005_q1",
+        question: "What are companies doing in response to climate change, according to the passage?",
+        options: [
+          "Ignoring environmental impact.",
+          "Setting carbon reduction targets and investing in renewable energy.",
+          "Moving all operations offshore.",
+          "Reducing reporting to stakeholders.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that 'Many companies now set carbon reduction targets, invest in renewable energy, and report their environmental impact.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_005_q2",
+        question: "What does the passage say about businesses that do not prepare for a low-carbon economy?",
+        options: [
+          "They will always outperform competitors.",
+          "They may face regulatory penalties and reputational damage.",
+          "They will receive government subsidies.",
+          "They have no risks.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says businesses 'that fail to prepare may face regulatory penalties and reputational damage.'",
+        difficulty: "medium",
+      },
+      {
+        id: "comp_005_q3",
+        question: "How can companies gain a competitive advantage in this context?",
+        options: [
+          "By avoiding any sustainability reporting.",
+          "By innovating with supply chain efficiency or sustainable products.",
+          "By relocating to countries with fewer regulations.",
+          "By reducing workforce size.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that businesses that innovate, e.g. 'by improving supply chain efficiency or developing sustainable products,' can gain a competitive advantage.",
+        difficulty: "medium",
+      },
+    ],
+  },
+  {
+    id: "comp_006",
+    title: "Time Management for Professionals",
+    passage: `Time management is a skill that can be learned and improved. Key strategies include prioritising tasks by importance and urgency, blocking time for focused work, and minimising distractions. Many professionals use techniques such as the Eisenhower Matrix or time-blocking to structure their day.
+
+Delegation is another important aspect: not every task needs to be done by the same person. Learning to say no to low-value requests and to set boundaries helps protect time for high-impact work. Regular review of how time is spent can reveal patterns and opportunities for improvement.`,
+    wordCount: 105,
+    difficulty: "easy",
+    questions: [
+      {
+        id: "comp_006_q1",
+        question: "What does the passage say about time management?",
+        options: [
+          "It is a fixed trait that cannot be changed.",
+          "It is a skill that can be learned and improved.",
+          "It only works for senior executives.",
+          "It requires expensive software.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that 'Time management is a skill that can be learned and improved.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_006_q2",
+        question: "Which strategy is mentioned in the passage?",
+        options: [
+          "Working longer hours only.",
+          "Prioritising tasks by importance and urgency.",
+          "Avoiding all meetings.",
+          "Doing all tasks personally.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage lists 'prioritising tasks by importance and urgency' as a key strategy.",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_006_q3",
+        question: "Why does the passage recommend delegation?",
+        options: [
+          "To reduce the number of employees.",
+          "Because not every task needs to be done by the same person.",
+          "To avoid learning new skills.",
+          "To increase meeting time.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says 'not every task needs to be done by the same person' when discussing delegation.",
+        difficulty: "medium",
+      },
+    ],
+  },
+  {
+    id: "comp_007",
+    title: "Digital Transformation",
+    passage: `Digital transformation refers to the integration of digital technology into all areas of a business, changing how it operates and delivers value to customers. It often involves updating legacy systems, training staff, and rethinking processes from a customer perspective. Success depends on leadership commitment and a culture that supports change.
+
+Not every digital initiative succeeds. Some projects fail because of resistance to change, poor planning, or a disconnect between technology and business goals. Organisations that take a phased approach, involve employees early, and align technology with strategy are more likely to achieve lasting benefits.`,
+    wordCount: 110,
+    difficulty: "hard",
+    questions: [
+      {
+        id: "comp_007_q1",
+        question: "What is digital transformation, according to the passage?",
+        options: [
+          "Replacing all employees with automation.",
+          "Integration of digital technology into all areas of a business.",
+          "Selling only online.",
+          "Using only legacy systems.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage defines it as 'the integration of digital technology into all areas of a business.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_007_q2",
+        question: "What does success in digital transformation depend on?",
+        options: [
+          "Spending the most money.",
+          "Leadership commitment and a culture that supports change.",
+          "Avoiding any training.",
+          "Keeping all legacy systems unchanged.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that 'Success depends on leadership commitment and a culture that supports change.'",
+        difficulty: "medium",
+      },
+      {
+        id: "comp_007_q3",
+        question: "Why do some digital initiatives fail?",
+        options: [
+          "Because technology is too cheap.",
+          "Due to resistance to change, poor planning, or disconnect between technology and goals.",
+          "Because employees are too skilled.",
+          "Because customers prefer legacy systems.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says projects 'fail because of resistance to change, poor planning, or a disconnect between technology and business goals.'",
+        difficulty: "medium",
+      },
+    ],
+  },
+  {
+    id: "comp_008",
+    title: "Cross-Cultural Collaboration",
+    passage: `Working with colleagues and clients from different cultures requires awareness and adaptability. Communication styles, attitudes toward hierarchy, and expectations around deadlines can vary significantly. For example, in some cultures direct feedback is valued, while in others it may be seen as rude. Similarly, the meaning of "soon" or "urgent" can differ.
+
+Building trust across cultures often takes time and patience. Simple steps include learning basic greetings, showing respect for local customs, and avoiding assumptions. When in doubt, asking clarifying questions and confirming understanding in writing can prevent misunderstandings and strengthen working relationships.`,
+    wordCount: 115,
+    difficulty: "medium",
+    questions: [
+      {
+        id: "comp_008_q1",
+        question: "What can vary across cultures, according to the passage?",
+        options: [
+          "Only language.",
+          "Communication styles, attitudes toward hierarchy, and expectations around deadlines.",
+          "Only dress codes.",
+          "Only time zones.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that 'Communication styles, attitudes toward hierarchy, and expectations around deadlines can vary significantly.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_008_q2",
+        question: "Why might direct feedback be perceived differently?",
+        options: [
+          "Because it is always wrong.",
+          "In some cultures it is valued; in others it may be seen as rude.",
+          "Because it is never used in business.",
+          "Because it is illegal in some countries.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says 'in some cultures direct feedback is valued, while in others it may be seen as rude.'",
+        difficulty: "medium",
+      },
+      {
+        id: "comp_008_q3",
+        question: "What does the passage recommend to prevent misunderstandings?",
+        options: [
+          "Avoiding all written communication.",
+          "Asking clarifying questions and confirming understanding in writing.",
+          "Using only one language globally.",
+          "Skipping introductions.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage recommends 'asking clarifying questions and confirming understanding in writing' to prevent misunderstandings.",
+        difficulty: "medium",
+      },
+    ],
+  },
+  {
+    id: "comp_009",
+    title: "Customer Feedback and Product Development",
+    passage: `Listening to customer feedback is central to building products that people want. Feedback can come from surveys, support tickets, reviews, and direct conversations. Analysing this data helps teams identify pain points, prioritise features, and fix issues before they affect too many users.
+
+However, not all feedback should be treated equally. A single loud voice might not represent the majority; balancing feedback with data on usage and business goals is important. Teams that close the loop by informing customers when their suggestions are implemented often see higher loyalty and more constructive feedback in the future.`,
+    wordCount: 110,
+    difficulty: "medium",
+    questions: [
+      {
+        id: "comp_009_q1",
+        question: "How can companies gather customer feedback?",
+        options: [
+          "Only through sales calls.",
+          "Through surveys, support tickets, reviews, and direct conversations.",
+          "Only after a product is discontinued.",
+          "Only from internal staff.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that 'Feedback can come from surveys, support tickets, reviews, and direct conversations.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_009_q2",
+        question: "Why should not all feedback be treated equally?",
+        options: [
+          "Because feedback is always negative.",
+          "A single loud voice might not represent the majority.",
+          "Because customers never know what they want.",
+          "Because it is too expensive to analyse.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says 'A single loud voice might not represent the majority' and recommends balancing feedback with data.",
+        difficulty: "medium",
+      },
+      {
+        id: "comp_009_q3",
+        question: "What can happen when teams inform customers that their suggestions were implemented?",
+        options: [
+          "Customers always ask for refunds.",
+          "Higher loyalty and more constructive feedback.",
+          "Legal problems only.",
+          "No change in behaviour.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that teams that 'close the loop' often see 'higher loyalty and more constructive feedback in the future.'",
+        difficulty: "medium",
+      },
+    ],
+  },
+  {
+    id: "comp_010",
+    title: "Leadership and Accountability",
+    passage: `Effective leaders take responsibility for both successes and failures. When things go wrong, they do not blame others; instead, they focus on what can be learned and how to improve. This behaviour builds trust and encourages team members to take ownership of their work.
+
+Accountability also means setting clear expectations, following through on commitments, and giving honest feedback. Leaders who model accountability create a culture where people feel safe to admit mistakes and propose new ideas. Over time, this can lead to higher performance and better team cohesion.`,
+    wordCount: 100,
+    difficulty: "medium",
+    questions: [
+      {
+        id: "comp_010_q1",
+        question: "What do effective leaders do when things go wrong?",
+        options: [
+          "Blame others and avoid discussion.",
+          "Take responsibility and focus on what can be learned.",
+          "Hide the failure from the team.",
+          "Resign immediately.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says they 'do not blame others; instead, they focus on what can be learned and how to improve.'",
+        difficulty: "easy",
+      },
+      {
+        id: "comp_010_q2",
+        question: "What does accountability include, according to the passage?",
+        options: [
+          "Only celebrating wins.",
+          "Setting clear expectations, following through on commitments, and giving honest feedback.",
+          "Avoiding all feedback.",
+          "Delegating all responsibility.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage states that 'Accountability also means setting clear expectations, following through on commitments, and giving honest feedback.'",
+        difficulty: "medium",
+      },
+      {
+        id: "comp_010_q3",
+        question: "What kind of culture do leaders who model accountability create?",
+        options: [
+          "One where mistakes are punished severely.",
+          "One where people feel safe to admit mistakes and propose new ideas.",
+          "One where only the leader speaks.",
+          "One with no expectations.",
+        ],
+        correctAnswer: 1,
+        explanation: "The passage says such leaders 'create a culture where people feel safe to admit mistakes and propose new ideas.'",
+        difficulty: "medium",
+      },
+    ],
+  },
 ];
 
 // ========== SKILL MCQ QUESTIONS ==========
