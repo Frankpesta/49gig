@@ -46,7 +46,7 @@ export default function DataProtectionPage() {
 
             <h3>3.3 Legal Obligation</h3>
             <p>
-              Processing is necessary to comply with legal obligations (e.g., tax reporting, identity verification, anti-money laundering).
+              Processing is necessary to comply with legal obligations (e.g., tax reporting, anti-money laundering).
             </p>
 
             <h3>3.4 Consent</h3>
@@ -106,7 +106,7 @@ export default function DataProtectionPage() {
             <p>We process personal data for the following purposes:</p>
             <ul>
               <li>Account registration and management</li>
-              <li>Identity verification and vetting</li>
+              <li>Freelancer verification and vetting (English and skills tests)</li>
               <li>Matching clients with freelancers</li>
               <li>Facilitating contracts and project management</li>
               <li>Processing payments and payouts</li>
@@ -129,7 +129,7 @@ export default function DataProtectionPage() {
             </p>
             <ul>
               <li>Payment processors</li>
-              <li>Identity verification services</li>
+              <li>Verification and vetting services</li>
               <li>Cloud hosting providers</li>
               <li>Email and communication services</li>
               <li>Analytics providers</li>

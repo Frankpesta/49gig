@@ -433,25 +433,6 @@ export default defineSchema({
     // Freelancer
     freelancerId: v.id("users"),
 
-    // Identity Verification
-    identityVerification: v.object({
-      provider: v.union(
-        v.literal("smile_identity"),
-        v.literal("dojah")
-      ),
-      status: v.union(
-        v.literal("pending"),
-        v.literal("verified"),
-        v.literal("failed"),
-        v.literal("rejected")
-      ),
-      verifiedAt: v.optional(v.number()),
-      documentType: v.optional(v.string()),
-      documentNumber: v.optional(v.string()),
-      livenessCheck: v.optional(v.boolean()),
-      score: v.optional(v.number()), // 0-100
-    }),
-
     // English Proficiency
     englishProficiency: v.object({
       grammarScore: v.optional(v.number()), // 0-100
@@ -502,7 +483,7 @@ export default defineSchema({
     ),
 
     // Overall Scoring
-    overallScore: v.number(), // Weighted: Identity 20%, English 30%, Skills 50%
+    overallScore: v.number(), // Weighted: English 30%, Skills 70%
 
     // Status
     status: v.union(
@@ -521,7 +502,6 @@ export default defineSchema({
     // Verification Steps Tracking
     currentStep: v.optional(
       v.union(
-        v.literal("identity"),
         v.literal("english"),
         v.literal("skills"),
         v.literal("complete")

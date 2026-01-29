@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
@@ -7,11 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { IdentityUpload } from "@/components/vetting/identity-upload";
 import { EnglishTest } from "@/components/vetting/english-test";
 import { SkillSelection } from "@/components/vetting/skill-selection";
+import { useRouter } from "next/navigation";
 
 export default function VerificationPage() {
   const { user, isAuthenticated } = useAuth();
@@ -20,6 +21,9 @@ export default function VerificationPage() {
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
   const initializeVerification = useMutation(api.vetting.mutations.initializeVerification);
+  const completeVerification = useMutation(api.vetting.mutations.completeVerification);
+  const [submitting, setSubmitting] = useState(false);
+  const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(null);
 
   // Check if query is still loading (undefined) vs returned null (not a freelancer/not authenticated)
   if (verificationStatus === undefined) {
@@ -87,16 +91,10 @@ export default function VerificationPage() {
 
   const { verificationStatus: status, vettingResult } = verificationStatus;
   const stepsCompleted = vettingResult?.stepsCompleted || [];
-  const currentStep = vettingResult?.currentStep || "identity";
+  const currentStep = vettingResult?.currentStep || "english";
+  const router = useRouter();
 
   const steps = [
-    {
-      id: "identity",
-      name: "Identity Verification",
-      description: "Verify your identity with government-issued ID",
-      completed: stepsCompleted.includes("identity"),
-      inProgress: currentStep === "identity" && !stepsCompleted.includes("identity"),
-    },
     {
       id: "english",
       name: "English Proficiency",
@@ -140,17 +138,16 @@ export default function VerificationPage() {
               <ul className="space-y-2">
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-                  <span>Identity verification with government-issued ID</span>
+                  <span>English proficiency test (grammar, comprehension, writing) — minimum 50%</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-                  <span>English proficiency test (grammar, comprehension, writing)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-                  <span>Skill assessments for your chosen skills</span>
+                  <span>Skill assessments for your chosen skills — minimum 50%</span>
                 </li>
               </ul>
+              <p className="text-sm text-muted-foreground">
+                You must score at least 50% in both to continue. Otherwise your account will be removed from the platform.
+              </p>
             </div>
             <Button onClick={handleInitialize} size="lg" className="w-full">
               Start Verification Process
@@ -243,20 +240,6 @@ export default function VerificationPage() {
                       <p className="text-sm text-muted-foreground mt-1">
                         {step.description}
                       </p>
-                      {step.id === "identity" && vettingResult.identityVerification && (
-                        <div className="mt-2 text-sm">
-                          <span className="text-muted-foreground">Status: </span>
-                          <Badge
-                            variant={
-                              vettingResult.identityVerification.status === "verified"
-                                ? "default"
-                                : "secondary"
-                            }
-                          >
-                            {vettingResult.identityVerification.status}
-                          </Badge>
-                        </div>
-                      )}
                       {step.id === "english" &&
                         vettingResult.englishProficiency.overallScore && (
                           <div className="mt-2 text-sm">
@@ -308,14 +291,6 @@ export default function VerificationPage() {
           {/* Step Components */}
           {status === "in_progress" && (
             <div className="space-y-6">
-              {currentStep === "identity" && !stepsCompleted.includes("identity") && (
-                <IdentityUpload
-                  onComplete={() => {
-                    // Refresh verification status
-                    window.location.reload();
-                  }}
-                />
-              )}
               {currentStep === "english" && !stepsCompleted.includes("english") && (
                 <EnglishTest
                   onComplete={() => {
@@ -344,7 +319,67 @@ export default function VerificationPage() {
                   }}
                 />
               )}
+              {/* Submit verification when both steps are done */}
+              {stepsCompleted.includes("english") &&
+                stepsCompleted.includes("skills") &&
+                currentStep === "complete" && (
+                  <Card>
+                    <CardContent className="p-4">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        You have completed the English proficiency and skill assessments. Submit your verification for review.
+                      </p>
+                      <Button
+                        onClick={async () => {
+                          setSubmitting(true);
+                          try {
+                            const result = await completeVerification(
+                              user?._id ? { userId: user._id } : {}
+                            );
+                            if (result.accountDeleted) {
+                              setAccountDeletedMessage(result.message ?? "Your account has been removed.");
+                              setTimeout(() => router.push("/login"), 4000);
+                            } else {
+                              window.location.reload();
+                            }
+                          } catch (e) {
+                            console.error(e);
+                          } finally {
+                            setSubmitting(false);
+                          }
+                        }}
+                        disabled={submitting}
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          "Submit verification"
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
             </div>
+          )}
+
+          {/* Account deleted (failed minimum scores) */}
+          {accountDeletedMessage && (
+            <Card className="border-destructive">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-2">
+                  <XCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-medium text-destructive">We&apos;re sorry</p>
+                    <p className="text-sm text-muted-foreground mt-1">{accountDeletedMessage}</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Redirecting you to the login page...
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {status === "rejected" && (

@@ -61,7 +61,7 @@ export default function TermsPage() {
 
             <h3>4.3 Vetting Process</h3>
             <p>
-              Freelancers undergo an automated vetting process including identity verification, skills testing, and portfolio evaluation. While we strive to maintain high standards, we do not guarantee the quality, accuracy, or reliability of freelancer services.
+              Freelancers undergo an automated vetting process including English proficiency and skills testing. While we strive to maintain high standards, we do not guarantee the quality, accuracy, or reliability of freelancer services.
             </p>
 
             <h2>5. User Obligations</h2>

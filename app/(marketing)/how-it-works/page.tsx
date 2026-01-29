@@ -351,7 +351,7 @@ export default function HowItWorksPage() {
                   step: 2,
                   title: "Automated Vetting Process",
                   description: "All freelancers go through a strict, automated vetting process that includes:",
-                  items: ["Identity verification", "Skills testing", "Portfolio evaluation"],
+                  items: ["English proficiency test", "Skills testing"],
                   note: "Only top-scoring professionals are approved.",
                   image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
                   icon: Shield,

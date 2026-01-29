@@ -1,5 +1,6 @@
 import { mutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import { calculateOverallScore, checkFraudFlags } from "./engine";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -78,15 +79,11 @@ export const initializeVerification = mutation({
     // Create initial vetting result
     const vettingResultId = await ctx.db.insert("vettingResults", {
       freelancerId: user._id,
-      identityVerification: {
-        provider: "smile_identity",
-        status: "pending",
-      },
       englishProficiency: {},
       skillAssessments: [],
       overallScore: 0,
       status: "pending",
-      currentStep: "identity",
+      currentStep: "english",
       stepsCompleted: [],
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -123,115 +120,6 @@ export const initializeVerification = mutation({
     });
 
     return { vettingResultId };
-  },
-});
-
-/**
- * Generate upload URL for identity documents
- */
-export const generateIdentityUploadUrl = mutation({
-  args: {
-    userId: v.optional(v.id("users")),
-  },
-  handler: async (ctx, args) => {
-    const user = await getCurrentUserInMutation(ctx, args.userId);
-    
-    if (!user) {
-      throw new Error("Not authenticated");
-    }
-
-    if (user.role !== "freelancer") {
-      throw new Error("Only freelancers can upload verification documents");
-    }
-
-    const url = await ctx.storage.generateUploadUrl();
-    return { url };
-  },
-});
-
-/**
- * Submit identity verification documents
- */
-export const submitIdentityVerification = mutation({
-  args: {
-    documentType: v.string(),
-    documentNumber: v.string(),
-    documentImageId: v.id("_storage"),
-    selfieImageId: v.id("_storage"),
-    provider: v.union(v.literal("smile_identity"), v.literal("dojah")),
-    browserFingerprint: v.optional(v.string()),
-    ipAddress: v.optional(v.string()),
-    userId: v.optional(v.id("users")),
-  },
-  handler: async (ctx, args) => {
-    const user = await getCurrentUserInMutation(ctx, args.userId);
-    
-    if (!user) {
-      throw new Error("Not authenticated");
-    }
-
-    if (user.role !== "freelancer") {
-      throw new Error("Only freelancers can submit verification");
-    }
-
-    const vettingResult = await ctx.db
-      .query("vettingResults")
-      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
-      .first();
-
-    if (!vettingResult) {
-      throw new Error("Verification not initialized");
-    }
-
-    if (vettingResult.identityVerification.status === "verified") {
-      throw new Error("Identity already verified");
-    }
-
-    // Update identity verification status
-    await ctx.db.patch(vettingResult._id, {
-      identityVerification: {
-        ...vettingResult.identityVerification,
-        provider: args.provider,
-        status: "pending",
-        documentType: args.documentType,
-        documentNumber: args.documentNumber,
-      },
-      updatedAt: Date.now(),
-    });
-
-    // Create audit log
-    await ctx.db.insert("auditLogs", {
-      action: "identity_verification_submitted",
-      actionType: "system",
-      actorId: user._id,
-      actorRole: user.role,
-      targetType: "vettingResult",
-      targetId: vettingResult._id,
-      details: {
-        provider: args.provider,
-        documentType: args.documentType,
-        browserFingerprint: args.browserFingerprint,
-        ipAddress: args.ipAddress,
-      },
-      createdAt: Date.now(),
-    });
-
-    // Trigger identity verification action
-    const processIdentity = (api as any).vetting.actions.processIdentityVerification;
-    await ctx.scheduler.runAfter(0, processIdentity, {
-      vettingResultId: vettingResult._id,
-      documentImageId: args.documentImageId,
-      selfieImageId: args.selfieImageId,
-      documentType: args.documentType,
-      documentNumber: args.documentNumber,
-      provider: args.provider,
-    });
-
-    return { 
-      success: true, 
-      message: "Identity verification submitted. Processing...",
-      vettingResultId: vettingResult._id,
-    };
   },
 });
 
@@ -491,7 +379,6 @@ export const submitSkillAssessment = mutation({
 
     // Recalculate overall score
     const overallScore = calculateOverallScore({
-      identityScore: vettingResult.identityVerification.score || 0,
       englishScore: vettingResult.englishProficiency.overallScore || 0,
       skillScores: updatedAssessments.map((a) => a.score),
     });
@@ -577,19 +464,14 @@ export const completeVerification = mutation({
       throw new Error("Verification not initialized");
     }
 
-    // Check all steps are completed
-    const requiredSteps = ["identity", "english", "skills"];
+    // Check all steps are completed (English + Skills only)
+    const requiredSteps = ["english", "skills"];
     const allStepsCompleted = requiredSteps.every((step) =>
       vettingResult.stepsCompleted.includes(step as any)
     );
 
     if (!allStepsCompleted) {
       throw new Error("Not all verification steps are completed");
-    }
-
-    // Check identity is verified
-    if (vettingResult.identityVerification.status !== "verified") {
-      throw new Error("Identity verification not completed");
     }
 
     // Check English proficiency is completed
@@ -602,16 +484,60 @@ export const completeVerification = mutation({
       throw new Error("At least one skill assessment is required");
     }
 
-    // Recalculate overall score
+    const englishScore = vettingResult.englishProficiency.overallScore;
+    const avgSkillScore =
+      vettingResult.skillAssessments.length > 0
+        ? vettingResult.skillAssessments.reduce((s, a) => s + a.score, 0) /
+          vettingResult.skillAssessments.length
+        : 0;
+
+    // Minimum 50% required in BOTH English and Skills; otherwise reject and delete account
+    const MIN_PERCENT = 50;
+    if (englishScore < MIN_PERCENT || avgSkillScore < MIN_PERCENT) {
+      await ctx.runMutation(internal.users.mutations.deleteUserAccountInternal, {
+        userId: user._id,
+        reason: "verification_failed_minimum_scores",
+      });
+
+      await ctx.db.patch(vettingResult._id, {
+        overallScore: calculateOverallScore({
+          englishScore,
+          skillScores: vettingResult.skillAssessments.map((a) => a.score),
+        }),
+        status: "rejected",
+        currentStep: "complete",
+        updatedAt: Date.now(),
+      });
+
+      await ctx.db.insert("auditLogs", {
+        action: "verification_failed_minimum_scores",
+        actionType: "system",
+        actorId: user._id,
+        actorRole: user.role,
+        targetType: "vettingResult",
+        targetId: vettingResult._id,
+        details: { englishScore, avgSkillScore, minRequired: MIN_PERCENT },
+        createdAt: Date.now(),
+      });
+
+      return {
+        success: false,
+        accountDeleted: true,
+        status: "rejected" as const,
+        message:
+          "We're sorry, but you didn't meet the minimum requirements (50% in both English proficiency and skills tests). Your account has been removed from the platform. Thank you for your interest.",
+      };
+    }
+
+    // Recalculate overall score (English 30%, Skills 70%)
     const overallScore = calculateOverallScore({
-      identityScore: vettingResult.identityVerification.score || 0,
-      englishScore: vettingResult.englishProficiency.overallScore || 0,
+      englishScore,
       skillScores: vettingResult.skillAssessments.map((a) => a.score),
     });
 
     // Determine status based on score and fraud flags
     let status: "approved" | "flagged" | "rejected" = "approved";
-    
+
     if (vettingResult.fraudFlags && vettingResult.fraudFlags.length > 0) {
       const criticalFlags = vettingResult.fraudFlags.filter(
         (f) => f.severity === "critical" || f.severity === "high"
@@ -622,7 +548,6 @@ export const completeVerification = mutation({
         status = "flagged";
       }
     } else if (overallScore < 70) {
-      // Minimum threshold
       status = "flagged";
     }
 
@@ -634,19 +559,16 @@ export const completeVerification = mutation({
       updatedAt: Date.now(),
     });
 
-    // Update user verification status
-    // Map vetting result status to user verification status
-    // Note: "flagged" from vettingResults maps to "pending_review" for users
     let userVerificationStatus: "not_started" | "in_progress" | "pending_review" | "approved" | "rejected" | "suspended" | undefined;
-    
+
     if (status === "approved") {
-      userVerificationStatus = "pending_review"; // Needs admin review before final approval
+      userVerificationStatus = "pending_review";
     } else if (status === "rejected") {
       userVerificationStatus = "rejected";
     } else if (status === "flagged") {
-      userVerificationStatus = "pending_review"; // Flagged cases need review
+      userVerificationStatus = "pending_review";
     } else {
-      userVerificationStatus = "in_progress"; // pending or in_progress from vetting
+      userVerificationStatus = "in_progress";
     }
 
     await ctx.db.patch(user._id, {
@@ -654,7 +576,6 @@ export const completeVerification = mutation({
       updatedAt: Date.now(),
     });
 
-    // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "verification_completed",
       actionType: "system",
@@ -690,6 +611,7 @@ export const completeVerification = mutation({
 
     return {
       success: true,
+      accountDeleted: false,
       status,
       overallScore,
       message:
@@ -872,53 +794,6 @@ export const rejectVerification = mutation({
 });
 
 /**
- * Update identity verification status (internal - called by actions)
- */
-export const updateIdentityVerification = mutation({
-  args: {
-    vettingResultId: v.id("vettingResults"),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("verified"),
-      v.literal("failed"),
-      v.literal("rejected")
-    ),
-    score: v.optional(v.number()),
-    livenessCheck: v.optional(v.boolean()),
-    verifiedAt: v.optional(v.number()),
-    provider: v.optional(v.union(v.literal("smile_identity"), v.literal("dojah"))),
-  },
-  handler: async (ctx, args) => {
-    const vettingResult = await ctx.db.get(args.vettingResultId);
-    if (!vettingResult) {
-      throw new Error("Vetting result not found");
-    }
-
-    await ctx.db.patch(args.vettingResultId, {
-      identityVerification: {
-        ...vettingResult.identityVerification,
-        status: args.status,
-        score: args.score,
-        livenessCheck: args.livenessCheck,
-        verifiedAt: args.verifiedAt,
-        provider: args.provider || vettingResult.identityVerification.provider,
-      },
-      updatedAt: Date.now(),
-    });
-
-    // Update steps completed if verified
-    if (args.status === "verified" && !vettingResult.stepsCompleted.includes("identity")) {
-      await ctx.db.patch(args.vettingResultId, {
-        stepsCompleted: [...vettingResult.stepsCompleted, "identity"],
-        currentStep: "english",
-      });
-    }
-
-    return { success: true };
-  },
-});
-
-/**
  * Update English written response score (internal - called by actions)
  */
 export const updateEnglishWrittenScore = mutation({
@@ -948,10 +823,8 @@ export const updateEnglishWrittenScore = mutation({
     });
 
     // Recalculate overall verification score
-    const identityScore = vettingResult.identityVerification.score || 0;
     const skillScores = vettingResult.skillAssessments.map((a) => a.score);
     const newOverallScore = calculateOverallScore({
-      identityScore,
       englishScore: overallScore,
       skillScores,
     });

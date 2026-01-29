@@ -35,24 +35,6 @@ OPENAI_API_KEY=your_openai_api_key_here
 **Note:** This should be set in Convex dashboard, not in `.env.local`
 Get your API key from: https://platform.openai.com/api-keys
 
-### Smile Identity (Identity Verification)
-```bash
-SMILE_IDENTITY_API_KEY=your_smile_identity_api_key_here
-SMILE_IDENTITY_PARTNER_ID=your_smile_identity_partner_id_here
-SMILE_IDENTITY_API_URL=https://api.smileidentity.com/v1
-```
-**Note:** These should be set in Convex dashboard
-Get your credentials from: https://docs.smileidentity.com/
-
-### Dojah (Fallback Identity Verification)
-```bash
-DOJAH_API_KEY=your_dojah_api_key_here
-DOJAH_APP_ID=your_dojah_app_id_here
-DOJAH_API_URL=https://api.dojah.io
-```
-**Note:** These should be set in Convex dashboard
-Get your credentials from: https://dojah.io/
-
 ### Judge0 (Coding Challenges)
 ```bash
 JUDGE0_API_URL=https://api.judge0.com
@@ -63,6 +45,26 @@ JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
 ```
 **Note:** These should be set in Convex dashboard
 Get your API key from: https://ce.judge0.com/ or https://rapidapi.com/judge0-official/api/judge0-ce
+
+### Pusher (Real-time Notifications)
+```bash
+# For Next.js frontend (.env.local)
+NEXT_PUBLIC_PUSHER_KEY=your_pusher_key_here
+NEXT_PUBLIC_PUSHER_CLUSTER=your_pusher_cluster_here
+```
+
+**For Convex Dashboard (Settings → Environment Variables):**
+```bash
+PUSHER_APP_ID=your_pusher_app_id_here
+PUSHER_KEY=your_pusher_key_here
+PUSHER_SECRET=your_pusher_secret_here
+PUSHER_CLUSTER=your_pusher_cluster_here
+```
+
+**Note:** 
+- The `PUSHER_KEY` and `PUSHER_CLUSTER` values should be the same for both Convex and `.env.local`
+- Get your credentials from: https://dashboard.pusher.com/
+- Create a new app in Pusher dashboard to get your keys
 
 ## Platform Configuration
 
