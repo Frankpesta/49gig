@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CodeEditor } from "./code-editor";
 import {
   Card,
   CardContent,
@@ -22,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { Clock, Upload, Code, FileText, CheckCircle2 } from "lucide-react";
+import { Clock, Upload, Code, FileText, CheckCircle2, Play, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
   getBrowserFingerprint,
@@ -60,6 +61,9 @@ export function SkillAssessment({
   const [codingChallenge, setCodingChallenge] = useState<any | null>(null);
   const [code, setCode] = useState<string>("");
   const [testResults, setTestResults] = useState<any[]>([]);
+  const [runLoading, setRunLoading] = useState(false);
+  const [codeLanguage, setCodeLanguage] = useState<string>("javascript");
+  const [outputPanelOpen, setOutputPanelOpen] = useState(true);
 
   // Portfolio state
   const [portfolioItems, setPortfolioItems] = useState<
@@ -222,7 +226,7 @@ export function SkillAssessment({
         if (codingChallenge) {
           const results = await executeCoding({
             code,
-            language: "javascript", // Would be determined by skill
+            language: codeLanguage,
             testCases: codingChallenge.testCases,
           });
 
@@ -420,23 +424,51 @@ export function SkillAssessment({
   }
 
   if (assessmentType === "coding") {
+    const visibleTestCases = codingChallenge?.testCases?.filter((tc: any) => !tc.isHidden) ?? [];
+    const passedCount = testResults.filter((r) => r.passed).length;
+    const totalCount = testResults.length;
+
     return (
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="overflow-hidden">
+        {/* IDE-style header: title, language, timer */}
+        <CardHeader className="border-b bg-muted/30 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle>{skillName} - Coding Challenge</CardTitle>
+              <CardTitle className="flex items-center gap-2 font-mono text-lg">
+                <Code className="h-5 w-5 text-primary" />
+                {skillName} — Coding Challenge
+              </CardTitle>
               <CardDescription>
-                Complete the coding challenge ({experienceLevel} level)
+                {experienceLevel} level · Complete the challenge and run tests
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              <span className="font-mono text-lg">{formatTime(timeRemaining)}</span>
+            <div className="flex items-center gap-3">
+              <Select value={codeLanguage} onValueChange={setCodeLanguage}>
+                <SelectTrigger className="w-[140px] font-mono">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="javascript">JavaScript</SelectItem>
+                  <SelectItem value="python">Python</SelectItem>
+                  <SelectItem value="typescript">TypeScript</SelectItem>
+                  <SelectItem value="java">Java</SelectItem>
+                  <SelectItem value="cpp">C++</SelectItem>
+                  <SelectItem value="c">C</SelectItem>
+                  <SelectItem value="csharp">C#</SelectItem>
+                  <SelectItem value="go">Go</SelectItem>
+                  <SelectItem value="rust">Rust</SelectItem>
+                  <SelectItem value="php">PHP</SelectItem>
+                  <SelectItem value="ruby">Ruby</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="flex items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 font-mono text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span>{formatTime(timeRemaining)}</span>
+              </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="p-0">
           <ErrorHandler
             error={error}
             onRetry={handleRetry}
@@ -444,83 +476,160 @@ export function SkillAssessment({
             title="Coding Challenge Error"
           />
           {codingChallenge && (
-            <>
-              <div className="space-y-2">
-                <h3 className="font-semibold">{codingChallenge.title}</h3>
-                <p className="text-sm text-muted-foreground">
+            <div className="flex flex-col">
+              {/* Problem panel */}
+              <div className="border-b bg-card px-4 py-4">
+                <h3 className="mb-1 font-semibold">{codingChallenge.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {codingChallenge.description}
                 </p>
+                {visibleTestCases.length > 0 && (
+                  <div className="mt-3 rounded-md border bg-muted/30 p-3 font-mono text-xs">
+                    <span className="text-muted-foreground">Sample: </span>
+                    <span className="text-foreground">
+                      Input <code className="rounded bg-muted px-1">{visibleTestCases[0].input}</code>
+                      {" → "}
+                      Output <code className="rounded bg-muted px-1">{visibleTestCases[0].expectedOutput}</code>
+                    </span>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="code">Your Solution:</Label>
-                <Textarea
-                  id="code"
+              {/* Code editor — IDE look */}
+              <div className="px-4 py-3">
+                <Label className="mb-2 block text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Your solution
+                </Label>
+                <CodeEditor
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  rows={15}
-                  className="font-mono text-sm"
-                  placeholder="Write your code here..."
+                  onChange={setCode}
+                  language={codeLanguage}
+                  height={360}
+                  className="ring-1 ring-border"
                 />
               </div>
 
-              {testResults.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Test Results:</Label>
-                  <div className="space-y-2">
-                    {testResults.map((result, index) => (
-                      <div
-                        key={index}
-                        className={`p-3 rounded border ${
-                          result.passed
-                            ? "bg-green-50 border-green-200"
-                            : "bg-red-50 border-red-200"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {result.passed ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          ) : (
-                            <Code className="h-4 w-4 text-red-600" />
-                          )}
-                          <span className="font-semibold">
-                            Test {index + 1}: {result.passed ? "Passed" : "Failed"}
-                          </span>
-                        </div>
-                        {!result.passed && (
-                          <div className="mt-2 text-sm text-muted-foreground">
-                            <p>Expected: {result.expectedOutput}</p>
-                            <p>Got: {result.actualOutput}</p>
-                            {result.error && <p className="text-red-600">{result.error}</p>}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+              {/* Toolbar: Run + Submit */}
+              <div className="flex items-center justify-between gap-2 border-t bg-muted/20 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="font-mono"
+                    disabled={runLoading}
+                    onClick={async () => {
+                      if (!codingChallenge) return;
+                      setRunLoading(true);
+                      setError(null);
+                      try {
+                        const results = await executeCoding({
+                          code,
+                          language: codeLanguage,
+                          testCases: codingChallenge.testCases,
+                        });
+                        setTestResults(results.results);
+                        setOutputPanelOpen(true);
+                      } catch (err) {
+                        setError(err instanceof Error ? err : new Error(String(err)));
+                      } finally {
+                        setRunLoading(false);
+                      }
+                    }}
+                  >
+                    {runLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Play className="mr-2 h-4 w-4" />
+                    )}
+                    Run tests
+                  </Button>
+                  {testResults.length > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      {passedCount}/{totalCount} passed
+                    </span>
+                  )}
                 </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={async () => {
-                    if (codingChallenge) {
-                      const results = await executeCoding({
-                        code,
-                        language: "javascript",
-                        testCases: codingChallenge.testCases,
-                      });
-                      setTestResults(results.results);
-                    }
-                  }}
-                >
-                  Run Tests
-                </Button>
-                <Button onClick={handleSubmit} className="flex-1">
-                  Submit Solution
+                <Button onClick={handleSubmit} size="sm">
+                  Submit solution
                 </Button>
               </div>
-            </>
+
+              {/* Output panel — test results */}
+              {(testResults.length > 0 || runLoading) && (
+                <div className="border-t">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium hover:bg-muted/50"
+                    onClick={() => setOutputPanelOpen(!outputPanelOpen)}
+                  >
+                    {outputPanelOpen ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    Output
+                    {testResults.length > 0 && (
+                      <span className="text-muted-foreground">
+                        ({passedCount}/{totalCount} tests passed)
+                      </span>
+                    )}
+                  </button>
+                  {outputPanelOpen && (
+                    <div className="max-h-[280px] overflow-auto border-t bg-[#1e1e1e] px-4 py-3 font-mono text-sm">
+                      {runLoading && testResults.length === 0 ? (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Running tests…
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {testResults.map((result: any, index: number) => (
+                            <div
+                              key={index}
+                              className={`rounded border px-3 py-2 ${
+                                result.passed
+                                  ? "border-emerald-800/50 bg-emerald-950/30 text-emerald-200"
+                                  : "border-red-900/50 bg-red-950/30 text-red-200"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {result.passed ? (
+                                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                                ) : (
+                                  <Code className="h-4 w-4 shrink-0 text-red-400" />
+                                )}
+                                <span className="font-medium">
+                                  Test {index + 1}: {result.passed ? "Passed" : "Failed"}
+                                </span>
+                              </div>
+                              {!result.passed && (
+                                <div className="mt-2 space-y-1 pl-6 text-xs text-muted-foreground">
+                                  <p>
+                                    <span className="text-muted-foreground">Input: </span>
+                                    <code className="rounded bg-black/30 px-1">{result.input}</code>
+                                  </p>
+                                  <p>
+                                    <span className="text-muted-foreground">Expected: </span>
+                                    <code className="rounded bg-black/30 px-1">{result.expectedOutput}</code>
+                                  </p>
+                                  <p>
+                                    <span className="text-muted-foreground">Got: </span>
+                                    <code className="rounded bg-black/30 px-1">{result.actualOutput || "(empty)"}</code>
+                                  </p>
+                                  {result.error && (
+                                    <p className="text-red-300">{result.error}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
