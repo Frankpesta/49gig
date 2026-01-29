@@ -1,4 +1,4 @@
-import { mutation } from "../_generated/server";
+import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -192,6 +192,53 @@ export const updateNotificationPreferences = mutation({
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Soft-delete a user by ID (internal - for system use e.g. verification failure)
+ */
+export const deleteUserAccountInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return;
+
+    if (user.status === "deleted") return;
+
+    const now = Date.now();
+    await ctx.db.patch(args.userId, {
+      status: "deleted",
+      updatedAt: now,
+    });
+
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const session of sessions) {
+      await ctx.db.patch(session._id, {
+        isActive: false,
+        revokedAt: now,
+        revokedReason: args.reason || "account_deleted",
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.insert("auditLogs", {
+      action: "account_deleted",
+      actionType: "system",
+      actorId: args.userId,
+      actorRole: user.role,
+      targetType: "user",
+      targetId: args.userId,
+      details: { reason: args.reason },
+      createdAt: now,
+    });
   },
 });
 

@@ -37,16 +37,14 @@ export default function AntiFraudPage() {
             </ul>
 
             <h2>4. Know Your Customer (KYC) Procedures</h2>
-            <h3>4.1 Identity Verification</h3>
+            <h3>4.1 Freelancer Verification</h3>
             <p>
-              All users must complete identity verification before accessing certain platform features, including:
+              Freelancers must complete English proficiency and skills testing before accessing platform features. Verification includes:
             </p>
             <ul>
-              <li>Full name verification</li>
-              <li>Government-issued ID verification (passport, driver's license, national ID)</li>
-              <li>Address verification</li>
-              <li>Date of birth confirmation</li>
-              <li>Biometric verification where applicable</li>
+              <li>English proficiency test (grammar, comprehension, writing)</li>
+              <li>Skills assessments (coding, MCQ, or portfolio as applicable)</li>
+              <li>Minimum score requirements; accounts may be removed if requirements are not met</li>
             </ul>
 
             <h3>4.2 Enhanced Due Diligence</h3>
@@ -167,7 +165,7 @@ export default function AntiFraudPage() {
               We maintain detailed records of:
             </p>
             <ul>
-              <li>User identity verification documents</li>
+              <li>Verification and vetting results (English and skills scores)</li>
               <li>Transaction history and details</li>
               <li>Communications and correspondence</li>
               <li>Suspicious activity reports</li>
@@ -217,7 +215,7 @@ export default function AntiFraudPage() {
               <li>Offers that seem too good to be true</li>
               <li>Requests for personal or financial information</li>
               <li>Poor communication or inconsistent information</li>
-              <li>Refusal to provide verification documents</li>
+              <li>Refusal to complete verification tests</li>
             </ul>
 
             <h2>13. Training and Awareness</h2>
@@ -227,7 +225,7 @@ export default function AntiFraudPage() {
 
             <h2>14. Third-Party Service Providers</h2>
             <p>
-              We work with reputable third-party service providers for identity verification, payment processing, and fraud detection. All service providers are required to comply with applicable AML and fraud prevention regulations.
+              We work with reputable third-party service providers for payment processing and fraud detection. All service providers are required to comply with applicable AML and fraud prevention regulations.
             </p>
 
             <h2>15. Updates to This Policy</h2>

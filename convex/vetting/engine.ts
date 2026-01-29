@@ -10,17 +10,16 @@
 import type { Doc } from "../_generated/dataModel";
 
 export interface ScoreInputs {
-  identityScore: number;
   englishScore: number;
   skillScores: number[];
 }
 
 /**
  * Calculate overall verification score
- * Weighted: Identity 20%, English 30%, Skills 50%
+ * Weighted: English 30%, Skills 70%
  */
 export function calculateOverallScore(inputs: ScoreInputs): number {
-  const { identityScore, englishScore, skillScores } = inputs;
+  const { englishScore, skillScores } = inputs;
 
   // Calculate average skill score
   const avgSkillScore =
@@ -29,8 +28,7 @@ export function calculateOverallScore(inputs: ScoreInputs): number {
       : 0;
 
   // Weighted calculation
-  const overallScore =
-    identityScore * 0.2 + englishScore * 0.3 + avgSkillScore * 0.5;
+  const overallScore = englishScore * 0.3 + avgSkillScore * 0.7;
 
   return Math.round(overallScore * 100) / 100; // Round to 2 decimal places
 }
@@ -227,17 +225,12 @@ export function isVerificationComplete(
   complete: boolean;
   missingSteps: string[];
 } {
-  const requiredSteps = ["identity", "english", "skills"];
+  const requiredSteps = ["english", "skills"];
   const completedSteps = vettingResult.stepsCompleted || [];
 
   const missingSteps = requiredSteps.filter(
     (step) => !completedSteps.includes(step as any)
   );
-
-  // Check identity is verified
-  if (vettingResult.identityVerification.status !== "verified") {
-    missingSteps.push("identity_verification");
-  }
 
   // Check English is completed
   if (!vettingResult.englishProficiency.overallScore) {

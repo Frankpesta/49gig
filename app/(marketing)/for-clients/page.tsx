@@ -49,9 +49,9 @@ export default function ForClientsPage() {
     {
       icon: Shield,
       title: "Access to Vetted, High-Quality Talent",
-      description: "Every professional on 49GIG is carefully vetted through identity verification, skills testing, portfolio evaluation, and performance scoring. Only top-scoring talents are approved.",
+      description: "Every professional on 49GIG is carefully vetted through English proficiency and skills testing. Only top-scoring talents are approved.",
       features: [
-        "Identity verification",
+        "English proficiency & skills testing",
         "Skills and competency testing",
         "Portfolio and experience evaluation",
         "Performance and reliability scoring",

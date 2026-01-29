@@ -226,7 +226,7 @@ export default function PaymentTermsPage() {
               Payments may be held for:
             </p>
             <ul>
-              <li>Identity verification requirements</li>
+              <li>Verification requirements</li>
               <li>Suspected fraud or unusual activity</li>
               <li>Pending dispute resolution</li>
               <li>Compliance investigations</li>

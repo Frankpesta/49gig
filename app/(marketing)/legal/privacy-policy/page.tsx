@@ -88,7 +88,7 @@ export default function PrivacyPolicyPage() {
 
             <h3>4.2 With Service Providers</h3>
             <p>
-              We share information with third-party service providers who perform services on our behalf, including payment processing, identity verification, data analytics, email delivery, hosting services, and customer support.
+              We share information with third-party service providers who perform services on our behalf, including payment processing, verification and vetting (e.g. English and skills testing), data analytics, email delivery, hosting services, and customer support.
             </p>
 
             <h3>4.3 For Legal Reasons</h3>

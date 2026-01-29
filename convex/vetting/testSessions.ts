@@ -86,15 +86,11 @@ export const createTestSession = mutation({
       // Create vetting result if it doesn't exist
       const newVettingResultId = await ctx.db.insert("vettingResults", {
         freelancerId: user._id,
-        identityVerification: {
-          provider: "smile_identity",
-          status: "pending",
-        },
         englishProficiency: {},
         skillAssessments: [],
         overallScore: 0,
         status: "pending",
-        currentStep: "identity",
+        currentStep: "english",
         stepsCompleted: [],
         createdAt: now,
         updatedAt: now,
