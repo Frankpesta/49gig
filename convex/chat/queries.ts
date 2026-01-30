@@ -191,6 +191,74 @@ export const getProjectChat = query({
 });
 
 /**
+ * Get all project chats (client–freelancer) for admin/moderator.
+ * Allows admin to view and separate project communication from support chats.
+ */
+export const getProjectChatsForAdmin = query({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = args.userId
+      ? await ctx.db.get(args.userId)
+      : await getCurrentUser(ctx);
+
+    if (!user || user.status !== "active") {
+      return [];
+    }
+
+    if (user.role !== "admin" && user.role !== "moderator") {
+      return [];
+    }
+
+    const chats = await ctx.db
+      .query("chats")
+      .withIndex("by_type", (q) => q.eq("type", "project"))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .order("desc")
+      .collect();
+
+    return chats.sort(
+      (a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
+    );
+  },
+});
+
+/**
+ * Get all support chats for admin/moderator.
+ * Allows admin to view and separate support requests from project chats.
+ */
+export const getSupportChatsForAdmin = query({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = args.userId
+      ? await ctx.db.get(args.userId)
+      : await getCurrentUser(ctx);
+
+    if (!user || user.status !== "active") {
+      return [];
+    }
+
+    if (user.role !== "admin" && user.role !== "moderator") {
+      return [];
+    }
+
+    const chats = await ctx.db
+      .query("chats")
+      .withIndex("by_type", (q) => q.eq("type", "support"))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .order("desc")
+      .collect();
+
+    return chats.sort(
+      (a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
+    );
+  },
+});
+
+/**
  * Get unread message count for a user
  */
 export const getUnreadCount = query({
