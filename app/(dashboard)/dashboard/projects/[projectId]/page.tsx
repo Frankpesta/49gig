@@ -21,12 +21,15 @@ import {
   Calendar,
   Edit,
   MessageCircle,
+  Star,
   LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 const STATUS_CONFIG: Record<
   string,
@@ -63,6 +66,9 @@ export default function ProjectDetailPage() {
   const projectIdParam = params.projectId;
   const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [isCreatingMilestones, setIsCreatingMilestones] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState("");
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
 
   // Validate the projectId from URL params
   const isValidId = isValidConvexId(projectIdParam);
@@ -89,6 +95,22 @@ export default function ProjectDetailPage() {
     (api as any)["projects/queries"].getProjectMilestones,
     user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
+
+  const existingReview = useQuery(
+    (api as any)["reviews/queries"].getReviewByProject,
+    projectId && user?._id ? { projectId, userId: user._id } : "skip"
+  );
+  const submitFreelancerRating = useMutation(
+    (api as any)["reviews/mutations"].submitFreelancerRating
+  );
+
+  // Prefill rating form when existing review loads
+  useEffect(() => {
+    if (existingReview) {
+      setRating(existingReview.rating);
+      setRatingComment(existingReview.comment ?? "");
+    }
+  }, [existingReview?._id, existingReview?.rating, existingReview?.comment]);
 
   if (!user) {
     return null;
@@ -168,6 +190,25 @@ export default function ProjectDetailPage() {
       toast.error(err instanceof Error ? err.message : "Could not open chat");
     } finally {
       setIsOpeningChat(false);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    if (!projectId || !user?._id || rating < 1 || rating > 5) return;
+    setIsSubmittingRating(true);
+    try {
+      await submitFreelancerRating({
+        projectId,
+        rating,
+        comment: ratingComment.trim() || undefined,
+        userId: user._id,
+      });
+      toast.success(existingReview ? "Rating updated" : "Rating submitted");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit rating");
+    } finally {
+      setIsSubmittingRating(false);
     }
   };
 
@@ -474,6 +515,79 @@ export default function ProjectDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Rate freelancer (client only, in_progress or completed) */}
+          {isClient &&
+            project.matchedFreelancerId &&
+            (project.status === "in_progress" || project.status === "completed") && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5" />
+                    Rate freelancer
+                  </CardTitle>
+                  <CardDescription>
+                    {existingReview
+                      ? "You can update your rating below. It feeds into your Satisfaction metric on the dashboard."
+                      : "Your rating helps other clients and improves your Satisfaction metric."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {existingReview && (
+                    <p className="text-sm text-muted-foreground">
+                      Current: {existingReview.rating}/5 stars
+                      {existingReview.comment && ` — "${existingReview.comment}"`}
+                    </p>
+                  )}
+                  <div>
+                    <Label className="text-sm">Rating (1–5 stars)</Label>
+                    <div className="flex gap-1 mt-2">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setRating(s)}
+                          className="p-1 rounded hover:bg-muted transition-colors"
+                          aria-label={`${s} stars`}
+                        >
+                          <Star
+                            className={`h-8 w-8 ${
+                              rating >= s
+                                ? "fill-amber-400 text-amber-500"
+                                : "text-muted-foreground"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="rating-comment" className="text-sm">
+                      Comment (optional)
+                    </Label>
+                    <Textarea
+                      id="rating-comment"
+                      placeholder="How was working with this freelancer?"
+                      value={ratingComment}
+                      onChange={(e) => setRatingComment(e.target.value)}
+                      rows={3}
+                      className="mt-2"
+                    />
+                  </div>
+                  <Button
+                    className="w-full"
+                    onClick={handleSubmitRating}
+                    disabled={isSubmittingRating || rating < 1}
+                  >
+                    {isSubmittingRating
+                      ? "Saving..."
+                      : existingReview
+                        ? "Update rating"
+                        : "Submit rating"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
         </div>
       </div>
     </div>
