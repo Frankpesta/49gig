@@ -46,6 +46,21 @@ JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
 **Note:** These should be set in Convex dashboard
 Get your API key from: https://ce.judge0.com/ or https://rapidapi.com/judge0-official/api/judge0-ce
 
+### Resend (Transactional Email)
+**Set in Convex Dashboard (Settings → Environment Variables):**
+- Email sending runs in Convex, so the API key must be in Convex, not `.env.local`.
+
+```bash
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+# Optional: override "from" address (default uses notifications.49gig.com)
+RESEND_FROM_EMAIL=49GIG <noreply@notifications.49gig.com>
+```
+
+- **Domain:** Use the domain verified in Resend for your API key (e.g. `notifications.49gig.com`).
+- Get your API key and verify your domain at: https://resend.com
+
+---
+
 ### Pusher (Real-time Notifications)
 ```bash
 # For Next.js frontend (.env.local)

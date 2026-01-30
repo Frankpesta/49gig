@@ -4,7 +4,8 @@ import { Resend } from "resend";
 import { render } from "@react-email/render";
 
 const resendApiKey = process.env.RESEND_API_KEY;
-const defaultFrom = process.env.RESEND_FROM_EMAIL || "49GIG <noreply@49gig.com>";
+const defaultFrom =
+  process.env.RESEND_FROM_EMAIL || "49GIG <noreply@notifications.49gig.com>";
 
 if (!resendApiKey) {
   // Avoid crashing in environments without email configured
