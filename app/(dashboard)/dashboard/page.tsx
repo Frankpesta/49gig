@@ -29,6 +29,8 @@ import {
   Target,
 } from "lucide-react";
 import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
+import { Doc } from "@/convex/_generated/dataModel";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -45,6 +47,10 @@ export default function DashboardPage() {
   const dashboardMetrics = useQuery(
     (api as any).dashboard.queries.getDashboardMetrics,
     user?._id ? { userId: user._id } : "skip"
+  );
+  const recentActivity = useQuery(
+    api.notifications.queries.getMyNotifications,
+    user?._id ? { userId: user._id, limit: 10 } : "skip"
   );
   const adminCharts = useQuery(
     (api as any)["analytics/queries"].getAdminChartData,
@@ -415,7 +421,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Activity with Enhanced Design */}
+      {/* Recent Activity - from notifications (matches, messages, payments, etc.) */}
       <Card className="overflow-hidden border-2">
         <CardHeader className="bg-gradient-to-r from-muted/50 to-transparent border-b">
           <div className="flex items-center justify-between">
@@ -426,22 +432,64 @@ export default function DashboardPage() {
               </CardDescription>
             </div>
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <AlertCircle className="h-5 w-5 text-primary" />
+              <Activity className="h-5 w-5 text-primary" />
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-8">
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-              <AlertCircle className="h-8 w-8 text-muted-foreground" />
+        <CardContent className="p-6">
+          {recentActivity === undefined ? (
+            <div className="flex items-center justify-center py-12">
+              <Clock className="h-8 w-8 animate-pulse text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">
-              No recent activity to display
-            </p>
-            <p className="text-xs text-muted-foreground/70">
-              Your activity will appear here as you use the platform
-            </p>
-          </div>
+          ) : recentActivity.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
+                <Activity className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground mb-1">
+                No recent activity to display
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                Your activity will appear here as you get matches, messages, and project updates
+              </p>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {recentActivity.map((n: Doc<"notifications">) => {
+                const href =
+                  n.type === "match" && n.data?.projectId
+                    ? `/dashboard/projects/${n.data.projectId}`
+                    : n.type === "message" && n.data?.chatId
+                      ? `/dashboard/chat/${n.data.chatId}`
+                      : null;
+                const content = (
+                  <>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium text-sm">{n.title}</p>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {formatDistanceToNow(n.createdAt, { addSuffix: true })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
+                  </>
+                );
+                return (
+                  <li
+                    key={n._id}
+                    className="flex flex-col gap-0.5 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                  >
+                    {href ? (
+                      <Link href={href} className="block -m-3 p-3">
+                        {content}
+                      </Link>
+                    ) : (
+                      content
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </CardContent>
       </Card>
     </div>

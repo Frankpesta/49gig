@@ -174,17 +174,17 @@ export const getProject = query({
   handler: async (ctx, args) => {
     const projectId = ctx.db.normalizeId("projects", args.projectId);
     if (!projectId) {
-      throw new Error("Invalid project ID");
+      return null;
     }
 
     const user = await getCurrentUserInQuery(ctx, args.userId);
     if (!user) {
-      throw new Error("Not authenticated");
+      return null;
     }
 
     const project = await ctx.db.get(projectId);
     if (!project) {
-      throw new Error("Project not found");
+      return null;
     }
 
     // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
@@ -207,7 +207,7 @@ export const getProject = query({
     }
 
     if (!canView) {
-      throw new Error("Not authorized to view this project");
+      return null;
     }
 
     // Get client and freelancer info
@@ -250,17 +250,17 @@ export const getProjectMilestones = query({
   handler: async (ctx, args) => {
     const projectId = ctx.db.normalizeId("projects", args.projectId);
     if (!projectId) {
-      throw new Error("Invalid project ID");
+      return [];
     }
 
     const user = await getCurrentUserInQuery(ctx, args.userId);
     if (!user) {
-      throw new Error("Not authenticated");
+      return [];
     }
 
     const project = await ctx.db.get(projectId);
     if (!project) {
-      throw new Error("Project not found");
+      return [];
     }
 
     // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
@@ -282,7 +282,7 @@ export const getProjectMilestones = query({
     }
 
     if (!canViewMilestones) {
-      throw new Error("Not authorized to view this project");
+      return [];
     }
 
     const milestones = await ctx.db
