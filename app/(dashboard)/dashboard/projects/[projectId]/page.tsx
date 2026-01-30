@@ -516,10 +516,12 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Rate freelancer (client only, in_progress or completed) */}
+          {/* Rate freelancer (client only, when project has a matched freelancer) */}
           {isClient &&
             project.matchedFreelancerId &&
-            (project.status === "in_progress" || project.status === "completed") && (
+            (project.status === "matched" ||
+              project.status === "in_progress" ||
+              project.status === "completed") && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
