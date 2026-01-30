@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
@@ -40,6 +40,7 @@ import {
   DollarSign,
   Clock,
   AlertCircle,
+  Banknote,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -55,6 +56,7 @@ export default function MilestoneDetailPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
+  const [isReleasing, setIsReleasing] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
   const [deliverables, setDeliverables] = useState<
     Array<{ name: string; url: string }>
@@ -90,6 +92,9 @@ export default function MilestoneDetailPage() {
   );
   const startMilestone = useMutation(
     (api as any)["milestones/mutations"].startMilestone
+  );
+  const releaseMilestonePayment = useAction(
+    (api as any)["payments/actions"].releaseMilestonePayment
   );
 
   if (!isAuthenticated || !user) {
@@ -245,6 +250,30 @@ export default function MilestoneDetailPage() {
         title: "Start Failed",
         message: errorMessage,
       });
+    }
+  };
+
+  const handleReleasePayment = async () => {
+    if (!user?._id) return;
+
+    setIsReleasing(true);
+    try {
+      await releaseMilestonePayment({
+        milestoneId: milestoneId as any,
+        userId: user._id,
+      });
+      router.refresh();
+      toast.success("Payment released to freelancer");
+    } catch (error) {
+      console.error("Failed to release payment:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to release payment";
+      setErrorDialog({
+        open: true,
+        title: "Release Failed",
+        message: errorMessage,
+      });
+    } finally {
+      setIsReleasing(false);
     }
   };
 
@@ -500,6 +529,37 @@ export default function MilestoneDetailPage() {
                         <>
                           <XCircle className="mr-2 h-4 w-4" />
                           Reject Milestone
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {canRelease && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Release payment</CardTitle>
+                    <CardDescription>
+                      Send the milestone amount to the freelancer now. If you don&apos;t release manually, it will be paid automatically 48 hours after approval.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      onClick={handleReleasePayment}
+                      disabled={isReleasing}
+                      className="w-full"
+                      variant="default"
+                    >
+                      {isReleasing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Releasing...
+                        </>
+                      ) : (
+                        <>
+                          <Banknote className="mr-2 h-4 w-4" />
+                          Release payment to freelancer
                         </>
                       )}
                     </Button>

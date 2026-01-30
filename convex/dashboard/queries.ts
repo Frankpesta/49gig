@@ -115,9 +115,34 @@ export const getDashboardMetrics = query({
       const satisfiedCount = completedProjects.filter(
         (project) => !disputedProjectIds.has(project._id)
       ).length;
-      const satisfactionRate =
+      let satisfactionRate =
         completedProjects.length > 0
           ? Math.round((satisfiedCount / completedProjects.length) * 100)
+          : 0;
+
+      // Satisfaction from client's ratings when available (1-5 → 0-100)
+      const clientReviews = await ctx.db
+        .query("reviews")
+        .withIndex("by_client", (q) => q.eq("clientId", user._id))
+        .collect();
+      if (clientReviews.length > 0) {
+        const avgRating =
+          clientReviews.reduce((sum, r) => sum + r.rating, 0) / clientReviews.length;
+        satisfactionRate = Math.round(avgRating * 20); // 1-5 → 20-100
+      }
+
+      // Active projects progress: % of milestones completed (paid or approved) for active projects
+      const activeProjectIds = new Set(activeProjects.map((p) => p._id));
+      const allMilestones = await ctx.db.query("milestones").collect();
+      const activeMilestones = allMilestones.filter((m) =>
+        activeProjectIds.has(m.projectId)
+      );
+      const completedMilestones = activeMilestones.filter(
+        (m) => m.status === "paid" || m.status === "approved"
+      );
+      const activeProjectsProgress =
+        activeMilestones.length > 0
+          ? Math.round((completedMilestones.length / activeMilestones.length) * 100)
           : 0;
 
       // Calculate trends (compare current period with previous period)
@@ -169,6 +194,7 @@ export const getDashboardMetrics = query({
         role: "client",
         metrics: {
           activeProjects: activeProjects.length,
+          activeProjectsProgress,
           proposals: proposals.length,
           escrowed,
           totalSpend,

@@ -609,6 +609,20 @@ export default defineSchema({
     .index("by_user", ["userId", "createdAt"])
     .index("by_read", ["userId", "readAt"]),
 
+  // Client ratings of freelancers (one per project)
+  reviews: defineTable({
+    projectId: v.id("projects"),
+    clientId: v.id("users"),
+    freelancerId: v.id("users"),
+    rating: v.number(), // 1-5
+    comment: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_freelancer", ["freelancerId"])
+    .index("by_client", ["clientId"]),
+
   twoFactorTokens: defineTable({
     userId: v.id("users"),
     code: v.string(),

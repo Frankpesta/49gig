@@ -47,6 +47,8 @@ import type * as projects_queries from "../projects/queries.js";
 import type * as resume_actions from "../resume/actions.js";
 import type * as resume_mutations from "../resume/mutations.js";
 import type * as resume_queries from "../resume/queries.js";
+import type * as reviews_mutations from "../reviews/mutations.js";
+import type * as reviews_queries from "../reviews/queries.js";
 import type * as sessions from "../sessions.js";
 import type * as transactions_queries from "../transactions/queries.js";
 import type * as users_mutations from "../users/mutations.js";
@@ -106,6 +108,8 @@ declare const fullApi: ApiFromModules<{
   "resume/actions": typeof resume_actions;
   "resume/mutations": typeof resume_mutations;
   "resume/queries": typeof resume_queries;
+  "reviews/mutations": typeof reviews_mutations;
+  "reviews/queries": typeof reviews_queries;
   sessions: typeof sessions;
   "transactions/queries": typeof transactions_queries;
   "users/mutations": typeof users_mutations;
