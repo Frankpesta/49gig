@@ -112,10 +112,10 @@ export default function UsersPage() {
   }
 
   const filteredUsers = users.filter((u: Doc<"users">) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesSearch;
+    const name = (u.name ?? "").toString().toLowerCase();
+    const email = (u.email ?? "").toString().toLowerCase();
+    const term = searchTerm.toLowerCase();
+    return name.includes(term) || email.includes(term);
   }) || [];
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
   const paginatedUsers = filteredUsers.slice(
@@ -260,8 +260,8 @@ export default function UsersPage() {
                 ) : (
                   paginatedUsers.map((u: Doc<"users">) => (
                     <TableRow key={u._id}>
-                      <TableCell className="font-medium">{u.name}</TableCell>
-                      <TableCell>{u.email}</TableCell>
+                      <TableCell className="font-medium">{u.name ?? "—"}</TableCell>
+                      <TableCell>{u.email ?? "—"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="capitalize">
                           {u.role}
@@ -298,7 +298,9 @@ export default function UsersPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(u.createdAt), { addSuffix: true })}
+                        {u.createdAt != null
+                          ? formatDistanceToNow(new Date(u.createdAt), { addSuffix: true })
+                          : "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <Dialog>

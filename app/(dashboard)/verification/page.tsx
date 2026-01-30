@@ -14,6 +14,8 @@ import { EnglishTest } from "@/components/vetting/english-test";
 import { SkillSelection } from "@/components/vetting/skill-selection";
 import { useRouter } from "next/navigation";
 
+const VERIFICATION_FAILED_KEY = "verification_failed_message";
+
 export default function VerificationPage() {
   const { user, isAuthenticated } = useAuth();
   const verificationStatus = useQuery(
@@ -23,7 +25,16 @@ export default function VerificationPage() {
   const initializeVerification = useMutation(api.vetting.mutations.initializeVerification);
   const completeVerification = useMutation(api.vetting.mutations.completeVerification);
   const [submitting, setSubmitting] = useState(false);
-  const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(null);
+  const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      const stored = sessionStorage.getItem(VERIFICATION_FAILED_KEY);
+      if (stored) {
+        sessionStorage.removeItem(VERIFICATION_FAILED_KEY);
+        return stored;
+      }
+    }
+    return null;
+  });
 
   // Check if query is still loading (undefined) vs returned null (not a freelancer/not authenticated)
   if (verificationStatus === undefined) {
@@ -331,6 +342,7 @@ export default function VerificationPage() {
                       <Button
                         onClick={async () => {
                           setSubmitting(true);
+                          setAccountDeletedMessage(null);
                           try {
                             const result = await completeVerification(
                               user?._id ? { userId: user._id } : {}
@@ -338,6 +350,9 @@ export default function VerificationPage() {
                             if (result.accountDeleted) {
                               setAccountDeletedMessage(result.message ?? "Your account has been removed.");
                               setTimeout(() => router.push("/login"), 4000);
+                            } else if (!result.success && result.message) {
+                              sessionStorage.setItem(VERIFICATION_FAILED_KEY, result.message);
+                              window.location.reload();
                             } else {
                               window.location.reload();
                             }
@@ -364,17 +379,17 @@ export default function VerificationPage() {
             </div>
           )}
 
-          {/* Account deleted (failed minimum scores) */}
+          {/* Verification failed (minimum scores not met) — user stays logged in, can retake */}
           {accountDeletedMessage && (
-            <Card className="border-destructive">
+            <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
               <CardContent className="p-4">
                 <div className="flex items-start gap-2">
-                  <XCircle className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
+                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-medium text-destructive">We&apos;re sorry</p>
+                    <p className="font-medium text-amber-800 dark:text-amber-200">Verification not yet passed</p>
                     <p className="text-sm text-muted-foreground mt-1">{accountDeletedMessage}</p>
                     <p className="text-sm text-muted-foreground mt-2">
-                      Redirecting you to the login page...
+                      You remain logged in. Complete or retake the required section(s) above, then submit again.
                     </p>
                   </div>
                 </div>

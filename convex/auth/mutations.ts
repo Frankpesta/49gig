@@ -289,6 +289,9 @@ export const signin = mutation({
     }
 
     if (user.status !== "active") {
+      if (user.status === "deleted") {
+        throw new Error("This account has been removed. If you believe this is an error, please contact support.");
+      }
       throw new Error("Account is not active");
     }
 

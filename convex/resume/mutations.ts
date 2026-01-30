@@ -45,14 +45,16 @@ export const completeResumeUpload = mutation({
       throw new Error("Only freelancers can upload resumes");
     }
 
-    // Enforce cooldown
+    // Enforce cooldown only after a successful extraction (processed). If extraction failed, allow re-upload.
     const now = Date.now();
-    if (
-      user.resumeCanReuploadAt &&
-      now < user.resumeCanReuploadAt
-    ) {
-      const waitDays = Math.ceil((user.resumeCanReuploadAt - now) / (1000 * 60 * 60 * 24));
-      throw new Error(`Reupload not allowed yet. Try again in ~${waitDays} day(s).`);
+    if (user.resumeStatus !== "failed") {
+      if (
+        user.resumeCanReuploadAt &&
+        now < user.resumeCanReuploadAt
+      ) {
+        const waitDays = Math.ceil((user.resumeCanReuploadAt - now) / (1000 * 60 * 60 * 24));
+        throw new Error(`Reupload not allowed yet. Try again in ~${waitDays} day(s).`);
+      }
     }
 
     // Confirm storage URL exists
@@ -73,7 +75,7 @@ export const completeResumeUpload = mutation({
         mimeType: args.mimeType,
         uploadedAt: now,
       },
-      resumeCanReuploadAt: now + SIX_MONTHS_MS,
+      // Do not set resumeCanReuploadAt here — only set when extraction succeeds (in applyParsedResumeData)
     });
 
     const sendSystemNotification =
@@ -132,6 +134,7 @@ export const applyParsedResumeData = mutation({
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const now = Date.now();
     await ctx.db.patch(args.userId, {
       resumeBio: args.resumeBio,
       resumeParsedData: {
@@ -139,6 +142,8 @@ export const applyParsedResumeData = mutation({
         error: args.error,
       },
       resumeStatus: args.resumeStatus,
+      // Only set re-upload cooldown when extraction succeeded; failed users can re-upload until success
+      ...(args.resumeStatus === "processed" && { resumeCanReuploadAt: now + SIX_MONTHS_MS }),
     });
 
     const sendSystemNotification =

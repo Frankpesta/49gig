@@ -26,72 +26,21 @@ import { api } from "@/convex/_generated/api";
 import { useOAuth } from "@/hooks/use-oauth";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { freelancerSignupFeatures } from "@/components/auth/auth-icons";
+import {
+  PLATFORM_CATEGORIES,
+  SKILLS_FOR_MCQ_CODING,
+  getSkillsForCategory,
+} from "@/lib/platform-skills";
 
 const authCardClass =
   "rounded-xl border border-border/60 bg-card shadow-lg";
 
-const TECH_FIELDS = [
-  { value: "development", label: "Software Development" },
-  { value: "data_science", label: "Data Science" },
-  { value: "technical_writing", label: "Technical Writing" },
-  { value: "design", label: "Design" },
-  { value: "marketing", label: "Marketing" },
-  { value: "other", label: "Other" },
+const EXPERIENCE_LEVELS = [
+  { value: "junior", label: "Junior" },
+  { value: "mid", label: "Mid-Level" },
+  { value: "senior", label: "Senior" },
+  { value: "expert", label: "Expert" },
 ] as const;
-
-const EXPERIENCE_LEVELS = {
-  development: [
-    { value: "junior", label: "Junior Developer" },
-    { value: "mid", label: "Mid-Level Developer" },
-    { value: "senior", label: "Senior Developer" },
-    { value: "expert", label: "Expert/Lead Developer" },
-  ],
-  data_science: [
-    { value: "junior", label: "Junior Data Scientist" },
-    { value: "mid", label: "Mid-Level Data Scientist" },
-    { value: "senior", label: "Senior Data Scientist" },
-    { value: "expert", label: "Expert Data Scientist" },
-  ],
-  technical_writing: [
-    { value: "junior", label: "Junior Technical Writer" },
-    { value: "mid", label: "Mid-Level Technical Writer" },
-    { value: "senior", label: "Senior Technical Writer" },
-    { value: "expert", label: "Expert Technical Writer" },
-  ],
-  design: [
-    { value: "junior", label: "Junior Designer" },
-    { value: "mid", label: "Mid-Level Designer" },
-    { value: "senior", label: "Senior Designer" },
-    { value: "expert", label: "Expert Designer" },
-  ],
-  other: [
-    { value: "junior", label: "Junior" },
-    { value: "mid", label: "Mid-Level" },
-    { value: "senior", label: "Senior" },
-    { value: "expert", label: "Expert" },
-  ],
-};
-
-const PROGRAMMING_LANGUAGES = [
-  "JavaScript",
-  "TypeScript",
-  "Python",
-  "Java",
-  "C++",
-  "C#",
-  "Go",
-  "Rust",
-  "PHP",
-  "Ruby",
-  "Swift",
-  "Kotlin",
-  "Scala",
-  "R",
-  "MATLAB",
-  "SQL",
-  "HTML/CSS",
-  "Other",
-];
 
 export default function FreelancerSignupPage() {
   const router = useRouter();
@@ -113,12 +62,7 @@ export default function FreelancerSignupPage() {
   );
   const { signInWithGoogle } = useOAuth();
 
-  const availableExperienceLevels =
-    formData.techField && formData.techField in EXPERIENCE_LEVELS
-      ? EXPERIENCE_LEVELS[
-          formData.techField as keyof typeof EXPERIENCE_LEVELS
-        ]
-      : [];
+  const categorySkills = formData.techField ? getSkillsForCategory(formData.techField) : [];
 
   const handleAddSkill = () => {
     if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
@@ -339,18 +283,19 @@ export default function FreelancerSignupPage() {
                           setFormData({
                             ...formData,
                             techField: value,
-                            experienceLevel: "", // Reset experience level when field changes
+                            experienceLevel: "",
+                            skills: [],
                           });
                         }}
                         disabled={isLoading}
                       >
                         <SelectTrigger className="h-11 rounded-lg">
-                          <SelectValue placeholder="Select your tech field" />
+                          <SelectValue placeholder="Select your tech category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {TECH_FIELDS.map((field) => (
-                            <SelectItem key={field.value} value={field.value}>
-                              {field.label}
+                          {PLATFORM_CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              {cat.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -378,7 +323,7 @@ export default function FreelancerSignupPage() {
                             <SelectValue placeholder="Select your experience level" />
                           </SelectTrigger>
                           <SelectContent>
-                            {availableExperienceLevels.map((level) => (
+                            {EXPERIENCE_LEVELS.map((level) => (
                               <SelectItem key={level.value} value={level.value}>
                                 {level.label}
                               </SelectItem>
@@ -391,11 +336,40 @@ export default function FreelancerSignupPage() {
                       <Label htmlFor="skills" className="text-sm font-medium">
                         Tech Skills
                       </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Skills for your category (used for verification):
+                      </p>
+                      {formData.techField && (
+                        <div className="flex flex-wrap gap-2">
+                          {categorySkills.map((skill) => (
+                            <Button
+                              key={skill}
+                              type="button"
+                              variant={formData.skills.includes(skill) ? "default" : "outline"}
+                              size="sm"
+                              className="rounded-full"
+                              onClick={() => {
+                                if (formData.skills.includes(skill)) {
+                                  handleRemoveSkill(skill);
+                                } else {
+                                  setFormData({
+                                    ...formData,
+                                    skills: [...formData.skills, skill],
+                                  });
+                                }
+                              }}
+                              disabled={isLoading}
+                            >
+                              {skill}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <Input
                           id="skills"
                           type="text"
-                          placeholder="e.g., React, Node.js, Python"
+                          placeholder="Add more skills..."
                           value={skillInput}
                           onChange={(e) => setSkillInput(e.target.value)}
                           onKeyDown={(e) => {
@@ -443,7 +417,7 @@ export default function FreelancerSignupPage() {
                         Programming Languages Written
                       </Label>
                       <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
-                        {PROGRAMMING_LANGUAGES.map((language) => (
+                        {[...SKILLS_FOR_MCQ_CODING, "R", "Swift", "Kotlin", "Scala", "MATLAB", "HTML/CSS", "Other"].map((language) => (
                           <label
                             key={language}
                             className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded"

@@ -1,6 +1,5 @@
 import { mutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
 import { calculateOverallScore, checkFraudFlags } from "./engine";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -491,21 +490,27 @@ export const completeVerification = mutation({
           vettingResult.skillAssessments.length
         : 0;
 
-    // Minimum 50% required in BOTH English and Skills; otherwise reject and delete account
+    // Minimum 50% required in BOTH English and Skills; otherwise reject (do NOT delete account — user can retake)
     const MIN_PERCENT = 50;
-    if (englishScore < MIN_PERCENT || avgSkillScore < MIN_PERCENT) {
-      await ctx.runMutation(internal.users.mutations.deleteUserAccountInternal, {
-        userId: user._id,
-        reason: "verification_failed_minimum_scores",
+    const englishFailed = englishScore < MIN_PERCENT;
+    const skillsFailed = avgSkillScore < MIN_PERCENT;
+    if (englishFailed || skillsFailed) {
+      const overallScore = calculateOverallScore({
+        englishScore,
+        skillScores: vettingResult.skillAssessments.map((a) => a.score),
       });
 
+      // Allow retake: remove failed step(s) from stepsCompleted and set currentStep to first failed
+      const newStepsCompleted = vettingResult.stepsCompleted.filter(
+        (s) => (s === "english" && !englishFailed) || (s === "skills" && !skillsFailed)
+      );
+      const retakeStep = englishFailed ? "english" : "skills";
+
       await ctx.db.patch(vettingResult._id, {
-        overallScore: calculateOverallScore({
-          englishScore,
-          skillScores: vettingResult.skillAssessments.map((a) => a.score),
-        }),
+        overallScore,
         status: "rejected",
-        currentStep: "complete",
+        currentStep: retakeStep,
+        stepsCompleted: newStepsCompleted,
         updatedAt: Date.now(),
       });
 
@@ -520,12 +525,17 @@ export const completeVerification = mutation({
         createdAt: Date.now(),
       });
 
+      const failedParts: string[] = [];
+      if (englishFailed) failedParts.push("English");
+      if (skillsFailed) failedParts.push("Skills");
+
       return {
         success: false,
-        accountDeleted: true,
+        accountDeleted: false,
         status: "rejected" as const,
-        message:
-          "We're sorry, but you didn't meet the minimum requirements (50% in both English proficiency and skills tests). Your account has been removed from the platform. Thank you for your interest.",
+        englishScore: Math.round(englishScore),
+        avgSkillScore: Math.round(avgSkillScore),
+        message: `You need at least ${MIN_PERCENT}% in both English and Skills. Your scores: English ${Math.round(englishScore)}%, Skills average ${Math.round(avgSkillScore)}%. Please retake the ${failedParts.join(" and ")} section(s) to continue.`,
       };
     }
 
@@ -559,10 +569,11 @@ export const completeVerification = mutation({
       updatedAt: Date.now(),
     });
 
+    // Auto-approve when they pass; only pending_review for flagged cases
     let userVerificationStatus: "not_started" | "in_progress" | "pending_review" | "approved" | "rejected" | "suspended" | undefined;
 
     if (status === "approved") {
-      userVerificationStatus = "pending_review";
+      userVerificationStatus = "approved"; // Automatic — no admin review needed
     } else if (status === "rejected") {
       userVerificationStatus = "rejected";
     } else if (status === "flagged") {
@@ -573,6 +584,7 @@ export const completeVerification = mutation({
 
     await ctx.db.patch(user._id, {
       verificationStatus: userVerificationStatus,
+      ...(userVerificationStatus === "approved" && { verificationCompletedAt: Date.now() }),
       updatedAt: Date.now(),
     });
 
@@ -598,10 +610,10 @@ export const completeVerification = mutation({
       >;
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [user._id],
-      title: "Verification submitted",
+      title: status === "approved" ? "Verification approved" : "Verification submitted",
       message:
         status === "approved"
-          ? "Verification completed and pending admin review."
+          ? "Your verification has been approved. Welcome aboard!"
           : status === "flagged"
           ? "Verification completed and pending review."
           : "Verification was rejected due to fraud flags.",
@@ -616,7 +628,7 @@ export const completeVerification = mutation({
       overallScore,
       message:
         status === "approved"
-          ? "Verification completed. Awaiting admin review."
+          ? "Verification approved. You can now access the full platform."
           : status === "flagged"
           ? "Verification completed but flagged for review."
           : "Verification rejected due to fraud flags.",
