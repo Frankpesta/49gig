@@ -51,9 +51,11 @@ export default function ResumeUploadPage() {
   const [success, setSuccess] = useState(false);
 
   const now = Date.now();
-  const cooldownMs = resumeInfo?.resumeCanReuploadAt
-    ? resumeInfo.resumeCanReuploadAt - now
-    : 0;
+  // Cooldown only applies after successful extraction; when extraction failed, re-upload is allowed
+  const cooldownMs =
+    resumeInfo?.resumeStatus !== "failed" && resumeInfo?.resumeCanReuploadAt
+      ? resumeInfo.resumeCanReuploadAt - now
+      : 0;
   const isCooldown = cooldownMs > 0;
   const cooldownDays = Math.ceil(cooldownMs / (1000 * 60 * 60 * 24));
 
@@ -74,13 +76,10 @@ export default function ResumeUploadPage() {
     }
   }, [user, profile, isAuthenticated, isInitializing, router]);
 
+  // Only leave upload page when extraction succeeded (processed). Failed users stay to re-upload.
   useEffect(() => {
     const status = resumeInfo?.resumeStatus;
-    const hasUploaded =
-      status === "uploaded" ||
-      status === "processing" ||
-      status === "processed";
-    if (hasUploaded) router.replace("/verification");
+    if (status === "processed") router.replace("/verification");
   }, [resumeInfo?.resumeStatus, router]);
 
   if (isInitializing || (profile === undefined && user === undefined)) {
@@ -243,6 +242,11 @@ export default function ResumeUploadPage() {
                     <p className="mt-1 text-xs">
                       We&apos;re parsing your resume. This usually takes a few
                       seconds.
+                    </p>
+                  )}
+                  {resumeInfo.resumeStatus === "failed" && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                      Previous extraction failed. You can upload a new PDF below.
                     </p>
                   )}
                   {isCooldown && (

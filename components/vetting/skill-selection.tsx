@@ -26,34 +26,30 @@ interface SkillSelectionProps {
   onAssessmentComplete?: (skillName: string, score: number) => void;
 }
 
-// Determine assessment type based on skill
+// UI/UX & Product Design: portfolio-only (rank by portfolio strength). Others: MCQ + coding.
+const PORTFOLIO_ONLY_SKILLS = [
+  "figma", "adobe xd", "sketch", "ui design", "ux research", "product design",
+  "prototyping", "ui/ux", "design", "technical writing", "data science", "data analyst",
+];
+
 function getAssessmentType(skillName: string): "mcq" | "coding" | "portfolio" {
   const skillLower = skillName.toLowerCase();
-  
-  // Development skills use coding
+
+  if (PORTFOLIO_ONLY_SKILLS.some((s) => skillLower.includes(s))) {
+    return "portfolio";
+  }
+
   const codingSkills = [
     "react", "javascript", "typescript", "python", "java", "node.js",
     "next.js", "vue.js", "angular", "c++", "c#", "go", "rust", "php",
-    "ruby", "swift", "kotlin", "flutter", "react native", "mobile dev",
-    "backend", "frontend", "full stack", "aws", "azure", "gcp", "docker",
-    "kubernetes", "devops", "cloud"
+    "ruby", "swift", "kotlin", "flutter", "sql", "docker", "kubernetes",
+    "aws", "azure", "gcp", "devops", "cloud", "backend", "frontend", "full stack",
   ];
-  
-  if (codingSkills.some(s => skillLower.includes(s))) {
+
+  if (codingSkills.some((s) => skillLower.includes(s))) {
     return "coding";
   }
-  
-  // Writing/content skills use portfolio
-  const portfolioSkills = [
-    "technical writing", "data science",
-    "data analyst", "ui/ux", "design", "figma", "sketch"
-  ];
-  
-  if (portfolioSkills.some(s => skillLower.includes(s))) {
-    return "portfolio";
-  }
-  
-  // Default to MCQ for other skills
+
   return "mcq";
 }
 

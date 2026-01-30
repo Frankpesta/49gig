@@ -85,18 +85,17 @@ export const getAllUsersAdmin = query({
   },
   handler: async (ctx, args) => {
     try {
-      // Get user - try both userId and Convex Auth
-      let user: Doc<"users"> | null = null;
-      
+      // Get current user - try userId (session token) then Convex Auth
+      let currentUser: Doc<"users"> | null = null;
+
       if (args.userId) {
         const userDoc = await ctx.db.get(args.userId);
         if (userDoc && (userDoc as Doc<"users">).status === "active") {
-          user = userDoc as Doc<"users">;
+          currentUser = userDoc as Doc<"users">;
         }
       }
-      
-      // Fallback to Convex Auth if userId not provided or not found
-      if (!user) {
+
+      if (!currentUser) {
         const identity = await ctx.auth.getUserIdentity();
         if (identity?.email) {
           const userDoc = await ctx.db
@@ -104,57 +103,45 @@ export const getAllUsersAdmin = query({
             .withIndex("by_email", (q) => q.eq("email", identity.email!))
             .first();
           if (userDoc && (userDoc as Doc<"users">).status === "active") {
-            user = userDoc as Doc<"users">;
+            currentUser = userDoc as Doc<"users">;
           }
         }
       }
 
-      if (!user) {
+      if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "moderator")) {
         return [];
       }
 
-      // Only admin or moderator can view all users
-      if (user.role !== "admin" && user.role !== "moderator") {
-        return [];
+      // Fetch all users (or filtered by index), then filter in memory to avoid index+filter API issues
+      let list: Doc<"users">[];
+      if (args.role && args.status) {
+        const byRole = await ctx.db
+          .query("users")
+          .withIndex("by_role", (q) => q.eq("role", args.role!))
+          .collect();
+        list = byRole.filter((u) => u.status === args.status);
+      } else if (args.role) {
+        list = await ctx.db
+          .query("users")
+          .withIndex("by_role", (q) => q.eq("role", args.role!))
+          .collect();
+      } else if (args.status) {
+        list = await ctx.db
+          .query("users")
+          .withIndex("by_status", (q) => q.eq("status", args.status!))
+          .collect();
+      } else {
+        list = await ctx.db.query("users").collect();
       }
+
+      return list.map((u) => {
+        const { passwordHash, ...rest } = u;
+        return rest;
+      });
     } catch (error) {
       console.error("Error in getAllUsersAdmin:", error);
       return [];
     }
-
-    // Build query - use index if available, otherwise filter
-    let users;
-    
-    if (args.role) {
-      // Use role index
-      const query = ctx.db
-        .query("users")
-        .withIndex("by_role", (q) => q.eq("role", args.role!));
-      
-      // Apply status filter if provided
-      if (args.status) {
-        users = await query
-          .filter((q) => q.eq(q.field("status"), args.status!))
-          .collect();
-      } else {
-        users = await query.collect();
-      }
-    } else if (args.status) {
-      // Use status index
-      users = await ctx.db
-        .query("users")
-        .withIndex("by_status", (q) => q.eq("status", args.status!))
-        .collect();
-    } else {
-      // No filters, get all users
-      users = await ctx.db.query("users").collect();
-    }
-
-    // Return without sensitive data
-    return users.map((u) => {
-      const { passwordHash, ...userWithoutPassword } = u;
-      return userWithoutPassword;
-    });
   },
 });
 
