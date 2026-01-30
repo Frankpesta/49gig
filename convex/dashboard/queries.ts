@@ -241,9 +241,7 @@ export const getDashboardMetrics = query({
           ? Math.round((respondedMatches.length / matches.length) * 100)
           : 0;
 
-      // Calculate trends (compare current period with previous period)
-      const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
-
+      // Calculate trends (use thirtyDaysAgo from handler scope)
       // Active Projects trend (30 days)
       const activeProjects30DaysAgo = projects.filter(
         (p) =>

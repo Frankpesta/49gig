@@ -141,15 +141,20 @@ export const getMessages = query({
 });
 
 /**
- * Get project chat for a specific project
- * Creates chat if it doesn't exist
+ * Get project chat for a specific project.
+ * Accepts projectId as string (e.g. from URL) and normalizes to support external IDs.
  */
 export const getProjectChat = query({
   args: {
-    projectId: v.id("projects"),
+    projectId: v.string(),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    const projectId = ctx.db.normalizeId("projects", args.projectId);
+    if (!projectId) {
+      return null;
+    }
+
     const user = args.userId
       ? await ctx.db.get(args.userId)
       : await getCurrentUser(ctx);
@@ -159,7 +164,7 @@ export const getProjectChat = query({
     }
 
     // Get project
-    const project = await ctx.db.get(args.projectId);
+    const project = await ctx.db.get(projectId);
     if (!project) {
       return null;
     }
@@ -178,7 +183,7 @@ export const getProjectChat = query({
     // Find existing project chat
     const existingChat = await ctx.db
       .query("chats")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
 
     if (existingChat) {

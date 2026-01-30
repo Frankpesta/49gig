@@ -163,20 +163,26 @@ export const getProjects = query({
 });
 
 /**
- * Get a single project by ID with full details
+ * Get a single project by ID with full details.
+ * Accepts projectId as string (e.g. from URL) and normalizes to support external IDs.
  */
 export const getProject = query({
   args: {
-    projectId: v.id("projects"),
+    projectId: v.string(),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    const projectId = ctx.db.normalizeId("projects", args.projectId);
+    if (!projectId) {
+      throw new Error("Invalid project ID");
+    }
+
     const user = await getCurrentUserInQuery(ctx, args.userId);
     if (!user) {
       throw new Error("Not authenticated");
     }
 
-    const project = await ctx.db.get(args.projectId);
+    const project = await ctx.db.get(projectId);
     if (!project) {
       throw new Error("Project not found");
     }
@@ -192,7 +198,7 @@ export const getProject = query({
     if (!canView && user.role === "freelancer") {
       const match = await ctx.db
         .query("matches")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
         .filter((q) => q.eq(q.field("freelancerId"), user._id))
         .first();
       if (match && (match.status === "pending" || match.status === "accepted")) {
@@ -233,20 +239,26 @@ export const getProject = query({
 });
 
 /**
- * Get milestones for a project
+ * Get milestones for a project.
+ * Accepts projectId as string (e.g. from URL) and normalizes to support external IDs.
  */
 export const getProjectMilestones = query({
   args: {
-    projectId: v.id("projects"),
+    projectId: v.string(),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    const projectId = ctx.db.normalizeId("projects", args.projectId);
+    if (!projectId) {
+      throw new Error("Invalid project ID");
+    }
+
     const user = await getCurrentUserInQuery(ctx, args.userId);
     if (!user) {
       throw new Error("Not authenticated");
     }
 
-    const project = await ctx.db.get(args.projectId);
+    const project = await ctx.db.get(projectId);
     if (!project) {
       throw new Error("Project not found");
     }
@@ -261,7 +273,7 @@ export const getProjectMilestones = query({
     if (!canViewMilestones && user.role === "freelancer") {
       const match = await ctx.db
         .query("matches")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
         .filter((q) => q.eq(q.field("freelancerId"), user._id))
         .first();
       if (match && (match.status === "pending" || match.status === "accepted")) {
@@ -275,7 +287,7 @@ export const getProjectMilestones = query({
 
     const milestones = await ctx.db
       .query("milestones")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .order("asc")
       .collect();
 
