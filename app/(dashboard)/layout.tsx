@@ -62,11 +62,13 @@ export default function DashboardLayout({
     }
   }, [isAuthenticated, isInitializing, router]);
 
-  // Enforce resume upload completion before dashboard for freelancers
+  // Enforce resume upload only for *unverified* freelancers (verified can use dashboard and be matched without resume)
   useEffect(() => {
     if (!isAuthenticated || isInitializing) return;
     if (!userProfile || userProfile.role !== "freelancer") return;
     if (resumeInfo === undefined) return;
+    // Verified freelancers can access dashboard and be matched without a resume
+    if (isVerified?.verified) return;
 
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
     const onResumeUpload = currentPath.startsWith("/resume-upload");
@@ -79,7 +81,7 @@ export default function DashboardLayout({
     if (!hasUploaded && !onResumeUpload) {
       router.replace("/resume-upload");
     }
-  }, [isAuthenticated, isInitializing, resumeInfo, router, userProfile]);
+  }, [isAuthenticated, isInitializing, isVerified, resumeInfo, router, userProfile]);
 
   // CRITICAL: Check if freelancer is verified - ENFORCE STRICTLY
   // This runs whenever auth state, user profile, or verification status changes
@@ -95,8 +97,8 @@ export default function DashboardLayout({
 
     // Check if user is a freelancer
     if (userProfile?.role === "freelancer") {
-      // If resume not processed, resume guard handles redirect
-      if (resumeInfo && resumeInfo.resumeStatus !== "processed") {
+      // Only require resume before verification check for unverified freelancers (verified can use dashboard without resume)
+      if (!isVerified?.verified && resumeInfo && resumeInfo.resumeStatus !== "processed") {
         return;
       }
       // Only check path on client side

@@ -181,12 +181,24 @@ export const getProject = query({
       throw new Error("Project not found");
     }
 
-    // Authorization: Only client, matched freelancer, admin, or moderator can view
-    const canView =
+    // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
+    let canView =
       user.role === "admin" ||
       user.role === "moderator" ||
       project.clientId === user._id ||
       project.matchedFreelancerId === user._id;
+
+    // Freelancer with a match (pending or accepted) for this project can view details before/after acceptance
+    if (!canView && user.role === "freelancer") {
+      const match = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .filter((q) => q.eq(q.field("freelancerId"), user._id))
+        .first();
+      if (match && (match.status === "pending" || match.status === "accepted")) {
+        canView = true;
+      }
+    }
 
     if (!canView) {
       throw new Error("Not authorized to view this project");
@@ -239,14 +251,25 @@ export const getProjectMilestones = query({
       throw new Error("Project not found");
     }
 
-    // Authorization: Only client, matched freelancer, admin, or moderator can view
-    const canView =
+    // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
+    let canViewMilestones =
       user.role === "admin" ||
       user.role === "moderator" ||
       project.clientId === user._id ||
       project.matchedFreelancerId === user._id;
 
-    if (!canView) {
+    if (!canViewMilestones && user.role === "freelancer") {
+      const match = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .filter((q) => q.eq(q.field("freelancerId"), user._id))
+        .first();
+      if (match && (match.status === "pending" || match.status === "accepted")) {
+        canViewMilestones = true;
+      }
+    }
+
+    if (!canViewMilestones) {
       throw new Error("Not authorized to view this project");
     }
 
@@ -285,14 +308,25 @@ export const getMilestoneById = query({
       throw new Error("Project not found");
     }
 
-    // Authorization: Only client, matched freelancer, admin, or moderator can view
-    const canView =
+    // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
+    let canViewMilestone =
       user.role === "admin" ||
       user.role === "moderator" ||
       project.clientId === user._id ||
       project.matchedFreelancerId === user._id;
 
-    if (!canView) {
+    if (!canViewMilestone && user.role === "freelancer") {
+      const match = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", milestone.projectId))
+        .filter((q) => q.eq(q.field("freelancerId"), user._id))
+        .first();
+      if (match && (match.status === "pending" || match.status === "accepted")) {
+        canViewMilestone = true;
+      }
+    }
+
+    if (!canViewMilestone) {
       throw new Error("Not authorized to view this milestone");
     }
 

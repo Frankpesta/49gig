@@ -131,8 +131,10 @@ export const acceptMatch = mutation({
       throw new Error("Project not found");
     }
 
-    // Only client who owns project can accept
-    if (project.clientId !== user._id && user.role !== "admin") {
+    // Client who owns project, matched freelancer, or admin can accept
+    const isClient = project.clientId === user._id;
+    const isMatchedFreelancer = match.freelancerId === user._id;
+    if (!isClient && !isMatchedFreelancer && user.role !== "admin") {
       throw new Error("Not authorized to accept this match");
     }
 
@@ -257,8 +259,10 @@ export const rejectMatch = mutation({
       throw new Error("Project not found");
     }
 
-    // Only client who owns project can reject
-    if (project.clientId !== user._id && user.role !== "admin") {
+    // Client who owns project, matched freelancer, or admin can reject
+    const isClient = project.clientId === user._id;
+    const isMatchedFreelancer = match.freelancerId === user._id;
+    if (!isClient && !isMatchedFreelancer && user.role !== "admin") {
       throw new Error("Not authorized to reject this match");
     }
 
