@@ -105,7 +105,7 @@ export const createPaymentIntent = action({
     });
 
     // Create payment record in database
-    const platformFee = project.platformFee || 10; // Default 10%
+    const platformFee = project.platformFee ?? 25; // Default 25% to company
     const platformFeeAmount = (args.amount * platformFee) / 100;
     const netAmount = args.amount - platformFeeAmount;
 
@@ -659,7 +659,7 @@ export const releaseMilestonePayment = action({
     }
 
     // Calculate platform fee
-    const platformFee: number = project.platformFee || 10; // Default 10%
+    const platformFee: number = project.platformFee ?? 25; // Default 25% to company
     const platformFeeAmount: number = (milestone.amount * platformFee) / 100;
     const netAmount: number = milestone.amount - platformFeeAmount;
 

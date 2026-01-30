@@ -548,8 +548,43 @@ export const createMilestones = mutation({
 });
 
 /**
+ * Suggest milestone/deliverable names from project title + description (keyword-based).
+ * Used when client does not provide deliverables so milestones reflect the project, not skills.
+ */
+function suggestDeliverablesFromDescription(
+  title: string,
+  description: string
+): string[] {
+  const text = `${(title || "").toLowerCase()} ${(description || "").toLowerCase()}`;
+  const suggested: string[] = [];
+
+  // Map keywords to phase names (order matters: first match wins)
+  const keywordPhases: Array<{ keywords: string[]; name: string }> = [
+    { keywords: ["design", "mockup", "wireframe", "figma", "ui/ux"], name: "Design & Mockups" },
+    { keywords: ["api", "backend", "server", "database", "auth"], name: "Backend / API" },
+    { keywords: ["frontend", "front-end", "react", "vue", "angular", "mobile app"], name: "Frontend / App" },
+    { keywords: ["integration", "connect", "third-party"], name: "Integration" },
+    { keywords: ["test", "qa", "bug"], name: "Testing & QA" },
+    { keywords: ["deploy", "launch", "host", "production"], name: "Deployment & Launch" },
+  ];
+
+  for (const { keywords, name } of keywordPhases) {
+    if (keywords.some((k) => text.includes(k)) && !suggested.includes(name)) {
+      suggested.push(name);
+    }
+  }
+
+  // If we found at least 2, use them; otherwise return empty (fall back to generic phases)
+  if (suggested.length >= 2 && suggested.length <= 5) {
+    return suggested;
+  }
+  return [];
+}
+
+/**
  * Auto-create milestones based on payment breakdown
- * This is called after project is funded to automatically create milestones
+ * This is called after project is funded to automatically create milestones.
+ * Uses: 1) client-defined deliverables, 2) description-based suggestions, 3) generic phases.
  */
 export const autoCreateMilestones = mutation({
   args: {
@@ -583,15 +618,23 @@ export const autoCreateMilestones = mutation({
     }
 
     // Only create milestones for milestone-based or fixed-price projects
-    // For hourly projects, milestones are not needed
     const projectType = project.intakeForm.projectType;
     if (projectType === "ongoing") {
-      // Ongoing projects don't need milestones (hourly billing)
       return [];
     }
 
-    // Auto-split milestones based on project characteristics
-    const deliverables = project.intakeForm.deliverables || [];
+    // Prefer client-defined deliverables; else suggest from title + description; else use generic phases
+    let deliverables = project.intakeForm.deliverables ?? [];
+    if (deliverables.length === 0) {
+      const suggested = suggestDeliverablesFromDescription(
+        project.intakeForm.title,
+        project.intakeForm.description
+      );
+      if (suggested.length >= 2 && suggested.length <= 5) {
+        deliverables = suggested;
+      }
+    }
+
     const durationDays = Math.ceil(
       (project.intakeForm.endDate - project.intakeForm.startDate) / (1000 * 60 * 60 * 24)
     );
@@ -605,7 +648,7 @@ export const autoCreateMilestones = mutation({
     }> = [];
 
     if (deliverables.length > 0 && deliverables.length <= 5) {
-      // Split by deliverables
+      // Split by deliverables (client-defined or description-suggested)
       const milestoneCount = deliverables.length;
       const amountPerMilestone = project.totalAmount / milestoneCount;
       const intervalMs = (project.intakeForm.endDate - project.intakeForm.startDate) / milestoneCount;
@@ -621,7 +664,7 @@ export const autoCreateMilestones = mutation({
         };
       });
     } else {
-      // Split by phases
+      // Split by generic phases (duration-based)
       let phases: Array<{ name: string; percentage: number }>;
 
       if (durationDays <= 7) {
@@ -711,6 +754,114 @@ export const autoCreateMilestones = mutation({
       createdAt: now,
     });
 
+    return milestoneIds;
+  },
+});
+
+/**
+ * Internal: auto-create milestones when project is funded (called from payment webhook).
+ * No auth; idempotent if milestones already exist.
+ */
+export const autoCreateMilestonesInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return [];
+
+    const existingMilestones = await ctx.db
+      .query("milestones")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    if (existingMilestones.length > 0) return [];
+
+    const projectType = project.intakeForm.projectType;
+    if (projectType === "ongoing") return [];
+
+    let deliverables = project.intakeForm.deliverables ?? [];
+    if (deliverables.length === 0) {
+      const suggested = suggestDeliverablesFromDescription(
+        project.intakeForm.title,
+        project.intakeForm.description
+      );
+      if (suggested.length >= 2 && suggested.length <= 5) deliverables = suggested;
+    }
+
+    const durationDays = Math.ceil(
+      (project.intakeForm.endDate - project.intakeForm.startDate) / (1000 * 60 * 60 * 24)
+    );
+
+    let milestones: Array<{ title: string; description: string; order: number; amount: number; dueDate: number }> = [];
+
+    if (deliverables.length > 0 && deliverables.length <= 5) {
+      const milestoneCount = deliverables.length;
+      const amountPerMilestone = project.totalAmount / milestoneCount;
+      const intervalMs = (project.intakeForm.endDate - project.intakeForm.startDate) / milestoneCount;
+      milestones = deliverables.map((deliverable, index) => {
+        const dueDate = project.intakeForm.startDate + (index + 1) * intervalMs;
+        return {
+          title: deliverable,
+          description: `Deliverable: ${deliverable}`,
+          order: index + 1,
+          amount: Math.round(amountPerMilestone * 100) / 100,
+          dueDate,
+        };
+      });
+    } else {
+      let phases: Array<{ name: string; percentage: number }>;
+      if (durationDays <= 7) phases = [{ name: "Initial Development", percentage: 50 }, { name: "Final Delivery", percentage: 50 }];
+      else if (durationDays <= 30) phases = [{ name: "Planning & Setup", percentage: 30 }, { name: "Development", percentage: 40 }, { name: "Testing & Delivery", percentage: 30 }];
+      else if (durationDays <= 90) phases = [{ name: "Planning & Design", percentage: 20 }, { name: "Core Development", percentage: 30 }, { name: "Integration & Testing", percentage: 30 }, { name: "Final Delivery", percentage: 20 }];
+      else phases = [{ name: "Planning & Design", percentage: 15 }, { name: "Initial Development", percentage: 20 }, { name: "Core Development", percentage: 25 }, { name: "Advanced Features", percentage: 25 }, { name: "Final Delivery", percentage: 15 }];
+      const intervalMs = (project.intakeForm.endDate - project.intakeForm.startDate) / phases.length;
+      milestones = phases.map((phase, index) => {
+        const dueDate = project.intakeForm.startDate + (index + 1) * intervalMs;
+        return {
+          title: phase.name,
+          description: `Phase ${index + 1}: ${phase.name}`,
+          order: index + 1,
+          amount: Math.round((project.totalAmount * phase.percentage) / 100 * 100) / 100,
+          dueDate,
+        };
+      });
+    }
+
+    const total = milestones.reduce((sum, m) => sum + m.amount, 0);
+    const difference = project.totalAmount - total;
+    if (Math.abs(difference) > 0.01 && milestones.length > 0) {
+      milestones[milestones.length - 1].amount += difference;
+      milestones[milestones.length - 1].amount = Math.round(milestones[milestones.length - 1].amount * 100) / 100;
+    }
+
+    const now = Date.now();
+    const milestoneIds: Doc<"milestones">["_id"][] = [];
+    for (const m of milestones) {
+      const id = await ctx.db.insert("milestones", {
+        projectId: args.projectId,
+        title: m.title,
+        description: m.description,
+        order: m.order,
+        amount: m.amount,
+        currency: project.currency,
+        status: "pending",
+        dueDate: m.dueDate,
+        createdAt: now,
+        updatedAt: now,
+      });
+      milestoneIds.push(id);
+    }
+
+    await ctx.db.insert("auditLogs", {
+      action: "milestones_auto_created",
+      actionType: "admin",
+      actorId: project.clientId,
+      actorRole: "system",
+      targetType: "project",
+      targetId: args.projectId,
+      details: { milestoneCount: milestones.length, totalAmount: project.totalAmount },
+      createdAt: now,
+    });
     return milestoneIds;
   },
 });

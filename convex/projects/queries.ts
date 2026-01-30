@@ -393,6 +393,25 @@ export const getProjectMilestonesInternal = internalQuery({
 });
 
 /**
+ * Get milestones ready for auto-release (approved, autoReleaseAt <= now)
+ * Used by cron to release payments 48h after client approval
+ */
+export const getMilestonesReadyForAutoRelease = internalQuery({
+  args: {
+    now: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const candidates = await ctx.db
+      .query("milestones")
+      .withIndex("by_auto_release", (q) => q.lte("autoReleaseAt", args.now))
+      .collect();
+    return candidates.filter(
+      (m) => m.status === "approved" && m.autoReleaseAt != null && m.autoReleaseAt <= args.now
+    );
+  },
+});
+
+/**
  * Get milestone by ID (internal - no auth required)
  */
 export const getMilestoneByIdInternal = internalQuery({

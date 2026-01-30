@@ -79,26 +79,14 @@ export function determineBillingModel(params: PaymentCalculationParams): Billing
 }
 
 /**
- * Calculate platform fee (can be tiered based on project size)
+ * Calculate platform fee – 25% to company (flat)
  */
 export function calculatePlatformFee(totalAmount: number): {
   fee: number;
   percentage: number;
 } {
-  // Tiered platform fee structure
-  if (totalAmount < 500) {
-    // Small projects: 12% (higher to cover processing costs)
-    return { fee: totalAmount * 0.12, percentage: 12 };
-  } else if (totalAmount < 5000) {
-    // Medium projects: 10% (standard)
-    return { fee: totalAmount * 0.1, percentage: 10 };
-  } else if (totalAmount < 50000) {
-    // Large projects: 8% (volume discount)
-    return { fee: totalAmount * 0.08, percentage: 8 };
-  } else {
-    // Enterprise projects: 6% (enterprise discount)
-    return { fee: totalAmount * 0.06, percentage: 6 };
-  }
+  const percentage = 25;
+  return { fee: totalAmount * (percentage / 100), percentage };
 }
 
 /**
@@ -241,12 +229,12 @@ export function calculateHourlyRate(
 ): number {
   const calculatedRate = totalAmount / estimatedHours;
 
-  // Ensure minimum rates by experience level
+  // Ensure minimum rates by experience level (reduced billables)
   const minimumRates: Record<ExperienceLevel, number> = {
-    junior: 20,
-    mid: 40,
-    senior: 80,
-    expert: 120,
+    junior: 15,
+    mid: 28,
+    senior: 56,
+    expert: 80,
   };
 
   return Math.max(calculatedRate, minimumRates[experienceLevel]);

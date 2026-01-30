@@ -27,15 +27,13 @@ export default function PaymentTermsPage() {
             </p>
             <ul>
               <li><strong>Client Service Fee:</strong> 5% of total project value</li>
-              <li><strong>Freelancer Service Fee:</strong> 10% of earnings (sliding scale for high earners)</li>
+              <li><strong>Freelancer Service Fee:</strong> 25% of earnings (platform fee)</li>
             </ul>
 
-            <h3>2.2 Fee Structure Tiers</h3>
-            <p>Freelancer fees decrease with cumulative lifetime earnings:</p>
+            <h3>2.2 Platform Fee</h3>
+            <p>The platform fee is 25% of the project or milestone amount (company fee).</p>
             <ul>
-              <li>$0 - $10,000: 10% fee</li>
-              <li>$10,001 - $50,000: 8% fee</li>
-              <li>$50,001+: 5% fee</li>
+              <li>Platform fee: 25% of project/milestone amount</li>
             </ul>
 
             <h3>2.3 Fee Changes</h3>

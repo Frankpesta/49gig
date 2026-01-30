@@ -7,12 +7,12 @@ export type ProjectType = "one_time" | "ongoing" | "not_sure";
 export type HireType = "single" | "team";
 export type TeamSize = "2-3" | "4-6" | "7+" | "not_sure";
 
-// Base hourly rates by experience level (USD)
+// Base hourly rates by experience level (USD) – reduced billables
 const BASE_HOURLY_RATES: Record<ExperienceLevel, number> = {
-  junior: 25,
-  mid: 50,
-  senior: 100,
-  expert: 150,
+  junior: 18,
+  mid: 35,
+  senior: 70,
+  expert: 100,
 };
 
 // Base daily rates (8 hours)
@@ -159,7 +159,7 @@ function calculateMinimumProjectValue(
   
   // For very short projects (< 3 days), ensure minimum viable amount
   if (durationDays < 3) {
-    return Math.max(baseMinimum, 300);
+    return Math.max(baseMinimum, 200);
   }
 
   return baseMinimum;
