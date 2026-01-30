@@ -7,9 +7,17 @@ export const getMyNotifications = query({
   args: {
     limit: v.optional(v.number()),
     refreshKey: v.optional(v.number()),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    let user: Doc<"users"> | null = null;
+    if (args.userId) {
+      const u = await ctx.db.get(args.userId);
+      if (u && u.status === "active") user = u;
+    } else {
+      const u = await getCurrentUser(ctx);
+      if (u && (u as Doc<"users">).status === "active") user = u as Doc<"users">;
+    }
     if (!user) {
       return [];
     }
