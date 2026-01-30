@@ -39,8 +39,8 @@ async function getCurrentUserInMutation(
  */
 export const initiateDispute = mutation({
   args: {
-    projectId: v.id("projects"),
-    milestoneId: v.optional(v.id("milestones")),
+    projectId: v.string(), // Accept string (e.g. from URL); normalized in handler
+    milestoneId: v.optional(v.string()),
     type: v.union(
       v.literal("milestone_quality"),
       v.literal("payment"),
@@ -72,8 +72,17 @@ export const initiateDispute = mutation({
       throw new Error("Not authenticated");
     }
 
+    const projectId = ctx.db.normalizeId("projects", args.projectId);
+    if (!projectId) {
+      throw new Error("Invalid project ID");
+    }
+    const milestoneIdRaw = args.milestoneId
+      ? ctx.db.normalizeId("milestones", args.milestoneId)
+      : undefined;
+    const milestoneId = milestoneIdRaw ?? undefined; // normalizeId returns null; schema expects undefined
+
     // Get project
-    const project = await ctx.db.get(args.projectId);
+    const project = await ctx.db.get(projectId);
     if (!project) {
       throw new Error("Project not found");
     }
@@ -89,7 +98,7 @@ export const initiateDispute = mutation({
     // Check if dispute already exists for this project/milestone
     const existingDisputes = await ctx.db
       .query("disputes")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .filter((q) =>
         q.or(
           q.eq(q.field("status"), "open"),
@@ -98,9 +107,9 @@ export const initiateDispute = mutation({
       )
       .collect();
 
-    if (args.milestoneId) {
+    if (milestoneId) {
       const milestoneDispute = existingDisputes.find(
-        (d) => d.milestoneId === args.milestoneId
+        (d) => d.milestoneId === milestoneId
       );
       if (milestoneDispute) {
         throw new Error("Dispute already exists for this milestone");
@@ -115,8 +124,8 @@ export const initiateDispute = mutation({
 
     // Calculate locked amount
     let lockedAmount = 0;
-    if (args.milestoneId) {
-      const milestone = await ctx.db.get(args.milestoneId);
+    if (milestoneId) {
+      const milestone = await ctx.db.get(milestoneId);
       if (milestone) {
         lockedAmount = milestone.amount;
       }
@@ -127,8 +136,8 @@ export const initiateDispute = mutation({
 
     // Create dispute
     const disputeId = await ctx.db.insert("disputes", {
-      projectId: args.projectId,
-      milestoneId: args.milestoneId,
+      projectId,
+      milestoneId,
       initiatorId: user._id,
       initiatorRole: user.role === "client" ? "client" : "freelancer",
       type: args.type,
@@ -142,7 +151,7 @@ export const initiateDispute = mutation({
     });
 
     // Update project status to disputed
-    await ctx.db.patch(args.projectId, {
+    await ctx.db.patch(projectId, {
       status: "disputed",
       updatedAt: Date.now(),
     });
@@ -164,8 +173,8 @@ export const initiateDispute = mutation({
       targetType: "dispute",
       targetId: disputeId,
       details: {
-        projectId: args.projectId,
-        milestoneId: args.milestoneId,
+        projectId,
+        milestoneId,
         type: args.type,
         lockedAmount,
       },
@@ -180,7 +189,7 @@ export const initiateDispute = mutation({
         title: "New dispute opened",
         message: `A dispute was opened for ${project.intakeForm.title}.`,
         type: "dispute",
-        data: { disputeId, projectId: args.projectId },
+        data: { disputeId, projectId },
       });
     }
     // TODO: Create system message in project chat
