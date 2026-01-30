@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,9 +8,74 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Search, Plus } from "lucide-react";
+import { MessageSquare, Search, Plus, Users, Headphones } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+
+function ChatListSection({
+  chats,
+  searchQuery,
+  unreadCount,
+}: {
+  chats: Doc<"chats">[];
+  searchQuery: string;
+  unreadCount?: number;
+}) {
+  const filtered = chats.filter((chat) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(q) ||
+      chat.lastMessagePreview?.toLowerCase().includes(q)
+    );
+  });
+
+  if (filtered.length === 0) {
+    return (
+      <div className="p-8 text-center">
+        <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">
+          {searchQuery ? "No chats found" : "No chats yet"}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="divide-y">
+      {filtered.map((chat) => (
+        <Link
+          key={chat._id}
+          href={`/dashboard/chat/${chat._id}`}
+          className="block p-4 hover:bg-muted/50 transition-colors"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-semibold truncate">
+                  {chat.title || "Untitled Chat"}
+                </h3>
+                <Badge variant="outline" className="text-xs">
+                  {chat.type}
+                </Badge>
+              </div>
+              {chat.lastMessagePreview && (
+                <p className="text-sm text-muted-foreground truncate">
+                  {chat.lastMessagePreview}
+                </p>
+              )}
+              {chat.lastMessageAt && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {new Date(chat.lastMessageAt).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export default function ChatPage() {
   const { user, isAuthenticated } = useAuth();
@@ -21,10 +86,26 @@ export default function ChatPage() {
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
 
+  const projectChatsForAdmin = useQuery(
+    api.chat.queries.getProjectChatsForAdmin,
+    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
+      ? { userId: user._id }
+      : "skip"
+  );
+
+  const supportChatsForAdmin = useQuery(
+    api.chat.queries.getSupportChatsForAdmin,
+    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
+      ? { userId: user._id }
+      : "skip"
+  );
+
   const unreadCount = useQuery(
     api.chat.queries.getUnreadCount,
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
+
+  const isAdminOrModerator = user?.role === "admin" || user?.role === "moderator";
 
   if (!isAuthenticated || !user) {
     return (
@@ -59,7 +140,9 @@ export default function ChatPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Messages</h1>
           <p className="text-muted-foreground mt-1">
-            Communicate with clients, freelancers, and support
+            {isAdminOrModerator
+              ? "View all project and support chats"
+              : "Communicate with clients, freelancers, and support"}
           </p>
         </div>
         <Button asChild>
@@ -71,7 +154,6 @@ export default function ChatPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Chat List */}
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
@@ -92,52 +174,40 @@ export default function ChatPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              {filteredChats.length === 0 ? (
-                <div className="p-8 text-center">
-                  <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">
-                    {searchQuery ? "No chats found" : "No chats yet"}
-                  </p>
+              {isAdminOrModerator ? (
+                <div className="divide-y">
+                  <div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-sm font-medium">
+                      <Users className="h-4 w-4" />
+                      Project Chats (Client ↔ Freelancer)
+                    </div>
+                    <ChatListSection
+                      chats={projectChatsForAdmin ?? []}
+                      searchQuery={searchQuery}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-sm font-medium">
+                      <Headphones className="h-4 w-4" />
+                      Support Chats
+                    </div>
+                    <ChatListSection
+                      chats={supportChatsForAdmin ?? []}
+                      searchQuery={searchQuery}
+                    />
+                  </div>
                 </div>
               ) : (
-                <div className="divide-y">
-                  {filteredChats.map((chat: Doc<"chats">) => (
-                    <Link
-                      key={chat._id}
-                      href={`/dashboard/chat/${chat._id}`}
-                      className="block p-4 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold truncate">
-                              {chat.title || "Untitled Chat"}
-                            </h3>
-                            <Badge variant="outline" className="text-xs">
-                              {chat.type}
-                            </Badge>
-                          </div>
-                          {chat.lastMessagePreview && (
-                            <p className="text-sm text-muted-foreground truncate">
-                              {chat.lastMessagePreview}
-                            </p>
-                          )}
-                          {chat.lastMessageAt && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {new Date(chat.lastMessageAt).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                <ChatListSection
+                  chats={filteredChats ?? []}
+                  searchQuery={searchQuery}
+                  unreadCount={unreadCount ?? 0}
+                />
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Chat Preview / Empty State */}
         <div className="lg:col-span-2">
           <Card className="h-[600px] flex items-center justify-center">
             <div className="text-center">

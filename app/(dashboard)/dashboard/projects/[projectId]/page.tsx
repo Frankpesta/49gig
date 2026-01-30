@@ -1,8 +1,8 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,10 +20,13 @@ import {
   FolderKanban,
   Calendar,
   Edit,
+  MessageCircle,
   LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
+import { useState } from "react";
 
 const STATUS_CONFIG: Record<
   string,
@@ -55,12 +58,21 @@ function isValidConvexId(id: string | string[] | undefined): id is Id<"projects"
 
 export default function ProjectDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { user } = useAuth();
   const projectIdParam = params.projectId;
-  
+  const [isOpeningChat, setIsOpeningChat] = useState(false);
+
   // Validate the projectId from URL params
   const isValidId = isValidConvexId(projectIdParam);
   const projectId = isValidId ? (projectIdParam as Id<"projects">) : null;
+
+  const projectChat = useQuery(
+    api.chat.queries.getProjectChat,
+    user?._id && projectId ? { projectId, userId: user._id } : "skip"
+  );
+
+  const createProjectChat = useMutation(api.chat.mutations.createProjectChat);
 
   const project = useQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,6 +149,23 @@ export default function ProjectDetailPage() {
   const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
   const isClient = user.role === "client" && project.clientId === user._id;
+  const isMatchedFreelancer = project.matchedFreelancerId === user._id;
+  const canChat =
+    project.matchedFreelancerId &&
+    (project.clientId === user._id || isMatchedFreelancer);
+
+  const handleOpenChat = async () => {
+    if (!projectId || !user?._id) return;
+    setIsOpeningChat(true);
+    try {
+      const chatId = await createProjectChat({ projectId, userId: user._id });
+      router.push(`/dashboard/chat/${chatId}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not open chat");
+    } finally {
+      setIsOpeningChat(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -362,6 +391,32 @@ export default function ProjectDetailPage() {
                       {project.freelancer.name}
                     </div>
                   </div>
+                </>
+              )}
+              {canChat && (
+                <>
+                  <Separator />
+                  {projectChat ? (
+                    <Button asChild className="w-full">
+                      <Link href={`/dashboard/chat/${projectChat._id}`}>
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        {isClient ? "Chat with freelancer" : "Chat with client"}
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full"
+                      onClick={handleOpenChat}
+                      disabled={isOpeningChat}
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      {isOpeningChat
+                        ? "Opening..."
+                        : isClient
+                          ? "Chat with freelancer"
+                          : "Chat with client"}
+                    </Button>
+                  )}
                 </>
               )}
             </CardContent>
