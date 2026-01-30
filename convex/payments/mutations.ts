@@ -2,6 +2,7 @@ import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
+import { internal } from "../_generated/api";
 
 const api = require("../_generated/api") as {
   api: {
@@ -283,6 +284,11 @@ export const handlePaymentSuccess = internalMutation({
         status: "funded",
         escrowedAmount: payment.amount,
         updatedAt: now,
+      });
+
+      // Auto-create milestones so client and freelancer can see and use them
+      await ctx.scheduler.runAfter(0, internal.projects.mutations.autoCreateMilestonesInternal, {
+        projectId: payment.projectId,
       });
 
       // Log audit

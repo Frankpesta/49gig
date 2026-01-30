@@ -155,7 +155,7 @@ export default function PaymentPage() {
     return null;
   }
 
-  const platformFee = project.platformFee || 10;
+  const platformFee = project.platformFee ?? 25;
   const platformFeeAmount = (project.totalAmount * platformFee) / 100;
   const totalAmount = project.totalAmount;
 

@@ -138,6 +138,8 @@ export default function CreateProjectPage() {
     endDate: "",
     timelineFlexible: false,
     projectType: "one_time" as ProjectType,
+    // Deliverables = phases/milestones (what the freelancer will deliver), not skills
+    deliverables: [] as string[],
     // Section 3: Talent Requirements
     talentCategory: "" as string,
     experienceLevel: "mid" as ExperienceLevel,
@@ -147,6 +149,7 @@ export default function CreateProjectPage() {
   });
 
   const [newSkill, setNewSkill] = useState("");
+  const [newDeliverable, setNewDeliverable] = useState("");
 
   // Calculate budget based on form data
   const budgetCalculation = useMemo(() => {
@@ -208,7 +211,7 @@ export default function CreateProjectPage() {
         experienceLevel: formData.experienceLevel,
         startDate,
         endDate,
-        deliverables: formData.requiredSkills.length > 0 ? formData.requiredSkills : undefined,
+        deliverables: formData.deliverables.length > 0 ? formData.deliverables : undefined,
         estimatedHours: budgetCalculation.breakdown.totalHours,
       });
     } catch (err) {
@@ -348,7 +351,7 @@ export default function CreateProjectPage() {
           timeline: `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
           category: formData.talentCategory,
           estimatedBudget: totalAmount,
-          deliverables: formData.requiredSkills.length > 0 ? formData.requiredSkills : undefined,
+          deliverables: formData.deliverables.length > 0 ? formData.deliverables : undefined,
         },
         totalAmount,
         platformFee,
@@ -654,6 +657,76 @@ export default function CreateProjectPage() {
                   ))}
                 </div>
               </div>
+
+              {formData.projectType === "one_time" && (
+                <div className="space-y-3 pt-4 border-t">
+                  <Label className="text-base font-semibold">
+                    7. Deliverables / Milestones (optional)
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    List the main phases or outcomes you expect, e.g. &quot;Design mockups&quot;, &quot;Backend API&quot;, &quot;Frontend&quot;, &quot;Testing &amp; handoff&quot;. These become payment milestones. If you leave this empty, we&apos;ll suggest milestones from your project description.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="e.g., Design mockups"
+                      value={newDeliverable}
+                      onChange={(e) => setNewDeliverable(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (newDeliverable.trim() && formData.deliverables.length < 5) {
+                            setFormData({
+                              ...formData,
+                              deliverables: [...formData.deliverables, newDeliverable.trim()],
+                            });
+                            setNewDeliverable("");
+                          }
+                        }
+                      }}
+                      className="h-11 flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        if (newDeliverable.trim() && formData.deliverables.length < 5) {
+                          setFormData({
+                            ...formData,
+                            deliverables: [...formData.deliverables, newDeliverable.trim()],
+                          });
+                          setNewDeliverable("");
+                        }
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {formData.deliverables.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {formData.deliverables.map((d) => (
+                        <Badge key={d} variant="secondary" className="gap-1">
+                          {d}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                deliverables: formData.deliverables.filter((x) => x !== d),
+                              })
+                            }
+                            className="rounded-full hover:bg-muted"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                  {formData.deliverables.length >= 5 && (
+                    <p className="text-xs text-muted-foreground">Max 5 milestones.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -662,7 +735,7 @@ export default function CreateProjectPage() {
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  7. Which talent category do you need?
+                  8. Which talent category do you need?
                 </Label>
                 <Select
                   value={formData.talentCategory}
@@ -689,7 +762,7 @@ export default function CreateProjectPage() {
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  8. Required level of experience:
+                  9. Required level of experience:
                 </Label>
                 <div className="space-y-3">
                   {EXPERIENCE_LEVELS.map((level) => (
@@ -720,7 +793,7 @@ export default function CreateProjectPage() {
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  9. Key skills or tools required (optional)
+                  10. Key skills or tools required (optional)
                 </Label>
                 <div className="flex gap-2">
                   <Input
@@ -820,9 +893,9 @@ export default function CreateProjectPage() {
                       </div>
                     )}
                     <div className="pt-2 border-t">
-                      Platform fee (10%):{" "}
+                      Platform fee (25%):{" "}
                       {formatBudget(
-                        budgetCalculation.estimatedBudget * 0.1
+                        budgetCalculation.estimatedBudget * 0.25
                       )}
                     </div>
                   </div>
