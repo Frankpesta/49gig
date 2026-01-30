@@ -485,10 +485,12 @@ export const createSubaccount = action({
       split_value: args.splitValue,
     });
 
-    // Update user with subaccount ID
+    // Update user with subaccount ID and bank details (for later transfers)
     await ctx.runMutation(internal.payments.mutations.updateUserFlutterwaveSubaccountId, {
       userId: args.freelancerId,
       flutterwaveSubaccountId: subaccountData.data.id.toString(),
+      bankCode: args.accountBank,
+      accountNumber: args.accountNumber,
     });
 
     return {
@@ -526,13 +528,14 @@ export const getSubaccountStatus = action({
 
     try {
       const subaccountData = await flutterwave.getSubaccount(freelancerDoc.flutterwaveSubaccountId);
+      const data = subaccountData.data;
       return {
         connected: true,
-        subaccountId: subaccountData.data.id.toString(),
-        accountName: subaccountData.data.account_name,
-        accountReference: subaccountData.data.account_reference,
-        bankName: subaccountData.data.bank_name,
-        bankCode: subaccountData.data.bank_code,
+        subaccountId: data.id.toString(),
+        accountName: data.account_name,
+        accountReference: data.account_reference,
+        bankName: data.bank_name,
+        bankCode: data.account_bank ?? data.bank_code,
       };
     } catch (error) {
       console.error("Failed to get subaccount status:", error);
@@ -627,10 +630,10 @@ export const releaseMilestonePayment = action({
       throw new Error("Freelancer not found");
     }
 
-    const freelancerDoc: typeof freelancer & {
+    const freelancerDoc = freelancer as typeof freelancer & {
       flutterwaveSubaccountId?: string;
-    } = freelancer as typeof freelancer & {
-      flutterwaveSubaccountId?: string;
+      flutterwavePayoutBankCode?: string;
+      flutterwavePayoutAccountNumber?: string;
     };
 
     // Check if freelancer has subaccount
@@ -638,24 +641,49 @@ export const releaseMilestonePayment = action({
       throw new Error("Freelancer has not set up payout account. Please contact the freelancer to set up their payout details.");
     }
 
-    // Get subaccount details to extract bank info
-    let subaccountDetails: {
-      status: string;
-      message: string;
-      data: {
-        id: number;
-        account_name: string;
-        account_reference: string;
-        bank_name: string;
-        bank_code: string;
-        account_number?: string;
+    // Prefer stored bank details (saved at subaccount creation); otherwise fetch from API
+    let accountBank: string | undefined = freelancerDoc.flutterwavePayoutBankCode;
+    let accountNumber: string | undefined = freelancerDoc.flutterwavePayoutAccountNumber;
+    let beneficiaryName: string | undefined;
+
+    if (!accountBank || !accountNumber) {
+      let subaccountDetails: {
+        status: string;
+        message: string;
+        data: {
+          id: number;
+          account_name: string;
+          account_reference: string;
+          bank_name: string;
+          bank_code?: string;
+          account_bank?: string;
+          account_number?: string;
+        };
       };
-    };
-    try {
-      subaccountDetails = await flutterwave.getSubaccount(freelancerDoc.flutterwaveSubaccountId);
-    } catch (error) {
-      console.error("Failed to get subaccount details:", error);
-      throw new Error("Failed to retrieve freelancer payout account details. Please contact support.");
+      try {
+        subaccountDetails = await flutterwave.getSubaccount(freelancerDoc.flutterwaveSubaccountId);
+      } catch (error) {
+        console.error("Failed to get subaccount details:", error);
+        throw new Error("Failed to retrieve freelancer payout account details. Please contact support.");
+      }
+      const data = subaccountDetails.data;
+      accountBank = accountBank ?? data.account_bank ?? data.bank_code;
+      accountNumber = accountNumber ?? data.account_number;
+      beneficiaryName = data.account_name;
+    }
+
+    if (!accountBank || !/^\d+$/.test(accountBank.trim())) {
+      throw new Error(
+        "Freelancer payout bank code is missing or invalid. The freelancer may need to update their payout details in Settings."
+      );
+    }
+    if (!accountNumber || accountNumber.trim().length === 0) {
+      throw new Error(
+        "Freelancer payout account number is missing. The freelancer may need to update their payout details in Settings."
+      );
+    }
+    if (!beneficiaryName) {
+      beneficiaryName = freelancer.name;
     }
 
     // Calculate platform fee
@@ -694,13 +722,13 @@ export const releaseMilestonePayment = action({
     };
     try {
       transferData = await flutterwave.createTransfer({
-        account_bank: subaccountDetails.data.bank_code,
-        account_number: subaccountDetails.data.account_number || "0000000000", // Placeholder - should be stored when subaccount is created
+        account_bank: accountBank.trim(),
+        account_number: accountNumber.trim(),
         amount: netAmount,
         narration: `Milestone payout: ${milestone.title} - Project: ${project.intakeForm.title}`,
         currency: milestone.currency.toUpperCase(),
         reference: transferRef,
-        beneficiary_name: subaccountDetails.data.account_name,
+        beneficiary_name: beneficiaryName,
         subaccount: freelancerDoc.flutterwaveSubaccountId,
       });
     } catch (error) {

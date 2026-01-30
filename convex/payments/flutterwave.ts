@@ -318,15 +318,17 @@ export async function getSubaccount(subaccountId: string): Promise<{
     account_name: string;
     account_reference: string;
     bank_name: string;
-    bank_code: string;
-    split_ratio: number;
-    split_type: string;
-    split_value: number;
-    subaccount_id: string;
-    email: string;
-    mobilization_number: string;
-    country: string;
-    created_at: string;
+    bank_code?: string;
+    account_bank?: string; // Flutterwave may return bank code as account_bank
+    account_number?: string;
+    split_ratio?: number;
+    split_type?: string;
+    split_value?: number;
+    subaccount_id?: string;
+    email?: string;
+    mobilization_number?: string;
+    country?: string;
+    created_at?: string;
   };
 }> {
   const response = await fetch(
