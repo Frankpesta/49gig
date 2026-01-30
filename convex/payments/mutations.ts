@@ -147,18 +147,23 @@ export const createPayment = internalMutation({
 });
 
 /**
- * Update user's Flutterwave subaccount ID
+ * Update user's Flutterwave subaccount ID and payout bank details (for transfers)
  * Internal mutation
  */
 export const updateUserFlutterwaveSubaccountId = internalMutation({
   args: {
     userId: v.id("users"),
     flutterwaveSubaccountId: v.string(),
+    bankCode: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<void> => {
-    await ctx.db.patch(args.userId, {
+    const patch: Record<string, unknown> = {
       flutterwaveSubaccountId: args.flutterwaveSubaccountId,
-    });
+    };
+    if (args.bankCode != null) patch.flutterwavePayoutBankCode = args.bankCode;
+    if (args.accountNumber != null) patch.flutterwavePayoutAccountNumber = args.accountNumber;
+    await ctx.db.patch(args.userId, patch);
   },
 });
 

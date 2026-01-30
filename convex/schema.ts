@@ -124,6 +124,8 @@ export default defineSchema({
     // Flutterwave
     flutterwaveCustomerEmail: v.optional(v.string()), // Flutterwave uses email as customer identifier
     flutterwaveSubaccountId: v.optional(v.string()), // Freelancer's Flutterwave Subaccount ID
+    flutterwavePayoutBankCode: v.optional(v.string()), // Stored at subaccount creation for transfers
+    flutterwavePayoutAccountNumber: v.optional(v.string()), // Stored at subaccount creation for transfers
 
     // Audit
     createdAt: v.number(),
