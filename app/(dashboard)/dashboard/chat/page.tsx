@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Search, Plus, Users, Headphones } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -176,36 +175,28 @@ export default function ChatPage() {
             </CardHeader>
             <CardContent className="p-0">
               {isAdminOrModerator ? (
-                <Tabs defaultValue="project" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2 mx-4 mb-2">
-                    <TabsTrigger value="project" className="text-xs gap-1">
-                      <Users className="h-3.5 w-3" />
-                      Project
-                    </TabsTrigger>
-                    <TabsTrigger value="support" className="text-xs gap-1">
-                      <Headphones className="h-3.5 w-3" />
-                      Support
-                    </TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="project" className="mt-0">
-                    <p className="px-4 py-1 text-xs text-muted-foreground">
-                      Client ↔ Freelancer
-                    </p>
+                <div className="divide-y">
+                  <div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-sm font-medium">
+                      <Users className="h-4 w-4" />
+                      Project Chats (Client ↔ Freelancer)
+                    </div>
                     <ChatListSection
                       chats={projectChatsForAdmin ?? []}
                       searchQuery={searchQuery}
                     />
-                  </TabsContent>
-                  <TabsContent value="support" className="mt-0">
-                    <p className="px-4 py-1 text-xs text-muted-foreground">
-                      User support requests
-                    </p>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-sm font-medium">
+                      <Headphones className="h-4 w-4" />
+                      Support Chats
+                    </div>
                     <ChatListSection
                       chats={supportChatsForAdmin ?? []}
                       searchQuery={searchQuery}
                     />
-                  </TabsContent>
-                </Tabs>
+                  </div>
+                </div>
               ) : (
                 <ChatListSection
                   chats={filteredChats ?? []}
