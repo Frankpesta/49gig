@@ -33,22 +33,27 @@ async function getCurrentUserInMutation(
 }
 
 /**
- * Create or get project chat
- * Automatically creates chat when project is matched
+ * Create or get project chat.
+ * Accepts projectId as string (e.g. from URL) and normalizes to support external IDs.
  */
 export const createProjectChat = mutation({
   args: {
-    projectId: v.id("projects"),
+    projectId: v.string(),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
+    const projectId = ctx.db.normalizeId("projects", args.projectId);
+    if (!projectId) {
+      throw new Error("Invalid project ID");
+    }
+
     const user = await getCurrentUserInMutation(ctx, args.userId);
     if (!user) {
       throw new Error("Not authenticated");
     }
 
     // Get project
-    const project = await ctx.db.get(args.projectId);
+    const project = await ctx.db.get(projectId);
     if (!project) {
       throw new Error("Project not found");
     }
@@ -66,7 +71,7 @@ export const createProjectChat = mutation({
     // Check if chat already exists
     const existingChat = await ctx.db
       .query("chats")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
 
     if (existingChat) {
@@ -83,7 +88,7 @@ export const createProjectChat = mutation({
     const chatId = await ctx.db.insert("chats", {
       type: "project",
       participants,
-      projectId: args.projectId,
+      projectId,
       title: `Project: ${project.intakeForm?.title || "Untitled"}`,
       status: "active",
       createdAt: Date.now(),
@@ -100,7 +105,7 @@ export const createProjectChat = mutation({
       targetId: chatId,
       details: {
         type: "project",
-        projectId: args.projectId,
+        projectId,
       },
       createdAt: Date.now(),
     });
