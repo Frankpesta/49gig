@@ -24,74 +24,28 @@ import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/ui/logo";
 import { toast } from "sonner";
+import {
+  PLATFORM_CATEGORIES,
+  SKILLS_FOR_MCQ_CODING,
+  getSkillsForCategory,
+} from "@/lib/platform-skills";
 
-const TECH_FIELDS = [
-  { value: "development", label: "Software Development" },
-  { value: "data_science", label: "Data Science" },
-  { value: "technical_writing", label: "Technical Writing" },
-  { value: "design", label: "Design" },
-  { value: "other", label: "Other" },
+const EXPERIENCE_LEVELS = [
+  { value: "junior", label: "Junior" },
+  { value: "mid", label: "Mid-Level" },
+  { value: "senior", label: "Senior" },
+  { value: "expert", label: "Expert" },
 ] as const;
 
-const EXPERIENCE_LEVELS = {
-  development: [
-    { value: "junior", label: "Junior Developer" },
-    { value: "mid", label: "Mid-Level Developer" },
-    { value: "senior", label: "Senior Developer" },
-    { value: "expert", label: "Expert/Lead Developer" },
-  ],
-  data_science: [
-    { value: "junior", label: "Junior Data Scientist" },
-    { value: "mid", label: "Mid-Level Data Scientist" },
-    { value: "senior", label: "Senior Data Scientist" },
-    { value: "expert", label: "Expert Data Scientist" },
-  ],
-  technical_writing: [
-    { value: "junior", label: "Junior Technical Writer" },
-    { value: "mid", label: "Mid-Level Technical Writer" },
-    { value: "senior", label: "Senior Technical Writer" },
-    { value: "expert", label: "Expert Technical Writer" },
-  ],
-  design: [
-    { value: "junior", label: "Junior Designer" },
-    { value: "mid", label: "Mid-Level Designer" },
-    { value: "senior", label: "Senior Designer" },
-    { value: "expert", label: "Expert Designer" },
-  ],
-  marketing: [
-    { value: "junior", label: "Junior Marketer" },
-    { value: "mid", label: "Mid-Level Marketer" },
-    { value: "senior", label: "Senior Marketer" },
-    { value: "expert", label: "Expert Marketer" },
-  ],
-  other: [
-    { value: "junior", label: "Junior" },
-    { value: "mid", label: "Mid-Level" },
-    { value: "senior", label: "Senior" },
-    { value: "expert", label: "Expert" },
-  ],
+// Map legacy signup techField values to current platform category ids
+const LEGACY_TECH_FIELD_TO_CATEGORY: Record<string, string> = {
+  development: "software_development",
+  data_science: "data_analytics",
+  design: "ui_ux_design",
+  technical_writing: "qa_testing",
+  marketing: "software_development",
+  other: "software_development",
 };
-
-const PROGRAMMING_LANGUAGES = [
-  "JavaScript",
-  "TypeScript",
-  "Python",
-  "Java",
-  "C++",
-  "C#",
-  "Go",
-  "Rust",
-  "PHP",
-  "Ruby",
-  "Swift",
-  "Kotlin",
-  "Scala",
-  "R",
-  "MATLAB",
-  "SQL",
-  "HTML/CSS",
-  "Other",
-];
 
 export default function FreelancerOnboardingPage() {
   const router = useRouter();
@@ -112,8 +66,12 @@ export default function FreelancerOnboardingPage() {
   useEffect(() => {
     // Pre-fill with existing profile data if available
     if (user?.profile) {
+      const rawTech = user.profile.techField || "";
+      const techField = rawTech && PLATFORM_CATEGORIES.some((c) => c.id === rawTech)
+        ? rawTech
+        : LEGACY_TECH_FIELD_TO_CATEGORY[rawTech] || rawTech;
       setFormData({
-        techField: user.profile.techField || "",
+        techField,
         experienceLevel: user.profile.experienceLevel || "",
         skills: user.profile.skills || [],
         languagesWritten: user.profile.languagesWritten || [],
@@ -121,12 +79,7 @@ export default function FreelancerOnboardingPage() {
     }
   }, [user]);
 
-  const availableExperienceLevels =
-    formData.techField && formData.techField in EXPERIENCE_LEVELS
-      ? EXPERIENCE_LEVELS[
-          formData.techField as keyof typeof EXPERIENCE_LEVELS
-        ]
-      : [];
+  const categorySkills = formData.techField ? getSkillsForCategory(formData.techField) : [];
 
   const handleAddSkill = () => {
     if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
@@ -252,7 +205,7 @@ export default function FreelancerOnboardingPage() {
 
                 <div className="space-y-3">
                   <Label htmlFor="techField" className="text-sm font-medium">
-                    Tech Field
+                    Tech Category
                   </Label>
                   <Select
                     value={formData.techField}
@@ -260,18 +213,19 @@ export default function FreelancerOnboardingPage() {
                       setFormData({
                         ...formData,
                         techField: value,
-                        experienceLevel: "", // Reset experience level when field changes
+                        experienceLevel: "",
+                        skills: [],
                       });
                     }}
                     disabled={isLoading}
                   >
                     <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select your tech field" />
+                      <SelectValue placeholder="Select your tech category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {TECH_FIELDS.map((field) => (
-                        <SelectItem key={field.value} value={field.value}>
-                          {field.label}
+                      {PLATFORM_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -299,7 +253,7 @@ export default function FreelancerOnboardingPage() {
                         <SelectValue placeholder="Select your experience level" />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableExperienceLevels.map((level) => (
+                        {EXPERIENCE_LEVELS.map((level) => (
                           <SelectItem key={level.value} value={level.value}>
                             {level.label}
                           </SelectItem>
@@ -312,11 +266,40 @@ export default function FreelancerOnboardingPage() {
                   <Label htmlFor="skills" className="text-sm font-medium">
                     Tech Skills
                   </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Skills for your category (used for verification):
+                  </p>
+                  {formData.techField && categorySkills.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {categorySkills.map((skill) => (
+                        <Button
+                          key={skill}
+                          type="button"
+                          variant={formData.skills.includes(skill) ? "default" : "outline"}
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => {
+                            if (formData.skills.includes(skill)) {
+                              handleRemoveSkill(skill);
+                            } else {
+                              setFormData({
+                                ...formData,
+                                skills: [...formData.skills, skill],
+                              });
+                            }
+                          }}
+                          disabled={isLoading}
+                        >
+                          {skill}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Input
                       id="skills"
                       type="text"
-                      placeholder="e.g., React, Node.js, Python"
+                      placeholder="Add more skills..."
                       value={skillInput}
                       onChange={(e) => setSkillInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -364,7 +347,7 @@ export default function FreelancerOnboardingPage() {
                     Programming Languages Written
                   </Label>
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
-                    {PROGRAMMING_LANGUAGES.map((language) => (
+                    {[...SKILLS_FOR_MCQ_CODING, "R", "Swift", "Kotlin", "Scala", "MATLAB", "HTML/CSS", "Other"].map((language) => (
                       <label
                         key={language}
                         className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded"

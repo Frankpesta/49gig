@@ -4,6 +4,7 @@ import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 import { v } from "convex/values";
 import OpenAI from "openai";
+import { extractText, getDocumentProxy } from "unpdf";
 import type { Doc } from "../_generated/dataModel";
 
 const openai = new OpenAI({
@@ -92,15 +93,14 @@ export const parseResumeAndBuildBio = action({
       }
 
       const pdfBuffer = await pdfResponse.arrayBuffer();
-      const pdfBlob = Buffer.from(pdfBuffer);
+      const pdfBytes = new Uint8Array(pdfBuffer);
 
-      // Step 2: Extract text from PDF using pdf-parse
+      // Step 2: Extract text from PDF using unpdf (Node/serverless-compatible, no DOMMatrix)
       let resumeText = "";
       try {
-        // Dynamic import for pdf-parse (Node.js only)
-        const pdfParse = require("pdf-parse");
-        const pdfData = await pdfParse(pdfBlob);
-        resumeText = pdfData.text;
+        const pdf = await getDocumentProxy(pdfBytes);
+        const { text } = await extractText(pdf, { mergePages: true });
+        resumeText = text ?? "";
         
         // Clean up the extracted text
         resumeText = resumeText
