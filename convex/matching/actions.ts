@@ -25,7 +25,23 @@ interface ScoringBreakdown {
 }
 
 /**
- * Calculate skill overlap score (0-100)
+ * Check if a freelancer skill matches a required skill (exact or closely related).
+ * Related: same base (e.g. React/React.js), one contains the other, or common aliases.
+ */
+function skillMatches(required: string, freelancerSkill: string): boolean {
+  const r = required.toLowerCase().trim();
+  const f = freelancerSkill.toLowerCase().trim();
+  if (r === f) return true;
+  if (f.includes(r) || r.includes(f)) return true;
+  // Normalize common variants: "React.js" -> "react", "Node" -> "node.js" etc.
+  const normalize = (s: string) => s.replace(/\s*[.\-]\s*js$/i, "").replace(/\s+/g, " ").trim();
+  if (normalize(r) === normalize(f)) return true;
+  return false;
+}
+
+/**
+ * Calculate skill overlap score (0-100).
+ * Uses exact and closely related matches so freelancers with relevant or related skills are included.
  */
 function calculateSkillOverlap(
   requiredSkills: string[],
@@ -35,9 +51,7 @@ function calculateSkillOverlap(
   if (freelancerSkills.length === 0) return 0;
 
   const matchedSkills = requiredSkills.filter((skill) =>
-    freelancerSkills.some(
-      (fs) => fs.toLowerCase() === skill.toLowerCase()
-    )
+    freelancerSkills.some((fs) => skillMatches(skill, fs))
   );
 
   return (matchedSkills.length / requiredSkills.length) * 100;

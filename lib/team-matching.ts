@@ -277,8 +277,16 @@ export function matchFreelancerToRole(
       return skill;
     });
   
+  const skillMatches = (required: string, fs: string) => {
+    const r = required.toLowerCase().trim();
+    const f = fs.toLowerCase().trim();
+    if (r === f) return true;
+    if (f.includes(r) || r.includes(f)) return true;
+    const norm = (s: string) => s.replace(/\s*[.\-]\s*js$/i, "").replace(/\s+/g, " ").trim();
+    return norm(r) === norm(f);
+  };
   const matchingSkills = roleSkills.filter((skill: string) =>
-    freelancerSkills.some((fs: string) => fs.toLowerCase() === skill.toLowerCase())
+    freelancerSkills.some((fs: string) => skillMatches(skill, fs))
   );
   
   if (matchingSkills.length > 0) {
