@@ -43,9 +43,10 @@ export const submitFreelancerRating = mutation({
     }
     if (!project.matchedFreelancerId) throw new Error("Project has no matched freelancer");
 
-    // Only allow rating when project is in_progress (at least one milestone done) or completed
-    if (project.status !== "in_progress" && project.status !== "completed") {
-      throw new Error("You can rate the freelancer once the project is in progress or completed");
+    // Allow rating when project is matched, in_progress, or completed
+    const allowedStatuses = ["matched", "in_progress", "completed"];
+    if (!allowedStatuses.includes(project.status)) {
+      throw new Error("You can rate the freelancer once the project has a matched freelancer and is in progress or completed");
     }
 
     const now = Date.now();
