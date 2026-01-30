@@ -66,10 +66,12 @@ export default function FreelancerOnboardingPage() {
   useEffect(() => {
     // Pre-fill with existing profile data if available
     if (user?.profile) {
-      const rawTech = user.profile.techField || "";
-      const techField = rawTech && PLATFORM_CATEGORIES.some((c) => c.id === rawTech)
-        ? rawTech
-        : LEGACY_TECH_FIELD_TO_CATEGORY[rawTech] || rawTech;
+      // Widen to string so we can compare legacy techField values with platform category ids
+      const rawTech: string = user.profile.techField ?? "";
+      const techField =
+        rawTech && PLATFORM_CATEGORIES.some((c) => c.id === rawTech)
+          ? rawTech
+          : LEGACY_TECH_FIELD_TO_CATEGORY[rawTech] ?? rawTech;
       setFormData({
         techField,
         experienceLevel: user.profile.experienceLevel || "",
