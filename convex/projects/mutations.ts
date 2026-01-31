@@ -638,9 +638,9 @@ export const autoCreateMilestones = mutation({
       return [];
     }
 
-    // Prefer client-defined deliverables; else suggest from title + description; else use generic phases
+    // Prefer client-defined deliverables; fall back to description when empty or insufficient (1 item)
     let deliverables = project.intakeForm.deliverables ?? [];
-    if (deliverables.length === 0) {
+    if (deliverables.length < 2) {
       const suggested = suggestDeliverablesFromDescription(
         project.intakeForm.title,
         project.intakeForm.description
@@ -795,7 +795,8 @@ export const autoCreateMilestonesInternal = internalMutation({
     if (projectType === "ongoing") return [];
 
     let deliverables = project.intakeForm.deliverables ?? [];
-    if (deliverables.length === 0) {
+    // Fall back to description when empty or insufficient (1 item, vague)
+    if (deliverables.length < 2) {
       const suggested = suggestDeliverablesFromDescription(
         project.intakeForm.title,
         project.intakeForm.description

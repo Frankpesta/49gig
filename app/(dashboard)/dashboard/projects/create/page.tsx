@@ -500,11 +500,14 @@ export default function CreateProjectPage() {
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label htmlFor="title" className="text-base font-semibold">
-                  Project Title / Role
+                  Project Title
                 </Label>
+                <p className="text-sm text-muted-foreground">
+                  A clear, descriptive title for your project (e.g., what you&apos;re building or the outcome you need).
+                </p>
                 <Input
                   id="title"
-                  placeholder="e.g., Backend Developer, Data Analyst"
+                  placeholder="e.g., Build a modern e-commerce website, Mobile app for inventory management, CRM integration with Salesforce"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
@@ -612,9 +615,17 @@ export default function CreateProjectPage() {
                 <Label htmlFor="deliverablesText" className="text-base font-semibold">
                   Deliverables Expected
                 </Label>
+                <p className="text-sm text-muted-foreground">
+                  List the main phases or outcomes you expect. These become payment milestones. Use clear, outcome-based descriptions.
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Examples: Design mockups, Backend API, Frontend build, Testing &amp; QA, Deployment</li>
+                  <li>One per line, or comma-separated (2–5 milestones recommended)</li>
+                  <li>Leave empty and we&apos;ll generate milestones from your project description</li>
+                </ul>
                 <Textarea
                   id="deliverablesText"
-                  placeholder="List the anticipated outcomes or deliverables (one per line or comma-separated)"
+                  placeholder={"e.g., Design mockups\nBackend API\nFrontend & integration\nTesting & handoff"}
                   rows={4}
                   value={formData.deliverablesText}
                   onChange={(e) =>
