@@ -9,10 +9,10 @@ export type TeamSize = "2-3" | "4-6" | "7+" | "not_sure";
 
 // Base hourly rates by experience level (USD)
 const BASE_HOURLY_RATES: Record<ExperienceLevel, number> = {
-  junior: 5,
-  mid: 10,
-  senior: 20,
-  expert: 30,
+  junior: 3,
+  mid: 5,
+  senior: 10,
+  expert: 15,
 };
 
 // Base daily rates (8 hours)
@@ -149,17 +149,17 @@ function calculateMinimumProjectValue(
   durationDays: number
 ): number {
   const baseMinimums: Record<ExperienceLevel, number> = {
-    junior: 50,
-    mid: 100,
-    senior: 200,
-    expert: 300,
+    junior: 30,
+    mid: 50,
+    senior: 100,
+    expert: 150,
   };
 
   const baseMinimum = baseMinimums[experienceLevel];
   
   // For very short projects (< 3 days), ensure minimum viable amount
   if (durationDays < 3) {
-    return Math.max(baseMinimum, 50);
+    return Math.max(baseMinimum, 30);
   }
 
   return baseMinimum;

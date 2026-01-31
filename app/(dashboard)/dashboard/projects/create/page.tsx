@@ -22,8 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { X, Plus, ArrowRight, ArrowLeft } from "lucide-react";
+import { ArrowRight, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -39,12 +38,6 @@ import {
   type PaymentBreakdown,
 } from "@/lib/payment-calculator";
 import { PaymentBreakdownDisplay } from "@/components/payments/payment-breakdown";
-
-const TALENT_CATEGORIES = [
-  "Software Development",
-  "UI/UX & Product Design",
-  "Data & Analytics",
-] as const;
 
 const PROJECT_DURATIONS = [
   { value: "1-3", label: "1–3 months" },
@@ -73,87 +66,37 @@ const TEAM_SIZES = [
   { value: "not_sure", label: "Not sure (let 49GIG recommend)" },
 ] as const;
 
-const PROJECT_TYPES = [
-  { value: "one_time", label: "One-time / clearly defined → Milestone-based" },
-  { value: "ongoing", label: "Ongoing / long-term → Hourly / monthly" },
-  { value: "not_sure", label: "Not sure (let 49GIG decide)" },
+const ROLE_TYPES = [
+  { value: "full_time", label: "Full-Time" },
+  { value: "part_time", label: "Part-Time" },
+  { value: "contract", label: "Contract / Freelance" },
 ] as const;
 
-const COMMON_SKILLS_BY_CATEGORY: Record<string, string[]> = {
-  "Programming Languages": [
-    "Java",
-    "Python",
-    "JavaScript",
-    "PHP",
-    "Ruby",
-    "Go",
-    "Rust",
-    "Swift",
-    "Kotlin",
-    "C++",
-    "TypeScript",
-  ],
-  "Frameworks / Libraries": [
-    "React",
-    "Node.js",
-    "Django",
-    "Laravel",
-    "Next.js",
-    "Angular",
-    "Vue.js",
-    "Express",
-    "Spring",
-  ],
-  "Cloud / DevOps": [
-    "AWS",
-    "Azure",
-    "GCP",
-    "Docker",
-    "Kubernetes",
-    "CI/CD",
-    "Terraform",
-    "Linux",
-  ],
-  "Data & Analytics": [
-    "SQL",
-    "Data Science",
-    "BI tools",
-    "ML/AI",
-    "Tableau",
-    "Power BI",
-    "Pandas",
-    "NumPy",
-  ],
-  "Design / UI/UX": [
-    "Figma",
-    "Adobe XD",
-    "Sketch",
-    "Prototyping",
-    "User Research",
-    "Wireframing",
-    "Visual Design",
-  ],
-};
+export type RoleType = (typeof ROLE_TYPES)[number]["value"];
 
-const TALENT_CATEGORIES_SKILLS: Record<string, string[]> = {
-  "Software Development": [
-    ...(COMMON_SKILLS_BY_CATEGORY["Programming Languages"] || []),
-    ...(COMMON_SKILLS_BY_CATEGORY["Frameworks / Libraries"] || []),
-    ...(COMMON_SKILLS_BY_CATEGORY["Cloud / DevOps"] || []),
-  ],
-  "UI/UX & Product Design": [
-    ...(COMMON_SKILLS_BY_CATEGORY["Design / UI/UX"] || []),
-    "Figma",
-    "Adobe XD",
-    "Sketch",
-  ],
-  "Data & Analytics": [
-    ...(COMMON_SKILLS_BY_CATEGORY["Data & Analytics"] || []),
-    "Python",
-    "R",
-    "SQL",
-  ],
-};
+// Derive projectType from roleType for backend (Contract → one_time, Full/Part → ongoing)
+function roleTypeToProjectType(roleType: RoleType): ProjectType {
+  return roleType === "contract" ? "one_time" : "ongoing";
+}
+
+// Skills Required - select all that apply (per image)
+const SKILLS_REQUIRED_OPTIONS = [
+  "Software Development",
+  "UI/UX Design",
+  "Data & Analytics",
+  "DevOps",
+  "AI/ML",
+  "Blockchain",
+  "Cybersecurity",
+  "QA & Testing",
+] as const;
+
+// Map selected skill to talentCategory for schema (one of 3)
+function skillsToTalentCategory(skills: string[]): string {
+  if (skills.some((s) => s === "UI/UX Design")) return "UI/UX & Product Design";
+  if (skills.some((s) => s === "Data & Analytics")) return "Data & Analytics";
+  return "Software Development";
+}
 
 export default function CreateProjectPage() {
   const router = useRouter();
@@ -171,25 +114,19 @@ export default function CreateProjectPage() {
     // Section 1: Hire Type
     hireType: "single" as HireType,
     teamSize: undefined as TeamSize | undefined,
-    // Section 2: Project Overview
+    // Section 2: Project Requirements (per image)
     title: "",
+    skillsRequired: [] as string[],
+    roleType: "contract" as RoleType,
     description: "",
-    startDate: "",
     projectDuration: "1-3" as ProjectDuration,
-    projectType: "one_time" as ProjectType,
-    // Deliverables = phases/milestones (what the freelancer will deliver), not skills
-    deliverables: [] as string[],
-    // Section 3: Talent Requirements
-    roleTitle: "",
-    talentCategory: "" as string,
+    deliverablesText: "",
+    budgetOverride: "" as string,
     experienceLevel: "mid" as ExperienceLevel,
-    requiredSkills: [] as string[],
-    // Section 4: Budget / Notes
+    startDate: "",
+    // Notes
     specialRequirements: "",
   });
-
-  const [newSkill, setNewSkill] = useState("");
-  const [newDeliverable, setNewDeliverable] = useState("");
 
   // Derive endDate from startDate + projectDuration
   const derivedEndDate = useMemo(() => {
@@ -202,13 +139,14 @@ export default function CreateProjectPage() {
     return end;
   }, [formData.startDate, formData.projectDuration]);
 
+  const projectType = roleTypeToProjectType(formData.roleType);
+
   // Calculate budget based on form data
   const budgetCalculation = useMemo(() => {
     if (
       !formData.startDate ||
       !derivedEndDate ||
-      !formData.experienceLevel ||
-      !formData.projectType
+      !formData.experienceLevel
     ) {
       return null;
     }
@@ -220,14 +158,19 @@ export default function CreateProjectPage() {
         return null;
       }
 
-      return calculateProjectBudget({
+      const calc = calculateProjectBudget({
         hireType: formData.hireType,
         teamSize: formData.teamSize,
         experienceLevel: formData.experienceLevel,
-        projectType: formData.projectType,
+        projectType,
         startDate,
         endDate: derivedEndDate,
       });
+      const override = formData.budgetOverride ? parseFloat(formData.budgetOverride) : undefined;
+      if (override != null && !isNaN(override) && override > 0) {
+        return { ...calc, estimatedBudget: override };
+      }
+      return calc;
     } catch (err) {
       return null;
     }
@@ -237,7 +180,8 @@ export default function CreateProjectPage() {
     formData.startDate,
     derivedEndDate,
     formData.experienceLevel,
-    formData.projectType,
+    formData.roleType,
+    formData.budgetOverride,
   ]);
 
   // Calculate payment breakdown
@@ -246,15 +190,19 @@ export default function CreateProjectPage() {
 
     try {
       const startDate = new Date(formData.startDate);
+      const deliverables = formData.deliverablesText
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
 
       return calculatePayment({
         totalAmount: budgetCalculation.estimatedBudget,
-        projectType: formData.projectType,
+        projectType,
         hireType: formData.hireType,
         experienceLevel: formData.experienceLevel,
         startDate,
         endDate: derivedEndDate,
-        deliverables: formData.deliverables.length > 0 ? formData.deliverables : undefined,
+        deliverables: deliverables.length > 0 ? deliverables : undefined,
         estimatedHours: budgetCalculation.breakdown.totalHours,
       });
     } catch (err) {
@@ -262,25 +210,13 @@ export default function CreateProjectPage() {
     }
   }, [budgetCalculation, formData, derivedEndDate]);
 
-  const availableSkills = useMemo(() => {
-    if (!formData.talentCategory) return [];
-    return TALENT_CATEGORIES_SKILLS[formData.talentCategory] || COMMON_SKILLS_BY_CATEGORY[formData.talentCategory] || [];
-  }, [formData.talentCategory]);
 
-  const handleAddSkill = () => {
-    if (newSkill.trim() && !formData.requiredSkills.includes(newSkill.trim())) {
-      setFormData({
-        ...formData,
-        requiredSkills: [...formData.requiredSkills, newSkill.trim()],
-      });
-      setNewSkill("");
-    }
-  };
-
-  const handleRemoveSkill = (skill: string) => {
+  const toggleSkill = (skill: string) => {
     setFormData({
       ...formData,
-      requiredSkills: formData.requiredSkills.filter((s) => s !== skill),
+      skillsRequired: formData.skillsRequired.includes(skill)
+        ? formData.skillsRequired.filter((s) => s !== skill)
+        : [...formData.skillsRequired, skill],
     });
   };
 
@@ -298,13 +234,17 @@ export default function CreateProjectPage() {
         return;
       }
     } else if (step === 2) {
-      // Validate Section 2: Project Overview
+      // Validate Section 2: Project Requirements
       if (!formData.title.trim()) {
-        setError("Project title is required");
+        setError("Project title / role is required");
+        return;
+      }
+      if (!formData.skillsRequired.length) {
+        setError("Please select at least one skill");
         return;
       }
       if (!formData.description.trim()) {
-        setError("Project description is required");
+        setError("Project scope / description is required");
         return;
       }
       if (!formData.startDate) {
@@ -320,22 +260,9 @@ export default function CreateProjectPage() {
         setError("Invalid start date format");
         return;
       }
-      if (!formData.projectType) {
-        setError("Please select project type");
-        return;
-      }
     } else if (step === 3) {
-      // Validate Section 3: Talent Requirements
-      if (!formData.talentCategory) {
-        setError("Please select a talent category");
-        return;
-      }
-      if (!formData.experienceLevel) {
-        setError("Please select experience level");
-        return;
-      }
       if (!budgetCalculation) {
-        setError("Unable to calculate budget. Please check your dates.");
+        setError("Unable to calculate budget. Please check your inputs.");
         return;
       }
     }
@@ -370,6 +297,11 @@ export default function CreateProjectPage() {
       const totalAmount = paymentBreakdown.totalAmount;
       const platformFee = paymentBreakdown.platformFeePercentage;
 
+      const deliverables = formData.deliverablesText
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+
       const projectId = await createProject({
         intakeForm: {
           hireType: formData.hireType,
@@ -378,18 +310,19 @@ export default function CreateProjectPage() {
           description: formData.description,
           startDate: startDate.getTime(),
           endDate: endDate.getTime(),
-          projectType: formData.projectType,
-          talentCategory: formData.talentCategory,
+          projectType,
+          talentCategory: skillsToTalentCategory(formData.skillsRequired),
           experienceLevel: formData.experienceLevel,
-          requiredSkills: formData.requiredSkills,
+          requiredSkills: formData.skillsRequired,
           budget: totalAmount,
           specialRequirements: formData.specialRequirements || undefined,
-          roleTitle: formData.roleTitle.trim() || undefined,
+          roleTitle: formData.title.trim() || undefined,
           projectDuration: formData.projectDuration,
+          roleType: formData.roleType,
           timeline: `${formData.projectDuration} months`,
-          category: formData.talentCategory,
+          category: skillsToTalentCategory(formData.skillsRequired),
           estimatedBudget: totalAmount,
-          deliverables: formData.deliverables.length > 0 ? formData.deliverables : undefined,
+          deliverables: deliverables.length > 0 ? deliverables : undefined,
         },
         totalAmount,
         platformFee,
@@ -433,7 +366,7 @@ export default function CreateProjectPage() {
 
       {/* Progress Indicator */}
       <div className="flex items-center gap-2">
-        {[1, 2, 3, 4].map((s) => (
+        {[1, 2, 3].map((s) => (
           <div key={s} className="flex items-center gap-2">
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
@@ -446,7 +379,7 @@ export default function CreateProjectPage() {
             >
               {s}
             </div>
-            {s < 4 && (
+            {s < 3 && (
               <div
                 className={`h-1 w-16 ${
                   s < step ? "bg-primary" : "bg-muted"
@@ -468,16 +401,14 @@ export default function CreateProjectPage() {
       <Card>
         <CardHeader>
           <CardTitle>
-            {step === 1 && "Section 1: Hire Type"}
-            {step === 2 && "Section 2: Project Overview"}
-            {step === 3 && "Section 3: Talent Requirements"}
-            {step === 4 && "Section 4: Budget / Notes"}
+            {step === 1 && "Step 1: Hire Type"}
+            {step === 2 && "Step 2: Project Requirements"}
+            {step === 3 && "Step 3: Budget / Review"}
           </CardTitle>
           <CardDescription>
             {step === 1 && "What would you like to hire?"}
-            {step === 2 && "Tell us about your project"}
-            {step === 3 && "Specify talent requirements"}
-            {step === 4 && "Review budget and add notes"}
+            {step === 2 && "Define your project requirements"}
+            {step === 3 && "Review budget and confirm"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -564,16 +495,16 @@ export default function CreateProjectPage() {
             </div>
           )}
 
-          {/* Step 2: Project Overview */}
+          {/* Step 2: Project Requirements (per image) */}
           {step === 2 && (
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label htmlFor="title" className="text-base font-semibold">
-                  3. Project title
+                  Project Title / Role
                 </Label>
                 <Input
                   id="title"
-                  placeholder="e.g., Build a modern e-commerce website"
+                  placeholder="e.g., Backend Developer, Data Analyst"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
@@ -583,13 +514,64 @@ export default function CreateProjectPage() {
               </div>
 
               <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  Skills Required (select all that apply)
+                </Label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {SKILLS_REQUIRED_OPTIONS.map((skill) => (
+                    <label
+                      key={skill}
+                      className="flex items-center space-x-3 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.skillsRequired.includes(skill)}
+                        onChange={() => toggleSkill(skill)}
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      />
+                      <span className="text-sm font-medium">{skill}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  Role Type
+                </Label>
+                <div className="space-y-3">
+                  {ROLE_TYPES.map((type) => (
+                    <label
+                      key={type.value}
+                      className="flex items-center space-x-3 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="roleType"
+                        value={type.value}
+                        checked={formData.roleType === type.value}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            roleType: e.target.value as RoleType,
+                          })
+                        }
+                        className="h-4 w-4 text-primary border-border focus:ring-primary"
+                      />
+                      <span className="text-sm font-medium">{type.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
                 <Label htmlFor="description" className="text-base font-semibold">
-                  4. Brief description of your project and expected outcome
+                  Project Scope / Description
                 </Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe your project in detail..."
-                  rows={6}
+                  placeholder="Describe your project scope and details..."
+                  rows={5}
                   value={formData.description}
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
@@ -599,30 +581,99 @@ export default function CreateProjectPage() {
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  5. Project Duration
+                  Project Duration
                 </Label>
-                <Select
-                  value={formData.projectDuration}
-                  onValueChange={(value: ProjectDuration) =>
-                    setFormData({ ...formData, projectDuration: value })
+                <div className="space-y-3">
+                  {PROJECT_DURATIONS.map((d) => (
+                    <label
+                      key={d.value}
+                      className="flex items-center space-x-3 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="projectDuration"
+                        value={d.value}
+                        checked={formData.projectDuration === d.value}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            projectDuration: e.target.value as ProjectDuration,
+                          })
+                        }
+                        className="h-4 w-4 text-primary border-border focus:ring-primary"
+                      />
+                      <span className="text-sm font-medium">{d.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="deliverablesText" className="text-base font-semibold">
+                  Deliverables Expected
+                </Label>
+                <Textarea
+                  id="deliverablesText"
+                  placeholder="List the anticipated outcomes or deliverables (one per line or comma-separated)"
+                  rows={4}
+                  value={formData.deliverablesText}
+                  onChange={(e) =>
+                    setFormData({ ...formData, deliverablesText: e.target.value })
                   }
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROJECT_DURATIONS.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="budgetOverride" className="text-base font-semibold">
+                  Budget (Optional)
+                </Label>
+                <Input
+                  id="budgetOverride"
+                  type="number"
+                  placeholder="e.g., 5000"
+                  value={formData.budgetOverride}
+                  onChange={(e) =>
+                    setFormData({ ...formData, budgetOverride: e.target.value })
+                  }
+                  className="h-11"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to use our estimated budget based on duration and experience level.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  Preferred Experience Level
+                </Label>
+                <div className="space-y-3">
+                  {EXPERIENCE_LEVELS.map((level) => (
+                    <label
+                      key={level.value}
+                      className="flex items-center space-x-3 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="experienceLevel"
+                        value={level.value}
+                        checked={formData.experienceLevel === level.value}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            experienceLevel: e.target.value as ExperienceLevel,
+                          })
+                        }
+                        className="h-4 w-4 text-primary border-border focus:ring-primary"
+                      />
+                      <span className="text-sm font-medium">{level.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-3">
                 <Label htmlFor="startDate" className="text-base font-semibold">
-                  6. Start date
+                  Start Date
                 </Label>
                 <DatePicker
                   id="startDate"
@@ -640,254 +691,6 @@ export default function CreateProjectPage() {
                   placeholder="Select start date"
                   minDate={new Date()}
                 />
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  7. Project type:
-                </Label>
-                <div className="space-y-3">
-                  {PROJECT_TYPES.map((type) => (
-                    <label
-                      key={type.value}
-                      className="flex items-center space-x-3 cursor-pointer group"
-                    >
-                      <input
-                        type="radio"
-                        name="projectType"
-                        value={type.value}
-                        checked={formData.projectType === type.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            projectType: e.target.value as ProjectType,
-                          })
-                        }
-                        className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
-                      />
-                      <span className="text-sm font-medium text-foreground group-hover:text-primary">
-                        {type.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {formData.projectType === "one_time" && (
-                <div className="space-y-3 pt-4 border-t">
-                  <Label className="text-base font-semibold">
-                    8. Deliverables / Milestones (optional)
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    List the main phases or outcomes you expect, e.g. &quot;Design mockups&quot;, &quot;Backend API&quot;, &quot;Frontend&quot;, &quot;Testing &amp; handoff&quot;. These become payment milestones. If you leave this empty, we&apos;ll suggest milestones from your project description.
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="e.g., Design mockups"
-                      value={newDeliverable}
-                      onChange={(e) => setNewDeliverable(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          if (newDeliverable.trim() && formData.deliverables.length < 5) {
-                            setFormData({
-                              ...formData,
-                              deliverables: [...formData.deliverables, newDeliverable.trim()],
-                            });
-                            setNewDeliverable("");
-                          }
-                        }
-                      }}
-                      className="h-11 flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        if (newDeliverable.trim() && formData.deliverables.length < 5) {
-                          setFormData({
-                            ...formData,
-                            deliverables: [...formData.deliverables, newDeliverable.trim()],
-                          });
-                          setNewDeliverable("");
-                        }
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  {formData.deliverables.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {formData.deliverables.map((d) => (
-                        <Badge key={d} variant="secondary" className="gap-1">
-                          {d}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setFormData({
-                                ...formData,
-                                deliverables: formData.deliverables.filter((x) => x !== d),
-                              })
-                            }
-                            className="rounded-full hover:bg-muted"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  {formData.deliverables.length >= 5 && (
-                    <p className="text-xs text-muted-foreground">Max 5 milestones.</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 3: Talent Requirements */}
-          {step === 3 && (
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="roleTitle" className="text-base font-semibold">
-                  Role / Job Title
-                </Label>
-                <Input
-                  id="roleTitle"
-                  placeholder="e.g., Backend Developer, Data Analyst"
-                  value={formData.roleTitle}
-                  onChange={(e) =>
-                    setFormData({ ...formData, roleTitle: e.target.value })
-                  }
-                  className="h-11"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  Required Skills / Technologies
-                </Label>
-                <Select
-                  value={formData.talentCategory}
-                  onValueChange={(value) =>
-                    setFormData({
-                      ...formData,
-                      talentCategory: value,
-                      requiredSkills: [],
-                    })
-                  }
-                >
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="Select talent category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TALENT_CATEGORIES.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  Experience Level
-                </Label>
-                <div className="space-y-3">
-                  {EXPERIENCE_LEVELS.map((level) => (
-                    <label
-                      key={level.value}
-                      className="flex items-center space-x-3 cursor-pointer group"
-                    >
-                      <input
-                        type="radio"
-                        name="experienceLevel"
-                        value={level.value}
-                        checked={formData.experienceLevel === level.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            experienceLevel: e.target.value as ExperienceLevel,
-                          })
-                        }
-                        className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
-                      />
-                      <span className="text-sm font-medium text-foreground group-hover:text-primary">
-                        {level.label}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  Key skills or tools (optional)
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Add a skill"
-                    value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddSkill();
-                      }
-                    }}
-                    className="h-11 flex-1"
-                  />
-                  <Button type="button" onClick={handleAddSkill}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {availableSkills.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {availableSkills.map((skill) => (
-                      <Badge
-                        key={skill}
-                        variant={
-                          formData.requiredSkills.includes(skill)
-                            ? "default"
-                            : "outline"
-                        }
-                        className="cursor-pointer"
-                        onClick={() => {
-                          if (formData.requiredSkills.includes(skill)) {
-                            handleRemoveSkill(skill);
-                          } else {
-                            setFormData({
-                              ...formData,
-                              requiredSkills: [
-                                ...formData.requiredSkills,
-                                skill,
-                              ],
-                            });
-                          }
-                        }}
-                      >
-                        {skill}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {formData.requiredSkills.length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    {formData.requiredSkills.map((skill) => (
-                      <Badge key={skill} variant="default">
-                        {skill}
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkill(skill)}
-                          className="ml-2 rounded-full hover:bg-primary/80"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {/* Budget Preview */}
@@ -934,8 +737,8 @@ export default function CreateProjectPage() {
             </div>
           )}
 
-          {/* Step 4: Budget / Notes */}
-          {step === 4 && (
+          {/* Step 3: Budget / Review */}
+          {step === 3 && (
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
@@ -1011,7 +814,7 @@ export default function CreateProjectPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
-        {step < 4 ? (
+        {step < 3 ? (
           <Button onClick={handleNext}>
             Next
             <ArrowRight className="ml-2 h-4 w-4" />
