@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, User, Building2, Briefcase, Globe, Link as LinkIcon, FileText } from "lucide-react";
+import { Loader2, Save, User, Building2, Briefcase, Globe, Link as LinkIcon, FileText, Star } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -43,6 +43,16 @@ export default function ProfilePage() {
     // @ts-ignore dynamic path cast for generated types
     (api as any).resume.queries.getFreelancerResume,
     user?._id ? { freelancerId: user._id, requesterId: user._id } : "skip"
+  );
+  const ratingStats = useQuery(
+    (api as any)["reviews/queries"].getFreelancerRatingStats,
+    user?._id && user?.role === "freelancer" ? { freelancerId: user._id } : "skip"
+  );
+  const freelancerReviews = useQuery(
+    (api as any)["reviews/queries"].getReviewsForFreelancer,
+    user?._id && user?.role === "freelancer"
+      ? { freelancerId: user._id, userId: user._id, limit: 10 }
+      : "skip"
   );
 
   // Initialize form data from user
@@ -246,6 +256,55 @@ export default function ProfilePage() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Client feedback / reputation */}
+            {isFreelancer && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="h-5 w-5" />
+                    Client feedback
+                  </CardTitle>
+                  <CardDescription>
+                    {ratingStats && ratingStats.count > 0
+                      ? `${ratingStats.averageRating}/5 average (${ratingStats.count} review${ratingStats.count !== 1 ? "s" : ""})`
+                      : "Ratings from clients you've worked with"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {freelancerReviews && freelancerReviews.length > 0 ? (
+                    <div className="space-y-4">
+                      {freelancerReviews.map(
+                        (r: { _id: string; rating: number; comment?: string; createdAt: number }) => (
+                          <div key={r._id} className="rounded-lg border p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Star
+                                  key={s}
+                                  className={`h-4 w-4 ${
+                                    r.rating >= s ? "fill-amber-400 text-amber-500" : "text-muted-foreground"
+                                  }`}
+                                />
+                              ))}
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {new Date(r.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            {r.comment && (
+                              <p className="text-sm">&quot;{r.comment}&quot;</p>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No feedback yet. Complete projects and clients will be able to rate you.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>

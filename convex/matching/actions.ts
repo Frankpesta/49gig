@@ -150,16 +150,23 @@ async function calculatePastPerformance(
 
 /**
  * Calculate ratings score (0-100)
- * Based on historical client ratings
+ * Based on historical client ratings (reviews table)
  */
 async function calculateRatingsScore(
-  ctx: any,
+  ctx: { runQuery: (fn: any, args: any) => Promise<any> },
   freelancerId: string
 ): Promise<number> {
-  // For now, return neutral score
-  // TODO: Implement ratings system when available
-  // This would query a ratings/reviews table
-  return 50;
+  try {
+    const stats = await ctx.runQuery(
+      internal.reviews.queries.getFreelancerRatingStatsInternal,
+      { freelancerId }
+    );
+    if (!stats || stats.count === 0) return 50; // Neutral if no reviews
+    // Average rating 1-5 → 0-100 score
+    return Math.round((stats.averageRating / 5) * 100);
+  } catch {
+    return 50;
+  }
 }
 
 /**

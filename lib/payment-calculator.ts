@@ -229,12 +229,12 @@ export function calculateHourlyRate(
 ): number {
   const calculatedRate = totalAmount / estimatedHours;
 
-  // Ensure minimum rates by experience level (reduced billables)
+  // Ensure minimum rates by experience level
   const minimumRates: Record<ExperienceLevel, number> = {
-    junior: 15,
-    mid: 28,
-    senior: 56,
-    expert: 80,
+    junior: 5,
+    mid: 10,
+    senior: 20,
+    expert: 30,
   };
 
   return Math.max(calculatedRate, minimumRates[experienceLevel]);

@@ -258,6 +258,19 @@ export const getDashboardMetrics = query({
         projectIds.has(milestone.projectId)
       );
 
+      // Client ratings / reputation
+      const clientReviews = await ctx.db
+        .query("reviews")
+        .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+        .collect();
+      const avgRating =
+        clientReviews.length > 0
+          ? Math.round(
+              (clientReviews.reduce((s, r) => s + r.rating, 0) / clientReviews.length) * 10
+            ) / 10
+          : 0;
+      const reviewCount = clientReviews.length;
+
       const acceptedMatches = matches.filter((match) => match.status === "accepted");
       const respondedMatches = matches.filter(
         (match) => match.status === "accepted" || match.status === "rejected"
@@ -300,6 +313,8 @@ export const getDashboardMetrics = query({
           estimatedHours,
           pendingReviews: pendingReviews.length,
           responseRate,
+          avgRating,
+          reviewCount,
           trends: {
             activeProjects: { value: Math.abs(activeProjectsTrend), isPositive: activeProjectsTrend >= 0, label: "30d" },
             earnings: { value: Math.abs(earningsTrend), isPositive: earningsTrend >= 0, label: "30d" },
