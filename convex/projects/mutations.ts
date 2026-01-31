@@ -70,7 +70,15 @@ export const createProject = mutation({
         v.literal("ongoing"),
         v.literal("not_sure")
       ),
+      projectDuration: v.optional(
+        v.union(
+          v.literal("1-3"),
+          v.literal("3-6"),
+          v.literal("6+")
+        )
+      ),
       // Section 3: Talent Requirements
+      roleTitle: v.optional(v.string()),
       talentCategory: v.union(
         v.literal("Software Development"),
         v.literal("UI/UX & Product Design"),

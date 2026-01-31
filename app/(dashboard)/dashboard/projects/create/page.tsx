@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -47,11 +46,24 @@ const TALENT_CATEGORIES = [
   "Data & Analytics",
 ] as const;
 
+const PROJECT_DURATIONS = [
+  { value: "1-3", label: "1–3 months" },
+  { value: "3-6", label: "3–6 months" },
+  { value: "6+", label: "6+ months" },
+] as const;
+
+export type ProjectDuration = (typeof PROJECT_DURATIONS)[number]["value"];
+
+const DURATION_DAYS: Record<ProjectDuration, number> = {
+  "1-3": 60,
+  "3-6": 135,
+  "6+": 270,
+};
+
 const EXPERIENCE_LEVELS = [
-  { value: "junior", label: "Junior" },
-  { value: "mid", label: "Mid-level" },
-  { value: "senior", label: "Senior" },
-  { value: "expert", label: "Expert" },
+  { value: "junior", label: "Junior (1–3 years)" },
+  { value: "mid", label: "Mid-level (3–5 years)" },
+  { value: "senior", label: "Senior (5+ years)" },
 ] as const;
 
 const TEAM_SIZES = [
@@ -68,50 +80,78 @@ const PROJECT_TYPES = [
 ] as const;
 
 const COMMON_SKILLS_BY_CATEGORY: Record<string, string[]> = {
-  "Software Development": [
-    "React",
-    "Next.js",
-    "TypeScript",
-    "Node.js",
-    "Python",
+  "Programming Languages": [
     "Java",
-    "C++",
-    "Go",
-    "Rust",
+    "Python",
+    "JavaScript",
     "PHP",
     "Ruby",
+    "Go",
+    "Rust",
     "Swift",
     "Kotlin",
-    "Docker",
-    "Kubernetes",
+    "C++",
+    "TypeScript",
+  ],
+  "Frameworks / Libraries": [
+    "React",
+    "Node.js",
+    "Django",
+    "Laravel",
+    "Next.js",
+    "Angular",
+    "Vue.js",
+    "Express",
+    "Spring",
+  ],
+  "Cloud / DevOps": [
     "AWS",
     "Azure",
     "GCP",
+    "Docker",
+    "Kubernetes",
+    "CI/CD",
+    "Terraform",
+    "Linux",
   ],
-  "UI/UX & Product Design": [
+  "Data & Analytics": [
+    "SQL",
+    "Data Science",
+    "BI tools",
+    "ML/AI",
+    "Tableau",
+    "Power BI",
+    "Pandas",
+    "NumPy",
+  ],
+  "Design / UI/UX": [
     "Figma",
     "Adobe XD",
     "Sketch",
-    "InVision",
     "Prototyping",
     "User Research",
     "Wireframing",
     "Visual Design",
-    "Design Systems",
-    "Framer",
+  ],
+};
+
+const TALENT_CATEGORIES_SKILLS: Record<string, string[]> = {
+  "Software Development": [
+    ...(COMMON_SKILLS_BY_CATEGORY["Programming Languages"] || []),
+    ...(COMMON_SKILLS_BY_CATEGORY["Frameworks / Libraries"] || []),
+    ...(COMMON_SKILLS_BY_CATEGORY["Cloud / DevOps"] || []),
+  ],
+  "UI/UX & Product Design": [
+    ...(COMMON_SKILLS_BY_CATEGORY["Design / UI/UX"] || []),
+    "Figma",
+    "Adobe XD",
+    "Sketch",
   ],
   "Data & Analytics": [
+    ...(COMMON_SKILLS_BY_CATEGORY["Data & Analytics"] || []),
     "Python",
     "R",
     "SQL",
-    "Tableau",
-    "Power BI",
-    "Excel",
-    "Machine Learning",
-    "Data Visualization",
-    "Statistics",
-    "Pandas",
-    "NumPy",
   ],
 };
 
@@ -135,12 +175,12 @@ export default function CreateProjectPage() {
     title: "",
     description: "",
     startDate: "",
-    endDate: "",
-    timelineFlexible: false,
+    projectDuration: "1-3" as ProjectDuration,
     projectType: "one_time" as ProjectType,
     // Deliverables = phases/milestones (what the freelancer will deliver), not skills
     deliverables: [] as string[],
     // Section 3: Talent Requirements
+    roleTitle: "",
     talentCategory: "" as string,
     experienceLevel: "mid" as ExperienceLevel,
     requiredSkills: [] as string[],
@@ -151,11 +191,22 @@ export default function CreateProjectPage() {
   const [newSkill, setNewSkill] = useState("");
   const [newDeliverable, setNewDeliverable] = useState("");
 
+  // Derive endDate from startDate + projectDuration
+  const derivedEndDate = useMemo(() => {
+    if (!formData.startDate || !formData.projectDuration) return null;
+    const start = new Date(formData.startDate);
+    if (isNaN(start.getTime())) return null;
+    const days = DURATION_DAYS[formData.projectDuration];
+    const end = new Date(start);
+    end.setDate(end.getDate() + days);
+    return end;
+  }, [formData.startDate, formData.projectDuration]);
+
   // Calculate budget based on form data
   const budgetCalculation = useMemo(() => {
     if (
       !formData.startDate ||
-      !formData.endDate ||
+      !derivedEndDate ||
       !formData.experienceLevel ||
       !formData.projectType
     ) {
@@ -164,13 +215,8 @@ export default function CreateProjectPage() {
 
     try {
       const startDate = new Date(formData.startDate);
-      const endDate = new Date(formData.endDate);
 
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return null;
-      }
-
-      if (endDate <= startDate) {
+      if (isNaN(startDate.getTime())) {
         return null;
       }
 
@@ -180,8 +226,7 @@ export default function CreateProjectPage() {
         experienceLevel: formData.experienceLevel,
         projectType: formData.projectType,
         startDate,
-        endDate,
-        timelineFlexible: formData.timelineFlexible,
+        endDate: derivedEndDate,
       });
     } catch (err) {
       return null;
@@ -190,19 +235,17 @@ export default function CreateProjectPage() {
     formData.hireType,
     formData.teamSize,
     formData.startDate,
-    formData.endDate,
+    derivedEndDate,
     formData.experienceLevel,
     formData.projectType,
-    formData.timelineFlexible,
   ]);
 
   // Calculate payment breakdown
   const paymentBreakdown = useMemo<PaymentBreakdown | null>(() => {
-    if (!budgetCalculation) return null;
+    if (!budgetCalculation || !derivedEndDate) return null;
 
     try {
       const startDate = new Date(formData.startDate);
-      const endDate = new Date(formData.endDate);
 
       return calculatePayment({
         totalAmount: budgetCalculation.estimatedBudget,
@@ -210,18 +253,18 @@ export default function CreateProjectPage() {
         hireType: formData.hireType,
         experienceLevel: formData.experienceLevel,
         startDate,
-        endDate,
+        endDate: derivedEndDate,
         deliverables: formData.deliverables.length > 0 ? formData.deliverables : undefined,
         estimatedHours: budgetCalculation.breakdown.totalHours,
       });
     } catch (err) {
       return null;
     }
-  }, [budgetCalculation, formData]);
+  }, [budgetCalculation, formData, derivedEndDate]);
 
   const availableSkills = useMemo(() => {
     if (!formData.talentCategory) return [];
-    return COMMON_SKILLS_BY_CATEGORY[formData.talentCategory] || [];
+    return TALENT_CATEGORIES_SKILLS[formData.talentCategory] || COMMON_SKILLS_BY_CATEGORY[formData.talentCategory] || [];
   }, [formData.talentCategory]);
 
   const handleAddSkill = () => {
@@ -268,18 +311,13 @@ export default function CreateProjectPage() {
         setError("Start date is required");
         return;
       }
-      if (!formData.endDate) {
-        setError("End date is required");
+      if (!formData.projectDuration) {
+        setError("Please select project duration");
         return;
       }
       const startDate = new Date(formData.startDate);
-      const endDate = new Date(formData.endDate);
-      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        setError("Invalid date format");
-        return;
-      }
-      if (endDate <= startDate) {
-        setError("End date must be after start date");
+      if (isNaN(startDate.getTime())) {
+        setError("Invalid start date format");
         return;
       }
       if (!formData.projectType) {
@@ -326,7 +364,7 @@ export default function CreateProjectPage() {
 
     try {
       const startDate = new Date(formData.startDate);
-      const endDate = new Date(formData.endDate);
+      const endDate = derivedEndDate!;
 
       // Use payment breakdown for platform fee
       const totalAmount = paymentBreakdown.totalAmount;
@@ -340,15 +378,15 @@ export default function CreateProjectPage() {
           description: formData.description,
           startDate: startDate.getTime(),
           endDate: endDate.getTime(),
-          timelineFlexible: formData.timelineFlexible,
           projectType: formData.projectType,
           talentCategory: formData.talentCategory,
           experienceLevel: formData.experienceLevel,
           requiredSkills: formData.requiredSkills,
           budget: totalAmount,
           specialRequirements: formData.specialRequirements || undefined,
-          // Legacy fields for backward compatibility
-          timeline: `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
+          roleTitle: formData.roleTitle.trim() || undefined,
+          projectDuration: formData.projectDuration,
+          timeline: `${formData.projectDuration} months`,
           category: formData.talentCategory,
           estimatedBudget: totalAmount,
           deliverables: formData.deliverables.length > 0 ? formData.deliverables : undefined,
@@ -561,75 +599,52 @@ export default function CreateProjectPage() {
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  5. Project timeline:
+                  5. Project Duration
                 </Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="startDate">Start date</Label>
-                    <DatePicker
-                      id="startDate"
-                      date={
-                        formData.startDate
-                          ? new Date(formData.startDate)
-                          : undefined
-                      }
-                      onDateChange={(date) =>
-                        setFormData({
-                          ...formData,
-                          startDate: date ? date.toISOString().split("T")[0] : "",
-                        })
-                      }
-                      placeholder="Select start date"
-                      minDate={new Date()}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endDate">End date</Label>
-                    <DatePicker
-                      id="endDate"
-                      date={
-                        formData.endDate
-                          ? new Date(formData.endDate)
-                          : undefined
-                      }
-                      onDateChange={(date) =>
-                        setFormData({
-                          ...formData,
-                          endDate: date ? date.toISOString().split("T")[0] : "",
-                        })
-                      }
-                      placeholder="Select end date"
-                      minDate={
-                        formData.startDate
-                          ? new Date(formData.startDate)
-                          : new Date()
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="timelineFlexible"
-                    checked={formData.timelineFlexible}
-                    onCheckedChange={(checked) =>
-                      setFormData({
-                        ...formData,
-                        timelineFlexible: checked === true,
-                      })
-                    }
-                  />
-                  <Label
-                    htmlFor="timelineFlexible"
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    Timeline flexible
-                  </Label>
-                </div>
+                <Select
+                  value={formData.projectDuration}
+                  onValueChange={(value: ProjectDuration) =>
+                    setFormData({ ...formData, projectDuration: value })
+                  }
+                >
+                  <SelectTrigger className="h-11">
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PROJECT_DURATIONS.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>
+                        {d.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                <Label htmlFor="startDate" className="text-base font-semibold">
+                  6. Start date
+                </Label>
+                <DatePicker
+                  id="startDate"
+                  date={
+                    formData.startDate
+                      ? new Date(formData.startDate)
+                      : undefined
+                  }
+                  onDateChange={(date) =>
+                    setFormData({
+                      ...formData,
+                      startDate: date ? date.toISOString().split("T")[0] : "",
+                    })
+                  }
+                  placeholder="Select start date"
+                  minDate={new Date()}
+                />
               </div>
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  6. Project type:
+                  7. Project type:
                 </Label>
                 <div className="space-y-3">
                   {PROJECT_TYPES.map((type) => (
@@ -661,7 +676,7 @@ export default function CreateProjectPage() {
               {formData.projectType === "one_time" && (
                 <div className="space-y-3 pt-4 border-t">
                   <Label className="text-base font-semibold">
-                    7. Deliverables / Milestones (optional)
+                    8. Deliverables / Milestones (optional)
                   </Label>
                   <p className="text-sm text-muted-foreground">
                     List the main phases or outcomes you expect, e.g. &quot;Design mockups&quot;, &quot;Backend API&quot;, &quot;Frontend&quot;, &quot;Testing &amp; handoff&quot;. These become payment milestones. If you leave this empty, we&apos;ll suggest milestones from your project description.
@@ -734,8 +749,23 @@ export default function CreateProjectPage() {
           {step === 3 && (
             <div className="space-y-6">
               <div className="space-y-3">
+                <Label htmlFor="roleTitle" className="text-base font-semibold">
+                  Role / Job Title
+                </Label>
+                <Input
+                  id="roleTitle"
+                  placeholder="e.g., Backend Developer, Data Analyst"
+                  value={formData.roleTitle}
+                  onChange={(e) =>
+                    setFormData({ ...formData, roleTitle: e.target.value })
+                  }
+                  className="h-11"
+                />
+              </div>
+
+              <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  8. Which talent category do you need?
+                  Required Skills / Technologies
                 </Label>
                 <Select
                   value={formData.talentCategory}
@@ -743,7 +773,7 @@ export default function CreateProjectPage() {
                     setFormData({
                       ...formData,
                       talentCategory: value,
-                      requiredSkills: [], // Reset skills when category changes
+                      requiredSkills: [],
                     })
                   }
                 >
@@ -762,7 +792,7 @@ export default function CreateProjectPage() {
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  9. Required level of experience:
+                  Experience Level
                 </Label>
                 <div className="space-y-3">
                   {EXPERIENCE_LEVELS.map((level) => (
@@ -793,7 +823,7 @@ export default function CreateProjectPage() {
 
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  10. Key skills or tools required (optional)
+                  Key skills or tools (optional)
                 </Label>
                 <div className="flex gap-2">
                   <Input

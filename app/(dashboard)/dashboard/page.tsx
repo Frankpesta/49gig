@@ -52,6 +52,12 @@ export default function DashboardPage() {
     api.notifications.queries.getMyNotifications,
     user?._id ? { userId: user._id, limit: 10 } : "skip"
   );
+  const freelancerReviews = useQuery(
+    (api as any)["reviews/queries"].getReviewsForFreelancer,
+    isFreelancer && user?._id
+      ? { freelancerId: user._id, userId: user._id, limit: 5 }
+      : "skip"
+  );
   const adminCharts = useQuery(
     (api as any)["analytics/queries"].getAdminChartData,
     isAdmin && user?._id ? { userId: user._id, rangeDays: adminRangeDays } : "skip"
@@ -153,12 +159,27 @@ export default function DashboardPage() {
           badge: "MTD",
         },
         {
+          title: "Client Ratings",
+          subtitle: "Your reputation",
+          value: dashboardMetrics?.metrics?.avgRating
+            ? `${dashboardMetrics.metrics.avgRating}/5 (${dashboardMetrics.metrics.reviewCount ?? 0} reviews)`
+            : "No reviews yet",
+          description: "Client feedback from completed projects",
+          icon: Star,
+          variant: "warning" as const,
+          progress:
+            dashboardMetrics?.metrics?.avgRating
+              ? { value: (dashboardMetrics.metrics.avgRating / 5) * 100, label: "Reputation" }
+              : undefined,
+          badge: "Reputation",
+        },
+        {
           title: "Match Score",
           subtitle: "Profile strength",
           value: `${dashboardMetrics?.metrics?.matchScore ?? 0}%`,
           description: "Completeness & relevance",
           icon: Gauge,
-          variant: "warning" as const,
+          variant: "default" as const,
           progress: { value: dashboardMetrics?.metrics?.matchScore ?? 0, label: "Profile" },
           badge: "Improve",
         },
@@ -297,6 +318,53 @@ export default function DashboardPage() {
           />
         ))}
       </div>
+
+      {/* Client feedback (freelancer) */}
+      {isFreelancer && freelancerReviews && freelancerReviews.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-heading font-semibold">Client feedback</h2>
+          <p className="text-sm text-muted-foreground">
+            Recent ratings and feedback from clients you&apos;ve worked with.
+          </p>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5" />
+                Your reviews
+              </CardTitle>
+              <CardDescription>
+                {freelancerReviews.length} review{freelancerReviews.length !== 1 ? "s" : ""} from clients
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {freelancerReviews.map((review: { _id: string; rating: number; comment?: string; createdAt: number }) => (
+                  <div key={review._id} className="rounded-lg border p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Star
+                          key={s}
+                          className={`h-4 w-4 ${
+                            review.rating >= s
+                              ? "fill-amber-400 text-amber-500"
+                              : "text-muted-foreground"
+                          }`}
+                        />
+                      ))}
+                      <span className="text-sm text-muted-foreground ml-2">
+                        {new Date(review.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    {review.comment && (
+                      <p className="text-sm text-foreground">&quot;{review.comment}&quot;</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {isAdmin && (
         <div className="space-y-4">

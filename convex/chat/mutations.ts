@@ -115,6 +115,18 @@ export const createProjectChat = mutation({
 });
 
 /**
+ * Generate an upload URL for chat attachments (files, images).
+ */
+export const generateUploadUrl = mutation({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
  * Send a message in a chat
  */
 export const sendMessage = mutation({
@@ -133,7 +145,7 @@ export const sendMessage = mutation({
           fileName: v.string(),
           fileSize: v.number(),
           mimeType: v.string(),
-          url: v.string(),
+          url: v.optional(v.string()), // Backend fills from storage if missing
         })
       )
     ),
@@ -165,6 +177,17 @@ export const sendMessage = mutation({
       throw new Error("Unauthorized");
     }
 
+    // Resolve attachment URLs if not provided
+    const attachments = args.attachments?.length
+      ? await Promise.all(
+          args.attachments.map(async (att) => {
+            const url =
+              att.url ?? (await ctx.storage.getUrl(att.fileId)) ?? "";
+            return { ...att, url };
+          })
+        )
+      : undefined;
+
     // Determine sender role
     const senderRole =
       user.role === "admin"
@@ -184,7 +207,7 @@ export const sendMessage = mutation({
       senderRole,
       content: args.content,
       contentType: args.contentType,
-      attachments: args.attachments,
+      attachments,
       isPinned: false,
       isDeleted: false,
       readBy: [], // Will be updated when recipients read

@@ -30,6 +30,9 @@ export default function ChatDetailPage() {
 
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ fileId: Id<"_storage">; fileName: string; fileSize: number; mimeType: string }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Redirect to support page if chatId is "support"
@@ -75,6 +78,7 @@ export default function ChatDetailPage() {
 
   const sendMessage = useMutation(api.chat.mutations.sendMessage);
   const markAsRead = useMutation(api.chat.mutations.markAsRead);
+  const generateUploadUrl = useMutation(api.chat.mutations.generateUploadUrl);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -90,23 +94,60 @@ export default function ChatDetailPage() {
   }, [chat, user?._id, markAsRead]);
 
   const handleSend = async () => {
-    if (!message.trim() || isSending || !chat?._id || !user?._id) return;
-    // Additional validation to prevent sending to invalid chat IDs
+    if ((!message.trim() && pendingFiles.length === 0) || isSending || !chat?._id || !user?._id) return;
     if (chat._id === "support" || !chat._id.startsWith("j")) return;
 
     setIsSending(true);
     try {
       await sendMessage({
         chatId: chat._id,
-        content: message,
-        contentType: "text",
+        content: message.trim() || (pendingFiles.length > 0 ? "📎 Sent attachment(s)" : ""),
+        contentType: pendingFiles.length > 0 && !message.trim() ? "file" : "text",
+        attachments: pendingFiles.length > 0 ? pendingFiles : undefined,
         userId: user._id,
       });
       setMessage("");
+      setPendingFiles([]);
     } catch (error) {
       console.error("Failed to send message:", error);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !user?._id) return;
+
+    setIsUploading(true);
+    try {
+      const uploaded: typeof pendingFiles = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 10 * 1024 * 1024) continue; // Skip files > 10MB
+        const uploadUrl = await generateUploadUrl({ userId: user._id });
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!response.ok) throw new Error("Upload failed");
+        const res = await response.json();
+        const storageId = typeof res === "string" ? res : res.storageId;
+        if (!storageId) throw new Error("Upload did not return storageId");
+        uploaded.push({
+          fileId: storageId,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type || "application/octet-stream",
+        });
+      }
+      setPendingFiles((prev) => [...prev, ...uploaded]);
+    } catch (error) {
+      console.error("Failed to upload file:", error);
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
     }
   };
 
@@ -284,22 +325,69 @@ export default function ChatDetailPage() {
 
         {/* Input Area */}
         <CardHeader className="border-t p-4">
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {pendingFiles.map((f, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-xs"
+                >
+                  📎 {f.fileName}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPendingFiles((prev) => prev.filter((_, j) => j !== i))
+                    }
+                    className="hover:text-destructive"
+                    aria-label="Remove"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2">
-            <Button variant="ghost" size="icon">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading || isSending}
+              title="Attach file or image"
+            >
               <Paperclip className="h-4 w-4" />
             </Button>
             <Input
-              placeholder="Type a message..."
+              placeholder="Type a message or attach files..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               disabled={isSending}
               className="flex-1"
             />
-            <Button onClick={handleSend} disabled={isSending || !message.trim()}>
+            <Button
+              onClick={handleSend}
+              disabled={
+                isSending ||
+                isUploading ||
+                (!message.trim() && pendingFiles.length === 0)
+              }
+            >
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Images, PDFs, docs, txt (max 10MB)
+          </p>
         </CardHeader>
       </Card>
     </div>
