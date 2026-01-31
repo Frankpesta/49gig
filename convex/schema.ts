@@ -194,6 +194,13 @@ export default defineSchema({
           v.literal("6+")
         )
       ),
+      roleType: v.optional(
+        v.union(
+          v.literal("full_time"),
+          v.literal("part_time"),
+          v.literal("contract")
+        )
+      ),
       // Section 3: Talent Requirements
       roleTitle: v.optional(v.string()),
       talentCategory: v.union(

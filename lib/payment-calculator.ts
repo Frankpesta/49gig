@@ -231,10 +231,10 @@ export function calculateHourlyRate(
 
   // Ensure minimum rates by experience level
   const minimumRates: Record<ExperienceLevel, number> = {
-    junior: 5,
-    mid: 10,
-    senior: 20,
-    expert: 30,
+    junior: 3,
+    mid: 5,
+    senior: 10,
+    expert: 15,
   };
 
   return Math.max(calculatedRate, minimumRates[experienceLevel]);
