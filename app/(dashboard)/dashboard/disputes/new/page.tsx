@@ -46,6 +46,16 @@ export default function NewDisputePage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const allProjects = useQuery(
+    (api as any)["projects/queries"].getProjects,
+    isAuthenticated && user?._id ? { userId: user._id } : "skip"
+  );
+
+  const disputableProjects = (allProjects ?? []).filter(
+    (p: { status: string }) =>
+      p.status === "matched" || p.status === "in_progress" || p.status === "completed"
+  );
+
   const project = useQuery(
     (api as any)["projects/queries"].getProject,
     formData.projectId && isAuthenticated && user?._id
@@ -162,18 +172,35 @@ export default function NewDisputePage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="projectId">Project ID *</Label>
-              <Input
-                id="projectId"
-                value={formData.projectId}
-                onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
-                placeholder="Enter project ID"
-                required
-                disabled={!!projectId}
-              />
-              {project && (
+              <Label htmlFor="project">Project *</Label>
+              {disputableProjects.length === 0 ? (
+                <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+                  No active projects to dispute. You can only open a dispute for a project you&apos;re working on (matched, in progress, or completed).
+                </div>
+              ) : (
+                <Select
+                  value={formData.projectId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, projectId: value, milestoneId: "" })
+                  }
+                  required
+                  disabled={!!projectId}
+                >
+                  <SelectTrigger id="project">
+                    <SelectValue placeholder="Select the project this dispute is about" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {disputableProjects.map((p: { _id: string; intakeForm?: { title?: string }; status: string }) => (
+                      <SelectItem key={p._id} value={p._id}>
+                        {p.intakeForm?.title || "Untitled"} ({p.status.replace("_", " ")})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {project && formData.projectId && (
                 <p className="text-sm text-muted-foreground">
-                  Project: {project.intakeForm?.title || "Untitled"}
+                  {project.intakeForm?.title || "Untitled"}
                 </p>
               )}
             </div>

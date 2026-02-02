@@ -78,54 +78,22 @@ export default function UsersPage() {
   const updateUserRole = useMutation(api.users.mutations.updateUserRole);
   const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
 
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, statusFilter]);
 
-  if (user.role !== "admin" && user.role !== "moderator") {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Access denied. Admin or Moderator role required.</p>
-      </div>
-    );
-  }
-
-  if (users === undefined) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Handle case where query returns null or error
-  if (users === null || !Array.isArray(users)) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Failed to load users. Please try again.</p>
-      </div>
-    );
-  }
-
-  const filteredUsers = users.filter((u: Doc<"users">) => {
+  const usersList = users != null && Array.isArray(users) ? users : [];
+  const filteredUsers = usersList.filter((u: Doc<"users">) => {
     const name = (u.name ?? "").toString().toLowerCase();
     const email = (u.email ?? "").toString().toLowerCase();
     const term = searchTerm.toLowerCase();
     return name.includes(term) || email.includes(term);
-  }) || [];
+  });
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
   const paginatedUsers = filteredUsers.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, roleFilter, statusFilter]);
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!user?._id) return;
@@ -176,6 +144,38 @@ export default function UsersPage() {
       setIsUpdating(false);
     }
   };
+
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-muted-foreground">Please log in</p>
+      </div>
+    );
+  }
+
+  if (user.role !== "admin" && user.role !== "moderator") {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-muted-foreground">Access denied. Admin or Moderator role required.</p>
+      </div>
+    );
+  }
+
+  if (users === undefined) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (users === null || !Array.isArray(users)) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-muted-foreground">Failed to load users. Please try again.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
