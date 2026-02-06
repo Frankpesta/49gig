@@ -43,6 +43,9 @@ const navLinks: NavLink[] = [
   { label: "About", href: "/about" },
 ];
 
+// Remove Pricing from navLinks
+const filteredNavLinks = navLinks.filter(link => link.label !== "Pricing");
+
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -120,7 +123,7 @@ export function Navbar() {
           </Link>
 
           <nav className="hidden lg:flex lg:flex-1 lg:items-center lg:justify-center lg:gap-0.5 xl:gap-1">
-            {navLinks.map((link) => {
+            {filteredNavLinks.map((link) => {
               const isActive =
                 pathname === link.href ||
                 link.children?.some((c) => c.href === pathname);
@@ -227,7 +230,7 @@ export function Navbar() {
         {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-border/50 bg-background">
             <div className="max-h-[calc(100vh-4rem)] overflow-y-auto py-4 space-y-0.5">
-              {navLinks.map((link) => (
+              {filteredNavLinks.map((link) => (
                 <div key={link.href}>
                   <Link
                     href={link.href}

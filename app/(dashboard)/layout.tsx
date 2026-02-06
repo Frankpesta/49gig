@@ -211,18 +211,20 @@ export default function DashboardLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/95 dark:bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex flex-1 items-center gap-2">
-            <DashboardBreadcrumb />
+        <header className="sticky top-0 z-40 flex h-14 sm:h-16 shrink-0 items-center justify-between gap-1 sm:gap-2 border-b border-border/50 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-3 sm:px-4">
+          <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="h-4 hidden sm:block" />
+            <nav className="flex-1 min-w-0 overflow-hidden">
+              <DashboardBreadcrumb />
+            </nav>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
             <NotificationBell />
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-6 p-6 md:p-8 lg:p-10 bg-background">
+        <div className="flex flex-1 flex-col gap-4 sm:gap-5 md:gap-6 p-3 sm:p-4 md:p-6 lg:p-8 bg-background overflow-x-hidden">
           {children}
         </div>
       </SidebarInset>
