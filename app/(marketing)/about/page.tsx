@@ -126,8 +126,8 @@ export default function AboutPage() {
   return (
     <div className="w-full">
       <PageHeader
-        title="Our Story"
-        description="We&apos;re on a mission to unlock Africa&apos;s vast talent potential by connecting skilled, vetted professionals with global opportunities—delivering exceptional value, trust, and results for companies while empowering freelancers to thrive internationally."
+        title="Building Global Opportunities"
+        description="49GIG connects exceptional African talent with world-class opportunities. We're redefining freelancing by prioritizing vetted quality, transparent relationships, and sustainable careers for professionals worldwide."
         badge={{
           icon: Building2,
           text: "About 49GIG"
