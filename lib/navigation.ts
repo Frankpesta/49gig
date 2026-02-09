@@ -19,6 +19,7 @@ import {
   Briefcase,
   CheckCircle2,
   AlertCircle,
+  DollarSign,
 } from "lucide-react";
 import type { UserRole } from "@/stores/authStore";
 
@@ -119,6 +120,14 @@ export const navigationItems: NavItem[] = [
     title: "Users",
     url: "/dashboard/users",
     icon: Users,
+    roles: ["admin", "moderator"],
+  },
+
+  // Admin & Moderator: Base rates by tech stack
+  {
+    title: "Pricing",
+    url: "/dashboard/pricing",
+    icon: DollarSign,
     roles: ["admin", "moderator"],
   },
 

@@ -1,4 +1,4 @@
-import { mutation, MutationCtx } from "../_generated/server";
+import { mutation, internalMutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -358,10 +358,11 @@ export const resolveDispute = mutation({
     ),
     resolutionAmount: v.optional(v.number()),
     notes: v.string(),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.status !== "active") {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
       throw new Error("Not authenticated");
     }
 
@@ -456,6 +457,93 @@ export const resolveDispute = mutation({
       },
       createdAt: now,
     });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Internal: resolve a dispute without auth (for automated resolution from actions).
+ * Only callable from server code (e.g. attemptAutomatedResolution).
+ */
+export const resolveDisputeInternal = internalMutation({
+  args: {
+    disputeId: v.id("disputes"),
+    decision: v.union(
+      v.literal("client_favor"),
+      v.literal("freelancer_favor"),
+      v.literal("partial"),
+      v.literal("replacement")
+    ),
+    resolutionAmount: v.optional(v.number()),
+    notes: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) {
+      throw new Error("Dispute not found");
+    }
+    if (dispute.status === "resolved" || dispute.status === "closed") {
+      throw new Error("Dispute already resolved");
+    }
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const now = Date.now();
+
+    const releaseDisputeFunds =
+      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
+
+    await ctx.db.patch(args.disputeId, {
+      status: "resolved",
+      resolution: {
+        decision: args.decision,
+        resolutionAmount: args.resolutionAmount,
+        notes: args.notes,
+        resolvedAt: now,
+      },
+      resolvedAt: now,
+      updatedAt: now,
+    });
+
+    let newProjectStatus: Doc<"projects">["status"] = "disputed";
+    if (args.decision === "replacement") {
+      newProjectStatus = "matching";
+    } else if (args.decision === "client_favor" || args.decision === "partial") {
+      newProjectStatus = "in_progress";
+    } else {
+      newProjectStatus = "completed";
+    }
+
+    await ctx.db.patch(dispute.projectId, {
+      status: newProjectStatus,
+      updatedAt: now,
+    });
+
+    await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
+      disputeId: args.disputeId,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    const notifyUserIds = [project.clientId, project.matchedFreelancerId].filter(
+      Boolean
+    ) as Doc<"users">["_id"][];
+    if (notifyUserIds.length > 0) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: notifyUserIds,
+        title: "Dispute resolved",
+        message: `The dispute for ${project.intakeForm.title} has been resolved.`,
+        type: "dispute",
+        data: { disputeId: args.disputeId, projectId: dispute.projectId },
+      });
+    }
 
     return { success: true };
   },
