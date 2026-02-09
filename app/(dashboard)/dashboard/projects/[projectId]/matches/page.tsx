@@ -229,7 +229,9 @@ export default function ProjectMatchesPage() {
       (project.status !== "draft" && project.status !== "pending_funding")
     )
       return;
-    if (matches && matches.length > 0) return;
+    // Wait for matches query to resolve; undefined = still loading
+    if (matches === undefined) return;
+    if (matches.length > 0) return; // already have matches
     if (matchingAttemptedRef.current) return; // already attempted (success or failure), avoid infinite retry
     matchingAttemptedRef.current = true;
     setMatchingRunning(true);
