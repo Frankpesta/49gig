@@ -263,7 +263,12 @@ export default defineSchema({
 
     // Matching
     matchedFreelancerId: v.optional(v.id("users")),
+    matchedFreelancerIds: v.optional(v.array(v.id("users"))), // Team projects
     matchedAt: v.optional(v.number()),
+
+    // Client selection before payment (pre-funding)
+    selectedFreelancerId: v.optional(v.id("users")), // Single hire
+    selectedFreelancerIds: v.optional(v.array(v.id("users"))), // Team hire
 
     // Contract
     contractFileId: v.optional(v.id("_storage")),
@@ -613,6 +618,21 @@ export default defineSchema({
     .index("by_freelancer", ["freelancerId"])
     .index("by_status", ["status"])
     .index("by_expires", ["expiresAt"]),
+
+  // One-on-one or kickoff sessions (Google Meet) scheduled before funding
+  scheduledCalls: defineTable({
+    projectId: v.id("projects"),
+    freelancerIds: v.array(v.id("users")), // One for single, multiple for team kickoff
+    startTime: v.number(),
+    endTime: v.number(),
+    meetLink: v.string(),
+    googleEventId: v.optional(v.string()),
+    title: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_start_time", ["startTime"]),
 
   notifications: defineTable({
     userId: v.id("users"),

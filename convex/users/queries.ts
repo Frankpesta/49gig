@@ -145,3 +145,32 @@ export const getAllUsersAdmin = query({
   },
 });
 
+/**
+ * Get user by ID (internal - returns name and email for notifications)
+ */
+export const getUserByIdInternal = internalQuery({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user || user.status !== "active") return null;
+    return { _id: user._id, name: user.name, email: user.email };
+  },
+});
+
+/**
+ * Get all moderators and admins (internal - for sending session emails)
+ */
+export const getModeratorsAndAdminsInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    return users.filter(
+      (u) =>
+        u.status === "active" &&
+        (u.role === "moderator" || u.role === "admin")
+    ).map((u) => ({ _id: u._id, name: u.name, email: u.email }));
+  },
+});
+

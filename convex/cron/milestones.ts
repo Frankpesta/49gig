@@ -73,7 +73,6 @@ export const autoReleaseMilestones = internalAction({
           }
 
           // Call the release action
-          // @ts-expect-error - Type instantiation depth issue with API types
           const releaseAction = api.payments.actions.releaseMilestonePayment as unknown as FunctionReference<
             "action",
             "public"

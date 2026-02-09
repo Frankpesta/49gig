@@ -187,12 +187,13 @@ export const getProject = query({
       return null;
     }
 
-    // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
+    // Authorization: client, matched freelancer(s), freelancer with pending/accepted match, admin, or moderator
     let canView =
       user.role === "admin" ||
       user.role === "moderator" ||
       project.clientId === user._id ||
-      project.matchedFreelancerId === user._id;
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
 
     // Freelancer with a match (pending or accepted) for this project can view details before/after acceptance
     if (!canView && user.role === "freelancer") {
@@ -268,7 +269,8 @@ export const getProjectMilestones = query({
       user.role === "admin" ||
       user.role === "moderator" ||
       project.clientId === user._id ||
-      project.matchedFreelancerId === user._id;
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
 
     if (!canViewMilestones && user.role === "freelancer") {
       const match = await ctx.db
@@ -421,5 +423,26 @@ export const getMilestoneByIdInternal = internalQuery({
   handler: async (ctx, args) => {
     const milestone = await ctx.db.get(args.milestoneId);
     return milestone;
+  },
+});
+
+/**
+ * Get unfunded projects (draft or pending_funding) older than a given timestamp.
+ * Used by cron to delete projects not funded within 14 days.
+ */
+export const getUnfundedProjectsOlderThanInternal = internalQuery({
+  args: {
+    createdBefore: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_created", (q) => q.lt("createdAt", args.createdBefore))
+      .collect();
+    return projects
+      .filter(
+        (p) => p.status === "draft" || p.status === "pending_funding"
+      )
+      .map((p) => p._id);
   },
 });

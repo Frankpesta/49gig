@@ -291,8 +291,8 @@ export const handlePaymentSuccess = internalMutation({
         updatedAt: now,
       });
 
-      // Auto-create milestones so client and freelancer can see and use them
-      await ctx.scheduler.runAfter(0, internal.projects.mutations.autoCreateMilestonesInternal, {
+      // Accept client's selected freelancer(s) and then auto-create milestones
+      await ctx.scheduler.runAfter(0, internal.projects.mutations.acceptSelectedMatchInternal, {
         projectId: payment.projectId,
       });
 

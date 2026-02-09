@@ -155,10 +155,9 @@ export function PaymentBreakdownDisplay({
           <div className="flex items-start gap-2 text-xs">
             <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div className="space-y-1">
-              <div className="font-semibold">Platform Fee</div>
+              <div className="font-semibold">Service Fee</div>
               <div className="text-muted-foreground">
-                The platform fee ({breakdown.platformFeePercentage}%) covers payment
-                processing, escrow services, dispute resolution, and platform maintenance.
+                The service fee ({breakdown.platformFeePercentage}%) includes vetting, escrow, contracts, replacements, and support.
                 This fee is included in the total project amount.
               </div>
             </div>

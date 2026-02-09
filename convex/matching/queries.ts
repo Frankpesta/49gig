@@ -37,13 +37,11 @@ export const getMatches = query({
       return [];
     }
 
-    // Check authorization
-    if (
-      project.clientId !== user._id &&
-      project.matchedFreelancerId !== user._id &&
-      user.role !== "admin" &&
-      user.role !== "moderator"
-    ) {
+    // Check authorization: client, matched freelancer, or admin/moderator
+    const isClient = project.clientId === user._id;
+    const isMatchedFreelancer = project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
+    if (!isClient && !isMatchedFreelancer && user.role !== "admin" && user.role !== "moderator") {
       return [];
     }
 
@@ -70,6 +68,7 @@ export const getMatches = query({
                 name: freelancer.name,
                 email: freelancer.email,
                 profile: freelancer.profile,
+                resumeBio: freelancer.resumeBio,
               }
             : null,
         };

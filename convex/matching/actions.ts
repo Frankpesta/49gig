@@ -543,3 +543,213 @@ export const generateTeamMatches = action({
     };
   },
 });
+
+/**
+ * Generate matches for a project in draft or pending_funding (pre-funding).
+ * Single: top 20 matches, persisted. Team: top 5 per required-skill group, persisted.
+ * Used right after project create so client can see matches before payment.
+ */
+export const generateMatchesForDraft = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.runQuery(
+      internal.projects.queries.getProjectInternal,
+      { projectId: args.projectId }
+    );
+
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    if (project.status !== "draft" && project.status !== "pending_funding") {
+      throw new Error(
+        "Pre-funding matching only allowed for draft or pending_funding projects"
+      );
+    }
+
+    const intakeForm = project.intakeForm;
+    const isTeam = intakeForm.hireType === "team";
+    const requiredSkills = intakeForm.requiredSkills || [];
+    const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
+    const verifiedFreelancers = (allUsers || []).filter(
+      (u: any) =>
+        u.role === "freelancer" &&
+        u.status === "active" &&
+        u.verificationStatus === "approved"
+    );
+
+    const approvedFreelancers = await Promise.all(
+      verifiedFreelancers.map(async (freelancer: any) => {
+        const vettingResult = await ctx.runQuery(
+          internal.vetting.queries.getVettingResultByFreelancer,
+          { freelancerId: freelancer._id }
+        );
+        return {
+          freelancer,
+          vettingResult,
+          overallScore: vettingResult?.overallScore || 0,
+        };
+      })
+    );
+
+    if (approvedFreelancers.length === 0) {
+      return { matchIds: [], isTeam: false, groupCount: 0 };
+    }
+
+    const now = Date.now();
+    const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
+    const matchIds: string[] = [];
+
+    if (!isTeam) {
+      // Single: top 20, same scoring as generateMatches
+      const scores: Array<{
+        freelancer: Doc<"users">;
+        score: number;
+        breakdown: ScoringBreakdown;
+      }> = [];
+
+      for (const { freelancer, overallScore: vettingScore } of approvedFreelancers) {
+        const skillOverlap = calculateSkillOverlap(
+          requiredSkills,
+          freelancer.profile?.skills || []
+        );
+        const ratings = await calculateRatingsScore(ctx, freelancer._id);
+        const availability = calculateAvailabilityScore(
+          freelancer.profile?.availability
+        );
+        const pastPerformance = await calculatePastPerformance(
+          ctx,
+          freelancer._id
+        );
+        const timezoneCompatibility = calculateTimezoneCompatibility(
+          undefined,
+          freelancer.profile?.timezone
+        );
+        const breakdown: ScoringBreakdown = {
+          skillOverlap,
+          vettingScore,
+          ratings,
+          availability,
+          pastPerformance,
+          timezoneCompatibility,
+        };
+        const overallScore =
+          skillOverlap * 0.4 +
+          vettingScore * 0.25 +
+          ratings * 0.15 +
+          availability * 0.1 +
+          pastPerformance * 0.1;
+        scores.push({ freelancer, score: overallScore, breakdown });
+      }
+
+      scores.sort((a, b) => b.score - a.score);
+      const top20 = scores.slice(0, 20);
+
+      for (const match of top20) {
+        const explanation = generateExplanation(
+          match.breakdown,
+          match.freelancer.name,
+          intakeForm.title
+        );
+        const confidence = determineConfidence(match.score);
+        const matchId = await ctx.runMutation(
+          internal.matching.mutations.createMatch,
+          {
+            projectId: args.projectId,
+            freelancerId: match.freelancer._id,
+            score: match.score,
+            confidence,
+            scoringBreakdown: match.breakdown,
+            explanation,
+            expiresAt,
+          }
+        );
+        matchIds.push(matchId);
+      }
+
+      return { matchIds, isTeam: false, groupCount: 0 };
+    }
+
+    // Team: top 5 per skill group (each requiredSkill is a group)
+    const skillGroups =
+      requiredSkills.length > 0
+        ? requiredSkills
+        : [intakeForm.talentCategory || "Software Development"];
+
+    for (const groupSkill of skillGroups) {
+      const groupScores: Array<{
+        freelancer: Doc<"users">;
+        score: number;
+        breakdown: ScoringBreakdown;
+      }> = [];
+
+      for (const { freelancer, overallScore: vettingScore } of approvedFreelancers) {
+        const skillOverlap = calculateSkillOverlap(
+          [groupSkill],
+          freelancer.profile?.skills || []
+        );
+        const ratings = await calculateRatingsScore(ctx, freelancer._id);
+        const availability = calculateAvailabilityScore(
+          freelancer.profile?.availability
+        );
+        const pastPerformance = await calculatePastPerformance(
+          ctx,
+          freelancer._id
+        );
+        const timezoneCompatibility = calculateTimezoneCompatibility(
+          undefined,
+          freelancer.profile?.timezone
+        );
+        const breakdown: ScoringBreakdown = {
+          skillOverlap,
+          vettingScore,
+          ratings,
+          availability,
+          pastPerformance,
+          timezoneCompatibility,
+        };
+        const overallScore =
+          skillOverlap * 0.4 +
+          vettingScore * 0.25 +
+          ratings * 0.15 +
+          availability * 0.1 +
+          pastPerformance * 0.1;
+        groupScores.push({ freelancer, score: overallScore, breakdown });
+      }
+
+      groupScores.sort((a, b) => b.score - a.score);
+      const top5 = groupScores.slice(0, 5);
+
+      for (const match of top5) {
+        const explanation = generateExplanation(
+          match.breakdown,
+          match.freelancer.name,
+          intakeForm.title
+        );
+        const confidence = determineConfidence(match.score);
+        const matchId = await ctx.runMutation(
+          internal.matching.mutations.createMatch,
+          {
+            projectId: args.projectId,
+            freelancerId: match.freelancer._id,
+            score: match.score,
+            confidence,
+            scoringBreakdown: match.breakdown,
+            explanation,
+            expiresAt,
+            teamRole: groupSkill,
+          }
+        );
+        matchIds.push(matchId);
+      }
+    }
+
+    return {
+      matchIds,
+      isTeam: true,
+      groupCount: skillGroups.length,
+    };
+  },
+});
