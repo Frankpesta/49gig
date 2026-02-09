@@ -58,6 +58,16 @@ export default function PaymentPage() {
       return;
     }
 
+    // Require freelancer selection before payment (for draft/pending_funding)
+    if (
+      (project.status === "draft" || project.status === "pending_funding") &&
+      !project.selectedFreelancerId &&
+      (!project.selectedFreelancerIds || project.selectedFreelancerIds.length === 0)
+    ) {
+      router.push(`/dashboard/projects/${projectId}/matches`);
+      return;
+    }
+
     // Prevent multiple simultaneous calls
     if (initializationRef.current || isInitializing || paymentLink) {
       return;

@@ -293,9 +293,9 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
       description: "Total amount client pays",
     },
     {
-      label: "Platform Fee",
+      label: "Service Fee",
       value: formatCurrency(breakdown.platformFee),
-      description: `${breakdown.platformFeePercentage}% of total`,
+      description: `${breakdown.platformFeePercentage}% — vetting, escrow, contracts, replacements, support`,
     },
     {
       label: "Freelancer Earnings",
@@ -324,7 +324,7 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
     });
   }
 
-  const summary = `${formatCurrency(breakdown.totalAmount)} total (${breakdown.platformFeePercentage}% platform fee)`;
+  const summary = `${formatCurrency(breakdown.totalAmount)} total (${breakdown.platformFeePercentage}% service fee — includes vetting, escrow, contracts, support)`;
 
   return { summary, details };
 }

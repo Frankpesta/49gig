@@ -27,13 +27,13 @@ export default function PaymentTermsPage() {
             </p>
             <ul>
               <li><strong>Client Service Fee:</strong> 5% of total project value</li>
-              <li><strong>Freelancer Service Fee:</strong> 25% of earnings (platform fee)</li>
+              <li><strong>Service Fee:</strong> 25% — includes vetting, escrow, contracts, replacements, and support</li>
             </ul>
 
             <h3>2.2 Platform Fee</h3>
-            <p>The platform fee is 25% of the project or milestone amount (company fee).</p>
+            <p>The service fee is 25% of the project or milestone amount, and includes vetting, escrow, contracts, replacements, and support.</p>
             <ul>
-              <li>Platform fee: 25% of project/milestone amount</li>
+              <li>Service fee (25%): vetting, escrow, contracts, replacements, support</li>
             </ul>
 
             <h3>2.3 Fee Changes</h3>
@@ -65,7 +65,7 @@ export default function PaymentTermsPage() {
             <h2>4. Project Funding and Escrow</h2>
             <h3>4.1 Upfront Funding Requirement</h3>
             <p>
-              Clients must fund the full project amount (including platform fees) in escrow before freelancers begin work.
+              Clients must fund the full project amount (including the service fee) in escrow before freelancers begin work.
             </p>
 
             <h3>4.2 Escrow Protection</h3>

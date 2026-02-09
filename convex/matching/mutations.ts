@@ -39,12 +39,16 @@ export const createMatch = internalMutation({
 
     const project = await ctx.db.get(args.projectId);
 
-    // Check if match already exists
-    const existing = await ctx.db
+    // Check if match already exists (same project, freelancer, and teamRole if provided)
+    const existingList = await ctx.db
       .query("matches")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) => q.eq(q.field("freelancerId"), args.freelancerId))
-      .first();
+      .collect();
+    const existing =
+      args.teamRole !== undefined
+        ? existingList.find((m) => m.teamRole === args.teamRole)
+        : existingList.find((m) => m.teamRole === undefined);
 
     if (existing) {
       // Update existing match

@@ -330,8 +330,8 @@ export default function CreateProjectPage() {
         ...(user?._id ? { userId: user._id } : {}),
       });
 
-      // Redirect to payment page
-      router.push(`/dashboard/projects/${projectId}/payment`);
+      // Redirect to matches page so client can select freelancer(s), then payment
+      router.push(`/dashboard/projects/${projectId}/matches`);
     } catch (err: any) {
       setError(err.message || "Failed to create project");
     } finally {
@@ -737,7 +737,7 @@ export default function CreateProjectPage() {
                       </div>
                     )}
                     <div className="pt-2 border-t">
-                      Platform fee (25%):{" "}
+                      Service fee (25%): includes vetting, escrow, contracts, replacements, support —{" "}
                       {formatBudget(
                         budgetCalculation.estimatedBudget * 0.25
                       )}
@@ -779,9 +779,9 @@ export default function CreateProjectPage() {
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Platform fee:</span>
+                        <span className="text-muted-foreground">Service fee (25%): vetting, escrow, contracts, support</span>
                         <div className="font-semibold">
-                          {formatBudget(budgetCalculation.estimatedBudget * 0.1)}
+                          {formatBudget(budgetCalculation.estimatedBudget * 0.25)}
                         </div>
                       </div>
                     </div>

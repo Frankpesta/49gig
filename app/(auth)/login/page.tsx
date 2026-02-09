@@ -34,9 +34,7 @@ export default function LoginPage() {
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
   const signin = useMutation(api["auth/mutations"].signin);
-  // @ts-expect-error - Dynamic path access for "auth/mutations" requires type assertion
   const verifyTwoFactorSignin = useMutation(api["auth/mutations"].verifyTwoFactorSignin);
   const { setUser } = useAuthStore();
   const { setRefreshToken } = useSessionRotation();

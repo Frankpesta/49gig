@@ -1,5 +1,6 @@
 import { mutation, internalMutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
@@ -449,6 +450,81 @@ export const updateProjectStatus = mutation({
 });
 
 /**
+ * Set selected freelancer for a single-hire project (pre-funding).
+ * Only client who owns the project can set selection.
+ */
+export const setSelectedFreelancer = mutation({
+  args: {
+    projectId: v.id("projects"),
+    freelancerId: v.id("users"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.clientId !== user._id && user.role !== "admin") {
+      throw new Error("Not authorized to set selection for this project");
+    }
+    if (project.intakeForm.hireType !== "single") {
+      throw new Error("Use setSelectedFreelancers for team projects");
+    }
+    if (project.status !== "draft" && project.status !== "pending_funding") {
+      throw new Error("Can only set selection before funding");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.projectId, {
+      selectedFreelancerId: args.freelancerId,
+      selectedFreelancerIds: undefined,
+      updatedAt: now,
+    });
+    return args.projectId;
+  },
+});
+
+/**
+ * Set selected freelancers for a team project (pre-funding).
+ * Only client who owns the project can set selection.
+ */
+export const setSelectedFreelancers = mutation({
+  args: {
+    projectId: v.id("projects"),
+    freelancerIds: v.array(v.id("users")),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.clientId !== user._id && user.role !== "admin") {
+      throw new Error("Not authorized to set selection for this project");
+    }
+    if (project.intakeForm.hireType !== "team") {
+      throw new Error("Use setSelectedFreelancer for single-hire projects");
+    }
+    if (project.status !== "draft" && project.status !== "pending_funding") {
+      throw new Error("Can only set selection before funding");
+    }
+    if (args.freelancerIds.length === 0) {
+      throw new Error("Select at least one freelancer");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.projectId, {
+      selectedFreelancerId: undefined,
+      selectedFreelancerIds: args.freelancerIds,
+      updatedAt: now,
+    });
+    return args.projectId;
+  },
+});
+
+/**
  * Create milestones for a project
  * Only client or admin can create milestones
  */
@@ -879,6 +955,115 @@ export const autoCreateMilestonesInternal = internalMutation({
       createdAt: now,
     });
     return milestoneIds;
+  },
+});
+
+/**
+ * Internal: accept client's pre-funding selection and set matched freelancer(s).
+ * Called after payment success so the selected freelancer(s) become assigned.
+ */
+export const acceptSelectedMatchInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return;
+
+    const selectedId = project.selectedFreelancerId;
+    const selectedIds = project.selectedFreelancerIds;
+    const now = Date.now();
+
+    const allMatches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    if (selectedId) {
+      const match = allMatches.find(
+        (m) => m.freelancerId === selectedId && m.status === "pending"
+      );
+      if (match) {
+        await ctx.db.patch(match._id, {
+          status: "accepted",
+          clientAction: "accepted",
+          clientActionAt: now,
+          updatedAt: now,
+        });
+        await ctx.db.patch(args.projectId, {
+          matchedFreelancerId: selectedId,
+          matchedAt: now,
+          updatedAt: now,
+        });
+      }
+      const otherPending = allMatches.filter(
+        (m) => m.status === "pending" && m.freelancerId !== selectedId
+      );
+      for (const m of otherPending) {
+        await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+      }
+    } else if (selectedIds && selectedIds.length > 0) {
+      const toAccept = allMatches.filter(
+        (m) => selectedIds.includes(m.freelancerId) && m.status === "pending"
+      );
+      for (const m of toAccept) {
+        await ctx.db.patch(m._id, {
+          status: "accepted",
+          clientAction: "accepted",
+          clientActionAt: now,
+          updatedAt: now,
+        });
+      }
+      await ctx.db.patch(args.projectId, {
+        matchedFreelancerIds: selectedIds,
+        matchedAt: now,
+        updatedAt: now,
+      });
+      const otherPending = allMatches.filter(
+        (m) => m.status === "pending" && !selectedIds.includes(m.freelancerId)
+      );
+      for (const m of otherPending) {
+        await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+      }
+    }
+
+    await ctx.scheduler.runAfter(0, internal.projects.mutations.autoCreateMilestonesInternal, {
+      projectId: args.projectId,
+    });
+  },
+});
+
+/**
+ * Internal: delete an unfunded project and its matches/scheduledCalls (14-day cleanup).
+ */
+export const deleteUnfundedProjectInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return;
+    if (project.status !== "draft" && project.status !== "pending_funding") {
+      return;
+    }
+
+    const matches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const m of matches) {
+      await ctx.db.delete(m._id);
+    }
+
+    const calls = await ctx.db
+      .query("scheduledCalls")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const c of calls) {
+      await ctx.db.delete(c._id);
+    }
+
+    await ctx.db.delete(args.projectId);
   },
 });
 

@@ -39,7 +39,7 @@ export default function ModeratorDisputesPage() {
 
   const disputes = useQuery(
     api.disputes.queries.getPendingDisputes,
-    isAuthenticated && user?._id ? {} : "skip"
+    isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
 
   const allDisputes = useQuery(

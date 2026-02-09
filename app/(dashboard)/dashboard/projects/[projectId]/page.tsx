@@ -428,7 +428,7 @@ export default function ProjectDetailPage() {
                   ${project.totalAmount.toLocaleString()}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Platform fee: {project.platformFee}%
+                  Service fee ({project.platformFee}%): vetting, escrow, contracts, support
                 </div>
               </div>
               <Separator />

@@ -318,7 +318,7 @@ export default function VerificationPage() {
                     "mid"
                   }
                   completedAssessments={
-                    vettingResult?.skillAssessments?.map((sa) => ({
+                    vettingResult?.skillAssessments?.map((sa: { skillId: string; skillName: string; score: number }) => ({
                       skillId: sa.skillId,
                       skillName: sa.skillName,
                       score: sa.score,

@@ -1,6 +1,21 @@
-import { query } from "../_generated/server";
+import { query, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
+import { Doc } from "../_generated/dataModel";
+
+async function getCurrentUserInQuery(
+  ctx: QueryCtx,
+  userId?: string
+): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId as Doc<"users">["_id"]);
+    if (!user || (user as Doc<"users">).status !== "active") return null;
+    return user as Doc<"users">;
+  }
+  const user = await getCurrentUser(ctx);
+  if (!user || (user as Doc<"users">).status !== "active") return null;
+  return user as Doc<"users">;
+}
 
 /**
  * Get all disputes for the current user
@@ -23,8 +38,8 @@ export const getDisputes = query({
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.status !== "active") {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) {
       return [];
     }
 
@@ -43,7 +58,7 @@ export const getDisputes = query({
         .collect();
     }
 
-    // Get user's projects
+    // Get user's projects (as client or matched freelancer)
     const userProjects = await ctx.db
       .query("projects")
       .filter((q) =>
@@ -89,8 +104,8 @@ export const getDispute = query({
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.status !== "active") {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) {
       return null;
     }
 
@@ -105,9 +120,11 @@ export const getDispute = query({
       return null;
     }
 
-    // Check authorization
+    // Check authorization (include team freelancers)
     const isClient = project.clientId === user._id;
-    const isFreelancer = project.matchedFreelancerId === user._id;
+    const isFreelancer =
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
     const isInitiator = dispute.initiatorId === user._id;
     const isAssignedModerator =
       dispute.assignedModeratorId === user._id;
@@ -143,10 +160,11 @@ export const getModeratorDisputes = query({
         v.literal("closed")
       )
     ),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.status !== "active") {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) {
       return [];
     }
 
@@ -177,10 +195,12 @@ export const getModeratorDisputes = query({
  * Get pending disputes (open or under_review) for moderators
  */
 export const getPendingDisputes = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.status !== "active") {
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) {
       return [];
     }
 

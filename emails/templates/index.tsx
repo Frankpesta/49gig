@@ -1165,3 +1165,71 @@ export function PayoutFailedEmail({
     </EmailLayout>
   );
 }
+
+export function OneOnOneSessionScheduledEmail({
+  name = "there",
+  projectName,
+  startTimeFormatted,
+  endTimeFormatted,
+  meetLink,
+  isTeamKickoff,
+  participantNames,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & {
+  projectName: string;
+  startTimeFormatted: string;
+  endTimeFormatted: string;
+  meetLink: string;
+  isTeamKickoff?: boolean;
+  participantNames?: string;
+}) {
+  return (
+    <EmailLayout
+      title={isTeamKickoff ? "Kickoff session scheduled" : "One-on-one session scheduled"}
+      preview="Your live session is on the calendar."
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi {name}, your {isTeamKickoff ? "team kickoff" : "one-on-one"} session for the
+        project &quot;{projectName}&quot; has been scheduled.
+      </Text>
+      <Section
+        style={{
+          backgroundColor: "#f0fdf4",
+          border: "1px solid #bbf7d0",
+          borderRadius: "8px",
+          padding: "16px",
+          marginBottom: "16px",
+        }}
+      >
+        <Text style={{ ...textStyle, margin: "0 0 8px", fontWeight: 600 }}>
+          When
+        </Text>
+        <Text style={{ ...textStyle, margin: "0 0 4px" }}>
+          {startTimeFormatted} – {endTimeFormatted}
+        </Text>
+        {participantNames && (
+          <>
+            <Text style={{ ...textStyle, margin: "12px 0 8px", fontWeight: 600 }}>
+              Participants
+            </Text>
+            <Text style={{ ...textStyle, margin: 0 }}>{participantNames}</Text>
+          </>
+        )}
+      </Section>
+      <Text style={textStyle}>
+        Join the session at the scheduled time using the link below. We recommend
+        testing your camera and microphone beforehand.
+      </Text>
+      <EmailButton href={meetLink}>Join Google Meet</EmailButton>
+      <Text style={{ ...textStyle, marginTop: "16px", fontSize: "12px", color: "#6b7280" }}>
+        This session was scheduled through 49GIG. If you need to reschedule, please
+        contact support or the other participant(s) via the project chat.
+      </Text>
+    </EmailLayout>
+  );
+}
