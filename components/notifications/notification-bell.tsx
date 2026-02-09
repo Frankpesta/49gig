@@ -26,10 +26,11 @@ export function NotificationBell() {
   const [refreshKey, setRefreshKey] = useState(0);
   const notifications = useQuery(
     api.notifications.queries.getMyNotifications,
-    inAppEnabled
+    inAppEnabled && user?._id
       ? {
           limit: 20,
           refreshKey,
+          userId: user._id,
         }
       : "skip"
   );

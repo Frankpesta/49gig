@@ -213,6 +213,57 @@ function determineConfidence(score: number): "low" | "medium" | "high" {
   return "low";
 }
 
+/** Single source of truth for scoring weights (used by all match generation paths) */
+const SCORING_WEIGHTS = {
+  skillOverlap: 0.4,
+  vettingScore: 0.25,
+  ratings: 0.15,
+  availability: 0.1,
+  pastPerformance: 0.1,
+};
+
+function computeOverallScore(breakdown: ScoringBreakdown): number {
+  return (
+    breakdown.skillOverlap * SCORING_WEIGHTS.skillOverlap +
+    breakdown.vettingScore * SCORING_WEIGHTS.vettingScore +
+    breakdown.ratings * SCORING_WEIGHTS.ratings +
+    breakdown.availability * SCORING_WEIGHTS.availability +
+    breakdown.pastPerformance * SCORING_WEIGHTS.pastPerformance
+  );
+}
+
+/**
+ * Score one freelancer against required skills. Shared by generateMatches and generateMatchesForDraft.
+ */
+async function scoreOneFreelancer(
+  ctx: any,
+  freelancer: Doc<"users">,
+  requiredSkills: string[],
+  vettingScore: number
+): Promise<{ score: number; breakdown: ScoringBreakdown }> {
+  const skillOverlap = calculateSkillOverlap(
+    requiredSkills,
+    freelancer.profile?.skills || []
+  );
+  const ratings = await calculateRatingsScore(ctx, freelancer._id);
+  const availability = calculateAvailabilityScore(freelancer.profile?.availability);
+  const pastPerformance = await calculatePastPerformance(ctx, freelancer._id);
+  const timezoneCompatibility = calculateTimezoneCompatibility(
+    undefined,
+    freelancer.profile?.timezone
+  );
+  const breakdown: ScoringBreakdown = {
+    skillOverlap,
+    vettingScore,
+    ratings,
+    availability,
+    pastPerformance,
+    timezoneCompatibility,
+  };
+  const score = computeOverallScore(breakdown);
+  return { score, breakdown };
+}
+
 /**
  * Generate matches for a project
  * This is called when a project is funded and ready for matching
@@ -289,42 +340,13 @@ export const generateMatches = action({
 
       if (existingMatch) continue;
 
-      // Calculate scoring breakdown
-      const skillOverlap = calculateSkillOverlap(
-        project.intakeForm.requiredSkills || [],
-        freelancer.profile?.skills || []
-      );
-
       const vettingScore = vettingResult?.overallScore || 0;
-      const ratings = await calculateRatingsScore(ctx, freelancer._id);
-      const availability = calculateAvailabilityScore(
-        freelancer.profile?.availability
-      );
-      const pastPerformance = await calculatePastPerformance(
+      const { score: overallScore, breakdown } = await scoreOneFreelancer(
         ctx,
-        freelancer._id
+        freelancer,
+        project.intakeForm.requiredSkills || [],
+        vettingScore
       );
-      const timezoneCompatibility = calculateTimezoneCompatibility(
-        undefined, // Projects don't have timezone field
-        freelancer.profile?.timezone
-      );
-
-      const breakdown: ScoringBreakdown = {
-        skillOverlap,
-        vettingScore,
-        ratings,
-        availability,
-        pastPerformance,
-        timezoneCompatibility,
-      };
-
-      // Calculate weighted overall score
-      const overallScore =
-        skillOverlap * 0.4 +
-        vettingScore * 0.25 +
-        ratings * 0.15 +
-        availability * 0.1 +
-        pastPerformance * 0.1;
 
       scores.push({
         freelancer,
@@ -603,7 +625,7 @@ export const generateMatchesForDraft = action({
     const matchIds: string[] = [];
 
     if (!isTeam) {
-      // Single: top 20, same scoring as generateMatches
+      // Single: top 20, same scoring as generateMatches (shared scoreOneFreelancer)
       const scores: Array<{
         freelancer: Doc<"users">;
         score: number;
@@ -611,36 +633,12 @@ export const generateMatchesForDraft = action({
       }> = [];
 
       for (const { freelancer, overallScore: vettingScore } of approvedFreelancers) {
-        const skillOverlap = calculateSkillOverlap(
-          requiredSkills,
-          freelancer.profile?.skills || []
-        );
-        const ratings = await calculateRatingsScore(ctx, freelancer._id);
-        const availability = calculateAvailabilityScore(
-          freelancer.profile?.availability
-        );
-        const pastPerformance = await calculatePastPerformance(
+        const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
-          freelancer._id
+          freelancer,
+          requiredSkills,
+          vettingScore
         );
-        const timezoneCompatibility = calculateTimezoneCompatibility(
-          undefined,
-          freelancer.profile?.timezone
-        );
-        const breakdown: ScoringBreakdown = {
-          skillOverlap,
-          vettingScore,
-          ratings,
-          availability,
-          pastPerformance,
-          timezoneCompatibility,
-        };
-        const overallScore =
-          skillOverlap * 0.4 +
-          vettingScore * 0.25 +
-          ratings * 0.15 +
-          availability * 0.1 +
-          pastPerformance * 0.1;
         scores.push({ freelancer, score: overallScore, breakdown });
       }
 
@@ -686,36 +684,12 @@ export const generateMatchesForDraft = action({
       }> = [];
 
       for (const { freelancer, overallScore: vettingScore } of approvedFreelancers) {
-        const skillOverlap = calculateSkillOverlap(
-          [groupSkill],
-          freelancer.profile?.skills || []
-        );
-        const ratings = await calculateRatingsScore(ctx, freelancer._id);
-        const availability = calculateAvailabilityScore(
-          freelancer.profile?.availability
-        );
-        const pastPerformance = await calculatePastPerformance(
+        const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
-          freelancer._id
+          freelancer,
+          [groupSkill],
+          vettingScore
         );
-        const timezoneCompatibility = calculateTimezoneCompatibility(
-          undefined,
-          freelancer.profile?.timezone
-        );
-        const breakdown: ScoringBreakdown = {
-          skillOverlap,
-          vettingScore,
-          ratings,
-          availability,
-          pastPerformance,
-          timezoneCompatibility,
-        };
-        const overallScore =
-          skillOverlap * 0.4 +
-          vettingScore * 0.25 +
-          ratings * 0.15 +
-          availability * 0.1 +
-          pastPerformance * 0.1;
         groupScores.push({ freelancer, score: overallScore, breakdown });
       }
 

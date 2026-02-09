@@ -4,7 +4,7 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -178,6 +178,7 @@ export default function ProjectMatchesPage() {
   );
 
   const [matchingRunning, setMatchingRunning] = useState(false);
+  const matchingAttemptedRef = useRef(false);
   const [singleVisibleCount, setSingleVisibleCount] = useState(PAGE_SIZE);
   const [selectedSingleId, setSelectedSingleId] = useState<Id<"users"> | null>(
     null
@@ -213,7 +214,12 @@ export default function ProjectMatchesPage() {
   const hasMoreSingle =
     !isTeam && pendingMatches.length > singleVisibleCount;
 
-  // Run matching once when project is draft and no matches
+  // Reset "attempted" when project changes so a new project can trigger matching
+  useEffect(() => {
+    matchingAttemptedRef.current = false;
+  }, [projectId]);
+
+  // Run matching once when project is draft and no matches; do not retry on failure
   useEffect(() => {
     if (
       !projectId ||
@@ -224,6 +230,8 @@ export default function ProjectMatchesPage() {
     )
       return;
     if (matches && matches.length > 0) return;
+    if (matchingAttemptedRef.current) return; // already attempted (success or failure), avoid infinite retry
+    matchingAttemptedRef.current = true;
     setMatchingRunning(true);
     generateMatchesForDraft({ projectId })
       .then(() => setMatchingRunning(false))

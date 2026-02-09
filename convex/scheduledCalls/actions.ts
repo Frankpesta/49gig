@@ -168,7 +168,7 @@ export const scheduleOneOnOneSession = action({
     startTime: v.number(),
     endTime: v.number(),
     title: v.string(),
-    userId: v.optional(v.id("users")), // Client making the request (for auth)
+    userId: v.id("users"), // Required: client making the request (enforces auth)
   },
   handler: async (ctx, args) => {
     const project = await ctx.runQuery(
@@ -176,7 +176,7 @@ export const scheduleOneOnOneSession = action({
       { projectId: args.projectId }
     );
     if (!project) throw new Error("Project not found");
-    if (args.userId && project.clientId !== args.userId) {
+    if (project.clientId !== args.userId) {
       throw new Error("Only the project client can schedule this session");
     }
 
