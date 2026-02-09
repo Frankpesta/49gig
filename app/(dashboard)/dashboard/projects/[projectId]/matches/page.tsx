@@ -283,9 +283,14 @@ export default function ProjectMatchesPage() {
         await setSelectedFreelancers({
           projectId,
           freelancerIds: Array.from(selectedTeamIds),
+          userId: user._id,
         });
       } else if (selectedSingleId) {
-        await setSelectedFreelancer({ projectId, freelancerId: selectedSingleId });
+        await setSelectedFreelancer({
+          projectId,
+          freelancerId: selectedSingleId,
+          userId: user._id,
+        });
       }
       router.push(`/dashboard/projects/${projectId}/payment`);
     } catch (e) {
@@ -341,9 +346,17 @@ export default function ProjectMatchesPage() {
       setScheduleDialogOpen(false);
       toast.success("Session scheduled. Check your email for the Meet link.");
       if (isTeam) {
-        await setSelectedFreelancers({ projectId, freelancerIds });
+        await setSelectedFreelancers({
+          projectId,
+          freelancerIds,
+          userId: user._id,
+        });
       } else {
-        await setSelectedFreelancer({ projectId, freelancerId: freelancerIds[0] });
+        await setSelectedFreelancer({
+          projectId,
+          freelancerId: freelancerIds[0],
+          userId: user._id,
+        });
       }
       router.push(`/dashboard/projects/${projectId}/payment`);
     } catch (e) {
