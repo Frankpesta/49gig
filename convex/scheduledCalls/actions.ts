@@ -37,20 +37,53 @@ function base64UrlEncode(buf: Buffer): string {
     .replace(/=+$/, "");
 }
 
+/** Shape of Google Cloud service account JSON key file (e.g. gig-483014-*.json). */
+interface GoogleServiceAccountKey {
+  type: string;
+  project_id?: string;
+  private_key_id?: string;
+  private_key: string;
+  client_email: string;
+  client_id?: string;
+  auth_uri?: string;
+  token_uri?: string;
+  auth_provider_x509_cert_url?: string;
+  client_x509_cert_url?: string;
+  universe_domain?: string;
+}
+
 /**
  * Create a JWT for Google OAuth2 service account and exchange for access token.
- * Env: GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL, GOOGLE_CALENDAR_PRIVATE_KEY (PEM string).
+ * Env: GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON = full contents of the service account JSON key file.
  */
 async function getGoogleCalendarAccessToken(): Promise<string> {
-  const email = process.env.GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL;
-  const privateKeyPem = process.env.GOOGLE_CALENDAR_PRIVATE_KEY?.replace(
-    /\\n/g,
-    "\n"
-  );
+  const jsonRaw = process.env.GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON;
+  if (!jsonRaw) {
+    throw new Error(
+      "Google Calendar API not configured: set GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON in Convex env (paste the full JSON key file content)"
+    );
+  }
 
+  let key: GoogleServiceAccountKey;
+  try {
+    key = JSON.parse(jsonRaw) as GoogleServiceAccountKey;
+  } catch {
+    throw new Error(
+      "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON is invalid JSON. Paste the full contents of your service account JSON key file (e.g. gig-483014-*.json)."
+    );
+  }
+
+  if (key.type !== "service_account") {
+    throw new Error(
+      "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON must be a service account key (type: 'service_account')"
+    );
+  }
+
+  const email = key.client_email;
+  const privateKeyPem = (key.private_key || "").replace(/\\n/g, "\n");
   if (!email || !privateKeyPem) {
     throw new Error(
-      "Google Calendar API not configured: set GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL and GOOGLE_CALENDAR_PRIVATE_KEY in Convex env"
+      "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON must contain client_email and private_key"
     );
   }
 
@@ -103,10 +136,7 @@ async function createGoogleCalendarEventWithMeet(
   endTime: number,
   attendeeEmails: string[]
 ): Promise<{ meetLink: string; eventId: string }> {
-  const calendarId =
-    process.env.GOOGLE_CALENDAR_ID ||
-    process.env.GOOGLE_CALENDAR_SERVICE_ACCOUNT_EMAIL ||
-    "primary";
+  const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
   const calendarIdEnc = calendarId.includes("@") ? encodeURIComponent(calendarId) : calendarId;
 
   const start = new Date(startTime);
