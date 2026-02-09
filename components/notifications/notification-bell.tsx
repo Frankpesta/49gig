@@ -55,7 +55,7 @@ export function NotificationBell() {
   }, [notifications, inAppEnabled]);
 
   const handleMarkAllRead = async () => {
-    await markAllRead({});
+    await markAllRead(user?._id ? { userId: user._id } : {});
   };
 
   return (
@@ -106,7 +106,12 @@ export function NotificationBell() {
                   "flex cursor-pointer items-start gap-3 px-4 py-3",
                   !notification.readAt && "bg-muted/40"
                 )}
-                onClick={() => markNotificationRead({ notificationId: notification._id })}
+                onClick={() =>
+                  markNotificationRead({
+                    notificationId: notification._id,
+                    ...(user?._id ? { userId: user._id } : {}),
+                  })
+                }
               >
                 <div className="mt-0.5 h-2 w-2 rounded-full bg-primary opacity-80" />
                 <div className="flex-1 space-y-1">
