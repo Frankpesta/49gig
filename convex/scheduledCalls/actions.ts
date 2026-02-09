@@ -125,8 +125,14 @@ async function getGoogleCalendarAccessToken(): Promise<string> {
   return tokenData.access_token;
 }
 
+/** Fallback Meet URL when using a service account (Calendar API cannot create Meet links for service accounts). */
+const MEET_NEW_LINK = "https://meet.google.com/new";
+
 /**
- * Create a Google Calendar event with Google Meet link.
+ * Create a Google Calendar event. Optionally includes a Meet link if the API returns one.
+ * Service accounts cannot create Meet links via the Calendar API ("Invalid conference type value"),
+ * so we create the event without conferenceData and use a fallback link (meet.google.com/new) that
+ * one participant can open to start a Meet and share with the other.
  * Env: GOOGLE_CALENDAR_ID (optional; default primary for the service account).
  */
 async function createGoogleCalendarEventWithMeet(
@@ -134,7 +140,7 @@ async function createGoogleCalendarEventWithMeet(
   title: string,
   startTime: number,
   endTime: number,
-  attendeeEmails: string[]
+  _attendeeEmails: string[]
 ): Promise<{ meetLink: string; eventId: string }> {
   const calendarId = process.env.GOOGLE_CALENDAR_ID || "primary";
   const calendarIdEnc = calendarId.includes("@") ? encodeURIComponent(calendarId) : calendarId;
@@ -145,22 +151,16 @@ async function createGoogleCalendarEventWithMeet(
   const startRfc = start.toISOString().replace(/\.\d{3}Z$/, "Z");
   const endRfc = end.toISOString().replace(/\.\d{3}Z$/, "Z");
 
-  // Do not set attendees: service accounts cannot invite without Domain-Wide Delegation.
-  // We create the event with a Meet link and send the link via our own email (OneOnOneSessionScheduledEmail).
+  // Do not set attendees (service accounts need Domain-Wide Delegation) or conferenceData
+  // (service accounts get "Invalid conference type value" when requesting hangoutsMeet).
   const eventBody = {
     summary: title,
-    description: `49GIG ${title}`,
+    description: `49GIG ${title}\n\nVideo call: One participant can start a Meet and share the link: ${MEET_NEW_LINK}`,
     start: { dateTime: startRfc, timeZone },
     end: { dateTime: endRfc, timeZone },
-    conferenceData: {
-      createRequest: {
-        requestId: `49gig-${startTime}-${Math.random().toString(36).slice(2)}`,
-        conferenceSolutionKey: { type: "hangoutsMeet" },
-      },
-    },
   };
 
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${calendarIdEnc}/events?conferenceDataVersion=1`;
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${calendarIdEnc}/events`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -182,10 +182,7 @@ async function createGoogleCalendarEventWithMeet(
   const meetLink =
     data.conferenceData?.entryPoints?.find((p) => p.uri?.startsWith("https://"))?.uri ||
     data.conferenceData?.entryPoints?.[0]?.uri ||
-    "";
-  if (!meetLink) {
-    throw new Error("Google Meet link was not returned by Calendar API");
-  }
+    MEET_NEW_LINK;
   return { meetLink, eventId: data.id };
 }
 
