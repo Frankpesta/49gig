@@ -145,12 +145,13 @@ async function createGoogleCalendarEventWithMeet(
   const startRfc = start.toISOString().replace(/\.\d{3}Z$/, "Z");
   const endRfc = end.toISOString().replace(/\.\d{3}Z$/, "Z");
 
+  // Do not set attendees: service accounts cannot invite without Domain-Wide Delegation.
+  // We create the event with a Meet link and send the link via our own email (OneOnOneSessionScheduledEmail).
   const eventBody = {
     summary: title,
     description: `49GIG ${title}`,
     start: { dateTime: startRfc, timeZone },
     end: { dateTime: endRfc, timeZone },
-    attendees: attendeeEmails.map((e) => ({ email: e })),
     conferenceData: {
       createRequest: {
         requestId: `49gig-${startTime}-${Math.random().toString(36).slice(2)}`,
