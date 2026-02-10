@@ -1,190 +1,204 @@
 "use client";
 
 import { PageHeader } from "@/components/marketing/page-header";
-import { FileText } from "lucide-react";
+import { FileText, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+
+interface Section {
+  id: string;
+  title: string;
+  subsections?: { title: string; content: string }[];
+  content?: string;
+}
 
 export default function TermsPage() {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["1", "2"]));
+
+  const toggleSection = (id: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedSections(newExpanded);
+  };
+
+  const sections: Section[] = [
+    {
+      id: "1",
+      title: "Agreement to Terms",
+      content: "These Terms and Conditions constitute a legally binding agreement between you and 49GIG governing your access to and use of our platform. By accessing or using the Platform, you agree to be bound by these Terms."
+    },
+    {
+      id: "2",
+      title: "Eligibility",
+      content: "To use the Platform, you must be at least 18 years of age, have the legal capacity to enter into binding contracts, and provide accurate information during registration."
+    },
+    {
+      id: "3",
+      title: "User Accounts",
+      subsections: [
+        { title: "Account Creation", content: "You must provide accurate information and keep your account information up to date." },
+        { title: "Account Security", content: "You are responsible for maintaining the confidentiality of your credentials and for all activities under your account." },
+        { title: "Account Suspension", content: "We reserve the right to suspend or terminate your account if you violate these Terms or engage in fraudulent conduct." }
+      ]
+    },
+    {
+      id: "4",
+      title: "Platform Services",
+      subsections: [
+        { title: "General Description", content: "49GIG is a marketplace platform connecting clients with vetted African freelancers. We facilitate connections, contracts, and payments." },
+        { title: "Role of 49GIG", content: "49GIG acts as an intermediary platform. We do not employ freelancers, nor do we act as an agent for either party." },
+        { title: "Vetting Process", content: "Freelancers undergo an automated vetting process including English proficiency and skills testing." }
+      ]
+    },
+    {
+      id: "5",
+      title: "User Obligations",
+      subsections: [
+        { title: "Prohibited Conduct", content: "You agree not to violate laws, infringe intellectual property rights, post false information, engage in harassment, or circumvent the Platform." },
+        { title: "Content Standards", content: "All content you post must comply with applicable laws and must not contain illegal, offensive, or infringing material." }
+      ]
+    },
+    {
+      id: "6",
+      title: "Fees and Payments",
+      subsections: [
+        { title: "Service Fees", content: "49GIG charges service fees for facilitating projects. Fee structures are outlined in our Pricing page and Payment Terms." },
+        { title: "Taxes", content: "You are responsible for determining and paying all applicable taxes related to your use of the Platform." }
+      ]
+    },
+    {
+      id: "7",
+      title: "Intellectual Property",
+      subsections: [
+        { title: "Platform Content", content: "The Platform and its original content are owned by 49GIG and protected by international copyright and trademark laws." },
+        { title: "Work Product", content: "Intellectual property rights in work product created by freelancers are determined by the contract between the client and freelancer." }
+      ]
+    },
+    {
+      id: "8",
+      title: "Dispute Resolution",
+      subsections: [
+        { title: "Process", content: "Disputes between clients and freelancers should be resolved directly between the parties or through our mediation support." },
+        { title: "Arbitration", content: "Any dispute shall be resolved through binding arbitration in accordance with the laws of Nigeria." }
+      ]
+    },
+    {
+      id: "9",
+      title: "Disclaimers and Limitations",
+      subsections: [
+        { title: "No Warranties", content: "THE PLATFORM IS PROVIDED 'AS IS' WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED." },
+        { title: "Limitation of Liability", content: "49GIG SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES." }
+      ]
+    },
+    {
+      id: "10",
+      title: "Governing Law",
+      content: "These Terms shall be governed by and construed in accordance with the laws of Nigeria."
+    }
+  ];
+
   return (
     <div className="w-full">
       <PageHeader
-        badge={{ icon: FileText, text: "Terms and Conditions" }}
+        badge={{ icon: FileText, text: "Terms & Conditions" }}
         title="Terms and Conditions"
-        description="Last updated: January 6, 2026"
+        description="Please read these terms carefully. By using our platform, you agree to be bound by these terms."
       />
 
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
-            <h2>1. Agreement to Terms</h2>
-            <p>
-              These Terms and Conditions ("Terms") constitute a legally binding agreement between you and 49GIG ("Company," "we," "our," or "us") governing your access to and use of the 49gig.com website and platform (collectively, the "Platform").
+      <section className="py-20 sm:py-24 lg:py-32 bg-background relative overflow-hidden">
+        <div className="absolute inset-0">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+          {/* Table of Contents */}
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-foreground mb-6">Table of Contents</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => toggleSection(section.id)}
+                  className="text-left text-sm text-primary hover:text-primary/80 transition-colors py-2 px-3 rounded-lg hover:bg-primary/10"
+                >
+                  {section.id}. {section.title}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {sections.map((section) => (
+              <div key={section.id}>
+                <button
+                  onClick={() => toggleSection(section.id)}
+                  className="w-full group"
+                >
+                  <Card className="border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-start gap-4 flex-1 text-left">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors flex-shrink-0 mt-0.5">
+                            <span className="text-sm font-semibold text-primary">{section.id}</span>
+                          </div>
+                          <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
+                            {section.title}
+                          </h3>
+                        </div>
+                        <ChevronDown
+                          className={`h-5 w-5 text-muted-foreground group-hover:text-primary transition-transform duration-300 flex-shrink-0 ${
+                            expandedSections.has(section.id) ? "rotate-180" : ""
+                          }`}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </button>
+
+                {/* Expanded Content */}
+                {expandedSections.has(section.id) && (
+                  <div className="mt-2 ml-0 pl-0 sm:pl-4 border-l border-primary/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Card className="border border-border/30 bg-muted/30">
+                      <CardContent className="p-6 space-y-6">
+                        {section.content ? (
+                          <p className="text-muted-foreground">{section.content}</p>
+                        ) : section.subsections ? (
+                          section.subsections.map((subsection, idx) => (
+                            <div key={idx} className="space-y-2">
+                              <h4 className="font-semibold text-foreground text-sm">{subsection.title}</h4>
+                              <p className="text-muted-foreground text-sm">{subsection.content}</p>
+                            </div>
+                          ))
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Additional Info */}
+          <div className="mt-12 pt-8 border-t border-border/30 space-y-6">
+            <div>
+              <h3 className="font-semibold text-foreground mb-3">Contact Information</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p><span className="font-medium text-foreground">Email:</span> legal@49gig.com</p>
+                <p><span className="font-medium text-foreground">Address:</span> 49GIG, Lagos, Nigeria</p>
+                <p><span className="font-medium text-foreground">Phone:</span> +234 (0) 123 456 7890</p>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Last updated: January 6, 2026
             </p>
-            <p>
-              By accessing or using the Platform, you agree to be bound by these Terms. If you do not agree to these Terms, you may not access or use the Platform.
-            </p>
-
-            <h2>2. Eligibility</h2>
-            <p>To use the Platform, you must:</p>
-            <ul>
-              <li>Be at least 18 years of age</li>
-              <li>Have the legal capacity to enter into binding contracts</li>
-              <li>Not be prohibited from using the Platform under applicable laws</li>
-              <li>Provide accurate, current, and complete information during registration</li>
-            </ul>
-
-            <h2>3. User Accounts</h2>
-            <h3>3.1 Account Creation</h3>
-            <p>
-              To access certain features, you must create an account. You agree to provide accurate information and keep your account information up to date.
-            </p>
-
-            <h3>3.2 Account Security</h3>
-            <p>
-              You are responsible for maintaining the confidentiality of your account credentials and for all activities under your account. You must notify us immediately of any unauthorized use of your account.
-            </p>
-
-            <h3>3.3 Account Suspension and Termination</h3>
-            <p>
-              We reserve the right to suspend or terminate your account at any time, with or without notice, if we believe you have violated these Terms or engaged in fraudulent, abusive, or illegal conduct.
-            </p>
-
-            <h2>4. Platform Services</h2>
-            <h3>4.1 General Description</h3>
-            <p>
-              49GIG is a marketplace platform connecting clients with vetted African freelancers. We facilitate connections, contracts, project management, and payments between clients and freelancers.
-            </p>
-
-            <h3>4.2 Role of 49GIG</h3>
-            <p>
-              49GIG acts as an intermediary platform. We do not employ freelancers, nor do we act as an agent for clients or freelancers. The contractual relationship for services is between the client and the freelancer.
-            </p>
-
-            <h3>4.3 Vetting Process</h3>
-            <p>
-              Freelancers undergo an automated vetting process including English proficiency and skills testing. While we strive to maintain high standards, we do not guarantee the quality, accuracy, or reliability of freelancer services.
-            </p>
-
-            <h2>5. User Obligations</h2>
-            <h3>5.1 Prohibited Conduct</h3>
-            <p>You agree not to:</p>
-            <ul>
-              <li>Violate any applicable laws or regulations</li>
-              <li>Infringe on intellectual property rights of others</li>
-              <li>Post false, misleading, or fraudulent information</li>
-              <li>Engage in harassment, abuse, or discriminatory behavior</li>
-              <li>Circumvent the Platform to avoid fees</li>
-              <li>Use the Platform for unauthorized commercial purposes</li>
-              <li>Interfere with or disrupt the Platform's functionality</li>
-              <li>Attempt to gain unauthorized access to Platform systems</li>
-              <li>Use automated tools (bots, scrapers) without permission</li>
-              <li>Solicit or spam other users</li>
-            </ul>
-
-            <h3>5.2 Content Standards</h3>
-            <p>
-              All content you post, upload, or submit must comply with applicable laws and must not contain illegal, offensive, defamatory, or infringing material.
-            </p>
-
-            <h2>6. Fees and Payments</h2>
-            <h3>6.1 Service Fees</h3>
-            <p>
-              49GIG charges service fees for facilitating projects. Fee structures are outlined in our Pricing page and Payment Terms. Fees are subject to change with notice.
-            </p>
-
-            <h3>6.2 Payment Processing</h3>
-            <p>
-              Payments are processed through third-party payment processors. You agree to comply with their terms and policies.
-            </p>
-
-            <h3>6.3 Taxes</h3>
-            <p>
-              You are responsible for determining and paying all applicable taxes related to your use of the Platform and any payments you make or receive.
-            </p>
-
-            <h2>7. Intellectual Property</h2>
-            <h3>7.1 Platform Content</h3>
-            <p>
-              The Platform and its original content, features, and functionality are owned by 49GIG and protected by international copyright, trademark, and other intellectual property laws.
-            </p>
-
-            <h3>7.2 User Content</h3>
-            <p>
-              You retain ownership of content you upload to the Platform. By uploading content, you grant 49GIG a non-exclusive, worldwide, royalty-free license to use, reproduce, modify, and display such content for the purpose of operating and improving the Platform.
-            </p>
-
-            <h3>7.3 Work Product</h3>
-            <p>
-              Intellectual property rights in work product created by freelancers are determined by the contract between the client and freelancer. 49GIG claims no ownership over such work product.
-            </p>
-
-            <h2>8. Dispute Resolution</h2>
-            <h3>8.1 Disputes Between Users</h3>
-            <p>
-              Disputes between clients and freelancers should first be resolved directly between the parties. 49GIG may provide mediation support but is not obligated to resolve disputes.
-            </p>
-
-            <h3>8.2 Dispute Resolution Process</h3>
-            <p>
-              If a dispute cannot be resolved directly, either party may request 49GIG's dispute resolution support. Our decision in such matters is final and binding.
-            </p>
-
-            <h3>8.3 Arbitration</h3>
-            <p>
-              Any dispute arising out of or relating to these Terms or the Platform shall be resolved through binding arbitration in accordance with the laws of Nigeria.
-            </p>
-
-            <h2>9. Disclaimers and Limitations of Liability</h2>
-            <h3>9.1 No Warranties</h3>
-            <p>
-              THE PLATFORM IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
-            </p>
-
-            <h3>9.2 Limitation of Liability</h3>
-            <p>
-              TO THE MAXIMUM EXTENT PERMITTED BY LAW, 49GIG SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES, WHETHER INCURRED DIRECTLY OR INDIRECTLY, OR ANY LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES.
-            </p>
-
-            <h3>9.3 Maximum Liability</h3>
-            <p>
-              Our total liability to you for any claims arising from your use of the Platform shall not exceed the amount of fees you paid to 49GIG in the 12 months preceding the claim.
-            </p>
-
-            <h2>10. Indemnification</h2>
-            <p>
-              You agree to indemnify, defend, and hold harmless 49GIG, its affiliates, officers, directors, employees, and agents from any claims, liabilities, damages, losses, and expenses (including legal fees) arising out of or related to your use of the Platform, your violation of these Terms, or your violation of any rights of another party.
-            </p>
-
-            <h2>11. Modifications to Terms</h2>
-            <p>
-              We reserve the right to modify these Terms at any time. We will notify you of material changes by posting the updated Terms on the Platform and updating the "Last updated" date. Your continued use of the Platform after changes constitutes acceptance of the modified Terms.
-            </p>
-
-            <h2>12. Governing Law</h2>
-            <p>
-              These Terms shall be governed by and construed in accordance with the laws of Nigeria, without regard to its conflict of law provisions.
-            </p>
-
-            <h2>13. Severability</h2>
-            <p>
-              If any provision of these Terms is found to be unenforceable or invalid, that provision shall be limited or eliminated to the minimum extent necessary, and the remaining provisions shall remain in full force and effect.
-            </p>
-
-            <h2>14. Entire Agreement</h2>
-            <p>
-              These Terms constitute the entire agreement between you and 49GIG regarding the use of the Platform and supersede all prior agreements and understandings.
-            </p>
-
-            <h2>15. Contact Information</h2>
-            <p>For questions about these Terms, please contact us:</p>
-            <ul>
-              <li><strong>Email:</strong> legal@49gig.com</li>
-              <li><strong>Address:</strong> 49GIG, Lagos, Nigeria</li>
-              <li><strong>Phone:</strong> +234 (0) 123 456 7890</li>
-            </ul>
           </div>
         </div>
       </section>
     </div>
   );
 }
-

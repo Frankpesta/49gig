@@ -60,37 +60,37 @@ export function AuthTwoColumnLayout({
           className={cn(
             "hidden lg:flex lg:flex-col lg:justify-between",
             "bg-muted/30 border-r border-border/50",
-            "px-10 xl:px-14 py-12",
+            "px-8 xl:px-12 py-10 xl:py-12",
             leftClassName
           )}
         >
-          <div className="flex flex-col gap-16">
+          <div className="flex flex-col gap-12 xl:gap-16">
             <Link href="/" className="inline-flex" aria-label="49GIG Home">
-              <Logo width={140} height={44} priority />
+              <Logo width={130} height={42} priority />
             </Link>
 
-            <div className="max-w-[380px] space-y-6">
-              <div className="space-y-3">
-                <h2 className="text-2xl xl:text-3xl font-semibold tracking-tight text-foreground">
+            <div className="max-w-[360px] space-y-5">
+              <div className="space-y-2.5">
+                <h2 className="text-xl xl:text-2xl font-semibold tracking-tight text-foreground leading-tight">
                   {leftTitle}
                 </h2>
-                <p className="text-base text-muted-foreground leading-relaxed">
+                <p className="text-sm xl:text-base text-muted-foreground leading-relaxed">
                   {leftDescription}
                 </p>
               </div>
 
               {features.length > 0 && (
-                <ul className="space-y-5 pt-2">
+                <ul className="space-y-3.5 xl:space-y-4 pt-2">
                   {features.map((f, i) => (
-                    <li key={i} className="flex gap-4">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <li key={i} className="flex gap-3 xl:gap-4">
+                      <span className="flex h-9 w-9 xl:h-10 xl:w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm xl:text-base">
                         {f.icon}
                       </span>
-                      <div className="space-y-1">
-                        <h3 className="text-sm font-semibold text-foreground">
+                      <div className="space-y-0.5">
+                        <h3 className="text-xs xl:text-sm font-semibold text-foreground">
                           {f.title}
                         </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
+                        <p className="text-xs xl:text-sm text-muted-foreground leading-relaxed">
                           {f.description}
                         </p>
                       </div>
@@ -101,7 +101,7 @@ export function AuthTwoColumnLayout({
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground mt-8">
+          <p className="text-xs xl:text-sm text-muted-foreground mt-8">
             © {new Date().getFullYear()} 49GIG. All rights reserved.
           </p>
         </div>
@@ -109,32 +109,32 @@ export function AuthTwoColumnLayout({
         {/* Right column – form */}
         <div
           className={cn(
-            "flex min-h-0 flex-col justify-center overflow-y-auto",
-            "px-4 sm:px-6 lg:px-10 xl:px-14 py-8 sm:py-10 lg:py-12",
+            "flex min-h-screen lg:min-h-0 flex-col justify-center overflow-y-auto",
+            "px-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 py-6 sm:py-8 md:py-10 lg:py-12",
             rightClassName
           )}
         >
-          <div className="mx-auto w-full max-w-[400px] space-y-8">
+          <div className="mx-auto w-full max-w-[380px] sm:max-w-[400px] space-y-6 sm:space-y-7 md:space-y-8">
             {showMobileLogo && (
-              <div className="lg:hidden flex justify-center pb-4">
+              <div className="lg:hidden flex justify-center pb-2">
                 <Link href="/" aria-label="49GIG Home">
-                  <Logo width={120} height={38} priority />
+                  <Logo width={110} height={35} priority />
                 </Link>
               </div>
             )}
 
-            <header className="space-y-3">
+            <header className="space-y-2.5 sm:space-y-3">
               {badge && (
-                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-primary">
+                  <span className="h-1 w-1 rounded-full bg-primary" />
                   {badge}
                 </div>
               )}
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-foreground leading-tight">
                 {heading}
               </h1>
               {subline && (
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                   {subline}
                 </p>
               )}

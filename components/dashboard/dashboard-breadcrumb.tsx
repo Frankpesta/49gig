@@ -10,11 +10,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Home } from "lucide-react";
+import { Home, ChevronRight } from "lucide-react";
 
 /**
  * Dashboard Breadcrumb Component
  * Automatically generates breadcrumbs based on the current route
+ * Features: Mobile-responsive, modern styling, smooth interactions
  */
 export function DashboardBreadcrumb() {
   const pathname = usePathname();
@@ -43,39 +44,45 @@ export function DashboardBreadcrumb() {
 
   return (
     <Breadcrumb>
-      <BreadcrumbList className="flex-nowrap overflow-hidden min-w-0">
-        <BreadcrumbItem className="shrink-0">
+      <BreadcrumbList className="flex flex-wrap items-center gap-1 text-sm">
+        <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link href="/dashboard" className="flex items-center gap-1">
-              <Home className="h-4 w-4 shrink-0" />
-              <span className="sr-only sm:not-sr-only">Dashboard</span>
+            <Link 
+              href="/dashboard" 
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors py-1 px-1.5"
+              title="Go to Dashboard"
+            >
+              <Home className="h-4 w-4" />
+              <span className="sr-only md:not-sr-only font-medium">Dashboard</span>
             </Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
-        {breadcrumbItems.length > 0 && <BreadcrumbSeparator className="shrink-0" />}
-        {/* Mobile: only current page (avoids wrapping "Dashboard > Projects > Create") */}
-        {currentPageLabel && (
-          <BreadcrumbItem className="min-w-0 md:hidden">
-            <BreadcrumbPage className="truncate block">{currentPageLabel}</BreadcrumbPage>
-          </BreadcrumbItem>
+        
+        {breadcrumbItems.length > 0 && (
+          <>
+            {breadcrumbItems.map((item, index) => (
+              <div key={item.href} className="flex items-center gap-1">
+                <ChevronRight className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
+                <BreadcrumbItem>
+                  {item.isLast ? (
+                    <BreadcrumbPage className="font-semibold text-foreground max-w-xs md:max-w-none truncate">
+                      {item.label}
+                    </BreadcrumbPage>
+                  ) : (
+                    <BreadcrumbLink asChild>
+                      <Link 
+                        href={item.href}
+                        className="text-muted-foreground hover:text-foreground transition-colors py-1 px-1.5 rounded-md hover:bg-muted/50 font-medium"
+                      >
+                        {item.label}
+                      </Link>
+                    </BreadcrumbLink>
+                  )}
+                </BreadcrumbItem>
+              </div>
+            ))}
+          </>
         )}
-        {/* Desktop: full trail */}
-        {breadcrumbItems.map((item) => (
-          <div key={item.href} className="hidden md:flex items-center shrink-0">
-            <BreadcrumbItem>
-              {item.isLast ? (
-                <BreadcrumbPage className="truncate max-w-[12rem]">{item.label}</BreadcrumbPage>
-              ) : (
-                <BreadcrumbLink asChild>
-                  <Link href={item.href} className="truncate max-w-[8rem] inline-block">
-                    {item.label}
-                  </Link>
-                </BreadcrumbLink>
-              )}
-            </BreadcrumbItem>
-            {!item.isLast && <BreadcrumbSeparator />}
-          </div>
-        ))}
       </BreadcrumbList>
     </Breadcrumb>
   );

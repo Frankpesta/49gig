@@ -81,40 +81,40 @@ export function MetricCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden border transition-all duration-500 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1",
+        "group relative overflow-hidden border transition-all duration-500 hover:shadow-lg md:hover:shadow-2xl hover:shadow-primary/10 md:hover:-translate-y-1",
         styles.card,
         className
       )}
     >
-      <CardContent className="p-6 space-y-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+      <CardContent className="p-3.5 sm:p-4 md:p-6 space-y-3.5 md:space-y-5">
+        <div className="flex items-start justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
             <div
               className={cn(
-                "relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-110",
+                "relative flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl transition-all duration-300 group-hover:scale-110",
                 styles.iconBg
               )}
             >
               <div
                 className={cn(
-                  "absolute inset-0 rounded-xl opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-60",
+                  "absolute inset-0 rounded-lg sm:rounded-xl opacity-0 blur-md transition-opacity duration-300 group-hover:opacity-60",
                   styles.glow
                 )}
               />
               <Icon
                 className={cn(
-                  "h-6 w-6 relative z-10 transition-all duration-300 group-hover:scale-110",
+                  "h-5 w-5 sm:h-6 sm:w-6 relative z-10 transition-all duration-300 group-hover:scale-110",
                   styles.icon,
                   iconClassName
                 )}
               />
             </div>
-            <div className="flex-1 min-w-0 pt-0.5 space-y-1">
-              <p className="text-sm font-semibold text-muted-foreground leading-tight">
+            <div className="flex-1 min-w-0 pt-0.5 space-y-0.5 sm:space-y-1">
+              <p className="text-xs sm:text-sm font-semibold text-muted-foreground leading-tight truncate">
                 {title}
               </p>
               {subtitle && (
-                <p className="text-xs text-muted-foreground/80 leading-tight">
+                <p className="text-xs text-muted-foreground/80 leading-tight truncate">
                   {subtitle}
                 </p>
               )}
@@ -127,15 +127,15 @@ export function MetricCard({
           )}
         </div>
 
-        <div className="space-y-1">
-          <div className="flex items-baseline gap-2.5">
-            <p className="text-3xl font-bold tracking-tight text-foreground">
+        <div className="space-y-0.5 sm:space-y-1">
+          <div className="flex items-baseline gap-2">
+            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground truncate">
               {value}
             </p>
             {trend && (
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold",
+                  "inline-flex items-center gap-0.5 rounded-full px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0",
                   trend.isPositive
                     ? "bg-green-500/10 text-green-600 dark:text-green-400"
                     : "bg-red-500/10 text-red-600 dark:text-red-400"
@@ -143,24 +143,23 @@ export function MetricCard({
               >
                 <span>{trend.isPositive ? "↑" : "↓"}</span>
                 {Math.abs(trend.value)}%
-                {trend.label ? <span className="ml-1 opacity-70">{trend.label}</span> : null}
               </span>
             )}
           </div>
           {description && (
-            <p className="text-sm text-muted-foreground/80 leading-relaxed">
+            <p className="text-xs sm:text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">
               {description}
             </p>
           )}
         </div>
 
         {progress && (
-          <div className="space-y-2">
+          <div className="space-y-1.5 sm:space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>{progress.label || "Progress"}</span>
-              <span>{Math.round(progress.value)}%</span>
+              <span className="truncate">{progress.label || "Progress"}</span>
+              <span className="flex-shrink-0 ml-2">{Math.round(progress.value)}%</span>
             </div>
-            <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden">
+            <div className="h-1.5 sm:h-2 w-full rounded-full bg-muted/40 overflow-hidden">
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700",
@@ -172,10 +171,10 @@ export function MetricCard({
           </div>
         )}
 
-        {children && <div className="pt-2">{children}</div>}
+        {children && <div className="pt-1.5 sm:pt-2">{children}</div>}
 
         {footnote && (
-          <p className="text-xs text-muted-foreground/70">{footnote}</p>
+          <p className="text-xs text-muted-foreground/70 line-clamp-2">{footnote}</p>
         )}
 
         {/* Enhanced decorative gradient overlay */}

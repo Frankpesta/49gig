@@ -14,7 +14,6 @@ const footerLinks = {
       { label: "For Freelancers", href: "/for-freelancers" },
       { label: "Hire Talent", href: "/hire-talent" },
       { label: "Hire a Team", href: "/hire-team" },
-      { label: "Pricing", href: "/pricing" },
     ],
   },
   company: {
@@ -101,9 +100,8 @@ export function Footer() {
                 priority
               />
             </Link>
-            <p className="text-sm text-muted-foreground mb-6 max-w-xs">
-              Connecting businesses with vetted, top-tier freelance talent. 
-              Your trusted marketplace for quality work.
+            <p className="text-sm text-muted-foreground mb-6 max-w-xs leading-relaxed">
+              Connecting exceptional African talent with global opportunities. We're redefining freelancing through vetted quality and transparent relationships.
             </p>
             
             {/* Newsletter Signup */}
