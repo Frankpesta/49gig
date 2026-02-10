@@ -388,6 +388,7 @@ export default function ProjectMatchesPage() {
     (api as any)["matching/queries"].getMatches,
     user?._id && projectId ? { projectId, userId: user._id, status: "pending" } : "skip"
   );
+  const [viewingFreelancerId, setViewingFreelancerId] = useState<Id<"users"> | null>(null);
   const publicProfile = useQuery(
     (api as any)["matching/queries"].getFreelancerPublicProfile,
     projectId && user?._id && viewingFreelancerId
@@ -422,7 +423,6 @@ export default function ProjectMatchesPage() {
   const [scheduleDate, setScheduleDate] = useState<Date | undefined>();
   const [scheduleTimeSlot, setScheduleTimeSlot] = useState<string>("09:00");
   const [scheduling, setScheduling] = useState(false);
-  const [viewingFreelancerId, setViewingFreelancerId] = useState<Id<"users"> | null>(null);
 
   const isTeam = project?.intakeForm?.hireType === "team";
   const pendingMatches = (matches ?? []).filter(
