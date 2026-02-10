@@ -758,6 +758,7 @@ export default function CreateProjectPage() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Navigation Buttons */}
       <div className="flex justify-between">
