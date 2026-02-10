@@ -29,6 +29,10 @@ export interface User {
     availability?: "available" | "busy" | "unavailable";
     timezone?: string;
     portfolioUrl?: string;
+    imageUrl?: string;
+    primaryRole?: string;
+    weeklyHours?: number;
+    earliestStartDate?: number;
   };
   notificationPreferences?: {
     email: boolean;
