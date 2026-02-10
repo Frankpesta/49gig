@@ -73,16 +73,15 @@ export const createProject = mutation({
       ),
       projectDuration: v.optional(
         v.union(
-          v.literal("1-3"),
-          v.literal("3-6"),
-          v.literal("6+")
+          v.literal("3"),
+          v.literal("6"),
+          v.literal("12+")
         )
       ),
       roleType: v.optional(
         v.union(
           v.literal("full_time"),
-          v.literal("part_time"),
-          v.literal("contract")
+          v.literal("part_time")
         )
       ),
       // Section 3: Talent Requirements

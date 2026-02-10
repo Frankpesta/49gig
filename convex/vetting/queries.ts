@@ -252,3 +252,141 @@ export const getVettingResultByFreelancer = internalQuery({
   },
 });
 
+/**
+ * Get current skill test session for a freelancer (most recent in-progress or completed).
+ */
+export const getSkillTestSession = query({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    let userId = args.userId;
+    if (!userId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity?.email) return null;
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
+      if (!user || user.role !== "freelancer") return null;
+      userId = user._id;
+    }
+    const session = await ctx.db
+      .query("vettingSkillTestSessions")
+      .withIndex("by_freelancer_created", (q) => q.eq("freelancerId", userId!))
+      .order("desc")
+      .first();
+    if (!session) return null;
+    const expiresAt = session.expiresAt ?? session.startedAt + 30 * 60 * 1000;
+    return {
+      _id: session._id,
+      status: session.status,
+      pathType: session.pathType,
+      experienceLevel: session.experienceLevel,
+      categoryId: session.categoryId,
+      selectedSkills: session.selectedSkills,
+      selectedLanguage: session.selectedLanguage,
+      codingPromptIds: session.codingPromptIds ?? [],
+      mcqQuestionIds: session.mcqQuestionIds ?? [],
+      mcqScore: session.mcqScore,
+      startedAt: session.startedAt,
+      expiresAt,
+      completedAt: session.completedAt,
+      vettingResultId: session.vettingResultId,
+    };
+  },
+});
+
+/**
+ * Get MCQ questions for a session (question text + options only; correct answer never sent to client).
+ */
+export const getMcqQuestionsForSession = query({
+  args: {
+    sessionId: v.id("vettingSkillTestSessions"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+    let userId = args.userId;
+    if (!userId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity?.email) return null;
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
+      if (!user) return null;
+      userId = user._id;
+    }
+    if (session.freelancerId !== userId) return null;
+    const ids = session.mcqQuestionIds ?? [];
+    if (ids.length === 0) return [];
+    const out: Array<{ _id: string; questionText: string; options: string[]; questionIndex: number }> = [];
+    for (let i = 0; i < ids.length; i++) {
+      const doc = await ctx.db.get(ids[i]);
+      if (doc) {
+        out.push({
+          _id: doc._id,
+          questionText: doc.questionText,
+          options: doc.options,
+          questionIndex: doc.questionIndex,
+        });
+      }
+    }
+    out.sort((a, b) => a.questionIndex - b.questionIndex);
+    return out;
+  },
+});
+
+/**
+ * Get coding prompts for a session.
+ */
+export const getCodingPromptsForSession = query({
+  args: {
+    sessionId: v.id("vettingSkillTestSessions"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) return null;
+    let userId = args.userId;
+    if (!userId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity?.email) return null;
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email!))
+        .first();
+      if (!user) return null;
+      userId = user._id;
+    }
+    if (session.freelancerId !== userId) return null;
+    const ids = session.codingPromptIds ?? [];
+    if (ids.length === 0) return [];
+    const out: Array<{
+      _id: string;
+      title: string;
+      description: string;
+      starterCode?: string;
+      promptIndex: number;
+      testCases?: Array<{ input: string; expectedOutput: string }>;
+    }> = [];
+    for (const id of ids) {
+      const doc = await ctx.db.get(id);
+      if (doc) {
+        out.push({
+          _id: doc._id,
+          title: doc.title,
+          description: doc.description,
+          starterCode: doc.starterCode,
+          promptIndex: doc.promptIndex,
+          testCases: doc.testCases,
+        });
+      }
+    }
+    out.sort((a, b) => a.promptIndex - b.promptIndex);
+    return out;
+  },
+});
+

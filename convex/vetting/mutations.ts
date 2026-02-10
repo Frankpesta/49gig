@@ -806,6 +806,176 @@ export const rejectVerification = mutation({
 });
 
 /**
+ * Submit MCQ answers for a skill test session. Server scores using stored correct answers; client never sees correct answers.
+ */
+export const submitMcqAnswers = mutation({
+  args: {
+    sessionId: v.id("vettingSkillTestSessions"),
+    answers: v.array(
+      v.object({
+        questionId: v.id("vettingMcqQuestions"),
+        selectedOptionIndex: v.number(),
+      })
+    ),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user || user.role !== "freelancer") throw new Error("Not authenticated");
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Session not found");
+    if (session.freelancerId !== user._id) throw new Error("Unauthorized");
+    if (session.expiresAt != null && Date.now() > session.expiresAt) {
+      throw new Error("Time's up. This skill test has expired.");
+    }
+
+    const questionIds = session.mcqQuestionIds ?? [];
+    if (questionIds.length === 0) throw new Error("No MCQ questions in session");
+
+    let correct = 0;
+    const answerMap = new Map(
+      args.answers.map((a) => [a.questionId, a.selectedOptionIndex])
+    );
+    for (const qid of questionIds) {
+      const doc = await ctx.db.get(qid);
+      if (doc && answerMap.has(qid)) {
+        if (answerMap.get(qid) === doc.correctOptionIndex) correct++;
+      }
+    }
+    const mcqScore =
+      questionIds.length > 0 ? Math.round((correct / questionIds.length) * 100) : 0;
+
+    await ctx.db.patch(args.sessionId, {
+      mcqAnswers: args.answers,
+      mcqScore,
+      status: "completed",
+      completedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    // Push aggregate skill assessment to vetting result so completeVerification can use it
+    const vettingResult = await ctx.db.get(session.vettingResultId);
+    if (vettingResult) {
+      const codingSubmissions = session.codingSubmissions ?? [];
+      let combinedScore = mcqScore;
+      if (session.pathType === "coding_mcq" && codingSubmissions.length > 0) {
+        let codingTotal = 0;
+        let codingPassed = 0;
+        for (const sub of codingSubmissions) {
+          const r = sub.runResult as { passed?: number; total?: number } | undefined;
+          if (r && typeof r.passed === "number" && typeof r.total === "number" && r.total > 0) {
+            codingPassed += r.passed;
+            codingTotal += r.total;
+          }
+        }
+        const codingScore = codingTotal > 0 ? Math.round((codingPassed / codingTotal) * 100) : 0;
+        combinedScore = Math.round((codingScore + mcqScore) / 2);
+      } else if (session.pathType === "portfolio_mcq" && session.portfolioScore != null) {
+        combinedScore = Math.round(session.portfolioScore * 0.3 + mcqScore * 0.7);
+      }
+      const newAssessment = {
+        skillId: "skill_test_session",
+        skillName: "Skill Test",
+        assessmentType: "mcq" as const,
+        score: combinedScore,
+        completedAt: Date.now(),
+        details: { mcqScore, pathType: session.pathType },
+      };
+      const stepsCompleted = vettingResult.stepsCompleted ?? [];
+      const hasSkills = stepsCompleted.includes("skills");
+      await ctx.db.patch(session.vettingResultId, {
+        skillAssessments: [...(vettingResult.skillAssessments || []), newAssessment],
+        ...(!hasSkills && {
+          stepsCompleted: [...stepsCompleted, "skills"],
+          currentStep: "complete",
+        }),
+        updatedAt: Date.now(),
+      });
+    }
+
+    return { mcqScore, correct, total: questionIds.length };
+  },
+});
+
+/**
+ * Set portfolio score and advance session to MCQ step (for portfolio_mcq path).
+ */
+export const setSessionPortfolioScore = mutation({
+  args: {
+    sessionId: v.id("vettingSkillTestSessions"),
+    portfolioScore: v.number(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user || user.role !== "freelancer") throw new Error("Not authenticated");
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Session not found");
+    if (session.freelancerId !== user._id) throw new Error("Unauthorized");
+    if (session.pathType !== "portfolio_mcq") throw new Error("Not a portfolio path");
+    if (session.expiresAt != null && Date.now() > session.expiresAt) {
+      throw new Error("Time's up. This skill test has expired.");
+    }
+
+    const score = Math.min(100, Math.max(0, args.portfolioScore));
+    await ctx.db.patch(args.sessionId, {
+      portfolioScore: score,
+      status: "mcq",
+      updatedAt: Date.now(),
+    });
+    return { ok: true };
+  },
+});
+
+/**
+ * Submit one coding submission for a session. Runs code via Judge0 (action) and stores result.
+ * Client should call the executeCodingChallenge action first to get runResult, then pass it here; or we can call the action from a mutation - we cannot. So the flow is: client runs action executeCodingChallenge with code + test cases, gets result, then calls this mutation with sessionId, promptId, code, runResult.
+ */
+export const submitCodingSubmission = mutation({
+  args: {
+    sessionId: v.id("vettingSkillTestSessions"),
+    promptId: v.id("vettingCodingPrompts"),
+    code: v.string(),
+    runResult: v.optional(v.any()),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user || user.role !== "freelancer") throw new Error("Not authenticated");
+
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) throw new Error("Session not found");
+    if (session.freelancerId !== user._id) throw new Error("Unauthorized");
+    if (session.expiresAt != null && Date.now() > session.expiresAt) {
+      throw new Error("Time's up. This skill test has expired.");
+    }
+
+    const existing = session.codingSubmissions ?? [];
+    const updated = [
+      ...existing,
+      {
+        promptId: args.promptId,
+        code: args.code,
+        submittedAt: Date.now(),
+        runResult: args.runResult,
+      },
+    ];
+    const allSubmitted =
+      (session.codingPromptIds?.length ?? 0) > 0 &&
+      updated.length >= (session.codingPromptIds?.length ?? 0);
+    await ctx.db.patch(args.sessionId, {
+      codingSubmissions: updated,
+      status: allSubmitted ? "mcq" : session.status,
+      updatedAt: Date.now(),
+    });
+
+    return { ok: true, nextStep: allSubmitted ? "mcq" : "coding" };
+  },
+});
+
+/**
  * Update English written response score (internal - called by actions)
  */
 export const updateEnglishWrittenScore = mutation({

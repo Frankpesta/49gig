@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, XCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { EnglishTest } from "@/components/vetting/english-test";
-import { SkillSelection } from "@/components/vetting/skill-selection";
+import { SkillTestPathFlow } from "@/components/vetting/skill-test-path-flow";
 import { useRouter } from "next/navigation";
 
 const VERIFICATION_FAILED_KEY = "verification_failed_message";
@@ -311,24 +311,7 @@ export default function VerificationPage() {
                 />
               )}
               {currentStep === "skills" && !stepsCompleted.includes("skills") && user && (
-                <SkillSelection
-                  skills={user.profile?.skills || []}
-                  experienceLevel={
-                    (user.profile?.experienceLevel as "junior" | "mid" | "senior" | "expert") ||
-                    "mid"
-                  }
-                  completedAssessments={
-                    vettingResult?.skillAssessments?.map((sa: { skillId: string; skillName: string; score: number }) => ({
-                      skillId: sa.skillId,
-                      skillName: sa.skillName,
-                      score: sa.score,
-                    })) || []
-                  }
-                  onAssessmentComplete={(skillName, score) => {
-                    // Assessment completed, refresh to update status
-                    window.location.reload();
-                  }}
-                />
+                <SkillTestPathFlow />
               )}
               {/* Submit verification when both steps are done */}
               {stepsCompleted.includes("english") &&

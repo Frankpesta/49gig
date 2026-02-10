@@ -41,17 +41,17 @@ import { PaymentBreakdownDisplay } from "@/components/payments/payment-breakdown
 import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
 
 const PROJECT_DURATIONS = [
-  { value: "1-3", label: "1–3 months" },
-  { value: "3-6", label: "3–6 months" },
-  { value: "6+", label: "6+ months" },
+  { value: "3", label: "3 months" },
+  { value: "6", label: "6 months" },
+  { value: "12+", label: "1 year +" },
 ] as const;
 
 export type ProjectDuration = (typeof PROJECT_DURATIONS)[number]["value"];
 
 const DURATION_DAYS: Record<ProjectDuration, number> = {
-  "1-3": 60,
-  "3-6": 135,
-  "6+": 270,
+  "3": 90,
+  "6": 180,
+  "12+": 365,
 };
 
 const EXPERIENCE_LEVELS = [
@@ -68,16 +68,15 @@ const TEAM_SIZES = [
 ] as const;
 
 const ROLE_TYPES = [
-  { value: "full_time", label: "Full-Time" },
-  { value: "part_time", label: "Part-Time" },
-  { value: "contract", label: "Contract / Freelance" },
+  { value: "full_time", label: "Full time" },
+  { value: "part_time", label: "Part time" },
 ] as const;
 
 export type RoleType = (typeof ROLE_TYPES)[number]["value"];
 
-// Derive projectType from roleType for backend (Contract → one_time, Full/Part → ongoing)
-function roleTypeToProjectType(roleType: RoleType): ProjectType {
-  return roleType === "contract" ? "one_time" : "ongoing";
+// Both full time and part time map to ongoing project type
+function roleTypeToProjectType(_roleType: RoleType): ProjectType {
+  return "ongoing";
 }
 
 // Map selected skills to talentCategory for schema (primary = first selected)
@@ -107,9 +106,9 @@ export default function CreateProjectPage() {
     // Section 2: Project Requirements (per image)
     title: "",
     skillsRequired: [] as string[],
-    roleType: "contract" as RoleType,
+    roleType: "full_time" as RoleType,
     description: "",
-    projectDuration: "1-3" as ProjectDuration,
+    projectDuration: "3" as ProjectDuration,
     deliverablesText: "",
     budgetOverride: "" as string,
     experienceLevel: "mid" as ExperienceLevel,
@@ -314,7 +313,10 @@ export default function CreateProjectPage() {
           roleTitle: formData.title.trim() || undefined,
           projectDuration: formData.projectDuration,
           roleType: formData.roleType,
-          timeline: `${formData.projectDuration} months`,
+          timeline:
+            formData.projectDuration === "12+"
+              ? "1 year +"
+              : `${formData.projectDuration} months`,
           category: skillsToTalentCategory(formData.skillsRequired),
           estimatedBudget: totalAmount,
           deliverables: deliverables.length > 0 ? deliverables : undefined,
