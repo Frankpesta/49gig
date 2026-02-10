@@ -10,7 +10,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Home, ChevronRight } from "lucide-react";
+import { Home } from "lucide-react";
 
 /**
  * Dashboard Breadcrumb Component
@@ -44,35 +44,46 @@ export function DashboardBreadcrumb() {
 
   return (
     <Breadcrumb>
-      <BreadcrumbList className="flex flex-wrap items-center gap-1 text-sm">
-        <BreadcrumbItem>
+      <BreadcrumbList className="flex flex-nowrap min-w-0 items-center gap-1 text-sm">
+        <BreadcrumbItem className="shrink-0">
           <BreadcrumbLink asChild>
-            <Link 
-              href="/dashboard" 
+            <Link
+              href="/dashboard"
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors py-1 px-1.5"
               title="Go to Dashboard"
             >
               <Home className="h-4 w-4" />
-              <span className="sr-only md:not-sr-only font-medium">Dashboard</span>
+              <span className="sr-only sm:not-sr-only font-medium">Dashboard</span>
             </Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
-        
         {breadcrumbItems.length > 0 && (
           <>
-            {breadcrumbItems.map((item, index) => (
-              <div key={item.href} className="flex items-center gap-1">
-                <ChevronRight className="h-4 w-4 text-muted-foreground/50 flex-shrink-0" />
+            {/* Mobile: only current page to avoid wrapping */}
+            {currentPageLabel && (
+              <>
+                <BreadcrumbSeparator className="shrink-0 md:hidden [&>svg]:size-3.5" />
+                <BreadcrumbItem className="min-w-0 md:hidden">
+                  <BreadcrumbPage className="block truncate font-semibold text-foreground">
+                    {currentPageLabel}
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </>
+            )}
+            {/* Desktop: full trail */}
+            {breadcrumbItems.map((item) => (
+              <div key={item.href} className="hidden md:flex items-center shrink-0 gap-1">
+                <BreadcrumbSeparator className="[&>svg]:size-3.5" />
                 <BreadcrumbItem>
                   {item.isLast ? (
-                    <BreadcrumbPage className="font-semibold text-foreground max-w-xs md:max-w-none truncate">
+                    <BreadcrumbPage className="font-semibold text-foreground truncate max-w-[12rem]">
                       {item.label}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
-                      <Link 
+                      <Link
                         href={item.href}
-                        className="text-muted-foreground hover:text-foreground transition-colors py-1 px-1.5 rounded-md hover:bg-muted/50 font-medium"
+                        className="text-muted-foreground hover:text-foreground transition-colors py-1 px-1.5 rounded-md hover:bg-muted/50 font-medium truncate max-w-[8rem] inline-block"
                       >
                         {item.label}
                       </Link>
