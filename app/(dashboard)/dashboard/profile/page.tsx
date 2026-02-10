@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, User, Building2, Briefcase, Globe, Link as LinkIcon, FileText, Star } from "lucide-react";
+import { Loader2, Save, User, Building2, Briefcase, Globe, Link as LinkIcon, FileText, Star, Camera } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -18,7 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PLATFORM_CATEGORIES, PROGRAMMING_LANGUAGES, getSkillsForCategory } from "@/lib/platform-skills";
+import { toast } from "sonner";
+
+const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuth();
@@ -41,8 +45,11 @@ export default function ProfilePage() {
     portfolioUrl: "",
   });
   const [newSkill, setNewSkill] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const updateProfile = useMutation(api.users.mutations.updateProfile);
+  const generateProfileImageUploadUrl = useMutation(api.users.mutations.generateProfileImageUploadUrl);
+  const setProfileImageFromStorageId = useMutation(api.users.mutations.setProfileImageFromStorageId);
   const resumeInfo = useQuery(
     // @ts-ignore dynamic path cast for generated types
     (api as any).resume.queries.getFreelancerResume,
@@ -114,6 +121,49 @@ export default function ProfilePage() {
     }
   };
 
+  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?._id) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file (JPEG, PNG, etc.)");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > PROFILE_IMAGE_MAX_BYTES) {
+      toast.error("Image must be 2MB or smaller");
+      e.target.value = "";
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const uploadUrl = await generateProfileImageUploadUrl({
+        userId: user._id,
+        sessionToken: typeof window !== "undefined" ? localStorage.getItem("sessionToken") ?? undefined : undefined,
+      });
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      const res = await response.json();
+      const storageId = typeof res === "string" ? res : res.storageId;
+      if (!storageId) throw new Error("Upload did not return storageId");
+      await setProfileImageFromStorageId({
+        storageId,
+        userId: user._id,
+        sessionToken: typeof window !== "undefined" ? localStorage.getItem("sessionToken") ?? undefined : undefined,
+      });
+      toast.success("Profile photo updated");
+    } catch (err) {
+      console.error("Failed to upload profile image:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to upload photo");
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = "";
+    }
+  };
+
   const addSkill = () => {
     if (newSkill.trim() && !formData.skills.includes(newSkill.trim())) {
       setFormData({
@@ -162,8 +212,38 @@ export default function ProfilePage() {
             <CardDescription>Your personal information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <div className="flex flex-col items-center gap-2">
+                <Avatar className="h-24 w-24 rounded-full border-2 border-border/60">
+                  <AvatarImage src={user?.profile?.imageUrl} alt={user?.name} />
+                  <AvatarFallback className="bg-primary/10 text-primary text-2xl font-semibold">
+                    {user?.name?.slice(0, 2).toUpperCase() ?? "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    disabled={isUploadingImage}
+                    onChange={handleProfileImageChange}
+                  />
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
+                    <span>
+                      {isUploadingImage ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4" />
+                      )}
+                      {isUploadingImage ? "Uploading…" : "Upload photo"}
+                    </span>
+                  </Button>
+                </label>
+                <p className="text-xs text-muted-foreground">JPEG or PNG, max 2MB</p>
+              </div>
+              <div className="flex-1 space-y-4 min-w-0">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -181,6 +261,8 @@ export default function ProfilePage() {
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
               <Input id="role" value={user.role} disabled />
+            </div>
+              </div>
             </div>
           </CardContent>
         </Card>

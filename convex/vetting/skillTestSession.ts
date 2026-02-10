@@ -44,7 +44,10 @@ export const startSkillTest = action({
     });
 
     if (!path) {
-      throw new Error("Could not determine vetting path. Complete your profile (category, skills).");
+      throw new Error(
+        "Complete your profile first: set your tech category and at least one skill in Dashboard → Profile. " +
+        "For Software Development, also add at least one programming language. Then return here to start the skill test."
+      );
     }
 
     const vettingResultId: Id<"vettingResults"> = await ctx.runMutation(
