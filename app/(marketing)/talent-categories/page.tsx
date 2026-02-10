@@ -69,7 +69,7 @@ export default function TalentCategoriesPage() {
     },
     {
       id: "design",
-      name: "UI/UX & Product Design",
+      name: "UI/UX and Product Design",
       icon: Palette,
       description: "Creative designers crafting intuitive user experiences and stunning visuals",
       color: "from-purple-500 to-purple-600",
@@ -82,7 +82,7 @@ export default function TalentCategoriesPage() {
     },
     {
       id: "data",
-      name: "Data & Analytics",
+      name: "Data Analytics",
       icon: Database,
       description: "Data scientists and analysts turning data into actionable business insights",
       color: "from-green-500 to-green-600",

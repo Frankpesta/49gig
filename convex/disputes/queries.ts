@@ -1,4 +1,4 @@
-import { query, QueryCtx } from "../_generated/server";
+import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -91,6 +91,16 @@ export const getDisputes = query({
       : allDisputes;
 
     return filtered.sort((a, b) => b.createdAt - a.createdAt);
+  },
+});
+
+/**
+ * Internal: get dispute by ID without auth (for actions e.g. releaseDisputeFunds).
+ */
+export const internalGetDispute = internalQuery({
+  args: { disputeId: v.id("disputes") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.disputeId);
   },
 });
 

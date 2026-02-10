@@ -99,8 +99,8 @@ export default function ForFreelancersPage() {
 
   const skillCategories = [
     { icon: Code, title: "Software Development", color: "primary" },
-    { icon: Palette, title: "UI/UX & Product Design", color: "primary" },
-    { icon: Database, title: "Data & Analytics", color: "primary" },
+    { icon: Palette, title: "UI/UX and Product Design", color: "primary" },
+    { icon: Database, title: "Data Analytics", color: "primary" },
     { icon: Cloud, title: "DevOps & Cloud Engineering", color: "primary" },
     { icon: Shield, title: "Cybersecurity & IT Infrastructure", color: "primary" },
     { icon: Brain, title: "AI, Machine Learning & Blockchain", color: "primary" },

@@ -89,8 +89,12 @@ export const createProject = mutation({
       roleTitle: v.optional(v.string()),
       talentCategory: v.union(
         v.literal("Software Development"),
-        v.literal("UI/UX & Product Design"),
-        v.literal("Data & Analytics")
+        v.literal("UI/UX and Product Design"),
+        v.literal("Data Analytics"),
+        v.literal("DevOps and Cloud Engineering"),
+        v.literal("Cyber Security and IT Infrastructure"),
+        v.literal("AI, Machine Learning and Blockchain"),
+        v.literal("Quality Assurance and Testing")
       ),
       experienceLevel: v.union(
         v.literal("junior"),

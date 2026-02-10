@@ -143,11 +143,11 @@ export const releaseDisputeFunds = action({
     disputeId: v.id("disputes"),
   },
   handler: async (ctx, args) => {
-    const dispute = await ctx.runQuery(api.disputes.queries.getDispute, {
+    const dispute = await ctx.runQuery(internal.disputes.queries.internalGetDispute, {
       disputeId: args.disputeId,
     });
 
-    if (!dispute || !dispute.resolution) {
+    if (!dispute || dispute.status !== "resolved" || !dispute.resolution) {
       throw new Error("Dispute not resolved");
     }
 

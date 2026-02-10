@@ -63,7 +63,7 @@ export interface BudgetCalculationParams {
   startDate: Date;
   endDate: Date;
   timelineFlexible?: boolean;
-  /** Talent category (e.g. Software Development, UI/UX & Product Design) for category-specific base rates */
+  /** Talent category (e.g. Software Development, UI/UX and Product Design) for category-specific base rates */
   talentCategory?: string;
   /** Base hourly rates per category – from platform pricing config */
   baseRatesByCategory?: Record<string, BaseRatesForCategory>;
