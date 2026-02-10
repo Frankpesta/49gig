@@ -36,6 +36,12 @@ export function DashboardBreadcrumb() {
     };
   });
 
+  // On mobile: show only Home + current page to avoid awkward wrapping
+  const currentPageLabel =
+    breadcrumbItems.length > 0
+      ? breadcrumbItems[breadcrumbItems.length - 1]!.label
+      : null;
+
   return (
     <Breadcrumb>
       <BreadcrumbList className="flex flex-wrap items-center gap-1 text-sm">

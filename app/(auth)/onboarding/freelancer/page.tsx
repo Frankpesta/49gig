@@ -55,6 +55,8 @@ export default function FreelancerOnboardingPage() {
     experienceLevel: "",
     skills: [] as string[],
     languagesWritten: [] as string[],
+    country: "",
+    timezone: "",
   });
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
@@ -77,6 +79,8 @@ export default function FreelancerOnboardingPage() {
         experienceLevel: user.profile.experienceLevel || "",
         skills: user.profile.skills || [],
         languagesWritten: user.profile.languagesWritten || [],
+        country: user.profile.country || "",
+        timezone: user.profile.timezone || "",
       });
     }
   }, [user]);
@@ -151,6 +155,8 @@ export default function FreelancerOnboardingPage() {
           experienceLevel: formData.experienceLevel as any,
           skills: formData.skills,
           languagesWritten: formData.languagesWritten,
+          ...(formData.country && { country: formData.country }),
+          ...(formData.timezone && { timezone: formData.timezone }),
         },
         sessionToken: sessionToken || undefined,
       });
@@ -270,6 +276,38 @@ export default function FreelancerOnboardingPage() {
                     </Select>
                   </div>
                 )}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="country" className="text-sm font-medium">
+                      Country (optional)
+                    </Label>
+                    <Input
+                      id="country"
+                      placeholder="e.g. Nigeria, Kenya"
+                      value={formData.country}
+                      onChange={(e) =>
+                        setFormData({ ...formData, country: e.target.value })
+                      }
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="timezone" className="text-sm font-medium">
+                      Time zone (optional)
+                    </Label>
+                    <Input
+                      id="timezone"
+                      placeholder="e.g. WAT, EAT, UTC+1"
+                      value={formData.timezone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, timezone: e.target.value })
+                      }
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-3">
                   <Label htmlFor="skills" className="text-sm font-medium">
                     Tech Skills
