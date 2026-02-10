@@ -74,14 +74,6 @@ export const navigationItems: NavItem[] = [
     roles: ["client"],
   },
 
-  // Freelancer-specific: Opportunities
-  {
-    title: "Opportunities",
-    url: "/dashboard/opportunities",
-    icon: Briefcase,
-    roles: ["freelancer"],
-  },
-
   // Chat (All roles)
   {
     title: "Messages",

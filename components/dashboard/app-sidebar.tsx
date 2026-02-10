@@ -38,8 +38,6 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -50,26 +48,10 @@ export function AppSidebar() {
 
   const logoSrc = resolvedTheme === "dark" ? "/logo-dark.png" : "/logo-light.png";
 
-  const pendingOpportunities = useQuery(
-    api.matching.queries.getFreelancerMatches,
-    user?.role === "freelancer" && user?._id
-      ? { freelancerId: user._id, status: "pending", userId: user._id }
-      : "skip"
-  );
-
   const navigationItems = React.useMemo(() => {
     if (!user) return [];
-    const items = getNavigationForRole(user.role);
-    const opportunityCount =
-      user.role === "freelancer" && pendingOpportunities
-        ? pendingOpportunities.length
-        : 0;
-    return items.map((item) =>
-      item.title === "Opportunities" && opportunityCount > 0
-        ? { ...item, badge: opportunityCount }
-        : item
-    );
-  }, [user, pendingOpportunities]);
+    return getNavigationForRole(user.role);
+  }, [user]);
 
   const handleLogout = () => {
     // Clear auth state
@@ -99,7 +81,6 @@ export function AppSidebar() {
     Dashboard: "text-indigo-500",
     Projects: "text-emerald-500",
     "Create Project": "text-amber-500",
-    Opportunities: "text-amber-500",
     Messages: "text-sky-500",
     Transactions: "text-green-500",
     Disputes: "text-rose-500",
