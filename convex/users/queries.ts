@@ -146,7 +146,7 @@ export const getAllUsersAdmin = query({
 });
 
 /**
- * Get user by ID (internal - returns name and email for notifications)
+ * Get user by ID (internal - returns name, email, role, status for callers that need them)
  */
 export const getUserByIdInternal = internalQuery({
   args: {
@@ -155,7 +155,13 @@ export const getUserByIdInternal = internalQuery({
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
     if (!user || user.status !== "active") return null;
-    return { _id: user._id, name: user.name, email: user.email };
+    return {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+    };
   },
 });
 
