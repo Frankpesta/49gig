@@ -88,7 +88,14 @@ export const updateProfile = mutation({
           v.literal("data_science"),
           v.literal("technical_writing"),
           v.literal("design"),
-          v.literal("other")
+          v.literal("other"),
+          v.literal("software_development"),
+          v.literal("ui_ux_design"),
+          v.literal("data_analytics"),
+          v.literal("devops_cloud"),
+          v.literal("cybersecurity_it"),
+          v.literal("ai_ml_blockchain"),
+          v.literal("qa_testing")
         )
       ),
       experienceLevel: v.optional(

@@ -10,14 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Loader2, DollarSign } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-
-const TALENT_CATEGORIES = [
-  "Software Development",
-  "UI/UX & Product Design",
-  "Data & Analytics",
-] as const;
+import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
 
 const EXPERIENCE_LEVELS = ["junior", "mid", "senior", "expert"] as const;
+
+const DEFAULT_RATES = { junior: 0, mid: 0, senior: 0, expert: 0 };
 
 export default function PricingPage() {
   const { user, isAuthenticated } = useAuth();
@@ -27,11 +24,22 @@ export default function PricingPage() {
   const [rates, setRates] = useState<Record<string, { junior: number; mid: number; senior: number; expert: number }>>({});
   const [saving, setSaving] = useState(false);
 
-  // Sync form from server when config loads
+  // Sync form from server: always show the 7 canonical categories; fill from config or defaults
   useEffect(() => {
-    if (config && Object.keys(config).length > 0) {
-      setRates(config);
+    if (config === undefined) return;
+    const next: Record<string, { junior: number; mid: number; senior: number; expert: number }> = {};
+    for (const category of TALENT_CATEGORY_LABELS) {
+      const fromConfig = config[category];
+      next[category] =
+        fromConfig &&
+        typeof fromConfig.junior === "number" &&
+        typeof fromConfig.mid === "number" &&
+        typeof fromConfig.senior === "number" &&
+        typeof fromConfig.expert === "number"
+          ? fromConfig
+          : { ...DEFAULT_RATES };
     }
+    setRates(next);
   }, [config]);
 
   const handleChange = (
@@ -58,7 +66,7 @@ export default function PricingPage() {
     setSaving(true);
     try {
       const toSave: Record<string, { junior: number; mid: number; senior: number; expert: number }> = {};
-      for (const cat of TALENT_CATEGORIES) {
+      for (const cat of TALENT_CATEGORY_LABELS) {
         const r = rates[cat];
         if (r && [r.junior, r.mid, r.senior, r.expert].every((n) => typeof n === "number" && n >= 0)) {
           toSave[cat] = r;
@@ -97,8 +105,9 @@ export default function PricingPage() {
     );
   }
 
-  const displayRates = Object.keys(rates).length > 0 ? rates : (config ?? {});
   const isLoading = config === undefined;
+  // Always render from canonical list; show rates state (initialized from config with 7 categories)
+  const displayRates = rates;
 
   return (
     <div className="space-y-6">
@@ -127,13 +136,8 @@ export default function PricingPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
-            {TALENT_CATEGORIES.map((category) => {
-              const r = displayRates[category] ?? {
-                junior: 0,
-                mid: 0,
-                senior: 0,
-                expert: 0,
-              };
+            {TALENT_CATEGORY_LABELS.map((category) => {
+              const r = displayRates[category] ?? DEFAULT_RATES;
               return (
                 <div key={category} className="space-y-4">
                   <h3 className="font-medium text-lg">{category}</h3>

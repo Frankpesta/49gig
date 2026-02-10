@@ -104,13 +104,13 @@ export default function Home() {
     },
     {
       icon: Palette,
-      title: "UI/UX & Product Design",
+      title: "UI/UX and Product Design",
       description: "Creative designers crafting intuitive user experiences",
       image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80",
     },
     {
       icon: Database,
-      title: "Data & Analytics",
+      title: "Data Analytics",
       description: "Data science, analysis, and business intelligence",
       image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
     },

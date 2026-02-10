@@ -26,7 +26,7 @@ import { Logo } from "@/components/ui/logo";
 import { toast } from "sonner";
 import {
   PLATFORM_CATEGORIES,
-  SKILLS_FOR_MCQ_CODING,
+  PROGRAMMING_LANGUAGES,
   getSkillsForCategory,
 } from "@/lib/platform-skills";
 
@@ -346,10 +346,13 @@ export default function FreelancerOnboardingPage() {
                 </div>
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">
-                    Programming Languages Written
+                    Programming Languages
                   </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Select languages you work with (used for matching and verification).
+                  </p>
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
-                    {[...SKILLS_FOR_MCQ_CODING, "R", "Swift", "Kotlin", "Scala", "MATLAB", "HTML/CSS", "Other"].map((language) => (
+                    {PROGRAMMING_LANGUAGES.map((language) => (
                       <label
                         key={language}
                         className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded"

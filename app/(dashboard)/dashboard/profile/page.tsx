@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PLATFORM_CATEGORIES, PROGRAMMING_LANGUAGES, getSkillsForCategory } from "@/lib/platform-skills";
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuth();
@@ -30,7 +31,10 @@ export default function ProfilePage() {
     industry: "",
     // Freelancer fields
     bio: "",
+    techField: "",
+    experienceLevel: "",
     skills: [] as string[],
+    languagesWritten: [] as string[],
     hourlyRate: "",
     availability: "available" as "available" | "busy" | "unavailable",
     timezone: "",
@@ -64,7 +68,10 @@ export default function ProfilePage() {
         companySize: user.profile?.companySize || "",
         industry: user.profile?.industry || "",
         bio: user.profile?.bio || "",
+        techField: user.profile?.techField || "",
+        experienceLevel: user.profile?.experienceLevel || "",
         skills: user.profile?.skills || [],
+        languagesWritten: user.profile?.languagesWritten || [],
         hourlyRate: user.profile?.hourlyRate?.toString() || "",
         availability: user.profile?.availability || "available",
         timezone: user.profile?.timezone || "",
@@ -87,7 +94,10 @@ export default function ProfilePage() {
           companySize: formData.companySize || undefined,
           industry: formData.industry || undefined,
           bio: formData.bio || undefined,
+          techField: formData.techField || undefined,
+          experienceLevel: formData.experienceLevel || undefined,
           skills: formData.skills.length > 0 ? formData.skills : undefined,
+          languagesWritten: formData.languagesWritten.length > 0 ? formData.languagesWritten : undefined,
           hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : undefined,
           availability: formData.availability,
           timezone: formData.timezone || undefined,
@@ -312,9 +322,106 @@ export default function ProfilePage() {
                   <Briefcase className="h-5 w-5" />
                   Professional Information
                 </CardTitle>
-                <CardDescription>Your professional profile</CardDescription>
+                <CardDescription>Category, skills, and programming languages (used for matching and verification)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Tech category</Label>
+                  <Select
+                    value={formData.techField}
+                    onValueChange={(value) =>
+                      setFormData({
+                        ...formData,
+                        techField: value,
+                        skills: [],
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PLATFORM_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {formData.techField && (
+                  <div className="space-y-2">
+                    <Label>Experience level</Label>
+                    <Select
+                      value={formData.experienceLevel}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, experienceLevel: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="junior">Junior</SelectItem>
+                        <SelectItem value="mid">Mid-Level</SelectItem>
+                        <SelectItem value="senior">Senior</SelectItem>
+                        <SelectItem value="expert">Expert</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {formData.techField && getSkillsForCategory(formData.techField).length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Skills (from category)</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {getSkillsForCategory(formData.techField).map((skill) => (
+                        <Button
+                          key={skill}
+                          type="button"
+                          variant={formData.skills.includes(skill) ? "default" : "outline"}
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => {
+                            if (formData.skills.includes(skill)) {
+                              removeSkill(skill);
+                            } else {
+                              setFormData({
+                                ...formData,
+                                skills: [...formData.skills, skill],
+                              });
+                            }
+                          }}
+                        >
+                          {skill}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label>Programming languages</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
+                    {PROGRAMMING_LANGUAGES.map((lang) => (
+                      <label
+                        key={lang}
+                        className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.languagesWritten.includes(lang)}
+                          onChange={() => {
+                            const next = formData.languagesWritten.includes(lang)
+                              ? formData.languagesWritten.filter((l) => l !== lang)
+                              : [...formData.languagesWritten, lang];
+                            setFormData({ ...formData, languagesWritten: next });
+                          }}
+                          className="rounded border-border"
+                        />
+                        {lang}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="bio">About you</Label>
                   <Textarea

@@ -49,7 +49,14 @@ export default defineSchema({
             v.literal("data_science"),
             v.literal("technical_writing"),
             v.literal("design"),
-            v.literal("other")
+            v.literal("other"),
+            v.literal("software_development"),
+            v.literal("ui_ux_design"),
+            v.literal("data_analytics"),
+            v.literal("devops_cloud"),
+            v.literal("cybersecurity_it"),
+            v.literal("ai_ml_blockchain"),
+            v.literal("qa_testing")
           )
         ),
         experienceLevel: v.optional(
@@ -205,8 +212,12 @@ export default defineSchema({
       roleTitle: v.optional(v.string()),
       talentCategory: v.union(
         v.literal("Software Development"),
-        v.literal("UI/UX & Product Design"),
-        v.literal("Data & Analytics")
+        v.literal("UI/UX and Product Design"),
+        v.literal("Data Analytics"),
+        v.literal("DevOps and Cloud Engineering"),
+        v.literal("Cyber Security and IT Infrastructure"),
+        v.literal("AI, Machine Learning and Blockchain"),
+        v.literal("Quality Assurance and Testing")
       ),
       experienceLevel: v.union(
         v.literal("junior"),

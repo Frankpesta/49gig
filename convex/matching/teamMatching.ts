@@ -7,10 +7,14 @@
 import { Doc } from "../_generated/dataModel";
 
 export type TeamSize = "2-3" | "4-6" | "7+" | "not_sure";
-export type TalentCategory = 
+export type TalentCategory =
   | "Software Development"
-  | "UI/UX & Product Design"
-  | "Data & Analytics"
+  | "UI/UX and Product Design"
+  | "Data Analytics"
+  | "DevOps and Cloud Engineering"
+  | "Cyber Security and IT Infrastructure"
+  | "AI, Machine Learning and Blockchain"
+  | "Quality Assurance and Testing"
 
 export type ExperienceLevel = "junior" | "mid" | "senior" | "expert";
 
@@ -204,11 +208,19 @@ export function determineTeamComposition(params: {
     if (category === "Software Development") {
       composition["backend_dev"] = (composition["backend_dev"] || 0) + Math.ceil(remaining / 2);
       composition["frontend_dev"] = (composition["frontend_dev"] || 0) + Math.floor(remaining / 2);
-    } else if (category === "UI/UX & Product Design") {
+    } else if (category === "UI/UX and Product Design") {
       composition["ui_designer"] = (composition["ui_designer"] || 0) + Math.ceil(remaining / 2);
       composition["ux_designer"] = (composition["ux_designer"] || 0) + Math.floor(remaining / 2);
-    } else if (category === "Data & Analytics") {
+    } else if (category === "Data Analytics") {
       composition["data_scientist"] = (composition["data_scientist"] || 0) + remaining;
+    } else if (category === "DevOps and Cloud Engineering") {
+      composition["devops"] = (composition["devops"] || 0) + remaining;
+    } else if (category === "Cyber Security and IT Infrastructure") {
+      composition["backend_dev"] = (composition["backend_dev"] || 0) + remaining;
+    } else if (category === "AI, Machine Learning and Blockchain") {
+      composition["data_scientist"] = (composition["data_scientist"] || 0) + remaining;
+    } else if (category === "Quality Assurance and Testing") {
+      composition["qa"] = (composition["qa"] || 0) + remaining;
     }
   }
   

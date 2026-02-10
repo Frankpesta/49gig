@@ -17,8 +17,12 @@ export const DEFAULT_BASE_HOURLY: BaseRatesByCategory[string] = {
 /** Default rates per talent category – used to seed or when config is empty */
 export const DEFAULT_RATES_BY_CATEGORY: BaseRatesByCategory = {
   "Software Development": { junior: 30, mid: 55, senior: 90, expert: 140 },
-  "UI/UX & Product Design": { junior: 25, mid: 45, senior: 75, expert: 115 },
-  "Data & Analytics": { junior: 28, mid: 50, senior: 85, expert: 130 },
+  "UI/UX and Product Design": { junior: 25, mid: 45, senior: 75, expert: 115 },
+  "Data Analytics": { junior: 28, mid: 50, senior: 85, expert: 130 },
+  "DevOps and Cloud Engineering": { junior: 32, mid: 58, senior: 95, expert: 145 },
+  "Cyber Security and IT Infrastructure": { junior: 35, mid: 60, senior: 100, expert: 155 },
+  "AI, Machine Learning and Blockchain": { junior: 38, mid: 65, senior: 110, expert: 170 },
+  "Quality Assurance and Testing": { junior: 24, mid: 42, senior: 70, expert: 108 },
 };
 
 /**

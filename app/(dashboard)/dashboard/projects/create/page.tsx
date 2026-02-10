@@ -38,6 +38,7 @@ import {
   type PaymentBreakdown,
 } from "@/lib/payment-calculator";
 import { PaymentBreakdownDisplay } from "@/components/payments/payment-breakdown";
+import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
 
 const PROJECT_DURATIONS = [
   { value: "1-3", label: "1–3 months" },
@@ -79,22 +80,10 @@ function roleTypeToProjectType(roleType: RoleType): ProjectType {
   return roleType === "contract" ? "one_time" : "ongoing";
 }
 
-// Skills Required - select all that apply (per image)
-const SKILLS_REQUIRED_OPTIONS = [
-  "Software Development",
-  "UI/UX Design",
-  "Data & Analytics",
-  "DevOps",
-  "AI/ML",
-  "Blockchain",
-  "Cybersecurity",
-  "QA & Testing",
-] as const;
-
-// Map selected skill to talentCategory for schema (one of 3)
-function skillsToTalentCategory(skills: string[]): string {
-  if (skills.some((s) => s === "UI/UX Design")) return "UI/UX & Product Design";
-  if (skills.some((s) => s === "Data & Analytics")) return "Data & Analytics";
+// Map selected skills to talentCategory for schema (primary = first selected)
+function skillsToTalentCategory(skills: string[]): (typeof TALENT_CATEGORY_LABELS)[number] {
+  const first = skills[0];
+  if (first && TALENT_CATEGORY_LABELS.includes(first as any)) return first as (typeof TALENT_CATEGORY_LABELS)[number];
   return "Software Development";
 }
 
@@ -527,7 +516,7 @@ export default function CreateProjectPage() {
                   Skills Required (select all that apply)
                 </Label>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {SKILLS_REQUIRED_OPTIONS.map((skill) => (
+                  {TALENT_CATEGORY_LABELS.map((skill) => (
                     <label
                       key={skill}
                       className="flex items-center space-x-3 cursor-pointer"
