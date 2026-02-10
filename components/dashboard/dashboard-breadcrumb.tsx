@@ -35,26 +35,41 @@ export function DashboardBreadcrumb() {
     };
   });
 
+  // On mobile: show only Home + current page to avoid awkward wrapping
+  const currentPageLabel =
+    breadcrumbItems.length > 0
+      ? breadcrumbItems[breadcrumbItems.length - 1]!.label
+      : null;
+
   return (
     <Breadcrumb>
-      <BreadcrumbList>
-        <BreadcrumbItem>
+      <BreadcrumbList className="flex-nowrap overflow-hidden min-w-0">
+        <BreadcrumbItem className="shrink-0">
           <BreadcrumbLink asChild>
             <Link href="/dashboard" className="flex items-center gap-1">
-              <Home className="h-4 w-4" />
-              <span className="sr-only md:not-sr-only">Dashboard</span>
+              <Home className="h-4 w-4 shrink-0" />
+              <span className="sr-only sm:not-sr-only">Dashboard</span>
             </Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
-        {breadcrumbItems.length > 0 && <BreadcrumbSeparator />}
-        {breadcrumbItems.map((item, index) => (
-          <div key={item.href} className="flex items-center">
+        {breadcrumbItems.length > 0 && <BreadcrumbSeparator className="shrink-0" />}
+        {/* Mobile: only current page (avoids wrapping "Dashboard > Projects > Create") */}
+        {currentPageLabel && (
+          <BreadcrumbItem className="min-w-0 md:hidden">
+            <BreadcrumbPage className="truncate block">{currentPageLabel}</BreadcrumbPage>
+          </BreadcrumbItem>
+        )}
+        {/* Desktop: full trail */}
+        {breadcrumbItems.map((item) => (
+          <div key={item.href} className="hidden md:flex items-center shrink-0">
             <BreadcrumbItem>
               {item.isLast ? (
-                <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                <BreadcrumbPage className="truncate max-w-[12rem]">{item.label}</BreadcrumbPage>
               ) : (
                 <BreadcrumbLink asChild>
-                  <Link href={item.href}>{item.label}</Link>
+                  <Link href={item.href} className="truncate max-w-[8rem] inline-block">
+                    {item.label}
+                  </Link>
                 </BreadcrumbLink>
               )}
             </BreadcrumbItem>

@@ -265,8 +265,8 @@ export const createOrUpdateUser = mutation({
       },
       profile: args.picture
         ? {
-            // Store profile picture URL if available
-            portfolioUrl: args.picture,
+            // Store profile photo from OAuth (e.g. Google)
+            imageUrl: args.picture,
           }
         : undefined,
       createdAt: now,

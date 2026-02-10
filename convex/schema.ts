@@ -78,6 +78,12 @@ export default defineSchema({
         ),
         timezone: v.optional(v.string()),
         portfolioUrl: v.optional(v.string()),
+        // Profile photo (e.g. from OAuth); do not use portfolioUrl for this
+        imageUrl: v.optional(v.string()),
+        // Freelancer: human-readable role title (e.g. "Senior Backend Engineer")
+        primaryRole: v.optional(v.string()),
+        weeklyHours: v.optional(v.number()),
+        earliestStartDate: v.optional(v.number()),
       })
     ),
 

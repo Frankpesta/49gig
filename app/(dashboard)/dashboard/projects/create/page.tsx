@@ -86,6 +86,15 @@ function skillsToTalentCategory(skills: string[]): (typeof TALENT_CATEGORY_LABEL
   return "Software Development";
 }
 
+// Parse "YYYY-MM-DD" as local date (avoids calendar off-by-one from UTC)
+function parseLocalDateString(value: string): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  if (isNaN(date.getTime())) return null;
+  return date;
+}
+
 export default function CreateProjectPage() {
   const router = useRouter();
   const { user } = useAuth();
@@ -117,11 +126,11 @@ export default function CreateProjectPage() {
     specialRequirements: "",
   });
 
-  // Derive endDate from startDate + projectDuration
+  // Derive endDate from startDate + projectDuration (use local date to match calendar)
   const derivedEndDate = useMemo(() => {
     if (!formData.startDate || !formData.projectDuration) return null;
-    const start = new Date(formData.startDate);
-    if (isNaN(start.getTime())) return null;
+    const start = parseLocalDateString(formData.startDate);
+    if (!start) return null;
     const days = DURATION_DAYS[formData.projectDuration];
     const end = new Date(start);
     end.setDate(end.getDate() + days);
@@ -141,9 +150,8 @@ export default function CreateProjectPage() {
     }
 
     try {
-      const startDate = new Date(formData.startDate);
-
-      if (isNaN(startDate.getTime())) {
+      const startDate = parseLocalDateString(formData.startDate);
+      if (!startDate || isNaN(startDate.getTime())) {
         return null;
       }
 
@@ -183,7 +191,8 @@ export default function CreateProjectPage() {
     if (!budgetCalculation || !derivedEndDate) return null;
 
     try {
-      const startDate = new Date(formData.startDate);
+      const startDate = parseLocalDateString(formData.startDate);
+      if (!startDate) return null;
       const deliverables = formData.deliverablesText
         .split(/[\n,]+/)
         .map((s) => s.trim())
@@ -249,8 +258,8 @@ export default function CreateProjectPage() {
         setError("Please select project duration");
         return;
       }
-      const startDate = new Date(formData.startDate);
-      if (isNaN(startDate.getTime())) {
+      const startDate = parseLocalDateString(formData.startDate);
+      if (!startDate || isNaN(startDate.getTime())) {
         setError("Invalid start date format");
         return;
       }
@@ -284,8 +293,13 @@ export default function CreateProjectPage() {
     }
 
     try {
-      const startDate = new Date(formData.startDate);
-      const endDate = derivedEndDate!;
+      const startDate = parseLocalDateString(formData.startDate);
+      if (!startDate || !derivedEndDate) {
+        setError("Invalid start date or duration.");
+        setIsSubmitting(false);
+        return;
+      }
+      const endDate = derivedEndDate;
 
       // Use payment breakdown for platform fee
       const totalAmount = paymentBreakdown.totalAmount;
@@ -351,140 +365,136 @@ export default function CreateProjectPage() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">Create New Project</h1>
-        <p className="text-muted-foreground">
-          Fill out the form below to create your project and get matched with
-          vetted freelancers.
-        </p>
-      </div>
+  const stepsConfig = [
+    { num: 1, title: "Hire type", desc: "Single or team" },
+    { num: 2, title: "Requirements", desc: "Scope & details" },
+    { num: 3, title: "Budget", desc: "Review & confirm" },
+  ];
 
-      {/* Progress Indicator */}
-      <div className="flex items-center gap-2">
-        {[1, 2, 3].map((s) => (
-          <div key={s} className="flex items-center gap-2">
-            <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full border-2 ${
-                s === step
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : s < step
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-muted text-muted-foreground"
-              }`}
-            >
-              {s}
+  return (
+    <div className="min-h-[80vh] rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+      {/* Header with gradient accent */}
+      <div className="border-b border-border/60 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 px-6 py-8">
+        <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight text-foreground">
+          Create new project
+        </h1>
+        <p className="mt-1.5 text-sm sm:text-base text-muted-foreground max-w-xl">
+          Fill out the steps below and we’ll match you with vetted freelancers.
+        </p>
+
+        {/* Progress stepper */}
+        <div className="mt-8 flex items-center gap-0">
+          {stepsConfig.map((s, i) => (
+            <div key={s.num} className="flex items-center flex-1">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                    step === s.num
+                      ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
+                      : step > s.num
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/80 text-muted-foreground"
+                  }`}
+                >
+                  {step > s.num ? "✓" : s.num}
+                </div>
+                <span className={`hidden sm:inline text-sm font-medium ${step >= s.num ? "text-foreground" : "text-muted-foreground"}`}>
+                  {s.title}
+                </span>
+              </div>
+              {i < stepsConfig.length - 1 && (
+                <div className={`mx-2 sm:mx-4 h-0.5 flex-1 rounded-full transition-colors ${step > s.num ? "bg-primary" : "bg-muted/60"}`} />
+              )}
             </div>
-            {s < 3 && (
-              <div
-                className={`h-1 w-16 ${
-                  s < step ? "bg-primary" : "bg-muted"
-                }`}
-              />
-            )}
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {error && (
-        <Card className="border-destructive bg-destructive/10">
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">{error}</p>
-          </CardContent>
-        </Card>
+        <div className="mx-6 mt-6 rounded-xl border border-destructive/50 bg-destructive/10 px-4 py-3">
+          <p className="text-sm font-medium text-destructive">{error}</p>
+        </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {step === 1 && "Step 1: Hire Type"}
-            {step === 2 && "Step 2: Project Requirements"}
-            {step === 3 && "Step 3: Budget / Review"}
-          </CardTitle>
-          <CardDescription>
-            {step === 1 && "What would you like to hire?"}
-            {step === 2 && "Define your project requirements"}
-            {step === 3 && "Review budget and confirm"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+      <div className="px-6 py-8 sm:px-8 sm:py-10">
+        <Card className="border-border/60 shadow-none bg-transparent">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-xl">
+              {step === 1 && "What would you like to hire?"}
+              {step === 2 && "Project requirements"}
+              {step === 3 && "Budget & review"}
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              {step === 1 && "Choose a single talent or a team for this project."}
+              {step === 2 && "Define the role, scope, duration, and skills."}
+              {step === 3 && "Confirm the budget and add any final notes."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-8">
           {/* Step 1: Hire Type */}
           {step === 1 && (
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  1. What would you like to hire?
-                </Label>
-                <div className="space-y-3">
-                  <label className="flex items-center space-x-3 cursor-pointer group">
-                    <input
-                      type="radio"
-                      name="hireType"
-                      value="single"
-                      checked={formData.hireType === "single"}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          hireType: e.target.value as HireType,
-                          teamSize: undefined,
-                        })
-                      }
-                      className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
-                    />
-                    <span className="text-sm font-medium text-foreground group-hover:text-primary">
-                      A single talent
-                    </span>
-                  </label>
-                  <label className="flex items-center space-x-3 cursor-pointer group">
-                    <input
-                      type="radio"
-                      name="hireType"
-                      value="team"
-                      checked={formData.hireType === "team"}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          hireType: e.target.value as HireType,
-                        })
-                      }
-                      className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
-                    />
-                    <span className="text-sm font-medium text-foreground group-hover:text-primary">
-                      A team
-                    </span>
-                  </label>
+            <div className="space-y-8">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Hire type</Label>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        hireType: "single",
+                        teamSize: undefined,
+                      })
+                    }
+                    className={`flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
+                      formData.hireType === "single"
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border/60 bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background text-lg">👤</div>
+                    <div>
+                      <p className="font-semibold text-foreground">Single talent</p>
+                      <p className="text-xs text-muted-foreground">One vetted freelancer</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, hireType: "team" })}
+                    className={`flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
+                      formData.hireType === "team"
+                        ? "border-primary bg-primary/10 shadow-sm"
+                        : "border-border/60 bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
+                    }`}
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background text-lg">👥</div>
+                    <div>
+                      <p className="font-semibold text-foreground">Team</p>
+                      <p className="text-xs text-muted-foreground">Multiple freelancers</p>
+                    </div>
+                  </button>
                 </div>
               </div>
 
               {formData.hireType === "team" && (
-                <div className="space-y-3 pt-4 border-t">
-                  <Label className="text-base font-semibold">
-                    2. If a team, how many people do you need?
-                  </Label>
-                  <div className="space-y-3">
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
+                  <Label className="text-sm font-medium">Team size</Label>
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {TEAM_SIZES.map((size) => (
-                      <label
+                      <button
                         key={size.value}
-                        className="flex items-center space-x-3 cursor-pointer group"
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, teamSize: size.value as TeamSize })
+                        }
+                        className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                          formData.teamSize === size.value
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-border/60 bg-background hover:border-primary/50"
+                        }`}
                       >
-                        <input
-                          type="radio"
-                          name="teamSize"
-                          value={size.value}
-                          checked={formData.teamSize === size.value}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              teamSize: e.target.value as TeamSize,
-                            })
-                          }
-                          className="w-4 h-4 text-primary border-border focus:ring-primary focus:ring-2 cursor-pointer"
-                        />
-                        <span className="text-sm font-medium text-foreground group-hover:text-primary">
-                          {size.label}
-                        </span>
-                      </label>
+                        {size.label}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -492,118 +502,90 @@ export default function CreateProjectPage() {
             </div>
           )}
 
-          {/* Step 2: Project Requirements (per image) */}
+          {/* Step 2: Project Requirements */}
           {step === 2 && (
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label htmlFor="title" className="text-base font-semibold">
-                  Project Title
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  A clear, descriptive title for your project (e.g., what you&apos;re building or the outcome you need).
-                </p>
+            <div className="space-y-8">
+              <div>
+                <Label htmlFor="title" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project title</Label>
+                <p className="mt-1 text-sm text-muted-foreground">A clear title for the role or outcome (e.g. Build an e‑commerce site, Mobile app for inventory).</p>
                 <Input
                   id="title"
-                  placeholder="e.g., Build a modern e-commerce website, Mobile app for inventory management, CRM integration with Salesforce"
+                  placeholder="e.g., Build a modern e-commerce website, Mobile app for inventory management"
                   value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                  className="h-11"
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="mt-3 h-11 rounded-lg border-border/60"
                 />
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  Skills Required (select all that apply)
-                </Label>
-                <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Skills required</Label>
+                <p className="mt-1 text-sm text-muted-foreground">Select all that apply.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {TALENT_CATEGORY_LABELS.map((skill) => (
-                    <label
+                    <button
                       key={skill}
-                      className="flex items-center space-x-3 cursor-pointer"
+                      type="button"
+                      onClick={() => toggleSkill(skill)}
+                      className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                        formData.skillsRequired.includes(skill)
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/60 bg-muted/30 hover:border-primary/40"
+                      }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={formData.skillsRequired.includes(skill)}
-                        onChange={() => toggleSkill(skill)}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                      />
-                      <span className="text-sm font-medium">{skill}</span>
-                    </label>
+                      {skill}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  Role Type
-                </Label>
-                <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Role type</Label>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {ROLE_TYPES.map((type) => (
-                    <label
+                    <button
                       key={type.value}
-                      className="flex items-center space-x-3 cursor-pointer"
+                      type="button"
+                      onClick={() => setFormData({ ...formData, roleType: type.value as RoleType })}
+                      className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                        formData.roleType === type.value
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border/60 bg-muted/30 hover:border-primary/50"
+                      }`}
                     >
-                      <input
-                        type="radio"
-                        name="roleType"
-                        value={type.value}
-                        checked={formData.roleType === type.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            roleType: e.target.value as RoleType,
-                          })
-                        }
-                        className="h-4 w-4 text-primary border-border focus:ring-primary"
-                      />
-                      <span className="text-sm font-medium">{type.label}</span>
-                    </label>
+                      {type.label}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="description" className="text-base font-semibold">
-                  Project Scope / Description
-                </Label>
+              <div>
+                <Label htmlFor="description" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project scope / description</Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe your project scope and details..."
+                  placeholder="Describe scope, deliverables, and any constraints..."
                   rows={5}
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="mt-3 rounded-lg border-border/60"
                 />
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  Project Duration
-                </Label>
-                <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project duration</Label>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {PROJECT_DURATIONS.map((d) => (
-                    <label
+                    <button
                       key={d.value}
-                      className="flex items-center space-x-3 cursor-pointer"
+                      type="button"
+                      onClick={() => setFormData({ ...formData, projectDuration: d.value as ProjectDuration })}
+                      className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                        formData.projectDuration === d.value
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border/60 bg-muted/30 hover:border-primary/50"
+                      }`}
                     >
-                      <input
-                        type="radio"
-                        name="projectDuration"
-                        value={d.value}
-                        checked={formData.projectDuration === d.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            projectDuration: e.target.value as ProjectDuration,
-                          })
-                        }
-                        className="h-4 w-4 text-primary border-border focus:ring-primary"
-                      />
-                      <span className="text-sm font-medium">{d.label}</span>
-                    </label>
+                      {d.label}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -631,113 +613,86 @@ export default function CreateProjectPage() {
                 />
               </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="budgetOverride" className="text-base font-semibold">
-                  Budget (Optional)
-                </Label>
+              <div>
+                <Label htmlFor="budgetOverride" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Budget (optional)</Label>
+                <p className="mt-1 text-sm text-muted-foreground">Leave empty to use our estimate from duration and experience.</p>
                 <Input
                   id="budgetOverride"
                   type="number"
                   placeholder="e.g., 5000"
                   value={formData.budgetOverride}
-                  onChange={(e) =>
-                    setFormData({ ...formData, budgetOverride: e.target.value })
-                  }
-                  className="h-11"
+                  onChange={(e) => setFormData({ ...formData, budgetOverride: e.target.value })}
+                  className="mt-3 h-11 rounded-lg border-border/60"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Leave empty to use our estimated budget based on duration and experience level.
-                </p>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  Preferred Experience Level
-                </Label>
-                <div className="space-y-3">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Preferred experience level</Label>
+                <div className="mt-3 flex flex-wrap gap-2">
                   {EXPERIENCE_LEVELS.map((level) => (
-                    <label
+                    <button
                       key={level.value}
-                      className="flex items-center space-x-3 cursor-pointer"
+                      type="button"
+                      onClick={() => setFormData({ ...formData, experienceLevel: level.value as ExperienceLevel })}
+                      className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                        formData.experienceLevel === level.value
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border/60 bg-muted/30 hover:border-primary/50"
+                      }`}
                     >
-                      <input
-                        type="radio"
-                        name="experienceLevel"
-                        value={level.value}
-                        checked={formData.experienceLevel === level.value}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            experienceLevel: e.target.value as ExperienceLevel,
-                          })
-                        }
-                        className="h-4 w-4 text-primary border-border focus:ring-primary"
-                      />
-                      <span className="text-sm font-medium">{level.label}</span>
-                    </label>
+                      {level.label}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="startDate" className="text-base font-semibold">
-                  Start Date
-                </Label>
+              <div>
+                <Label htmlFor="startDate" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Start date</Label>
                 <DatePicker
                   id="startDate"
-                  date={
-                    formData.startDate
-                      ? new Date(formData.startDate)
-                      : undefined
-                  }
-                  onDateChange={(date) =>
-                    setFormData({
-                      ...formData,
-                      startDate: date ? date.toISOString().split("T")[0] : "",
-                    })
-                  }
+                  date={formData.startDate ? parseLocalDateString(formData.startDate) ?? undefined : undefined}
+                  onDateChange={(date) => {
+                    if (!date) {
+                      setFormData({ ...formData, startDate: "" });
+                      return;
+                    }
+                    const y = date.getFullYear();
+                    const m = String(date.getMonth() + 1).padStart(2, "0");
+                    const d = String(date.getDate()).padStart(2, "0");
+                    setFormData({ ...formData, startDate: `${y}-${m}-${d}` });
+                  }}
                   placeholder="Select start date"
                   minDate={new Date()}
+                  className="mt-3"
                 />
               </div>
 
               {/* Budget Preview */}
               {budgetCalculation && (
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold">Estimated Budget</span>
-                    <span className="text-lg font-bold">
+                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated budget</span>
+                    <span className="text-xl font-bold text-primary">
                       {formatBudget(budgetCalculation.estimatedBudget)}
                     </span>
                   </div>
-                  <div className="text-xs text-muted-foreground space-y-1">
+                  <div className="text-xs text-muted-foreground space-y-1.5 pt-2 border-t border-border/40">
                     <div>
-                      Base rate: {formatBudget(budgetCalculation.breakdown.baseRate)}
+                      Base: {formatBudget(budgetCalculation.breakdown.baseRate)}
                       {budgetCalculation.breakdown.totalHours && (
-                        <span> × {budgetCalculation.breakdown.totalHours} hours</span>
+                        <span> × {budgetCalculation.breakdown.totalHours} hrs</span>
                       )}
                       {budgetCalculation.breakdown.totalDays && (
                         <span> × {budgetCalculation.breakdown.totalDays} days</span>
                       )}
                     </div>
-                    <div>
-                      Timeline multiplier:{" "}
-                      {(budgetCalculation.breakdown.timelineMultiplier * 100).toFixed(0)}%
-                    </div>
-                    <div>
-                      Project type multiplier:{" "}
-                      {(budgetCalculation.breakdown.projectTypeMultiplier * 100).toFixed(0)}%
-                    </div>
+                    <div>Timeline: {(budgetCalculation.breakdown.timelineMultiplier * 100).toFixed(0)}%</div>
+                    <div>Project type: {(budgetCalculation.breakdown.projectTypeMultiplier * 100).toFixed(0)}%</div>
                     {budgetCalculation.breakdown.teamMultiplier && (
-                      <div>
-                        Team size: {budgetCalculation.breakdown.teamMultiplier} members
-                      </div>
+                      <div>Team: {budgetCalculation.breakdown.teamMultiplier} members</div>
                     )}
-                    <div className="pt-2 border-t">
-                      Service fee (25%): includes vetting, escrow, contracts, replacements, support —{" "}
-                      {formatBudget(
-                        budgetCalculation.estimatedBudget * 0.25
-                      )}
+                    <div className="pt-2 border-t border-border/40">
+                      Service fee (25%): vetting, escrow, contracts, support — {formatBudget(budgetCalculation.estimatedBudget * 0.25)}
                     </div>
                   </div>
                 </div>
@@ -747,26 +702,24 @@ export default function CreateProjectPage() {
 
           {/* Step 3: Budget / Review */}
           {step === 3 && (
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <Label className="text-base font-semibold">
-                  10. Payment breakdown:
-                </Label>
+            <div className="space-y-8">
+              <div>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Payment breakdown</Label>
                 {paymentBreakdown ? (
-                  <PaymentBreakdownDisplay breakdown={paymentBreakdown} />
+                  <div className="mt-3">
+                    <PaymentBreakdownDisplay breakdown={paymentBreakdown} />
+                  </div>
                 ) : budgetCalculation ? (
-                  <div className="rounded-lg border bg-primary/5 p-6 space-y-4">
+                  <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-6 space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold">
-                        Total Project Budget
-                      </span>
-                      <span className="text-3xl font-bold text-primary">
+                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total project budget</span>
+                      <span className="text-2xl font-bold text-primary">
                         {formatBudget(budgetCalculation.estimatedBudget)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/40 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Base amount:</span>
+                        <span className="text-muted-foreground">Base amount</span>
                         <div className="font-semibold">
                           {formatBudget(
                             budgetCalculation.estimatedBudget /
@@ -776,7 +729,7 @@ export default function CreateProjectPage() {
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Service fee (25%): vetting, escrow, contracts, support</span>
+                        <span className="text-muted-foreground">Service fee (25%)</span>
                         <div className="font-semibold">
                           {formatBudget(budgetCalculation.estimatedBudget * 0.25)}
                         </div>
@@ -784,27 +737,21 @@ export default function CreateProjectPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+                  <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
                     Unable to calculate budget. Please check your project dates.
                   </div>
                 )}
               </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="specialRequirements" className="text-base font-semibold">
-                  11. Any special requirements or notes? (optional)
-                </Label>
+              <div>
+                <Label htmlFor="specialRequirements" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Special requirements or notes (optional)</Label>
                 <Textarea
                   id="specialRequirements"
                   placeholder="Any additional requirements or notes..."
                   rows={4}
                   value={formData.specialRequirements}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      specialRequirements: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setFormData({ ...formData, specialRequirements: e.target.value })}
+                  className="mt-3 rounded-lg border-border/60"
                 />
               </div>
             </div>
