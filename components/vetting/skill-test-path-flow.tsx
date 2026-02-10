@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Code, FileQuestion, Loader2, CheckCircle2, ChevronLeft, ChevronRight, Play, Upload, Clock } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ErrorHandler } from "./error-handler";
 import { Input } from "@/components/ui/input";
@@ -200,6 +201,11 @@ export function SkillTestPathFlow() {
         </CardHeader>
         <CardContent className="space-y-4">
           <ErrorHandler error={error} onRetry={handleStartTest} onDismiss={() => setError(null)} title="Error" />
+          {error?.message?.includes("Complete your profile") && (
+            <Button variant="outline" className="w-full" asChild>
+              <Link href="/dashboard/profile">Go to Profile to complete setup</Link>
+            </Button>
+          )}
           <Button onClick={handleStartTest} disabled={starting} className="w-full">
             {starting ? (
               <>

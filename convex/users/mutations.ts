@@ -64,6 +64,46 @@ async function getCurrentUserInMutation(
 }
 
 /**
+ * Generate an upload URL for profile picture.
+ * Client should upload an image (e.g. JPEG/PNG, max ~2MB), then call setProfileImageFromStorageId with the returned storageId.
+ */
+export const generateProfileImageUploadUrl = mutation({
+  args: {
+    userId: v.optional(v.id("users")),
+    sessionToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId, args.sessionToken);
+    if (!user) throw new Error("Not authenticated");
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Set profile image from an uploaded file (storageId). Resolves the storage URL and saves to profile.imageUrl.
+ */
+export const setProfileImageFromStorageId = mutation({
+  args: {
+    storageId: v.id("_storage"),
+    userId: v.optional(v.id("users")),
+    sessionToken: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId, args.sessionToken);
+    if (!user) throw new Error("Not authenticated");
+
+    const imageUrl = await ctx.storage.getUrl(args.storageId);
+    if (!imageUrl) throw new Error("File not found or not yet available");
+
+    const updatedProfile = { ...user.profile, imageUrl };
+    await ctx.db.patch(user._id, {
+      profile: updatedProfile,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
  * Update user profile
  * Supports both Convex Auth and session token authentication
  */
