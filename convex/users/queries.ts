@@ -146,7 +146,7 @@ export const getAllUsersAdmin = query({
 });
 
 /**
- * Get user by ID (internal - returns name, email, role, status for callers that need them)
+ * Get user by ID (internal - returns name, email, role, status, profile for callers that need them e.g. vetting)
  */
 export const getUserByIdInternal = internalQuery({
   args: {
@@ -161,6 +161,7 @@ export const getUserByIdInternal = internalQuery({
       email: user.email,
       role: user.role,
       status: user.status,
+      profile: user.profile,
     };
   },
 });

@@ -378,6 +378,24 @@ export const getProjectsByFreelancer = internalQuery({
 });
 
 /**
+ * Get all freelancer IDs who have an active project (matched or in_progress).
+ * Used by matching to exclude them from new matches until they complete.
+ */
+export const getFreelancerIdsWithActiveProjects = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const projects = await ctx.db.query("projects").collect();
+    const ids = new Set<string>();
+    for (const p of projects) {
+      if (p.status !== "matched" && p.status !== "in_progress") continue;
+      if (p.matchedFreelancerId) ids.add(p.matchedFreelancerId);
+      if (p.matchedFreelancerIds) for (const id of p.matchedFreelancerIds) ids.add(id);
+    }
+    return Array.from(ids);
+  },
+});
+
+/**
  * Get project milestones (internal)
  */
 export const getProjectMilestonesInternal = internalQuery({

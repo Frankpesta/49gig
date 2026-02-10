@@ -291,7 +291,7 @@ export default function DashboardPage() {
                 Welcome back, {user.name.split(" ")[0]}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Here&apos;s what&apos;s happening with your {isClient ? "projects" : isFreelancer ? "opportunities" : "platform"} today.
+                Here&apos;s what&apos;s happening with your {isClient ? "projects" : isFreelancer ? "projects" : "platform"} today.
               </p>
             </div>
           </div>
@@ -426,17 +426,17 @@ export default function DashboardPage() {
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                   <TrendingUp className="h-5 w-5 text-primary" />
                 </div>
-                <CardTitle className="text-xl">View Opportunities</CardTitle>
+                <CardTitle className="text-xl">View Projects</CardTitle>
               </div>
               <CardDescription className="text-base">
-                Browse projects matched to your skills and expertise
+                Projects you&apos;re selected for appear here
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild variant="outline" className="w-full group-hover:scale-[1.02] transition-transform">
-                <Link href="/dashboard/opportunities" className="flex items-center justify-center">
+                <Link href="/dashboard/projects" className="flex items-center justify-center">
                   <TrendingUp className="mr-2 h-4 w-4" />
-                  View Opportunities
+                  View Projects
                   <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
               </Button>
@@ -480,7 +480,7 @@ export default function DashboardPage() {
               {isClient 
                 ? "Add company details to improve project matching"
                 : isFreelancer
-                ? "Complete your profile to get more opportunities"
+                ? "Complete your profile to get more projects"
                 : "Update your profile information"}
             </CardDescription>
           </CardHeader>

@@ -479,7 +479,7 @@ export function MatchFoundClientEmail({
       <Text style={textStyle}>
         Hi {name}, we matched {freelancerName} to your project {projectName}.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/opportunities`}>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>
         Review match
       </EmailButton>
     </EmailLayout>
@@ -505,8 +505,8 @@ export function OpportunityMatchFreelancerEmail({
       <Text style={textStyle}>
         Hi {name}, you have been matched to {projectName} with {clientName}.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/opportunities`}>
-        View opportunity
+      <EmailButton href={`${appUrl}/dashboard/projects`}>
+        View projects
       </EmailButton>
     </EmailLayout>
   );

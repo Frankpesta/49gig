@@ -292,15 +292,20 @@ export const generateMatches = action({
     }
 
     // Get all verified freelancers directly from database
-    // Query users with freelancer role and approved verification status
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
-    
-    // Filter to verified freelancers
+    const activeProjectFreelancerIds = await ctx.runQuery(
+      internal.projects.queries.getFreelancerIdsWithActiveProjects,
+      {}
+    );
+    const activeSet = new Set(activeProjectFreelancerIds || []);
+
+    // Filter to verified freelancers and exclude those with an active project (matched or in_progress)
     const verifiedFreelancers = (allUsers || []).filter(
       (u: any) =>
         u.role === "freelancer" &&
         u.status === "active" &&
-        u.verificationStatus === "approved"
+        u.verificationStatus === "approved" &&
+        !activeSet.has(u._id)
     );
     
     // Get vetting results for each freelancer
@@ -436,14 +441,20 @@ export const generateTeamMatches = action({
       experienceLevel: intakeForm.experienceLevel as any,
     });
 
-    // Get all verified freelancers
+    // Get all verified freelancers, excluding those with an active project
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
-    
+    const activeProjectFreelancerIdsTeam = await ctx.runQuery(
+      internal.projects.queries.getFreelancerIdsWithActiveProjects,
+      {}
+    );
+    const activeSetTeam = new Set(activeProjectFreelancerIdsTeam || []);
+
     const verifiedFreelancers = (allUsers || []).filter(
       (u: any) =>
         u.role === "freelancer" &&
         u.status === "active" &&
-        u.verificationStatus === "approved"
+        u.verificationStatus === "approved" &&
+        !activeSetTeam.has(u._id)
     );
 
     if (verifiedFreelancers.length === 0) {
@@ -595,11 +606,18 @@ export const generateMatchesForDraft = action({
     const isTeam = intakeForm.hireType === "team";
     const requiredSkills = intakeForm.requiredSkills || [];
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
+    const activeProjectFreelancerIdsDraft = await ctx.runQuery(
+      internal.projects.queries.getFreelancerIdsWithActiveProjects,
+      {}
+    );
+    const activeSetDraft = new Set(activeProjectFreelancerIdsDraft || []);
+
     const verifiedFreelancers = (allUsers || []).filter(
       (u: any) =>
         u.role === "freelancer" &&
         u.status === "active" &&
-        u.verificationStatus === "approved"
+        u.verificationStatus === "approved" &&
+        !activeSetDraft.has(u._id)
     );
 
     const approvedFreelancers = await Promise.all(

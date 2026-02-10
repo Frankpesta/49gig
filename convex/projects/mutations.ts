@@ -8,6 +8,7 @@ import type { FunctionReference } from "convex/server";
 const api = require("../_generated/api") as {
   api: {
     notifications: { actions: { sendSystemNotification: unknown } };
+    contracts: { actions: { generateAndSendContract: unknown } };
   };
 };
 
@@ -964,6 +965,7 @@ export const autoCreateMilestonesInternal = internalMutation({
 /**
  * Internal: accept client's pre-funding selection and set matched freelancer(s).
  * Called after payment success so the selected freelancer(s) become assigned.
+ * Sets project status to "matched", then schedules milestone creation and contract generation.
  */
 export const acceptSelectedMatchInternal = internalMutation({
   args: {
@@ -976,6 +978,7 @@ export const acceptSelectedMatchInternal = internalMutation({
     const selectedId = project.selectedFreelancerId;
     const selectedIds = project.selectedFreelancerIds;
     const now = Date.now();
+    const acceptedMatchIds: Doc<"matches">["_id"][] = [];
 
     const allMatches = await ctx.db
       .query("matches")
@@ -993,8 +996,10 @@ export const acceptSelectedMatchInternal = internalMutation({
           clientActionAt: now,
           updatedAt: now,
         });
+        acceptedMatchIds.push(match._id);
         await ctx.db.patch(args.projectId, {
           matchedFreelancerId: selectedId,
+          status: "matched",
           matchedAt: now,
           updatedAt: now,
         });
@@ -1016,9 +1021,11 @@ export const acceptSelectedMatchInternal = internalMutation({
           clientActionAt: now,
           updatedAt: now,
         });
+        acceptedMatchIds.push(m._id);
       }
       await ctx.db.patch(args.projectId, {
         matchedFreelancerIds: selectedIds,
+        status: "matched",
         matchedAt: now,
         updatedAt: now,
       });
@@ -1033,6 +1040,12 @@ export const acceptSelectedMatchInternal = internalMutation({
     await ctx.scheduler.runAfter(0, internal.projects.mutations.autoCreateMilestonesInternal, {
       projectId: args.projectId,
     });
+
+    const generateAndSendContract = api.api.contracts.actions
+      .generateAndSendContract as unknown as FunctionReference<"action">;
+    for (const matchId of acceptedMatchIds) {
+      await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId });
+    }
   },
 });
 
