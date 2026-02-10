@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,6 +104,7 @@ export default function CreateProjectPage() {
   const createProject = useMutation(
     (api as any)["projects/mutations"].createProject
   );
+  const pricingConfig = useQuery(api.pricing.queries.getPricingConfig);
 
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -158,6 +159,7 @@ export default function CreateProjectPage() {
         return null;
       }
 
+      const talentCategory = skillsToTalentCategory(formData.skillsRequired);
       const calc = calculateProjectBudget({
         hireType: formData.hireType,
         teamSize: formData.teamSize,
@@ -165,6 +167,8 @@ export default function CreateProjectPage() {
         projectType,
         startDate,
         endDate: derivedEndDate,
+        talentCategory,
+        baseRatesByCategory: pricingConfig ?? undefined,
       });
       const override = formData.budgetOverride ? parseFloat(formData.budgetOverride) : undefined;
       if (override != null && !isNaN(override) && override > 0) {
@@ -182,6 +186,8 @@ export default function CreateProjectPage() {
     formData.experienceLevel,
     formData.roleType,
     formData.budgetOverride,
+    formData.skillsRequired,
+    pricingConfig,
   ]);
 
   // Calculate payment breakdown

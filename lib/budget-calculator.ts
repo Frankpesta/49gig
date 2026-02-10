@@ -7,21 +7,28 @@ export type ProjectType = "one_time" | "ongoing" | "not_sure";
 export type HireType = "single" | "team";
 export type TeamSize = "2-3" | "4-6" | "7+" | "not_sure";
 
-// Base hourly rates by experience level (USD)
-const BASE_HOURLY_RATES: Record<ExperienceLevel, number> = {
-  junior: 3,
-  mid: 5,
-  senior: 10,
-  expert: 15,
+export type BaseRatesForCategory = Record<
+  ExperienceLevel,
+  number
+>;
+
+// Fallback when no pricing config / category (USD per hour)
+const FALLBACK_HOURLY: BaseRatesForCategory = {
+  junior: 30,
+  mid: 55,
+  senior: 90,
+  expert: 140,
 };
 
-// Base daily rates (8 hours)
-const BASE_DAILY_RATES: Record<ExperienceLevel, number> = {
-  junior: BASE_HOURLY_RATES.junior * 8,
-  mid: BASE_HOURLY_RATES.mid * 8,
-  senior: BASE_HOURLY_RATES.senior * 8,
-  expert: BASE_HOURLY_RATES.expert * 8,
-};
+function getRates(
+  baseRatesByCategory?: Record<string, BaseRatesForCategory>,
+  talentCategory?: string
+): BaseRatesForCategory {
+  if (baseRatesByCategory && talentCategory && baseRatesByCategory[talentCategory]) {
+    return baseRatesByCategory[talentCategory];
+  }
+  return FALLBACK_HOURLY;
+}
 
 // Timeline multipliers (shorter timelines = premium, longer = discount)
 const TIMELINE_MULTIPLIERS = {
@@ -48,7 +55,7 @@ const PROJECT_TYPE_MULTIPLIERS: Record<ProjectType, number> = {
   not_sure: 1.0, // Default to standard
 };
 
-interface BudgetCalculationParams {
+export interface BudgetCalculationParams {
   hireType: HireType;
   teamSize?: TeamSize;
   experienceLevel: ExperienceLevel;
@@ -56,6 +63,10 @@ interface BudgetCalculationParams {
   startDate: Date;
   endDate: Date;
   timelineFlexible?: boolean;
+  /** Talent category (e.g. Software Development, UI/UX & Product Design) for category-specific base rates */
+  talentCategory?: string;
+  /** Base hourly rates per category – from platform pricing config */
+  baseRatesByCategory?: Record<string, BaseRatesForCategory>;
 }
 
 interface BudgetResult {
@@ -179,7 +190,13 @@ export function calculateProjectBudget(
     startDate,
     endDate,
     timelineFlexible,
+    talentCategory,
+    baseRatesByCategory,
   } = params;
+
+  const rates = getRates(baseRatesByCategory, talentCategory);
+  const baseHourlyRate = rates[experienceLevel];
+  const baseDailyRate = baseHourlyRate * 8;
 
   const durationDays = calculateDurationDays(startDate, endDate);
   const timelineMultiplier = timelineFlexible
@@ -192,7 +209,7 @@ export function calculateProjectBudget(
   if (hireType === "team" && teamSize) {
     // Team pricing
     const teamMultiplier = getTeamSizeMultiplier(teamSize);
-    const baseMonthlyRate = BASE_DAILY_RATES[experienceLevel] * 20; // 20 working days per month
+    const baseMonthlyRate = baseDailyRate * 20; // 20 working days per month
     const monthlyRate = baseMonthlyRate * teamMultiplier;
     
     // For ongoing projects, use monthly rate
@@ -219,7 +236,7 @@ export function calculateProjectBudget(
     }
 
     // For one-time projects, calculate based on days
-    const dailyRate = BASE_DAILY_RATES[experienceLevel] * teamMultiplier;
+    const dailyRate = baseDailyRate * teamMultiplier;
     const estimatedBudget = Math.round(
       dailyRate * durationDays * timelineMultiplier * projectTypeMultiplier
     );
@@ -227,7 +244,7 @@ export function calculateProjectBudget(
     return {
       estimatedBudget,
       breakdown: {
-        baseRate: BASE_DAILY_RATES[experienceLevel],
+        baseRate: baseDailyRate,
         timelineMultiplier,
         projectTypeMultiplier,
         teamMultiplier,
@@ -237,10 +254,7 @@ export function calculateProjectBudget(
     };
   }
 
-  // Single talent pricing
-  const baseHourlyRate = BASE_HOURLY_RATES[experienceLevel];
-  const baseDailyRate = BASE_DAILY_RATES[experienceLevel];
-
+  // Single talent pricing (baseHourlyRate, baseDailyRate already set above)
   if (projectType === "ongoing") {
     // Ongoing: hourly or monthly
     const hoursPerDay = 8;

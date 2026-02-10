@@ -47,7 +47,7 @@ export const attemptAutomatedResolution = action({
           (Date.now() - milestone.dueDate) / (1000 * 60 * 60 * 24);
         if (daysOverdue > 7) {
           // Auto-resolve in client's favor
-          await ctx.runMutation(api.disputes.mutations.resolveDispute, {
+          await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
             disputeId: args.disputeId,
             decision: "client_favor",
             notes: `Automated resolution: Milestone overdue by ${Math.round(daysOverdue)} days`,
@@ -82,7 +82,7 @@ export const attemptAutomatedResolution = action({
 
           if (daysSinceLastMessage > 3) {
             // Auto-resolve in client's favor
-            await ctx.runMutation(api.disputes.mutations.resolveDispute, {
+            await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
               disputeId: args.disputeId,
               decision: "client_favor",
               notes: `Automated resolution: No communication for ${Math.round(daysSinceLastMessage)} days`,
@@ -112,7 +112,7 @@ export const attemptAutomatedResolution = action({
 
       if (milestonePayment) {
         // Auto-resolve in freelancer's favor
-        await ctx.runMutation(api.disputes.mutations.resolveDispute, {
+        await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
           disputeId: args.disputeId,
           decision: "freelancer_favor",
           notes: "Automated resolution: Payment was successful",

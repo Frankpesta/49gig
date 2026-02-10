@@ -77,6 +77,7 @@ export default function ResolveDisputePage() {
           ? parseFloat(formData.resolutionAmount) * 100
           : undefined,
         notes: formData.notes,
+        userId: user._id,
       });
 
       router.push(`/dashboard/disputes/${disputeId}`);

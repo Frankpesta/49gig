@@ -738,7 +738,7 @@ export default defineSchema({
         ),
         resolutionAmount: v.optional(v.number()),
         notes: v.string(),
-        resolvedBy: v.id("users"),
+        resolvedBy: v.optional(v.id("users")), // omitted for automated resolution
         resolvedAt: v.number(),
       })
     ),
@@ -892,5 +892,21 @@ export default defineSchema({
     .index("by_refresh_token", ["refreshToken"])
     .index("by_expires", ["expiresAt"])
     .index("by_active", ["isActive"]),
+
+  // Platform pricing: base hourly rates per talent category (admin-editable)
+  pricingConfig: defineTable({
+    key: v.literal("baseRates"),
+    ratesByCategory: v.record(
+      v.string(),
+      v.object({
+        junior: v.number(),
+        mid: v.number(),
+        senior: v.number(),
+        expert: v.number(),
+      })
+    ),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("users")),
+  }).index("by_key", ["key"]),
 });
 
