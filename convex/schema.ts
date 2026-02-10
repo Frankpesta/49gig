@@ -196,16 +196,15 @@ export default defineSchema({
       ),
       projectDuration: v.optional(
         v.union(
-          v.literal("1-3"),
-          v.literal("3-6"),
-          v.literal("6+")
+          v.literal("3"),
+          v.literal("6"),
+          v.literal("12+")
         )
       ),
       roleType: v.optional(
         v.union(
           v.literal("full_time"),
-          v.literal("part_time"),
-          v.literal("contract")
+          v.literal("part_time")
         )
       ),
       // Section 3: Talent Requirements
@@ -919,5 +918,113 @@ export default defineSchema({
     updatedAt: v.number(),
     updatedBy: v.optional(v.id("users")),
   }).index("by_key", ["key"]),
+
+  // --- Vetting: generated questions and skill test sessions ---
+
+  // Generated MCQ questions (server holds correct answer; client never receives it)
+  vettingMcqQuestions: defineTable({
+    questionKey: v.string(),
+    categoryId: v.string(),
+    skillTopics: v.array(v.string()),
+    experienceLevel: v.union(
+      v.literal("junior"),
+      v.literal("mid"),
+      v.literal("senior"),
+      v.literal("expert")
+    ),
+    questionIndex: v.number(),
+    questionText: v.string(),
+    options: v.array(v.string()),
+    correctOptionIndex: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_question_key", ["questionKey"])
+    .index("by_category_level", ["categoryId", "experienceLevel"]),
+
+  // Generated coding challenges (language + difficulty)
+  vettingCodingPrompts: defineTable({
+    promptKey: v.string(),
+    categoryId: v.string(),
+    language: v.string(),
+    experienceLevel: v.union(
+      v.literal("junior"),
+      v.literal("mid"),
+      v.literal("senior"),
+      v.literal("expert")
+    ),
+    promptIndex: v.number(),
+    title: v.string(),
+    description: v.string(),
+    starterCode: v.optional(v.string()),
+    testCases: v.optional(
+      v.array(
+        v.object({
+          input: v.string(),
+          expectedOutput: v.string(),
+        })
+      )
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_prompt_key", ["promptKey"])
+    .index("by_category_language_level", ["categoryId", "language", "experienceLevel"]),
+
+  // Active skill test session (path-based: coding+mcq, portfolio+mcq, or mcq-only)
+  vettingSkillTestSessions: defineTable({
+    freelancerId: v.id("users"),
+    vettingResultId: v.id("vettingResults"),
+    status: v.union(
+      v.literal("not_started"),
+      v.literal("coding"),
+      v.literal("mcq"),
+      v.literal("portfolio_review"),
+      v.literal("completed")
+    ),
+    pathType: v.union(
+      v.literal("coding_mcq"),
+      v.literal("portfolio_mcq"),
+      v.literal("mcq_only")
+    ),
+    experienceLevel: v.union(
+      v.literal("junior"),
+      v.literal("mid"),
+      v.literal("senior"),
+      v.literal("expert")
+    ),
+    categoryId: v.string(),
+    selectedSkills: v.array(v.string()),
+    selectedLanguage: v.optional(v.string()),
+    codingPromptIds: v.optional(v.array(v.id("vettingCodingPrompts"))),
+    mcqQuestionIds: v.optional(v.array(v.id("vettingMcqQuestions"))),
+    codingSubmissions: v.optional(
+      v.array(
+        v.object({
+          promptId: v.id("vettingCodingPrompts"),
+          code: v.string(),
+          submittedAt: v.number(),
+          runResult: v.optional(v.any()),
+        })
+      )
+    ),
+    mcqAnswers: v.optional(
+      v.array(
+        v.object({
+          questionId: v.id("vettingMcqQuestions"),
+          selectedOptionIndex: v.number(),
+        })
+      )
+    ),
+    mcqScore: v.optional(v.number()),
+    portfolioScore: v.optional(v.number()),
+    startedAt: v.number(),
+    expiresAt: v.optional(v.number()), // 30 minutes from startedAt — no submissions accepted after
+    completedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_freelancer", ["freelancerId"])
+    .index("by_freelancer_created", ["freelancerId", "createdAt"])
+    .index("by_vetting_result", ["vettingResultId"])
+    .index("by_status", ["status"]),
 });
 

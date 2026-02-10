@@ -61,11 +61,16 @@ import type * as users_mutations from "../users/mutations.js";
 import type * as users_queries from "../users/queries.js";
 import type * as vetting_actions from "../vetting/actions.js";
 import type * as vetting_engine from "../vetting/engine.js";
+import type * as vetting_internalMutations from "../vetting/internalMutations.js";
+import type * as vetting_internalQueries from "../vetting/internalQueries.js";
 import type * as vetting_mutations from "../vetting/mutations.js";
+import type * as vetting_paths from "../vetting/paths.js";
 import type * as vetting_portfolioScoring from "../vetting/portfolioScoring.js";
 import type * as vetting_queries from "../vetting/queries.js";
+import type * as vetting_questionGeneration from "../vetting/questionGeneration.js";
 import type * as vetting_questions from "../vetting/questions.js";
 import type * as vetting_skillTestComplexity from "../vetting/skillTestComplexity.js";
+import type * as vetting_skillTestSession from "../vetting/skillTestSession.js";
 import type * as vetting_testSessions from "../vetting/testSessions.js";
 
 import type {
@@ -128,11 +133,16 @@ declare const fullApi: ApiFromModules<{
   "users/queries": typeof users_queries;
   "vetting/actions": typeof vetting_actions;
   "vetting/engine": typeof vetting_engine;
+  "vetting/internalMutations": typeof vetting_internalMutations;
+  "vetting/internalQueries": typeof vetting_internalQueries;
   "vetting/mutations": typeof vetting_mutations;
+  "vetting/paths": typeof vetting_paths;
   "vetting/portfolioScoring": typeof vetting_portfolioScoring;
   "vetting/queries": typeof vetting_queries;
+  "vetting/questionGeneration": typeof vetting_questionGeneration;
   "vetting/questions": typeof vetting_questions;
   "vetting/skillTestComplexity": typeof vetting_skillTestComplexity;
+  "vetting/skillTestSession": typeof vetting_skillTestSession;
   "vetting/testSessions": typeof vetting_testSessions;
 }>;
 

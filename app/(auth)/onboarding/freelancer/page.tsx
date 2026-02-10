@@ -135,6 +135,12 @@ export default function FreelancerOnboardingPage() {
       return;
     }
 
+    // Software Development requires at least one programming language (for skill test).
+    if (formData.techField === "software_development" && formData.languagesWritten.length === 0) {
+      setError("Software Development requires at least one programming language. Please select at least one language you write code in.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -347,9 +353,14 @@ export default function FreelancerOnboardingPage() {
                 <div className="space-y-3">
                   <Label className="text-sm font-medium">
                     Programming Languages
+                    {formData.techField === "software_development" && (
+                      <span className="text-destructive ml-1">*</span>
+                    )}
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Select languages you work with (used for matching and verification).
+                    {formData.techField === "software_development"
+                      ? "Required for Software Development. Select at least one language (used for skill test and matching)."
+                      : "Select languages you work with (used for matching and verification)."}
                   </p>
                   <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
                     {PROGRAMMING_LANGUAGES.map((language) => (
