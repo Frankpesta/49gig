@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { ProjectContractView } from "@/components/contracts/project-contract-view";
 
 const STATUS_CONFIG: Record<
   string,
@@ -175,10 +176,40 @@ export default function ProjectDetailPage() {
   const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
   const isClient = user.role === "client" && project.clientId === user._id;
-  const isMatchedFreelancer = project.matchedFreelancerId === user._id;
+  const isMatchedFreelancer =
+    project.matchedFreelancerId === user._id ||
+    (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
   const canChat =
-    project.matchedFreelancerId &&
+    (project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0) &&
     (project.clientId === user._id || isMatchedFreelancer);
+
+  const needContractSign =
+    (project.status === "matched" || project.status === "in_progress") &&
+    (isClient
+      ? !project.clientContractSignedAt
+      : isMatchedFreelancer &&
+        !project.freelancerContractSignatures?.some((s: { freelancerId: Id<"users"> }) => s.freelancerId === user._id));
+
+  if (needContractSign && projectId && user._id) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/dashboard/projects">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-heading font-bold">Sign the contract</h1>
+            <p className="text-sm text-muted-foreground">
+              Read and sign the project agreement to continue. Your signature will be added and a copy sent to your email.
+            </p>
+          </div>
+        </div>
+        <ProjectContractView projectId={projectId} userId={user._id} />
+      </div>
+    );
+  }
 
   const handleOpenChat = async () => {
     if (!projectId || !user?._id) return;

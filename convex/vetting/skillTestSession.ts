@@ -2,8 +2,9 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+
+const internalAny: any = require("../_generated/api").internal;
 import type { VettingPathType } from "./paths";
 import { getVettingPath } from "./paths";
 
@@ -27,7 +28,7 @@ export const startSkillTest = action({
     categoryId: string;
   }> => {
     const user = await ctx.runQuery(
-      internal.users.queries.getUserByIdInternal,
+      internalAny.users.queries.getUserByIdInternal,
       { userId: args.userId }
     );
 
@@ -51,12 +52,12 @@ export const startSkillTest = action({
     }
 
     const vettingResultId: Id<"vettingResults"> = await ctx.runMutation(
-      internal.vetting.internalMutations.getOrCreateVettingResult,
+      internalAny.vetting.internalMutations.getOrCreateVettingResult,
       { freelancerId: args.userId }
     );
 
     const sessionId: Id<"vettingSkillTestSessions"> = await ctx.runMutation(
-      internal.vetting.internalMutations.createSkillTestSession,
+      internalAny.vetting.internalMutations.createSkillTestSession,
       {
         freelancerId: args.userId,
         vettingResultId,
@@ -69,7 +70,7 @@ export const startSkillTest = action({
     );
 
     const mcqIds = await ctx.runAction(
-      (internal as any)["vetting/questionGeneration"].getOrGenerateSkillMcqQuestions,
+      (internalAny as any)["vetting/questionGeneration"].getOrGenerateSkillMcqQuestions,
       {
         categoryId: path.categoryId,
         skillTopics: path.selectedSkills,
@@ -80,7 +81,7 @@ export const startSkillTest = action({
     let codingIds: Id<"vettingCodingPrompts">[] = [];
     if (path.pathType === "coding_mcq" && path.selectedLanguage) {
       codingIds = await ctx.runAction(
-        (internal as any)["vetting/questionGeneration"].getOrGenerateCodingPrompts,
+        (internalAny as any)["vetting/questionGeneration"].getOrGenerateCodingPrompts,
         {
           categoryId: path.categoryId,
           language: path.selectedLanguage,
@@ -90,7 +91,7 @@ export const startSkillTest = action({
     }
 
     await ctx.runMutation(
-      internal.vetting.internalMutations.updateSkillTestSessionIds,
+      internalAny.vetting.internalMutations.updateSkillTestSessionIds,
       {
         sessionId,
         mcqQuestionIds: mcqIds,

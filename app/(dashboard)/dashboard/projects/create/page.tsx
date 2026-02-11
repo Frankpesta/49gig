@@ -669,31 +669,41 @@ export default function CreateProjectPage() {
 
               {/* Budget Preview */}
               {budgetCalculation && (
-                <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-3">
-                  <div className="flex items-center justify-between">
+                <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated budget</span>
-                    <span className="text-xl font-bold text-primary">
+                    <span className="text-xl font-bold text-primary tabular-nums">
                       {formatBudget(budgetCalculation.estimatedBudget)}
                     </span>
                   </div>
-                  <div className="text-xs text-muted-foreground space-y-1.5 pt-2 border-t border-border/40">
+                  <p className="text-xs text-muted-foreground">
+                    Total you pay. Includes 25% service fee (vetting, escrow, contracts, support). Talent receives 75%.
+                  </p>
+                  <div className="text-xs text-muted-foreground space-y-2 pt-2 border-t border-border/40">
+                    <div className="font-medium text-foreground/80">How we calculated it</div>
                     <div>
-                      Base: {formatBudget(budgetCalculation.breakdown.baseRate)}
-                      {budgetCalculation.breakdown.totalHours && (
-                        <span> × {budgetCalculation.breakdown.totalHours} hrs</span>
+                      Base rate: {formatBudget(budgetCalculation.breakdown.baseRate)}
+                      {budgetCalculation.breakdown.totalHours != null && (
+                        <span>/hr × {budgetCalculation.breakdown.totalHours} hrs</span>
                       )}
-                      {budgetCalculation.breakdown.totalDays && (
-                        <span> × {budgetCalculation.breakdown.totalDays} days</span>
+                      {budgetCalculation.breakdown.totalDays != null && (
+                        <span>/day × {budgetCalculation.breakdown.totalDays} days</span>
+                      )}
+                      {budgetCalculation.breakdown.monthlyRate != null && (
+                        <span>/mo (ongoing)</span>
                       )}
                     </div>
-                    <div>Timeline: {(budgetCalculation.breakdown.timelineMultiplier * 100).toFixed(0)}%</div>
-                    <div>Project type: {(budgetCalculation.breakdown.projectTypeMultiplier * 100).toFixed(0)}%</div>
-                    {budgetCalculation.breakdown.teamMultiplier && (
-                      <div>Team: {budgetCalculation.breakdown.teamMultiplier} members</div>
+                    <div>
+                      Timeline factor: {(budgetCalculation.breakdown.timelineMultiplier * 100).toFixed(0)}%
+                      {budgetCalculation.breakdown.timelineMultiplier < 1 && " (discount for longer timeline)"}
+                    </div>
+                    <div>
+                      Project type factor: {(budgetCalculation.breakdown.projectTypeMultiplier * 100).toFixed(0)}%
+                      {budgetCalculation.breakdown.projectTypeMultiplier < 1 && " (e.g. ongoing discount)"}
+                    </div>
+                    {budgetCalculation.breakdown.teamMultiplier != null && (
+                      <div>Team size: {budgetCalculation.breakdown.teamMultiplier} equivalent members</div>
                     )}
-                    <div className="pt-2 border-t border-border/40">
-                      Service fee (25%): vetting, escrow, contracts, support — {formatBudget(budgetCalculation.estimatedBudget * 0.25)}
-                    </div>
                   </div>
                 </div>
               )}
@@ -711,27 +721,26 @@ export default function CreateProjectPage() {
                   </div>
                 ) : budgetCalculation ? (
                   <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-6 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total project budget</span>
-                      <span className="text-2xl font-bold text-primary">
+                      <span className="text-2xl font-bold text-primary tabular-nums">
                         {formatBudget(budgetCalculation.estimatedBudget)}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/40 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Base amount</span>
-                        <div className="font-semibold">
-                          {formatBudget(
-                            budgetCalculation.estimatedBudget /
-                              budgetCalculation.breakdown.timelineMultiplier /
-                              budgetCalculation.breakdown.projectTypeMultiplier
-                          )}
+                    <p className="text-sm text-muted-foreground">
+                      You pay this total. 25% is the platform service fee; 75% goes to talent.
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 pt-3 border-t border-border/40 text-sm sm:grid-cols-2">
+                      <div className="rounded-lg border border-border/60 bg-background/50 p-3 sm:border-0 sm:bg-transparent sm:p-0">
+                        <span className="text-muted-foreground">Service fee (25%)</span>
+                        <div className="font-semibold tabular-nums">
+                          {formatBudget(budgetCalculation.estimatedBudget * 0.25)}
                         </div>
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">Service fee (25%)</span>
-                        <div className="font-semibold">
-                          {formatBudget(budgetCalculation.estimatedBudget * 0.25)}
+                      <div className="rounded-lg border border-border/60 bg-background/50 p-3 sm:border-0 sm:bg-transparent sm:p-0">
+                        <span className="text-muted-foreground">Talent receives (75%)</span>
+                        <div className="font-semibold tabular-nums">
+                          {formatBudget(budgetCalculation.estimatedBudget * 0.75)}
                         </div>
                       </div>
                     </div>
@@ -747,11 +756,13 @@ export default function CreateProjectPage() {
                 <Label htmlFor="specialRequirements" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Special requirements or notes (optional)</Label>
                 <Textarea
                   id="specialRequirements"
-                  placeholder="Any additional requirements or notes..."
+                  name="specialRequirements"
+                  autoComplete="off"
+                  placeholder="e.g. time zone, tools, or extra instructions"
                   rows={4}
                   value={formData.specialRequirements}
                   onChange={(e) => setFormData({ ...formData, specialRequirements: e.target.value })}
-                  className="mt-3 rounded-lg border-border/60"
+                  className="mt-3 rounded-lg border-border/60 min-h-[6rem]"
                 />
               </div>
             </div>

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Send,
   Paperclip,
@@ -56,12 +56,13 @@ export default function ChatDetailPage() {
   const isSupportRoute = chatId === "support";
   const shouldSkipQueries = isSupportRoute || !isValidChatId || !isAuthenticated || !user?._id;
 
-  const chat = useQuery(
-    api.chat.queries.getChat,
+  const chatWithParticipants = useQuery(
+    api.chat.queries.getChatWithParticipantDetails,
     shouldSkipQueries || isSupportRoute
       ? "skip"
       : { chatId: chatId as any, userId: user._id }
   );
+  const chat = chatWithParticipants;
 
   // Additional safety: ensure chat._id is valid before using it
   const isValidChatFromQuery = chat?._id && chat._id !== "support" && chat._id.startsWith("j");
@@ -214,7 +215,12 @@ export default function ChatDetailPage() {
   }
 
   const displayMessages = messages || [];
-  const otherParticipants = chat.participants.filter((p: Id<"users">) => p !== user._id);
+  const participantsList = "participants" in chat && Array.isArray(chat.participants) && chat.participants[0] && typeof chat.participants[0] === "object"
+    ? (chat.participants as { _id: Id<"users">; name: string; imageUrl?: string }[])
+    : [];
+  const getParticipant = (userId: Id<"users">) =>
+    participantsList.find((p) => p._id === userId);
+  const otherParticipants = participantsList.filter((p) => p._id !== user._id);
 
   return (
     <div className="container mx-auto max-w-7xl py-8">
@@ -236,6 +242,23 @@ export default function ChatDetailPage() {
               </Link>
             )}
           </p>
+          {participantsList.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {participantsList.map((p) => (
+                <div key={p._id} className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-1">
+                  <Avatar className="h-6 w-6">
+                    {p.imageUrl && <AvatarImage src={p.imageUrl} alt={p.name} />}
+                    <AvatarFallback className="text-xs">
+                      {p.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium">
+                    {p._id === user._id ? "You" : p.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <Badge variant="outline">{chat.type}</Badge>
       </div>
@@ -251,6 +274,8 @@ export default function ChatDetailPage() {
             displayMessages.map((msg: Doc<"messages">) => {
               const isOwnMessage = msg.senderId === user._id;
               const isRead = msg.readBy.some((r) => r.userId === user._id);
+              const sender = participantsList.length > 0 ? getParticipant(msg.senderId) : null;
+              const senderName = sender?.name ?? (msg.senderRole === "client" ? "Client" : "Freelancer");
 
               return (
                 <div
@@ -258,9 +283,10 @@ export default function ChatDetailPage() {
                   className={`flex gap-3 ${isOwnMessage ? "justify-end" : "justify-start"}`}
                 >
                   {!isOwnMessage && (
-                    <Avatar>
-                      <AvatarFallback>
-                        {msg.senderRole === "client" ? "C" : "F"}
+                    <Avatar className="h-8 w-8 shrink-0">
+                      {sender?.imageUrl && <AvatarImage src={sender.imageUrl} alt={senderName} />}
+                      <AvatarFallback className="text-xs">
+                        {senderName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   )}
@@ -268,8 +294,8 @@ export default function ChatDetailPage() {
                     className={`flex flex-col max-w-[70%] ${isOwnMessage ? "items-end" : "items-start"}`}
                   >
                     {!isOwnMessage && (
-                      <span className="text-xs text-muted-foreground mb-1">
-                        {msg.senderRole}
+                      <span className="text-xs font-medium text-muted-foreground mb-1">
+                        {senderName}
                       </span>
                     )}
                     <div
@@ -312,8 +338,11 @@ export default function ChatDetailPage() {
                     </div>
                   </div>
                   {isOwnMessage && (
-                    <Avatar>
-                      <AvatarFallback>You</AvatarFallback>
+                    <Avatar className="h-8 w-8 shrink-0">
+                      {getParticipant(user._id)?.imageUrl && (
+                        <AvatarImage src={getParticipant(user._id)!.imageUrl!} alt="You" />
+                      )}
+                      <AvatarFallback className="text-xs">You</AvatarFallback>
                     </Avatar>
                   )}
                 </div>

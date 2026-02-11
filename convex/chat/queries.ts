@@ -169,10 +169,11 @@ export const getProjectChat = query({
       return null;
     }
 
-    // Check authorization - user must be client or matched freelancer
+    // Check authorization - user must be client or matched freelancer (single or team)
     const isClient = project.clientId === user._id;
     const isFreelancer =
-      project.matchedFreelancerId === user._id;
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
     const isAdminOrModerator =
       user.role === "admin" || user.role === "moderator";
 
@@ -260,6 +261,45 @@ export const getSupportChatsForAdmin = query({
     return chats.sort(
       (a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
     );
+  },
+});
+
+/**
+ * Get chat with participant details (name, profile image) for display.
+ * Only returns data if the user is a participant.
+ */
+export const getChatWithParticipantDetails = query({
+  args: {
+    chatId: v.id("chats"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = args.userId
+      ? await ctx.db.get(args.userId)
+      : await getCurrentUser(ctx);
+    if (!user || user.status !== "active") return null;
+
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) return null;
+    const isParticipant = chat.participants.includes(user._id);
+    const isAdminOrModerator =
+      user.role === "admin" || user.role === "moderator";
+    if (!isParticipant && !isAdminOrModerator) return null;
+
+    const participants = await Promise.all(
+      chat.participants.map(async (userId) => {
+        const u = await ctx.db.get(userId);
+        return u
+          ? {
+              _id: u._id,
+              name: u.name || "Unknown",
+              imageUrl: u.profile?.imageUrl,
+            }
+          : { _id: userId, name: "Unknown", imageUrl: undefined };
+      })
+    );
+
+    return { ...chat, participants };
   },
 });
 

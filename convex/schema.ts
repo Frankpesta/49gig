@@ -290,6 +290,10 @@ export default defineSchema({
     contractFileId: v.optional(v.id("_storage")),
     contractGeneratedAt: v.optional(v.number()),
     contractSignedAt: v.optional(v.number()),
+    clientContractSignedAt: v.optional(v.number()),
+    freelancerContractSignatures: v.optional(
+      v.array(v.object({ freelancerId: v.id("users"), signedAt: v.number() }))
+    ),
 
     // Payment
     totalAmount: v.number(),
