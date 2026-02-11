@@ -1,9 +1,11 @@
-
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { internal, api } from "../_generated/api";
+import { api } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import * as flutterwave from "./flutterwave";
+
+const internalAny: any = require("../_generated/api").internal;
+const apiAny: any = require("../_generated/api").api;
 
 /**
  * Initialize a Flutterwave payment for project pre-funding
@@ -18,7 +20,7 @@ export const createPaymentIntent = action({
   },
   handler: async (ctx, args): Promise<{ paymentLink: string; paymentId: string; txRef: string }> => {
     // Verify user and project
-    const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
+    const user = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.userId,
     });
 
@@ -26,7 +28,7 @@ export const createPaymentIntent = action({
       throw new Error("Only clients can create payments");
     }
 
-    const project = await ctx.runQuery(internal.payments.queries.getProject, {
+    const project = await ctx.runQuery(internalAny.payments.queries.getProject, {
       projectId: args.projectId,
       userId: args.userId,
     });
@@ -45,7 +47,7 @@ export const createPaymentIntent = action({
 
     // Check if payment already exists
     const existingPayment = await ctx.runQuery(
-      internal.payments.queries.getPaymentByProject,
+      internalAny.payments.queries.getPaymentByProject,
       {
         projectId: args.projectId,
       }
@@ -110,7 +112,7 @@ export const createPaymentIntent = action({
     const netAmount = args.amount - platformFeeAmount;
 
     const paymentId = await ctx.runMutation(
-      internal.payments.mutations.createPayment,
+      internalAny.payments.mutations.createPayment,
       {
         projectId: args.projectId,
         type: "pre_funding",
@@ -126,13 +128,13 @@ export const createPaymentIntent = action({
     );
 
     // Update project status to pending_funding only if still in draft
-    const currentProject = await ctx.runQuery(internal.payments.queries.getProject, {
+    const currentProject = await ctx.runQuery(internalAny.payments.queries.getProject, {
       projectId: args.projectId,
       userId: args.userId,
     });
     
     if (currentProject && currentProject.status === "draft") {
-      await ctx.runMutation(internal.projects.mutations.updateProjectStatusInternal, {
+      await ctx.runMutation(internalAny.projects.mutations.updateProjectStatusInternal, {
         projectId: args.projectId,
         status: "pending_funding",
       });
@@ -165,7 +167,7 @@ export const verifyPayment = action({
 
     // Find payment record
     const payment = await ctx.runQuery(
-      internal.payments.queries.getPaymentByTransactionId,
+      internalAny.payments.queries.getPaymentByTransactionId,
       {
         transactionId: args.txRef,
       }
@@ -176,7 +178,7 @@ export const verifyPayment = action({
     }
 
     // Update payment status
-    await ctx.runMutation(internal.payments.mutations.handlePaymentSuccess, {
+    await ctx.runMutation(internalAny.payments.mutations.handlePaymentSuccess, {
       transactionId: args.txRef,
       eventId: verification.data.id.toString(),
       data: verification.data,
@@ -185,7 +187,7 @@ export const verifyPayment = action({
               // Trigger matching if this is a pre-funding payment
     if (payment.type === "pre_funding") {
       try {
-        await ctx.runAction(api.matching.actions.generateMatches, {
+        await ctx.runAction(apiAny.matching.actions.generateMatches, {
           projectId: payment.projectId,
           limit: 5,
         });
@@ -228,7 +230,7 @@ export const handleFlutterwaveWebhook = action({
           
           // Find payment by transaction reference
           const payment = await ctx.runQuery(
-            internal.payments.queries.getPaymentByTransactionId,
+            internalAny.payments.queries.getPaymentByTransactionId,
             {
               transactionId: txRef,
             }
@@ -236,7 +238,7 @@ export const handleFlutterwaveWebhook = action({
 
           if (payment) {
             if (args.data.status === "successful") {
-              await ctx.runMutation(internal.payments.mutations.handlePaymentSuccess, {
+              await ctx.runMutation(internalAny.payments.mutations.handlePaymentSuccess, {
                 transactionId: txRef,
                 eventId: args.data.id?.toString() || txRef,
                 data: args.data,
@@ -245,7 +247,7 @@ export const handleFlutterwaveWebhook = action({
               // Trigger matching if this is a pre-funding payment
     if (payment.type === "pre_funding") {
       try {
-        await ctx.runAction(api.matching.actions.generateMatches, {
+        await ctx.runAction(apiAny.matching.actions.generateMatches, {
           projectId: payment.projectId,
           limit: 5,
         });
@@ -254,7 +256,7 @@ export const handleFlutterwaveWebhook = action({
                 }
               }
             } else {
-              await ctx.runMutation(internal.payments.mutations.handlePaymentFailure, {
+              await ctx.runMutation(internalAny.payments.mutations.handlePaymentFailure, {
                 transactionId: txRef,
                 eventId: args.data.id?.toString() || txRef,
                 errorMessage: args.data.processor_response || "Payment failed",
@@ -266,7 +268,7 @@ export const handleFlutterwaveWebhook = action({
 
       case "transfer.completed":
         if (args.data.reference) {
-          await ctx.runMutation(internal.payments.mutations.updatePaymentByTransferId, {
+          await ctx.runMutation(internalAny.payments.mutations.updatePaymentByTransferId, {
             transferId: args.data.reference,
             status: "succeeded",
           });
@@ -275,7 +277,7 @@ export const handleFlutterwaveWebhook = action({
 
       case "transfer.reversed":
         if (args.data.reference) {
-          await ctx.runMutation(internal.payments.mutations.updatePaymentByTransferId, {
+          await ctx.runMutation(internalAny.payments.mutations.updatePaymentByTransferId, {
             transferId: args.data.reference,
             status: "failed",
             errorMessage: "Transfer reversed",
@@ -309,7 +311,7 @@ export const refundPaymentIntent = action({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: true; refundId: string }> => {
-    const payment = await ctx.runQuery(internal.payments.queries.getPaymentByProject, {
+    const payment = await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
       projectId: args.projectId,
     });
     
@@ -335,7 +337,7 @@ export const refundPaymentIntent = action({
     );
 
     // Get project to find clientId for the refund payment record
-    const project = await ctx.runQuery(internal.payments.queries.getProject, {
+    const project = await ctx.runQuery(internalAny.payments.queries.getProject, {
       projectId: args.projectId,
       userId: args.projectId as unknown as Id<"users">,
     });
@@ -345,7 +347,7 @@ export const refundPaymentIntent = action({
       throw new Error("Unable to determine client ID for refund");
     }
 
-    await ctx.runMutation(internal.payments.mutations.createPayment, {
+    await ctx.runMutation(internalAny.payments.mutations.createPayment, {
       projectId: args.projectId,
       type: "refund",
       amount: args.amount,
@@ -378,7 +380,7 @@ export const createPayoutTransfer = action({
     accountName: v.string(),
   },
   handler: async (ctx, args) => {
-    const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+    const freelancer = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.freelancerId,
     });
     
@@ -408,7 +410,7 @@ export const createPayoutTransfer = action({
       }),
     });
 
-    await ctx.runMutation(internal.payments.mutations.createPayment, {
+    await ctx.runMutation(internalAny.payments.mutations.createPayment, {
       projectId: args.projectId,
       milestoneId: args.milestoneId,
       type: "payout",
@@ -444,7 +446,7 @@ export const createSubaccount = action({
   },
   handler: async (ctx, args) => {
     // Verify freelancer
-    const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+    const freelancer = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.freelancerId,
     });
 
@@ -486,7 +488,7 @@ export const createSubaccount = action({
     });
 
     // Update user with subaccount ID and bank details (for later transfers)
-    await ctx.runMutation(internal.payments.mutations.updateUserFlutterwaveSubaccountId, {
+    await ctx.runMutation(internalAny.payments.mutations.updateUserFlutterwaveSubaccountId, {
       userId: args.freelancerId,
       flutterwaveSubaccountId: subaccountData.data.id.toString(),
       bankCode: args.accountBank,
@@ -510,7 +512,7 @@ export const getSubaccountStatus = action({
     freelancerId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+    const freelancer = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.freelancerId,
     });
 
@@ -580,7 +582,7 @@ export const releaseMilestonePayment = action({
     platformFee: number;
   }> => {
     // Verify user
-    const user = await ctx.runQuery(internal.payments.queries.verifyUser, {
+    const user = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.userId,
     });
 
@@ -589,7 +591,7 @@ export const releaseMilestonePayment = action({
     }
 
     // Get milestone
-    const milestone = await ctx.runQuery(internal.projects.queries.getMilestoneByIdInternal, {
+    const milestone = await ctx.runQuery(internalAny.projects.queries.getMilestoneByIdInternal, {
       milestoneId: args.milestoneId,
     });
 
@@ -603,7 +605,7 @@ export const releaseMilestonePayment = action({
     }
 
     // Get project
-    const project = await ctx.runQuery(internal.payments.queries.getProject, {
+    const project = await ctx.runQuery(internalAny.payments.queries.getProject, {
       projectId: milestone.projectId,
       userId: args.userId,
     });
@@ -622,7 +624,7 @@ export const releaseMilestonePayment = action({
       throw new Error("Project has no matched freelancer");
     }
 
-    const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+    const freelancer = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: project.matchedFreelancerId,
     });
 
@@ -737,7 +739,7 @@ export const releaseMilestonePayment = action({
     }
 
     // Create payment record
-    const paymentId: string = await ctx.runMutation(internal.payments.mutations.createPayment, {
+    const paymentId: string = await ctx.runMutation(internalAny.payments.mutations.createPayment, {
       projectId: milestone.projectId,
       milestoneId: args.milestoneId,
       type: "milestone_release",
@@ -753,7 +755,7 @@ export const releaseMilestonePayment = action({
 
     // Update milestone status
     const now = Date.now();
-    await ctx.runMutation(internal.milestones.mutations.updateMilestonePaymentStatus, {
+    await ctx.runMutation(internalAny.milestones.mutations.updateMilestonePaymentStatus, {
       milestoneId: args.milestoneId,
       status: "paid",
       paidAt: now,
@@ -761,7 +763,7 @@ export const releaseMilestonePayment = action({
     });
 
     // Log audit
-    await ctx.runMutation(internal.payments.mutations.logPaymentAudit, {
+    await ctx.runMutation(internalAny.payments.mutations.logPaymentAudit, {
       action: "milestone_payment_released_manual",
       actorId: args.userId,
       actorRole: user.role,
@@ -778,7 +780,7 @@ export const releaseMilestonePayment = action({
     });
 
     // Send notifications
-    await ctx.scheduler.runAfter(0, internal.notifications.actions.sendSystemNotification, {
+    await ctx.scheduler.runAfter(0, internalAny.notifications.actions.sendSystemNotification, {
       userIds: [project.matchedFreelancerId],
       title: "Milestone payment released",
       message: `Payment of ${netAmount} ${milestone.currency.toUpperCase()} has been released for milestone: ${milestone.title}`,

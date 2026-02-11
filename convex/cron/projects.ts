@@ -1,6 +1,6 @@
 import { internalAction } from "../_generated/server";
-import { internal } from "../_generated/api";
 
+const internalAny: any = require("../_generated/api").internal;
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
@@ -17,14 +17,14 @@ export const cleanupUnfundedProjectsAfter48h = internalAction({
 
     try {
       const projectIds = await ctx.runQuery(
-        internal.projects.queries.getUnfundedProjectsOlderThanInternal,
+        internalAny.projects.queries.getUnfundedProjectsOlderThanInternal,
         { createdBefore }
       );
 
       for (const projectId of projectIds) {
         try {
           await ctx.runMutation(
-            internal.projects.mutations.deleteUnfundedProjectInternal,
+            internalAny.projects.mutations.deleteUnfundedProjectInternal,
             { projectId }
           );
           deleted++;

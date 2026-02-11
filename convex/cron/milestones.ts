@@ -1,6 +1,4 @@
 import { internalAction } from "../_generated/server";
-import { internal, api } from "../_generated/api";
-import type { FunctionReference } from "convex/server";
 
 const internalAny: any = require("../_generated/api").internal;
 
@@ -23,8 +21,7 @@ export const autoReleaseMilestones = internalAction({
     try {
       // Query milestones that are approved and have passed their autoReleaseAt time
       const milestonesToRelease = await ctx.runQuery(
-        // @ts-expect-error - Type instantiation depth issue with internal API types
-        internal.projects.queries.getMilestonesReadyForAutoRelease,
+        internalAny.projects.queries.getMilestonesReadyForAutoRelease,
         { now }
       );
 
@@ -37,7 +34,7 @@ export const autoReleaseMilestones = internalAction({
       for (const milestone of milestonesToRelease) {
         try {
           // Get project to access clientId and freelancerId
-          const project = await ctx.runQuery(internal.projects.queries.getProjectInternal, {
+          const project = await ctx.runQuery(internalAny.projects.queries.getProjectInternal, {
             projectId: milestone.projectId,
           });
 
@@ -52,7 +49,7 @@ export const autoReleaseMilestones = internalAction({
           }
 
           // Get freelancer to check for subaccount
-          const freelancer = await ctx.runQuery(internal.payments.queries.verifyUser, {
+          const freelancer = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
             userId: project.matchedFreelancerId,
           });
 
@@ -72,11 +69,9 @@ export const autoReleaseMilestones = internalAction({
             continue;
           }
 
-          // Call the release action
-          const releaseAction = api.payments.actions.releaseMilestonePayment as unknown as FunctionReference<
-            "action",
-            "public"
-          >;
+          // Call the release action (use require to avoid deep type instantiation)
+          const apiModule = require("../_generated/api").api;
+          const releaseAction = apiModule.payments.actions.releaseMilestonePayment;
 
           await ctx.runAction(releaseAction, {
             milestoneId: milestone._id,

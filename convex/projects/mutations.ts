@@ -1,16 +1,16 @@
 import { mutation, internalMutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 
-const api = require("../_generated/api") as {
+const apiModule = require("../_generated/api");
+const api = apiModule as {
   api: {
     notifications: { actions: { sendSystemNotification: unknown } };
-    contracts: { actions: { generateAndSendContract: unknown } };
   };
 };
+const internalAny: any = apiModule.internal;
 
 /**
  * Helper function to get current user in mutations
@@ -1037,15 +1037,14 @@ export const acceptSelectedMatchInternal = internalMutation({
       }
     }
 
-    await ctx.scheduler.runAfter(0, internal.projects.mutations.autoCreateMilestonesInternal, {
+    await ctx.scheduler.runAfter(0, internalAny.projects.mutations.autoCreateMilestonesInternal, {
       projectId: args.projectId,
     });
 
-    const generateAndSendContract = api.api.contracts.actions
-      .generateAndSendContract as unknown as FunctionReference<"action">;
-    for (const matchId of acceptedMatchIds) {
-      await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId });
-    }
+    // Generate contract PDF (with pending signatures); email sent when each party signs
+    await ctx.scheduler.runAfter(0, internalAny.contracts.actions.regenerateContractPdfAndSend, {
+      projectId: args.projectId,
+    });
   },
 });
 

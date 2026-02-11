@@ -288,19 +288,19 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
 } {
   const details: Array<{ label: string; value: string; description?: string }> = [
     {
-      label: "Total Project Value",
+      label: "Total (you pay)",
       value: formatCurrency(breakdown.totalAmount),
-      description: "Total amount client pays",
+      description: "Full amount charged for the project",
     },
     {
-      label: "Service Fee",
+      label: "Service fee",
       value: formatCurrency(breakdown.platformFee),
-      description: `${breakdown.platformFeePercentage}% — vetting, escrow, contracts, replacements, support`,
+      description: `${breakdown.platformFeePercentage}% — vetting, escrow, contracts, support`,
     },
     {
-      label: "Freelancer Earnings",
+      label: "Freelancer receives",
       value: formatCurrency(breakdown.netAmount),
-      description: "Amount freelancer receives after platform fee",
+      description: "Amount talent gets after platform fee",
     },
   ];
 

@@ -2,8 +2,9 @@
 
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
+
+const internalAny: any = require("../_generated/api").internal;
 import OpenAI from "openai";
 
 const MCQ_COUNT = 50;
@@ -28,7 +29,7 @@ export const getOrGenerateSkillMcqQuestions = internalAction({
   },
   handler: async (ctx, args): Promise<Id<"vettingMcqQuestions">[]> => {
     const existingIds: Id<"vettingMcqQuestions">[] = await ctx.runQuery(
-      internal.vetting.internalQueries.getExistingMcqIds,
+      internalAny.vetting.internalQueries.getExistingMcqIds,
       { categoryId: args.categoryId, experienceLevel: args.experienceLevel }
     );
 
@@ -53,7 +54,7 @@ export const getOrGenerateSkillMcqQuestions = internalAction({
     });
 
     const ids: Id<"vettingMcqQuestions">[] = await ctx.runMutation(
-      internal.vetting.internalMutations.insertVettingMcqBatch,
+      internalAny.vetting.internalMutations.insertVettingMcqBatch,
       { questions }
     );
 
@@ -72,7 +73,7 @@ export const getOrGenerateCodingPrompts = internalAction({
   },
   handler: async (ctx, args): Promise<Id<"vettingCodingPrompts">[]> => {
     const existingIds: Id<"vettingCodingPrompts">[] = await ctx.runQuery(
-      internal.vetting.internalQueries.getExistingCodingPromptIds,
+      internalAny.vetting.internalQueries.getExistingCodingPromptIds,
       {
         categoryId: args.categoryId,
         language: args.language,
@@ -95,7 +96,7 @@ export const getOrGenerateCodingPrompts = internalAction({
     });
 
     const ids: Id<"vettingCodingPrompts">[] = await ctx.runMutation(
-      internal.vetting.internalMutations.insertVettingCodingBatch,
+      internalAny.vetting.internalMutations.insertVettingCodingBatch,
       { prompts }
     );
 

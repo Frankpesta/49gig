@@ -1,18 +1,21 @@
 "use node";
 
 import React from "react";
-import { action } from "../_generated/server";
+import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { FunctionReference } from "convex/server";
 import { sendEmail } from "../email/send";
 import { ContractReadyEmail } from "../../emails/templates";
 import type { Doc, Id } from "../_generated/dataModel";
+import { getClientAgreementFilled, getFreelancerAgreementFilled } from "./content";
+
 const api = require("../_generated/api") as {
   api: {
     contracts: {
-      queries: { getContractContext: unknown };
-      mutations: { storeContract: unknown };
+      queries: { getContractContext: unknown; getProjectContractParties: unknown };
+      mutations: { storeContract: unknown; updateContractFile: unknown };
     };
   };
 };
@@ -267,6 +270,166 @@ async function generateContractPdf({
   return pdfDoc.save();
 }
 
+/** Generate full 49GIG contract PDF (client + freelancer agreements) with signature lines. */
+async function generateFullContractPdf({
+  project,
+  client,
+  freelancers,
+  clientSignedAt,
+  freelancerSignatures,
+}: {
+  project: Doc<"projects">;
+  client: Doc<"users">;
+  freelancers: Doc<"users">[];
+  clientSignedAt?: number;
+  freelancerSignatures?: { freelancerId: Id<"users">; signedAt: number }[];
+}) {
+  const pdfDoc = await PDFDocument.create();
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const signatureFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+
+  const pageWidth = 612;
+  const pageHeight = 792;
+  const margin = 56;
+  const lineHeight = 14;
+  const titleSize = 16;
+  const headingSize = 12;
+  const bodySize = 10;
+  const effectiveDate = formatDate();
+  const freelancerNames = freelancers.map((f) => f.name || "Freelancer").join(", ");
+
+  let page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
+
+  const ensureSpace = (need: number) => {
+    if (y < margin + need) {
+      page = pdfDoc.addPage([pageWidth, pageHeight]);
+      y = pageHeight - margin;
+    }
+  };
+
+  const drawHeading = (text: string) => {
+    ensureSpace(lineHeight + 8);
+    page.drawText(text, {
+      x: margin,
+      y,
+      size: headingSize,
+      font: bold,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+    y -= lineHeight + 4;
+  };
+
+  const drawParagraph = (text: string) => {
+    const lines = wrapText(text, pageWidth - margin * 2, regular, bodySize);
+    for (const line of lines) {
+      ensureSpace(lineHeight);
+      page.drawText(line, {
+        x: margin,
+        y,
+        size: bodySize,
+        font: regular,
+        color: rgb(0.2, 0.2, 0.2),
+      });
+      y -= lineHeight;
+    }
+    y -= 4;
+  };
+
+  // Client Agreement
+  const clientBody = getClientAgreementFilled(
+    client.name || "Client",
+    freelancerNames,
+    effectiveDate
+  );
+  drawHeading("49GIG Client Project Agreement (Digital Contract)");
+  for (const block of clientBody.split(/\n\n+/)) {
+    const t = block.trim();
+    if (t.length > 0) drawParagraph(t);
+  }
+
+  ensureSpace(lineHeight * 4);
+  drawHeading("49GIG Freelancer Project Agreement (Digital Contract)");
+  for (const f of freelancers) {
+    const freelancerBody = getFreelancerAgreementFilled(
+      f.name || "Freelancer",
+      effectiveDate
+    );
+    for (const block of freelancerBody.split(/\n\n+/)) {
+      const t = block.trim();
+      if (t.length > 0) drawParagraph(t);
+    }
+  }
+
+  // Signatures
+  ensureSpace(lineHeight * 6);
+  drawHeading("Signatures");
+  drawParagraph(
+    `Signed electronically via 49GIG. Names below indicate acceptance of the terms above.`
+  );
+  y -= 8;
+
+  ensureSpace(lineHeight * 3);
+  page.drawText("Client:", { x: margin, y, size: bodySize, font: bold, color: rgb(0.1, 0.1, 0.1) });
+  y -= lineHeight;
+  if (clientSignedAt) {
+    page.drawText(client.name || "Client", {
+      x: margin,
+      y,
+      size: 12,
+      font: signatureFont,
+      color: rgb(0.15, 0.15, 0.4),
+    });
+    y -= lineHeight;
+    page.drawText(new Date(clientSignedAt).toLocaleDateString("en-US", { dateStyle: "long" }), {
+      x: margin,
+      y,
+      size: bodySize,
+      font: regular,
+      color: rgb(0.3, 0.3, 0.3),
+    });
+  } else {
+    page.drawText("(Pending signature)", { x: margin, y, size: bodySize, font: regular, color: rgb(0.5, 0.5, 0.5) });
+  }
+  y -= lineHeight * 2;
+
+  for (const f of freelancers) {
+    ensureSpace(lineHeight * 3);
+    const sig = freelancerSignatures?.find((s) => s.freelancerId === f._id);
+    page.drawText(`Freelancer: ${f.name || "Freelancer"}`, {
+      x: margin,
+      y,
+      size: bodySize,
+      font: bold,
+      color: rgb(0.1, 0.1, 0.1),
+    });
+    y -= lineHeight;
+    if (sig) {
+      page.drawText(f.name || "Freelancer", {
+        x: margin,
+        y,
+        size: 12,
+        font: signatureFont,
+        color: rgb(0.15, 0.15, 0.4),
+      });
+      y -= lineHeight;
+      page.drawText(new Date(sig.signedAt).toLocaleDateString("en-US", { dateStyle: "long" }), {
+        x: margin,
+        y,
+        size: bodySize,
+        font: regular,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+    } else {
+      page.drawText("(Pending signature)", { x: margin, y, size: bodySize, font: regular, color: rgb(0.5, 0.5, 0.5) });
+    }
+    y -= lineHeight * 2;
+  }
+
+  return pdfDoc.save();
+}
+
 export const generateAndSendContract = action({
   args: {
     matchId: v.id("matches"),
@@ -364,6 +527,80 @@ export const generateAndSendContract = action({
     });
 
     await Promise.all([sendToClient, sendToFreelancer]);
+
+    return { status: "sent", contractFileId: storageId };
+  },
+});
+
+/**
+ * Internal: Regenerate contract PDF with current signatures and send to all parties.
+ * Called after client or freelancer signs.
+ */
+export const regenerateContractPdfAndSend = internalAction({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    // Type instantiation depth limit with internal API - use require to avoid deep resolution
+    const apiModule = require("../_generated/api");
+    const parties = await ctx.runQuery(
+      apiModule.internal.contracts.queries.getProjectContractParties,
+      { projectId: args.projectId }
+    );
+    if (!parties) return { status: "parties_not_found" };
+
+    const { project, client, freelancers } = parties;
+    const pdfBytes = await generateFullContractPdf({
+      project,
+      client,
+      freelancers,
+      clientSignedAt: project.clientContractSignedAt,
+      freelancerSignatures: project.freelancerContractSignatures,
+    });
+
+    const pdfArrayBuffer = pdfBytes.buffer.slice(
+      pdfBytes.byteOffset,
+      pdfBytes.byteOffset + pdfBytes.byteLength
+    ) as ArrayBuffer;
+    const storageId = await ctx.storage.store(
+      new Blob([pdfArrayBuffer], { type: "application/pdf" })
+    );
+
+    await ctx.runMutation(
+      apiModule.internal.contracts.mutations.updateContractFile,
+      {
+        projectId: args.projectId,
+        contractFileId: storageId,
+      }
+    );
+
+    const contractUrl = await ctx.storage.getUrl(storageId);
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+    const attachment = {
+      filename: `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}.pdf`,
+      content: Buffer.from(pdfBytes).toString("base64"),
+      contentType: "application/pdf",
+    };
+
+    const allRecipients = [
+      { email: client.email, name: client.name || "there" },
+      ...freelancers.map((f: Doc<"users">) => ({ email: f.email, name: f.name || "there" })),
+    ];
+    for (const recipient of allRecipients) {
+      await sendEmail({
+        to: recipient.email,
+        subject: `Contract ready / signed – ${project.intakeForm.title}`,
+        react: React.createElement(ContractReadyEmail, {
+          name: recipient.name,
+          projectName: project.intakeForm.title,
+          contractUrl: contractUrl || `${appUrl}/dashboard/projects/${args.projectId}`,
+          appUrl,
+          logoUrl,
+          date,
+        }),
+        attachments: [attachment],
+      });
+    }
 
     return { status: "sent", contractFileId: storageId };
   },

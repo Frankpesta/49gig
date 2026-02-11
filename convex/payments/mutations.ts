@@ -2,13 +2,13 @@ import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
-import { internal } from "../_generated/api";
-
-const api = require("../_generated/api") as {
+const apiModule = require("../_generated/api");
+const api = apiModule as {
   api: {
     notifications: { actions: { sendSystemNotification: unknown } };
   };
 };
+const internalAny: any = apiModule.internal;
 
 /**
  * Helper to get current user in mutations
@@ -292,7 +292,7 @@ export const handlePaymentSuccess = internalMutation({
       });
 
       // Accept client's selected freelancer(s) and then auto-create milestones
-      await ctx.scheduler.runAfter(0, internal.projects.mutations.acceptSelectedMatchInternal, {
+      await ctx.scheduler.runAfter(0, internalAny.projects.mutations.acceptSelectedMatchInternal, {
         projectId: payment.projectId,
       });
 

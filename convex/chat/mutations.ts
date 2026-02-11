@@ -78,10 +78,15 @@ export const createProjectChat = mutation({
       return existingChat._id;
     }
 
-    // Create participants array
+    // Create participants array: client + all matched freelancers (single or team)
     const participants: Doc<"users">["_id"][] = [project.clientId];
     if (project.matchedFreelancerId) {
       participants.push(project.matchedFreelancerId);
+    }
+    if (project.matchedFreelancerIds?.length) {
+      for (const id of project.matchedFreelancerIds) {
+        if (!participants.includes(id)) participants.push(id);
+      }
     }
 
     // Create chat

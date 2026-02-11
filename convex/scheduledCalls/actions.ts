@@ -2,8 +2,9 @@
 
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { internal } from "../_generated/api";
 import React from "react";
+
+const internalAny: any = require("../_generated/api").internal;
 import { sendEmail } from "../email/send";
 import { OneOnOneSessionScheduledEmail } from "../../emails/templates";
 
@@ -200,7 +201,7 @@ export const scheduleOneOnOneSession = action({
   },
   handler: async (ctx, args) => {
     const project = await ctx.runQuery(
-      internal.projects.queries.getProjectInternal,
+      internalAny.projects.queries.getProjectInternal,
       { projectId: args.projectId }
     );
     if (!project) throw new Error("Project not found");
@@ -209,7 +210,7 @@ export const scheduleOneOnOneSession = action({
     }
 
     const overlapping = await ctx.runQuery(
-      internal.scheduledCalls.queries.getOverlappingCallsInternal,
+      internalAny.scheduledCalls.queries.getOverlappingCallsInternal,
       { startTime: args.startTime, endTime: args.endTime }
     );
     if (overlapping.length > 0) {
@@ -218,12 +219,12 @@ export const scheduleOneOnOneSession = action({
       );
     }
 
-    const client = await ctx.runQuery(internal.users.queries.getUserByIdInternal, {
+    const client = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
       userId: project.clientId,
     });
     const freelancers = await Promise.all(
       args.freelancerIds.map((id) =>
-        ctx.runQuery(internal.users.queries.getUserByIdInternal, { userId: id })
+        ctx.runQuery(internalAny.users.queries.getUserByIdInternal, { userId: id })
       )
     );
     const attendeeEmails: string[] = [client?.email ?? ""];
@@ -242,7 +243,7 @@ export const scheduleOneOnOneSession = action({
     );
 
     await ctx.runMutation(
-      internal.scheduledCalls.mutations.createScheduledCallInternal,
+      internalAny.scheduledCalls.mutations.createScheduledCallInternal,
       {
         projectId: args.projectId,
         freelancerIds: args.freelancerIds,
@@ -308,7 +309,7 @@ export const scheduleOneOnOneSession = action({
     }
 
     const moderators = await ctx.runQuery(
-      internal.users.queries.getModeratorsAndAdminsInternal,
+      internalAny.users.queries.getModeratorsAndAdminsInternal,
       {}
     );
     for (const mod of moderators) {

@@ -21,6 +21,7 @@ import type * as auth_sessions from "../auth/sessions.js";
 import type * as chat_mutations from "../chat/mutations.js";
 import type * as chat_queries from "../chat/queries.js";
 import type * as contracts_actions from "../contracts/actions.js";
+import type * as contracts_content from "../contracts/content.js";
 import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_queries from "../contracts/queries.js";
 import type * as cron_milestones from "../cron/milestones.js";
@@ -93,6 +94,7 @@ declare const fullApi: ApiFromModules<{
   "chat/mutations": typeof chat_mutations;
   "chat/queries": typeof chat_queries;
   "contracts/actions": typeof contracts_actions;
+  "contracts/content": typeof contracts_content;
   "contracts/mutations": typeof contracts_mutations;
   "contracts/queries": typeof contracts_queries;
   "cron/milestones": typeof cron_milestones;

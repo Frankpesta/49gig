@@ -64,14 +64,17 @@ export function PaymentBreakdownDisplay({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Summary */}
-        <div className="grid grid-cols-3 gap-4">
+        {/* Summary: stack on mobile to avoid overlapping values */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {formatted.details.map((detail, index) => (
-            <div key={index} className="space-y-1">
+            <div
+              key={index}
+              className="min-w-0 rounded-lg border border-border/60 bg-muted/30 p-4 sm:bg-transparent sm:border-0 sm:p-0"
+            >
               <div className="text-sm text-muted-foreground">{detail.label}</div>
-              <div className="text-lg font-semibold">{detail.value}</div>
+              <div className="mt-1 text-lg font-semibold tabular-nums">{detail.value}</div>
               {detail.description && (
-                <div className="text-xs text-muted-foreground">
+                <div className="mt-1 text-xs text-muted-foreground leading-snug">
                   {detail.description}
                 </div>
               )}
@@ -154,11 +157,11 @@ export function PaymentBreakdownDisplay({
         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
           <div className="flex items-start gap-2 text-xs">
             <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <div className="space-y-1">
-              <div className="font-semibold">Service Fee</div>
+            <div className="space-y-1 min-w-0">
+              <div className="font-semibold">What the service fee covers</div>
               <div className="text-muted-foreground">
-                The service fee ({breakdown.platformFeePercentage}%) includes vetting, escrow, contracts, replacements, and support.
-                This fee is included in the total project amount.
+                The service fee ({breakdown.platformFeePercentage}% of the total) is included in the amount you pay.
+                It covers vetting, escrow, contracts, replacements, and support.
               </div>
             </div>
           </div>
