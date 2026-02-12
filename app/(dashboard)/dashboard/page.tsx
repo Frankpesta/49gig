@@ -623,7 +623,7 @@ export default function DashboardPage() {
                         {notification.title}
                       </p>
                       <p className="text-[11px] text-muted-foreground line-clamp-2">
-                        {notification.body}
+                        {notification.message}
                       </p>
                     </div>
                     <span className="text-[11px] text-muted-foreground whitespace-nowrap">
