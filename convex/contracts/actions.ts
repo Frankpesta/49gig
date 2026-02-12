@@ -99,7 +99,10 @@ async function generateContractPdf({
   };
 
   const drawParagraph = (text: string) => {
-    const lines = wrapText(text, pageWidth - margin * 2, regular, bodySize);
+    // pdf-lib's WinAnsi encoding cannot handle raw newline characters (0x0a),
+    // so we normalize any embedded newlines to spaces before wrapping.
+    const safeText = text.replace(/\n/g, " ");
+    const lines = wrapText(safeText, pageWidth - margin * 2, regular, bodySize);
     for (const line of lines) {
       if (y < margin) {
         page = pdfDoc.addPage([pageWidth, pageHeight]);
