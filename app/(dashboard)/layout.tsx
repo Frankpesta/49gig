@@ -210,8 +210,8 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset className="bg-background">
-        <header className="sticky top-0 z-40 flex h-14 sm:h-16 shrink-0 items-center justify-between gap-1 sm:gap-2 border-b border-border/50 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 px-3 sm:px-4">
+      <SidebarInset className="relative bg-gradient-to-br from-background via-primary/5 to-background">
+        <header className="sticky top-0 z-40 flex h-14 sm:h-16 shrink-0 items-center justify-between gap-1 sm:gap-2 border-b border-border/50 bg-background/90 backdrop-blur supports-backdrop-filter:bg-background/70 px-3 sm:px-4">
           <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="h-4 hidden sm:block" />
@@ -224,8 +224,18 @@ export default function DashboardLayout({
             <ThemeToggle />
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 sm:gap-5 md:gap-6 p-3 sm:p-4 md:p-6 lg:p-8 bg-background overflow-x-hidden">
-          {children}
+        <div className="relative flex-1 overflow-x-hidden">
+          {/* Ambient background for all dashboard pages */}
+          <div className="pointer-events-none absolute inset-0 opacity-60">
+            <div className="absolute -top-40 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
+            <div className="absolute -bottom-40 -left-24 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.05),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(15,118,110,0.08),_transparent_60%)] dark:bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.65),_transparent_60%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.22),_transparent_65%)]" />
+          </div>
+          <div className="relative flex flex-1 flex-col gap-4 sm:gap-5 md:gap-6 p-3 sm:p-4 md:p-6 lg:p-8">
+            <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 sm:gap-5 md:gap-6">
+              {children}
+            </div>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
