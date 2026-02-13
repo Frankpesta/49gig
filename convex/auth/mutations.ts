@@ -247,10 +247,10 @@ export const signup = mutation({
     clearRateLimit(`signup:${args.email}`);
 
     const now = Date.now();
-    const verificationToken = generateToken("verify");
+    const verificationCode = generateTwoFactorCode();
     await ctx.db.insert("emailVerificationTokens", {
       userId,
-      token: verificationToken,
+      token: verificationCode,
       expiresAt: now + EMAIL_VERIFICATION_EXPIRY_MS,
       createdAt: now,
     });
@@ -258,7 +258,7 @@ export const signup = mutation({
       userId,
       email: args.email,
       name: args.name,
-      token: verificationToken,
+      code: verificationCode,
     });
 
     return {
@@ -519,25 +519,29 @@ export const resetPassword = mutation({
 });
 
 /**
- * Verify email address
+ * Verify email address (6-digit code)
  */
 export const verifyEmail = mutation({
   args: {
-    token: v.string(),
+    code: v.string(),
   },
   handler: async (ctx, args) => {
+    const code = args.code.trim();
+    if (code.length !== 6 || !/^\d+$/.test(code)) {
+      throw new Error("Invalid verification code");
+    }
     const tokenDoc = await ctx.db
       .query("emailVerificationTokens")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .withIndex("by_token", (q) => q.eq("token", code))
       .first();
     if (!tokenDoc) {
-      throw new Error("Invalid verification token");
+      throw new Error("Invalid verification code");
     }
     if (tokenDoc.usedAt) {
-      throw new Error("Verification token already used");
+      throw new Error("Verification code already used");
     }
     if (tokenDoc.expiresAt < Date.now()) {
-      throw new Error("Verification token expired");
+      throw new Error("Verification code expired. Please request a new one.");
     }
 
     const user = await ctx.db.get(tokenDoc.userId);
@@ -612,10 +616,10 @@ export const resendEmailVerification = mutation({
       }
     }
 
-    const verificationToken = generateToken("verify");
+    const verificationCode = generateTwoFactorCode();
     await ctx.db.insert("emailVerificationTokens", {
       userId: user._id,
-      token: verificationToken,
+      token: verificationCode,
       expiresAt: now + EMAIL_VERIFICATION_EXPIRY_MS,
       createdAt: now,
     });
@@ -623,7 +627,7 @@ export const resendEmailVerification = mutation({
       userId: user._id,
       email: user.email,
       name: user.name,
-      token: verificationToken,
+      code: verificationCode,
     });
 
     return { success: true };

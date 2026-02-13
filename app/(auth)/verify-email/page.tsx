@@ -1,11 +1,9 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -14,22 +12,28 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { loginFeatures } from "@/components/auth/auth-icons";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 
 const authCardClass =
   "rounded-xl border border-border/60 bg-card shadow-lg";
 
 function VerifyEmailContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const [token, setToken] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const verifyEmail = useMutation(
     (api as any)["auth/mutations"].verifyEmail
@@ -44,15 +48,10 @@ function VerifyEmailContent() {
   );
 
   useEffect(() => {
-    const tokenParam = searchParams.get("token");
-    if (tokenParam) {
-      setToken(tokenParam);
-      handleVerify(tokenParam);
-    }
     if (typeof window !== "undefined") {
       setSessionToken(localStorage.getItem("sessionToken"));
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
     if (!success || !userProfile) return;
@@ -72,14 +71,15 @@ function VerifyEmailContent() {
     }
   }, [success, userProfile, router]);
 
-  const handleVerify = async (verifyToken: string) => {
+  const handleVerify = async (verifyCode: string) => {
+    if (verifyCode.length !== 6) return;
     setIsLoading(true);
     setError("");
     try {
-      const result = await verifyEmail({ token: verifyToken });
+      const result = await verifyEmail({ code: verifyCode });
       if (result.success) setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to verify email");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to verify email");
     } finally {
       setIsLoading(false);
     }
@@ -88,50 +88,25 @@ function VerifyEmailContent() {
   const handleResend = async () => {
     setIsResending(true);
     setError("");
+    setResendSuccess(false);
     try {
       await resendVerification({ sessionToken: sessionToken || undefined });
-      setSuccess(true);
-    } catch (err: any) {
-      setError(err.message || "Failed to resend verification email");
+      setResendSuccess(true);
+      setCode("");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to resend verification email");
     } finally {
       setIsResending(false);
     }
   };
 
-  if (success && !token) {
-    return (
-      <AuthTwoColumnLayout
-        leftTitle="Email verification"
-        leftDescription="We&apos;ve sent a new verification link to your inbox. Check your email to continue."
-        features={loginFeatures}
-        heading="Verification sent"
-        subline="Check your inbox for the verification email."
-      >
-        <Card className={authCardClass}>
-          <CardHeader className="space-y-2 px-4 pt-6 pb-4 sm:px-6 lg:px-8 sm:pt-8 sm:pb-6">
-            <CardTitle className="text-xl font-semibold sm:text-2xl">
-              Email sent
-            </CardTitle>
-            <CardDescription>
-              We&apos;ve sent a new verification email. Please check your inbox.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="px-4 pb-6 pt-0 sm:px-6 lg:px-8 sm:pb-8">
-            <Link href="/login" className="w-full">
-              <Button
-                variant="outline"
-                className="w-full h-11 rounded-lg text-base font-medium border-2"
-              >
-                Back to Sign In
-              </Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      </AuthTwoColumnLayout>
-    );
-  }
+  const handleCodeComplete = (value: string) => {
+    if (value.length === 6) {
+      handleVerify(value);
+    }
+  };
 
-  if (success && token) {
+  if (success) {
     return (
       <AuthTwoColumnLayout
         leftTitle="Email verified"
@@ -169,10 +144,10 @@ function VerifyEmailContent() {
   return (
     <AuthTwoColumnLayout
       leftTitle="Verify your email"
-      leftDescription="Enter the verification token we sent to your email to complete sign-up."
+      leftDescription="We sent a 6-digit verification code to your inbox. Enter it below to complete sign-up."
       features={loginFeatures}
       heading="Verify your email"
-      subline="Enter the verification token from your email."
+      subline="Enter the 6-digit code from your email."
     >
       <Card className={authCardClass}>
         <CardHeader className="space-y-2 px-4 pt-6 pb-4 sm:px-6 lg:px-8 sm:pt-8 sm:pb-6">
@@ -180,7 +155,7 @@ function VerifyEmailContent() {
             Email verification
           </CardTitle>
           <CardDescription>
-            Enter the verification token sent to your email.
+            Enter the 6-digit code we sent to your email.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 px-4 pb-6 pt-0 sm:px-6 lg:px-8 sm:pb-8">
@@ -189,27 +164,39 @@ function VerifyEmailContent() {
               {error}
             </div>
           )}
-          <div className="space-y-3">
-            <Label htmlFor="token" className="text-sm font-medium">
-              Verification token
-            </Label>
-            <Input
-              id="token"
-              type="text"
-              placeholder="Enter verification token"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              disabled={isLoading}
-              className="h-11 rounded-lg"
-            />
+          {resendSuccess && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground sm:p-4">
+              We&apos;ve sent a new verification code. Check your inbox.
+            </div>
+          )}
+          <div className="space-y-4">
+            <div className="flex justify-center">
+              <InputOTP
+                maxLength={6}
+                pattern={REGEXP_ONLY_DIGITS}
+                value={code}
+                onChange={setCode}
+                onComplete={handleCodeComplete}
+                disabled={isLoading}
+              >
+                <InputOTPGroup className="flex-nowrap justify-center gap-1 sm:gap-2">
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+            <Button
+              onClick={() => handleVerify(code)}
+              className="w-full h-11 rounded-lg text-base font-medium"
+              disabled={isLoading || code.length !== 6}
+            >
+              {isLoading ? "Verifying…" : "Verify email"}
+            </Button>
           </div>
-          <Button
-            onClick={() => handleVerify(token)}
-            className="w-full h-11 rounded-lg text-base font-medium"
-            disabled={isLoading || !token}
-          >
-            {isLoading ? "Verifying…" : "Verify email"}
-          </Button>
           <div className="relative pt-2">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-border" />
@@ -226,7 +213,7 @@ function VerifyEmailContent() {
             className="w-full h-11 rounded-lg border-2 text-base font-medium"
             disabled={isResending}
           >
-            {isResending ? "Sending…" : "Resend verification email"}
+            {isResending ? "Sending…" : "Resend verification code"}
           </Button>
         </CardContent>
         <CardFooter className="border-t px-4 pb-6 pt-6 sm:px-6 lg:px-8 sm:pb-8">
@@ -248,7 +235,7 @@ export default function VerifyEmailPage() {
       fallback={
         <AuthTwoColumnLayout
           leftTitle="Verify your email"
-          leftDescription="Enter the verification token we sent to your email."
+          leftDescription="We sent a 6-digit verification code to your inbox."
           features={loginFeatures}
           heading="Loading…"
           subline="Please wait."
