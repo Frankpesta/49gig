@@ -1,11 +1,11 @@
 "use client";
 
 import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 
-// Avoid "Type instantiation is excessively deep" - auth/oauth API path triggers deep inference
-const getGoogleAuthUrlRef = api["auth/oauth"].getGoogleAuthUrl;
+// Use require to avoid "Type instantiation is excessively deep" on auth/oauth API path
+const convexApi = require("@/convex/_generated/api").api;
+const getGoogleAuthUrlRef = convexApi["auth/oauth"].getGoogleAuthUrl;
 
 /**
  * Hook for OAuth authentication
