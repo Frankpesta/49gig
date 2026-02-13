@@ -35,6 +35,7 @@ function VerifyEmailContent() {
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const verifyEmail = useMutation(
     (api as any)["auth/mutations"].verifyEmail
   );
@@ -50,6 +51,7 @@ function VerifyEmailContent() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setSessionToken(localStorage.getItem("sessionToken"));
+      setPendingEmail(sessionStorage.getItem("pending_verify_email"));
     }
   }, []);
 
@@ -77,7 +79,10 @@ function VerifyEmailContent() {
     setError("");
     try {
       const result = await verifyEmail({ code: verifyCode });
-      if (result.success) setSuccess(true);
+      if (result.success) {
+      setSuccess(true);
+      sessionStorage.removeItem("pending_verify_email");
+    }
     } catch (err: unknown) {
       setError((err as Error).message || "Failed to verify email");
     } finally {
@@ -90,7 +95,10 @@ function VerifyEmailContent() {
     setError("");
     setResendSuccess(false);
     try {
-      await resendVerification({ sessionToken: sessionToken || undefined });
+      await resendVerification({
+        sessionToken: sessionToken || undefined,
+        email: !sessionToken && pendingEmail ? pendingEmail : undefined,
+      });
       setResendSuccess(true);
       setCode("");
     } catch (err: unknown) {

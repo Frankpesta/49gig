@@ -146,8 +146,11 @@ export default function FreelancerSignupPage() {
       if (result.success) {
         // Track pending resume upload for freelancers
         localStorage.setItem("pending_resume_upload", "freelancer");
-
+        if (result.sessionToken) {
+          localStorage.setItem("sessionToken", result.sessionToken);
+        }
         if (result.emailVerificationRequired) {
+          sessionStorage.setItem("pending_verify_email", formData.email);
           router.push("/verify-email");
         } else {
           router.replace("/resume-upload");

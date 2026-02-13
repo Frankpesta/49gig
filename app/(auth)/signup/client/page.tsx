@@ -95,6 +95,10 @@ export default function ClientSignupPage() {
 
       if (result.success) {
         if (result.emailVerificationRequired) {
+          if (result.sessionToken) {
+            localStorage.setItem("sessionToken", result.sessionToken);
+          }
+          sessionStorage.setItem("pending_verify_email", formData.email);
           router.push("/verify-email");
         } else {
           router.push("/dashboard");
