@@ -261,10 +261,14 @@ export const signup = mutation({
       code: verificationCode,
     });
 
+    // Create session so user can resend verification before email is verified
+    const { sessionToken } = await createSessionForUser(ctx, userId);
+
     return {
       success: true,
       userId,
       emailVerificationRequired: true,
+      sessionToken,
     };
   },
 });
@@ -583,6 +587,7 @@ export const verifyEmail = mutation({
 export const resendEmailVerification = mutation({
   args: {
     sessionToken: v.optional(v.string()),
+    email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -593,12 +598,25 @@ export const resendEmailVerification = mutation({
         .withIndex("by_email", (q) => q.eq("email", identity.email!))
         .first();
     } else if (args.sessionToken) {
-      const sessionData = await getUserBySessionToken(ctx, args.sessionToken);
-      user = sessionData.user;
+      try {
+        const sessionData = await getUserBySessionToken(ctx, args.sessionToken);
+        user = sessionData.user;
+      } catch {
+        user = null;
+      }
+    } else if (args.email) {
+      // Fallback: look up by email (e.g. user lost sessionToken). Rate limit to prevent abuse.
+      if (checkRateLimit(`resend_verify:${args.email}`, 3, 15 * 60 * 1000)) {
+        throw new Error("Too many resend attempts. Please try again in 15 minutes.");
+      }
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", args.email!))
+        .first();
     }
 
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("User not found. Please sign up again or try signing in.");
     }
 
     if (user.emailVerified) {
