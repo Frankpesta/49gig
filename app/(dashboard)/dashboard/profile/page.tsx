@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PLATFORM_CATEGORIES, PROGRAMMING_LANGUAGES, getSkillsForCategory, type TechFieldValue } from "@/lib/platform-skills";
+import { PLATFORM_CATEGORIES, PROGRAMMING_LANGUAGES, getSkillsForCategory, type TechFieldValue, type ExperienceLevelValue } from "@/lib/platform-skills";
 import { toast } from "sonner";
 
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -102,7 +102,7 @@ export default function ProfilePage() {
           industry: formData.industry || undefined,
           bio: formData.bio || undefined,
           techField: (formData.techField || undefined) as TechFieldValue | undefined,
-          experienceLevel: formData.experienceLevel || undefined,
+          experienceLevel: (formData.experienceLevel || undefined) as ExperienceLevelValue | undefined,
           skills: formData.skills.length > 0 ? formData.skills : undefined,
           languagesWritten: formData.languagesWritten.length > 0 ? formData.languagesWritten : undefined,
           hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : undefined,

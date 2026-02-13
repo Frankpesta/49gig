@@ -26,6 +26,9 @@ export type TechFieldValue =
   | "other"
   | PlatformCategoryId;
 
+/** Valid experience levels for schema/mutations */
+export type ExperienceLevelValue = "junior" | "mid" | "senior" | "expert";
+
 /** Canonical list of talent category labels (schema, pricing, project create). Single source of truth. */
 export const TALENT_CATEGORY_LABELS = [
   "Software Development",
