@@ -17,6 +17,18 @@ export const PLATFORM_CATEGORIES = [
 
 export type PlatformCategoryId = (typeof PLATFORM_CATEGORIES)[number]["id"];
 
+/** All valid techField values (legacy + platform categories) for schema/mutations */
+export type TechFieldValue =
+  | "development"
+  | "data_science"
+  | "technical_writing"
+  | "design"
+  | "other"
+  | PlatformCategoryId;
+
+/** Valid experience levels for schema/mutations */
+export type ExperienceLevelValue = "junior" | "mid" | "senior" | "expert";
+
 /** Canonical list of talent category labels (schema, pricing, project create). Single source of truth. */
 export const TALENT_CATEGORY_LABELS = [
   "Software Development",

@@ -93,6 +93,72 @@ export function VerificationEmail({
   );
 }
 
+/**
+ * Beautiful 6-digit verification code email for manual signups
+ */
+export function VerificationCodeEmail({
+  name = "there",
+  code,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { code: string }) {
+  return (
+    <EmailLayout
+      title="Your verification code"
+      preview="Enter this 6-digit code to verify your email and activate your account."
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi {name}, welcome to 49GIG! Enter the verification code below to activate your account.
+      </Text>
+      <Section
+        style={{
+          background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdfa 100%)",
+          borderRadius: "16px",
+          padding: "28px 32px",
+          textAlign: "center",
+          margin: "24px 0",
+          border: "1px solid #bae6fd",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: "12px",
+            fontWeight: 600,
+            color: "#0369a1",
+            margin: "0 0 16px",
+            letterSpacing: "0.5px",
+            textTransform: "uppercase",
+          }}
+        >
+          Your verification code
+        </Text>
+        <Text
+          style={{
+            fontSize: "32px",
+            fontWeight: 700,
+            letterSpacing: "8px",
+            margin: 0,
+            color: "#0c4a6e",
+            fontFamily: "ui-monospace, 'SF Mono', Monaco, monospace",
+          }}
+        >
+          {code}
+        </Text>
+      </Section>
+      <Text style={{ ...textStyle, marginTop: "8px" }}>
+        This code expires in 24 hours. Enter it on the verification page to complete your sign-up.
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "16px", color: "#6b7280", fontSize: "13px" }}>
+        If you did not create an account, you can safely ignore this email.
+      </Text>
+    </EmailLayout>
+  );
+}
+
 export function PasswordResetEmail({
   name = "there",
   resetUrl,

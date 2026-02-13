@@ -1,17 +1,18 @@
 "use client";
 
 import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
+
+// Use require to avoid "Type instantiation is excessively deep" on auth/oauth API path
+const convexApi = require("@/convex/_generated/api").api;
+const getGoogleAuthUrlRef = convexApi["auth/oauth"].getGoogleAuthUrl;
 
 /**
  * Hook for OAuth authentication
  */
 export function useOAuth() {
   const router = useRouter();
-  const getGoogleAuthUrl = useAction(
-    (api as any)["auth/oauth"].getGoogleAuthUrl
-  );
+  const getGoogleAuthUrl = useAction(getGoogleAuthUrlRef);
 
   const signInWithGoogle = async (role?: "client" | "freelancer") => {
     try {
