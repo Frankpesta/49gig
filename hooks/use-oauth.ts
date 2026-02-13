@@ -4,15 +4,15 @@ import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 
+// Avoid "Type instantiation is excessively deep" - auth/oauth API path triggers deep inference
+const getGoogleAuthUrlRef = api["auth/oauth"].getGoogleAuthUrl;
+
 /**
  * Hook for OAuth authentication
  */
 export function useOAuth() {
   const router = useRouter();
-  const getGoogleAuthUrl = useAction(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)["auth/oauth"].getGoogleAuthUrl as any
-  );
+  const getGoogleAuthUrl = useAction(getGoogleAuthUrlRef);
 
   const signInWithGoogle = async (role?: "client" | "freelancer") => {
     try {
