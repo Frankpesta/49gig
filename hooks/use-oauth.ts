@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 export function useOAuth() {
   const router = useRouter();
   const getGoogleAuthUrl = useAction(
-    (api as any)["auth/oauth"].getGoogleAuthUrl
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (api as any)["auth/oauth"].getGoogleAuthUrl as any
   );
 
   const signInWithGoogle = async (role?: "client" | "freelancer") => {
