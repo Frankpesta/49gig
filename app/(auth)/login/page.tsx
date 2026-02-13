@@ -74,6 +74,12 @@ export default function LoginPage() {
         password,
       });
 
+      if (result.requiresEmailVerification && result.email) {
+        sessionStorage.setItem("pending_verify_email", result.email);
+        router.replace("/verify-email");
+        return;
+      }
+
       if (result.requiresTwoFactor) {
         setRequiresTwoFactor(true);
         setTwoFactorTokenId(result.twoFactorTokenId);

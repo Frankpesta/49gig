@@ -330,6 +330,39 @@ export const signin = mutation({
       throw new Error("Invalid email or password");
     }
 
+    // Block login until email is verified
+    if (!user.emailVerified) {
+      const now = Date.now();
+      // Invalidate any existing unused verification tokens
+      const existingTokens = await ctx.db
+        .query("emailVerificationTokens")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .collect();
+      for (const token of existingTokens) {
+        if (!token.usedAt) {
+          await ctx.db.patch(token._id, { usedAt: now });
+        }
+      }
+      const verificationCode = generateTwoFactorCode();
+      await ctx.db.insert("emailVerificationTokens", {
+        userId: user._id,
+        token: verificationCode,
+        expiresAt: now + EMAIL_VERIFICATION_EXPIRY_MS,
+        createdAt: now,
+      });
+      await ctx.scheduler.runAfter(0, sendVerificationEmailRef, {
+        userId: user._id,
+        email: user.email,
+        name: user.name,
+        code: verificationCode,
+      });
+      return {
+        success: false,
+        requiresEmailVerification: true,
+        email: user.email,
+      };
+    }
+
     // Update last login
     const now = Date.now();
     await ctx.db.patch(user._id, {
