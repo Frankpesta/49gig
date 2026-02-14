@@ -92,6 +92,7 @@ export function AppSidebar() {
     Profile: "text-blue-500",
     Settings: "text-zinc-500",
     "Help & Support": "text-teal-500",
+    Enquiries: "text-amber-500",
     "All Projects": "text-emerald-500",
     Active: "text-emerald-500",
     Completed: "text-emerald-500",

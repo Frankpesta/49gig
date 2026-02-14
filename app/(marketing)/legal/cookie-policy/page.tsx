@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { Cookie } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionTransition } from "@/components/ui/section-transition";
@@ -34,15 +34,20 @@ export default function CookiePolicyPage() {
     }
   ];
 
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Cookies", icon: Cookie }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: Cookie, text: "Cookie Policy" }}
+      <PageHero
         title="Cookie Policy"
         description="We use cookies to improve your experience and understand how you use our platform."
+        badge={{ icon: Cookie, text: "Cookie Policy" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=800&q=80"
+        imageAlt="Privacy and cookies"
       />
 
-      <section className="py-20 sm:py-24 lg:py-32 bg-background relative overflow-hidden">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />

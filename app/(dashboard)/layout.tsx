@@ -151,8 +151,8 @@ export default function DashboardLayout({
   if (isInitializing) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="flex flex-col items-center gap-4 animate-in fade-in duration-200">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p className="text-sm text-muted-foreground">Loading dashboard...</p>
         </div>
       </div>
@@ -166,9 +166,9 @@ export default function DashboardLayout({
     isVerified === undefined
   ) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4 animate-in fade-in duration-200">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <p className="text-sm text-muted-foreground">Checking verification status...</p>
         </div>
       </div>
@@ -198,8 +198,8 @@ export default function DashboardLayout({
       // Still loading redirect, show loading state
       return (
         <div className="flex min-h-screen items-center justify-center bg-background">
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <div className="flex flex-col items-center gap-4 animate-in fade-in duration-200">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
             <p className="text-sm text-muted-foreground">Redirecting to verification...</p>
           </div>
         </div>
@@ -208,9 +208,9 @@ export default function DashboardLayout({
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="overflow-hidden">
       <AppSidebar />
-      <SidebarInset className="relative bg-gradient-to-br from-background via-primary/5 to-background">
+      <SidebarInset className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background">
         <header className="sticky top-0 z-40 flex h-14 sm:h-16 shrink-0 items-center justify-between gap-1 sm:gap-2 border-b border-border/50 bg-background/90 backdrop-blur supports-backdrop-filter:bg-background/70 px-3 sm:px-4">
           <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
             <SidebarTrigger className="-ml-1" />
@@ -224,7 +224,7 @@ export default function DashboardLayout({
             <ThemeToggle />
           </div>
         </header>
-        <div className="relative flex-1 overflow-x-hidden">
+        <div className="dashboard-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           {/* Ambient background for all dashboard pages */}
           <div className="pointer-events-none absolute inset-0 opacity-60">
             <div className="absolute -top-40 -right-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />

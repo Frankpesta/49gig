@@ -1,20 +1,25 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { Lock } from "lucide-react";
 
 export default function DataProtectionPage() {
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Data Protection", icon: Lock }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: Lock, text: "Data Protection" }}
+      <PageHero
         title="Data Protection Policy (GDPR Compliance)"
-        description="Last updated: January 6, 2026"
+        description="How we protect your personal data. Last updated: January 6, 2026."
+        badge={{ icon: Lock, text: "Data Protection" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=800&q=80"
+        imageAlt="Data protection"
       />
 
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
+          <div className="prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-semibold prose-p:text-muted-foreground prose-p:leading-relaxed prose-li:text-muted-foreground">
             <h2>1. Introduction</h2>
             <p>
               49GIG ("we," "our," or "us") is committed to protecting the personal data of all users, including those in the European Union (EU) and European Economic Area (EEA). This Data Protection Policy outlines how we comply with the General Data Protection Regulation (GDPR) and other applicable data protection laws.

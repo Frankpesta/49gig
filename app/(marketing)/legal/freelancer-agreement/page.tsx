@@ -1,20 +1,25 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { FileSignature } from "lucide-react";
 
 export default function FreelancerAgreementPage() {
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Freelancer Agreement", icon: FileSignature }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: FileSignature, text: "Freelancer Agreement" }}
+      <PageHero
         title="Freelancer Agreement Template"
-        description="Last updated: January 6, 2026"
+        description="Standard terms for freelancer engagements. Last updated: January 6, 2026."
+        badge={{ icon: FileSignature, text: "Freelancer Agreement" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
+        imageAlt="Freelancer agreement"
       />
 
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
+          <div className="prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-semibold prose-p:text-muted-foreground prose-p:leading-relaxed prose-li:text-muted-foreground">
             <h2>Freelancer Services Agreement</h2>
             <p className="text-sm italic">
               This Freelancer Services Agreement ("Agreement") is entered into between the Client and the Freelancer through the 49GIG platform. By accepting a project, the Freelancer agrees to be bound by these terms.

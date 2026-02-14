@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import {
   CheckCircle2,
   Users,
@@ -211,7 +212,7 @@ export default function Home() {
       >
         <HeroVideo />
         <div
-          className="absolute inset-0 bg-linear-to-b from-black/70 via-black/50 to-black/70"
+          className="absolute inset-0 bg-black/60 sm:bg-black/55 md:bg-black/50"
           aria-hidden
         />
         <div className="relative z-10 flex min-h-[88vh] flex-col justify-center px-4 pt-14 md:pt-16 sm:px-6 lg:px-8">
@@ -529,133 +530,31 @@ export default function Home() {
             </div>
           </SectionTransition>
 
-          {/* Modern Timeline Design */}
-          <div className="relative max-w-6xl mx-auto">
-            {/* Central Timeline Line */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-linear-to-b from-primary via-secondary to-primary transform -translate-x-1/2 hidden lg:block" />
-
-            <div className="space-y-16 lg:space-y-20">
-              {howItWorks.map((item, index) => (
-                <SectionTransition key={index} variant="slide" direction={index % 2 === 0 ? "left" : "right"} delay={300 + index * 150}>
-                  <div className={`relative grid gap-8 lg:grid-cols-2 lg:gap-16 items-center ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}>
-                    {/* Timeline Node */}
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 hidden lg:block">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-secondary shadow-2xl border-4 border-background">
-                        <item.icon className="h-7 w-7 text-white" />
-                      </div>
-                      <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg border-4 border-background">
-                        {item.step}
-                      </div>
-                    </div>
-
-                    {/* Content Card */}
-                    <div className={`lg:${index % 2 === 0 ? 'pr-16' : 'pl-16'} space-y-6`}>
-                      <div className="bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:scale-105">
-                        <div className="space-y-6">
-                          {/* Mobile Step Indicator */}
-                          <div className="flex items-center gap-4 lg:hidden">
-                            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-linear-to-br from-primary to-secondary shadow-lg">
-                              <item.icon className="h-6 w-6 text-white" />
-                            </div>
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg">
-                              {item.step}
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            <h3 className="text-2xl lg:text-3xl font-bold text-foreground leading-tight">
-                              {item.title}
-                            </h3>
-                            <div className="h-1 w-16 bg-linear-to-r from-primary to-secondary rounded-full" />
-                            <p className="text-lg text-muted-foreground leading-relaxed">
-                              {item.description}
-                            </p>
-                          </div>
-
-                          {/* Enhanced Feature Tags */}
-                          <div className="flex flex-wrap gap-3">
-                            {index === 0 && [
-                              { text: "Project details", icon: FileCheck, color: "from-blue-500 to-blue-600" },
-                              { text: "Budget range", icon: DollarSign, color: "from-green-500 to-green-600" },
-                              { text: "Timeline", icon: Clock, color: "from-purple-500 to-purple-600" },
-                              { text: "Skills needed", icon: Target, color: "from-orange-500 to-orange-600" }
-                            ].map((tag, idx) => (
-                              <div key={idx} className={`inline-flex items-center gap-2 rounded-full bg-linear-to-r ${tag.color} px-4 py-2 text-sm font-medium text-white shadow-lg hover:scale-105 transition-transform duration-200`}>
-                                <tag.icon className="h-3 w-3" />
-                                {tag.text}
-                              </div>
-                            ))}
-
-                            {index === 1 && [
-                              { text: "AI matching", icon: Search, color: "from-primary to-primary/80" },
-                              { text: "Skill assessment", icon: CheckCircle2, color: "from-secondary to-secondary/80" },
-                              { text: "Availability check", icon: Clock, color: "from-green-500 to-green-600" },
-                              { text: "Experience level", icon: Star, color: "from-yellow-500 to-yellow-600" }
-                            ].map((tag, idx) => (
-                              <div key={idx} className={`inline-flex items-center gap-2 rounded-full bg-linear-to-r ${tag.color} px-4 py-2 text-sm font-medium text-white shadow-lg hover:scale-105 transition-transform duration-200`}>
-                                <tag.icon className="h-3 w-3" />
-                                {tag.text}
-                              </div>
-                            ))}
-
-                            {index === 2 && [
-                              { text: "Review profiles", icon: UserCheck, color: "from-indigo-500 to-indigo-600" },
-                              { text: "Check portfolios", icon: Briefcase, color: "from-pink-500 to-pink-600" },
-                              { text: "Conduct interviews", icon: MessageCircle, color: "from-cyan-500 to-cyan-600" },
-                              { text: "Make offers", icon: Handshake, color: "from-emerald-500 to-emerald-600" }
-                            ].map((tag, idx) => (
-                              <div key={idx} className={`inline-flex items-center gap-2 rounded-full bg-linear-to-r ${tag.color} px-4 py-2 text-sm font-medium text-white shadow-lg hover:scale-105 transition-transform duration-200`}>
-                                <tag.icon className="h-3 w-3" />
-                                {tag.text}
-                              </div>
-                            ))}
-
-                            {index === 3 && [
-                              { text: "Milestone tracking", icon: TrendingUpIcon, color: "from-violet-500 to-violet-600" },
-                              { text: "Secure payments", icon: Shield, color: "from-teal-500 to-teal-600" },
-                              { text: "Quality assurance", icon: Award, color: "from-amber-500 to-amber-600" },
-                              { text: "24/7 support", icon: Heart, color: "from-rose-500 to-rose-600" }
-                            ].map((tag, idx) => (
-                              <div key={idx} className={`inline-flex items-center gap-2 rounded-full bg-linear-to-r ${tag.color} px-4 py-2 text-sm font-medium text-white shadow-lg hover:scale-105 transition-transform duration-200`}>
-                                <tag.icon className="h-3 w-3" />
-                                {tag.text}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Enhanced Image Section */}
-                    <div className="relative group lg:block hidden">
-                      <div className="relative aspect-4/3 w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
-                        <Image
-                          src={item.image}
-                          alt={item.title}
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
-                          sizes="(max-width: 1024px) 100vw, 50vw"
-                        />
-                        <div className="absolute inset-0 bg-linear-to-tr from-primary/10 via-transparent to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                        {/* Floating success indicators */}
-                        <div className="absolute top-4 right-4 bg-background/95 backdrop-blur-sm rounded-2xl px-4 py-2 border border-border/30 shadow-lg">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            <span className="text-sm font-medium text-foreground">Success Rate: 98%</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Floating elements */}
-                      <div className="absolute -top-4 -right-4 w-8 h-8 bg-primary/20 rounded-full animate-bounce shadow-lg" style={{ animationDelay: `${index * 0.5}s` }} />
-                      <div className="absolute -bottom-4 -left-4 w-6 h-6 bg-secondary/20 rounded-full animate-bounce shadow-lg" style={{ animationDelay: `${index * 0.5 + 0.3}s` }} />
-                    </div>
+          {/* Bento Grid - Varied card sizes */}
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
+            {howItWorks.map((item, index) => (
+              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
+                <BentoCard
+                  colSpan={index === 0 ? 2 : 1}
+                  rowSpan={index === 0 ? 2 : 1}
+                  className="bg-background/90 backdrop-blur-xl hover:shadow-primary/10"
+                >
+                  <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 text-primary mb-4">
+                    <item.icon className="h-6 w-6 sm:h-7 sm:w-7" />
                   </div>
-                </SectionTransition>
-              ))}
-            </div>
-          </div>
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold mb-3">
+                    {item.step}
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2 leading-tight">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+                    {item.description}
+                  </p>
+                </BentoCard>
+              </SectionTransition>
+            ))}
+          </BentoGrid>
 
           {/* Enhanced CTA Section */}
           <SectionTransition variant="fade" delay={800}>

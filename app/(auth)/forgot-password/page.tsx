@@ -117,10 +117,17 @@ export default function ForgotPasswordPage() {
             </div>
             <Button
               type="submit"
-              className="w-full h-11 rounded-lg text-sm font-medium"
+              className="w-full h-11 rounded-lg text-sm font-medium disabled:opacity-90"
               disabled={isLoading}
             >
-              {isLoading ? "Sending…" : "Send reset link"}
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Sending…
+                </span>
+              ) : (
+                "Send reset link"
+              )}
             </Button>
           </CardContent>
         </form>

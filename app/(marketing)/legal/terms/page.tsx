@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { FileText, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,7 +66,7 @@ export default function TermsPage() {
       id: "6",
       title: "Fees and Payments",
       subsections: [
-        { title: "Service Fees", content: "49GIG charges service fees for facilitating projects. Fee structures are outlined in our Pricing page and Payment Terms." },
+        { title: "Service Fees", content: "49GIG charges service fees for facilitating projects. Fee structures are outlined in our Payment Terms." },
         { title: "Taxes", content: "You are responsible for determining and paying all applicable taxes related to your use of the Platform." }
       ]
     },
@@ -101,15 +101,20 @@ export default function TermsPage() {
     }
   ];
 
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Terms", icon: FileText }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: FileText, text: "Terms & Conditions" }}
+      <PageHero
         title="Terms and Conditions"
         description="Please read these terms carefully. By using our platform, you agree to be bound by these terms."
+        badge={{ icon: FileText, text: "Terms & Conditions" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
+        imageAlt="Legal documents"
       />
 
-      <section className="py-20 sm:py-24 lg:py-32 bg-background relative overflow-hidden">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
@@ -117,9 +122,9 @@ export default function TermsPage() {
 
         <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           {/* Table of Contents */}
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Table of Contents</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className="mb-10">
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4">Table of Contents</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
               {sections.map((section) => (
                 <button
                   key={section.id}

@@ -1,20 +1,25 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { DollarSign } from "lucide-react";
 
 export default function PaymentTermsPage() {
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Payment Terms", icon: DollarSign }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: DollarSign, text: "Payment Terms" }}
+      <PageHero
         title="Payment Terms & Conditions"
-        description="Last updated: January 6, 2026"
+        description="Governs all financial transactions on the 49GIG platform. Last updated: January 6, 2026."
+        badge={{ icon: DollarSign, text: "Payment Terms" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&q=80"
+        imageAlt="Payment and finance"
       />
 
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
+          <div className="prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-semibold prose-p:text-muted-foreground prose-p:leading-relaxed prose-li:text-muted-foreground">
             <h2>1. Overview</h2>
             <p>
               These Payment Terms govern all financial transactions on the 49GIG platform, including project payments, service fees, freelancer payouts, and related financial operations.

@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
@@ -16,18 +14,8 @@ import {
   Search,
   Filter,
   Star,
-  DollarSign,
-  Clock,
-  MapPin,
-  Award,
   ArrowRight,
   Sparkles,
-  Lightbulb,
-  TrendingUp,
-  BarChart3,
-  MessageCircle,
-  ThumbsUp,
-  Crown,
   Layers,
   Shield,
   Brain,
@@ -35,13 +23,7 @@ import {
   Code,
   Palette,
   Database,
-  Cloud,
-  Cpu,
-  UserCheck,
-  FileText,
-  Settings,
-  Globe,
-  Heart
+  Cloud
 } from "lucide-react";
 
 export default function TalentCategoriesPage() {
@@ -64,8 +46,7 @@ export default function TalentCategoriesPage() {
       skills: ["React", "Node.js", "Python", "Java", "PHP", "Go", "Rust", "Mobile Dev"],
       image: "https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80",
       freelancerCount: 1250,
-      avgRating: 4.8,
-      startingPrice: 45
+      avgRating: 4.8
     },
     {
       id: "design",
@@ -77,8 +58,7 @@ export default function TalentCategoriesPage() {
       skills: ["UI Design", "UX Research", "Prototyping", "Figma", "Adobe XD", "Brand Design"],
       image: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800&q=80",
       freelancerCount: 890,
-      avgRating: 4.7,
-      startingPrice: 35
+      avgRating: 4.7
     },
     {
       id: "data",
@@ -90,8 +70,7 @@ export default function TalentCategoriesPage() {
       skills: ["Python", "SQL", "Tableau", "Power BI", "Machine Learning", "Statistics"],
       image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
       freelancerCount: 650,
-      avgRating: 4.9,
-      startingPrice: 50
+      avgRating: 4.9
     },
     {
       id: "devops",
@@ -103,8 +82,7 @@ export default function TalentCategoriesPage() {
       skills: ["Docker", "Kubernetes", "AWS", "Azure", "Terraform", "CI/CD", "Linux"],
       image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=80",
       freelancerCount: 420,
-      avgRating: 4.8,
-      startingPrice: 55
+      avgRating: 4.8
     },
     {
       id: "cybersecurity",
@@ -116,8 +94,7 @@ export default function TalentCategoriesPage() {
       skills: ["Network Security", "Penetration Testing", "SIEM", "Compliance", "Risk Assessment"],
       image: "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&q=80",
       freelancerCount: 380,
-      avgRating: 4.9,
-      startingPrice: 60
+      avgRating: 4.9
     },
     {
       id: "ai-ml",
@@ -129,8 +106,7 @@ export default function TalentCategoriesPage() {
       skills: ["Machine Learning", "Deep Learning", "TensorFlow", "Blockchain", "Smart Contracts", "Web3"],
       image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80",
       freelancerCount: 520,
-      avgRating: 4.8,
-      startingPrice: 65
+      avgRating: 4.8
     },
     {
       id: "qa",
@@ -142,8 +118,7 @@ export default function TalentCategoriesPage() {
       skills: ["Test Automation", "Selenium", "Cypress", "QA", "Performance Testing", "API Testing"],
       image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
       freelancerCount: 310,
-      avgRating: 4.7,
-      startingPrice: 40
+      avgRating: 4.7
     }
   ];
 
@@ -152,128 +127,71 @@ export default function TalentCategoriesPage() {
     category.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const featuredFreelancers = [
-    {
-      name: "Sarah Johnson",
-      role: "Senior React Developer",
-      category: "development",
-      rating: 4.9,
-      completedProjects: 127,
-      hourlyRate: 65,
-      location: "Nigeria",
-      skills: ["React", "TypeScript", "Node.js"],
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&q=80",
-      verified: true,
-      available: true
-    },
-    {
-      name: "David Kiprop",
-      role: "UX/UI Designer",
-      category: "design",
-      rating: 4.8,
-      completedProjects: 89,
-      hourlyRate: 45,
-      location: "Kenya",
-      skills: ["Figma", "User Research", "Prototyping"],
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-      verified: true,
-      available: true
-    },
-    {
-      name: "Amara Okafor",
-      role: "Data Scientist",
-      category: "data",
-      rating: 5.0,
-      completedProjects: 156,
-      hourlyRate: 70,
-      location: "South Africa",
-      skills: ["Python", "ML", "SQL"],
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
-      verified: true,
-      available: false
-    }
-  ];
-
   return (
     <div className="w-full">
-      <PageHeader
+      <PageHero
         title="Explore Talent Categories"
         description="Find skilled African professionals across every specialty. From developers and designers to data scientists and marketers—discover the perfect talent for your project."
-        badge={{
-          icon: Layers,
-          text: "All Categories"
-        }}
+        badge={{ icon: Layers, text: "All Categories" }}
         breadcrumbs={breadcrumbs}
-      >
-        <div className="space-y-8">
-          {/* Search and Filter Bar */}
-          <div className="bg-background/80 backdrop-blur-xl rounded-3xl p-6 border border-border/30 shadow-xl">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Search skills, categories, or roles..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-background/50 border border-border/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-300"
-                />
-              </div>
-              <Button variant="outline" className="px-6 py-3 border-primary/30 hover:bg-primary/5">
-                <Filter className="h-4 w-4 mr-2" />
-                Filters
-              </Button>
-            </div>
+        imageSrc="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80"
+        imageAlt="Professional collaboration"
+        actions={
+          <>
+            <CTAButton href="/signup" variant="primary" className="gap-2">
+              Start Hiring
+              <ArrowRight className="h-4 w-4" />
+            </CTAButton>
+            <CTAButton href="/hire-talent" variant="secondary" className="gap-2">
+              Learn More
+              <ArrowRight className="h-4 w-4" />
+            </CTAButton>
+          </>
+        }
+      />
 
-            {/* Category Pills */}
-            <div className="flex flex-wrap gap-3 mt-6">
+      {/* Search and Filter Bar */}
+      <section className="py-6 sm:py-8 border-b border-border/30 bg-muted/20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search skills, categories, or roles..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-background border border-border/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
+              />
+            </div>
+            <Button variant="outline" className="px-6 py-3 border-primary/30 hover:bg-primary/5">
+              <Filter className="h-4 w-4 mr-2" />
+              Filters
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:gap-3 mt-4">
+            <button
+              onClick={() => setSelectedCategory(null)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                selectedCategory === null ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"
+              }`}
+            >
+              All Categories
+            </button>
+            {categories.map((category) => (
               <button
-                onClick={() => setSelectedCategory(null)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                  selectedCategory === null
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  selectedCategory === category.id ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80 text-muted-foreground"
                 }`}
               >
-                All Categories
+                {category.name}
               </button>
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
-                    selectedCategory === category.id
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-primary">5,000+</div>
-              <div className="text-sm text-muted-foreground">Verified Freelancers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-secondary">50+</div>
-              <div className="text-sm text-muted-foreground">Specialties</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-green-600">4.8★</div>
-              <div className="text-sm text-muted-foreground">Average Rating</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-purple-600">120+</div>
-              <div className="text-sm text-muted-foreground">Countries</div>
-            </div>
+            ))}
           </div>
         </div>
-      </PageHeader>
+      </section>
 
       {/* TALENT CATEGORIES GRID */}
       <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-primary/5 to-background relative overflow-hidden">
@@ -299,10 +217,6 @@ export default function TalentCategoriesPage() {
                       <div className="flex items-start justify-between mb-6">
                         <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${category.color} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                           <category.icon className="h-8 w-8 text-white" />
-                        </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-black text-foreground">${category.startingPrice}+</div>
-                          <div className="text-sm text-muted-foreground">starting rate</div>
                         </div>
                       </div>
 
@@ -354,203 +268,6 @@ export default function TalentCategoriesPage() {
                             Explore
                             <ArrowRight className="h-3 w-3" />
                           </CTAButton>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SectionTransition>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* FEATURED FREELANCERS */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-muted/20 via-background to-muted/20 border-y border-border/30 relative overflow-hidden">
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-secondary/10 to-primary/10 px-6 py-3 text-sm font-bold text-secondary mb-6 border border-secondary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-secondary/20 to-primary/20">
-                  <Crown className="h-3.5 w-3.5 text-secondary" />
-                </div>
-                Featured Talent
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
-                Top-Rated <span className="bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">African Professionals</span>
-              </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                Meet some of our highest-rated freelancers across different categories, ready to take your project to the next level.
-              </p>
-            </div>
-          </SectionTransition>
-
-          {/* Featured Freelancers */}
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {featuredFreelancers.map((freelancer, index) => (
-              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative">
-                  <div className="relative bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-6 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 overflow-hidden">
-                    {/* Background Gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="relative">
-                      {/* Profile Header */}
-                      <div className="flex items-start gap-4 mb-6">
-                        <div className="relative">
-                          <div className="w-16 h-16 rounded-2xl overflow-hidden">
-                            <Image
-                              src={freelancer.image}
-                              alt={freelancer.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          {freelancer.verified && (
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                              <CheckCircle2 className="h-3 w-3 text-white" />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg text-foreground truncate">{freelancer.name}</h3>
-                          <p className="text-primary font-medium text-sm">{freelancer.role}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm font-medium">{freelancer.rating}</span>
-                            <span className="text-sm text-muted-foreground">({freelancer.completedProjects} projects)</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Skills */}
-                      <div className="mb-6">
-                        <div className="flex flex-wrap gap-2">
-                          {freelancer.skills.map((skill, idx) => (
-                            <span key={idx} className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
-                              {skill}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-4 border-t border-border/30">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            <MapPin className="h-4 w-4" />
-                            <span>{freelancer.location}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-foreground">${freelancer.hourlyRate}/hr</div>
-                          </div>
-                          {freelancer.available ? (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                              <span className="text-xs font-medium">Available</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span className="text-xs">Busy</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* CTA */}
-                      <div className="mt-6">
-                        <CTAButton href="/hire-talent" variant="primary" size="sm" className="w-full justify-center gap-2">
-                          View Profile
-                          <ArrowRight className="h-3 w-3" />
-                        </CTAButton>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SectionTransition>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* WHY CHOOSE 49GIG TALENT */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-muted/10 to-background relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary/20 to-secondary/20">
-                  <Lightbulb className="h-3.5 w-3.5 text-primary" />
-                </div>
-                Why 49GIG Talent
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
-                Quality That <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Delivers Results</span>
-              </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                Every freelancer on our platform goes through rigorous vetting to ensure they meet the highest standards of quality and professionalism.
-              </p>
-            </div>
-          </SectionTransition>
-
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Award,
-                title: "Rigorous Vetting",
-                description: "Every freelancer undergoes comprehensive testing and background verification before joining our platform."
-              },
-              {
-                icon: Star,
-                title: "Proven Track Record",
-                description: "Our freelancers have successfully completed thousands of projects with consistently high ratings."
-              },
-              {
-                icon: Globe,
-                title: "Global Standards",
-                description: "African talent trained to meet international standards and best practices across all industries."
-              },
-              {
-                icon: Heart,
-                title: "Client-Focused",
-                description: "Our freelancers are committed to delivering exceptional results that exceed client expectations."
-              }
-            ].map((reason, index) => (
-              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative h-full">
-                  <div className="relative h-full bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
-                    {/* Animated Background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="relative space-y-6">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20 group-hover:scale-110">
-                        <reason.icon className="h-8 w-8 text-primary group-hover:scale-110 transition-transform duration-300" />
-                      </div>
-
-                      <div className="space-y-3">
-                        <h3 className="text-xl lg:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
-                          {reason.title}
-                        </h3>
-                        <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
-                          {reason.description}
-                        </p>
-                      </div>
-
-                      {/* Progress Bar Animation */}
-                      <div className="space-y-2">
-                        <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
-                          <div className="h-full w-0 bg-gradient-to-r from-primary to-secondary rounded-full group-hover:w-full transition-all duration-700 ease-out" />
                         </div>
                       </div>
                     </div>

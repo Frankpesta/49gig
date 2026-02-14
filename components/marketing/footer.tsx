@@ -84,9 +84,9 @@ export function Footer() {
 
   return (
     <footer className="border-t border-border bg-background">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-10 lg:gap-14">
           {/* Brand Column */}
           <div className="lg:col-span-2">
             <Link href="/" className="inline-block" aria-label="49GIG Home">
@@ -94,19 +94,19 @@ export function Footer() {
                 key={logoSrc}
                 src={logoSrc}
                 alt="49GIG"
-                width={100}
-                height={50}
+                width={120}
+                height={60}
                 className="h-auto w-auto object-contain object-left"
                 priority
               />
             </Link>
-            <p className="text-sm text-muted-foreground mb-6 max-w-xs leading-relaxed">
-              Connecting exceptional African talent with global opportunities. We're redefining freelancing through vetted quality and transparent relationships.
+            <p className="text-base text-muted-foreground mt-4 mb-6 max-w-sm leading-relaxed">
+              Connecting exceptional African talent with global opportunities. We&apos;re redefining freelancing through vetted quality and transparent relationships.
             </p>
             
             {/* Newsletter Signup */}
             <div className="space-y-3">
-              <p className="text-sm font-medium text-foreground">
+              <p className="text-base font-semibold text-foreground">
                 Stay updated
               </p>
               <form className="flex gap-2">
@@ -127,8 +127,8 @@ export function Footer() {
 
           {/* Links Columns */}
           {Object.entries(footerLinks).map(([key, section]) => (
-            <div key={key} className="space-y-4">
-              <h3 className="text-sm font-semibold text-foreground">
+            <div key={key} className="space-y-5">
+              <h3 className="text-base font-semibold text-foreground">
                 {section.title}
               </h3>
               <ul className="space-y-3">
@@ -136,7 +136,7 @@ export function Footer() {
                   <li key={link.href}>
                     <Link
                       href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-base text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -148,10 +148,10 @@ export function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-border">
+        <div className="mt-14 pt-10 border-t border-border">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             {/* Copyright */}
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               © {currentYear} 49GIG. All rights reserved.
             </p>
 

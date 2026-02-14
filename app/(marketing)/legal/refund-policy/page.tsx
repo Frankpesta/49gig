@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { RefreshCw, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionTransition } from "@/components/ui/section-transition";
@@ -49,15 +49,20 @@ export default function RefundPolicyPage() {
     }
   ];
 
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Refund Policy", icon: RefreshCw }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: RefreshCw, text: "Refund Policy" }}
+      <PageHero
         title="Refund & Cancellation Policy"
         description="Clear, transparent guidelines for refunds and cancellations on the 49GIG platform."
+        badge={{ icon: RefreshCw, text: "Refund Policy" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&q=80"
+        imageAlt="Refunds and payments"
       />
 
-      <section className="py-20 sm:py-24 lg:py-32 bg-background relative overflow-hidden">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
@@ -108,22 +113,18 @@ export default function RefundPolicyPage() {
             </div>
           </SectionTransition>
 
-          {/* Cancellation Timeline */}
+          {/* Cancellation Timeline - Bento Grid */}
           <SectionTransition variant="fade" delay={500}>
             <div className="mb-16">
-              <h2 className="text-3xl font-bold text-foreground mb-8">Cancellation Timeline</h2>
-              <div className="space-y-6">
+              <h2 className="text-2xl sm:text-3xl font-semibold text-foreground mb-6">Cancellation Timeline</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 {timeline.map((item, index) => (
-                  <SectionTransition key={index} variant="slide" direction="left" delay={600 + index * 100}>
-                    <Card className="border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all duration-300">
+                  <SectionTransition key={index} variant="slide" direction="up" delay={600 + index * 100}>
+                    <Card className="border border-border/50 hover:border-primary/50 hover:shadow-md transition-all h-full">
                       <CardContent className="p-6">
-                        <div className="flex items-start gap-4">
-                          <div className="text-3xl flex-shrink-0">{item.icon}</div>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-foreground mb-2">{item.title}</h3>
-                            <p className="text-muted-foreground">{item.description}</p>
-                          </div>
-                        </div>
+                        <div className="text-2xl mb-3">{item.icon}</div>
+                        <h3 className="text-base font-semibold text-foreground mb-2">{item.title}</h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
                       </CardContent>
                     </Card>
                   </SectionTransition>

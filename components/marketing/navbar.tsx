@@ -32,19 +32,16 @@ const navLinks: NavLink[] = [
   { label: "For Freelancers", href: "/for-freelancers" },
   {
     label: "Resources",
-    href: "/resources",
+    href: "/use-cases",
     children: [
-      { label: "Blog", href: "/blog" },
       { label: "Use Cases", href: "/use-cases" },
       { label: "Contact Us", href: "/contact" },
     ],
   },
-  { label: "Pricing", href: "/pricing" },
   { label: "About", href: "/about" },
 ];
 
-// Remove Pricing from navLinks
-const filteredNavLinks = navLinks.filter(link => link.label !== "Pricing");
+const filteredNavLinks = navLinks;
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);

@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
 
+// Lightweight fade-in for auth pages (no framer-motion dependency)
+const fadeIn = "animate-in fade-in duration-300 fill-mode-both";
+
 export interface AuthFeature {
   icon: ReactNode;
   title: string;
@@ -48,13 +51,13 @@ export function AuthTwoColumnLayout({
 }: AuthTwoColumnLayoutProps) {
   return (
     <div className="relative min-h-screen bg-background">
-      {/* Subtle ambient gradient – no heavy blurs */}
+      {/* Subtle ambient gradient – lightweight, no heavy blurs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute left-0 top-0 w-[min(60%,480px)] h-full bg-gradient-to-r from-primary/[0.03] to-transparent" />
         <div className="absolute right-0 bottom-0 w-[min(50%,400px)] h-[60%] bg-gradient-to-t from-muted/30 to-transparent" />
       </div>
 
-      <div className="relative grid min-h-screen lg:grid-cols-2">
+      <div className={cn("relative grid min-h-screen lg:grid-cols-2", fadeIn)}>
         {/* Left column – branding (hidden on mobile) */}
         <div
           className={cn(
@@ -123,9 +126,9 @@ export function AuthTwoColumnLayout({
               </div>
             )}
 
-            <header className="space-y-2.5 sm:space-y-3">
+            <header className={cn("space-y-2.5 sm:space-y-3", fadeIn)} style={{ animationDelay: "50ms" }}>
               {badge && (
-                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-primary">
+                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-primary ring-1 ring-primary/10">
                   <span className="h-1 w-1 rounded-full bg-primary" />
                   {badge}
                 </div>

@@ -195,8 +195,15 @@ function ResetPasswordContent() {
                 />
               </div>
               <div className="pt-2">
-                <Button type="submit" className="w-full h-11 text-base font-medium" disabled={isLoading}>
-                  {isLoading ? "Resetting..." : "Reset Password"}
+                <Button type="submit" className="w-full h-11 text-base font-medium disabled:opacity-90" disabled={isLoading}>
+                  {isLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Resetting...
+                    </span>
+                  ) : (
+                    "Reset Password"
+                  )}
                 </Button>
               </div>
             </CardContent>

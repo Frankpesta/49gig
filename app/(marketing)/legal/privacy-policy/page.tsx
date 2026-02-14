@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { Shield, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -192,15 +192,20 @@ export default function PrivacyPolicyPage() {
     }
   ];
 
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Privacy", icon: Shield }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: Shield, text: "Privacy Policy" }}
+      <PageHero
         title="Your Privacy Matters"
         description="We take data protection seriously. This privacy policy explains how we collect, use, and protect your information."
+        badge={{ icon: Shield, text: "Privacy Policy" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=800&q=80"
+        imageAlt="Privacy and security"
       />
 
-      <section className="py-20 sm:py-24 lg:py-32 bg-background relative overflow-hidden">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background relative overflow-hidden">
         <div className="absolute inset-0">
           <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
@@ -208,9 +213,9 @@ export default function PrivacyPolicyPage() {
 
         <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           {/* Table of Contents */}
-          <div className="mb-12">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Table of Contents</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className="mb-10">
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4">Table of Contents</h2>
+            <div className="grid gap-2 sm:grid-cols-2">
               {sections.map((section) => (
                 <button
                   key={section.id}

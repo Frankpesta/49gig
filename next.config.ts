@@ -10,6 +10,12 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Performance: enable React strict mode for better dev experience
+  reactStrictMode: true,
+  // Optimize package imports for smaller bundles
+  experimental: {
+    optimizePackageImports: ["lucide-react", "date-fns"],
+  },
 };
 
 export default nextConfig;

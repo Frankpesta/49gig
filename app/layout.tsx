@@ -15,13 +15,13 @@ const inter = Inter({
   preload: true,
 });
 
-// Inter Tight - For headings and emphasis
+// Inter Tight - For headings and emphasis (preload for faster LCP)
 const interTight = Inter_Tight({
   variable: "--font-inter-tight",
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600", "700", "800"],
-  preload: false,
+  preload: true,
 });
 
 export const metadata: Metadata = {

@@ -4,9 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import {
   CheckCircle2,
   Users,
@@ -45,68 +46,6 @@ export default function HireTeamPage() {
   const breadcrumbs = [
     { label: "Hire", href: "/hire-talent" },
     { label: "Team", icon: Users },
-  ];
-
-  const teamPlans = [
-    {
-      name: "Startup Team",
-      price: "$2,500",
-      period: "per month",
-      description: "Perfect for early-stage startups and small projects",
-      teamSize: "3-5 members",
-      features: [
-        "Product Manager",
-        "2 Developers",
-        "UI/UX Designer",
-        "Basic project management",
-        "Weekly standups",
-        "Monthly reports",
-        "Email support"
-      ],
-      popular: false,
-      color: "border-border/50"
-    },
-    {
-      name: "Growth Team",
-      price: "$5,000",
-      period: "per month",
-      description: "Ideal for growing companies scaling their products",
-      teamSize: "5-8 members",
-      features: [
-        "Senior Product Manager",
-        "4 Full-stack Developers",
-        "2 UI/UX Designers",
-        "QA Engineer",
-        "DevOps Engineer",
-        "Advanced project management",
-        "Daily standups",
-        "Bi-weekly reports",
-        "Priority support"
-      ],
-      popular: true,
-      color: "border-primary/50 bg-primary/5"
-    },
-    {
-      name: "Enterprise Team",
-      price: "Custom",
-      period: "pricing",
-      description: "For large-scale projects and dedicated development",
-      teamSize: "10+ members",
-      features: [
-        "Technical Lead",
-        "8+ Developers",
-        "3 UI/UX Designers",
-        "2 QA Engineers",
-        "DevOps & Security",
-        "Product Manager",
-        "Project Manager",
-        "Dedicated account manager",
-        "24/7 support",
-        "Custom integrations"
-      ],
-      popular: false,
-      color: "border-secondary/50 bg-secondary/5"
-    }
   ];
 
   const teamCompositions = [
@@ -204,165 +143,28 @@ export default function HireTeamPage() {
 
   return (
     <div className="w-full">
-      <PageHeader
+      <PageHero
         title="Hire Dedicated Teams"
         description="Assemble high-performing, dedicated teams of African professionals for your next big project. From development teams to design squads, get the complete package with seamless collaboration and single-point accountability."
-        badge={{
-          icon: Layers,
-          text: "Team Hiring"
-        }}
+        badge={{ icon: Layers, text: "Team Hiring" }}
         breadcrumbs={breadcrumbs}
-      >
-        <div className="space-y-8">
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-primary">50+</div>
-              <div className="text-sm text-muted-foreground">Active Teams</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-secondary">24/7</div>
-              <div className="text-sm text-muted-foreground">Team Availability</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-green-600">98%</div>
-              <div className="text-sm text-muted-foreground">Client Satisfaction</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-purple-600">3 days</div>
-              <div className="text-sm text-muted-foreground">Setup Time</div>
-            </div>
-          </div>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <CTAButton href="#pricing" variant="primary" className="gap-3">
+        imageSrc="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80"
+        imageAlt="Team collaboration"
+        actions={
+          <>
+            <CTAButton href="/signup" variant="primary" className="gap-2">
               <Users className="h-5 w-5" />
-              View Team Plans
-              <ArrowRight className="h-5 w-5" />
+              Get Started
+              <ArrowRight className="h-4 w-4" />
             </CTAButton>
-            <CTAButton href="#compositions" variant="secondary" className="gap-3">
+            <CTAButton href="#compositions" variant="secondary" className="gap-2">
               <Layers className="h-5 w-5" />
               Team Compositions
-              <ArrowRight className="h-5 w-5" />
+              <ArrowRight className="h-4 w-4" />
             </CTAButton>
-          </div>
-        </div>
-      </PageHeader>
-
-      {/* TEAM PRICING SECTION */}
-      <section id="pricing" className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-primary/5 to-background relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary/20 to-secondary/20">
-                  <DollarSign className="h-3.5 w-3.5 text-primary" />
-                </div>
-                Transparent Team Pricing
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
-                Dedicated Teams, <br className="hidden lg:block" />
-                <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Fixed Monthly Rates</span>
-              </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                No surprises, no hidden fees. Get a complete team working exclusively on your project with predictable monthly costs.
-              </p>
-            </div>
-          </SectionTransition>
-
-          {/* Pricing Cards */}
-          <div className="grid gap-8 md:grid-cols-3 mb-16">
-            {teamPlans.map((plan, index) => (
-              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className={`relative group ${plan.popular ? 'scale-105' : ''}`}>
-                  {/* Popular Badge */}
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                      <div className="bg-gradient-to-r from-primary to-secondary text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                        Most Popular
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={`relative h-full bg-background/80 backdrop-blur-xl border-2 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 ${plan.color} ${plan.popular ? 'ring-2 ring-primary/20' : ''}`}>
-                    {/* Header */}
-                    <div className="text-center mb-8">
-                      <h3 className="text-2xl font-bold text-foreground mb-2">{plan.name}</h3>
-                      <div className="flex items-baseline justify-center gap-2 mb-2">
-                        <span className="text-4xl lg:text-5xl font-black text-foreground">
-                          {plan.price === "Custom" ? "Custom" : `$${plan.price}`}
-                        </span>
-                        {plan.period !== "pricing" && (
-                          <span className="text-lg text-muted-foreground">/{plan.period}</span>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground mb-4">{plan.description}</p>
-                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 rounded-full text-sm font-medium text-primary">
-                        <Users className="h-4 w-4" />
-                        {plan.teamSize}
-                      </div>
-                    </div>
-
-                    {/* Features */}
-                    <div className="space-y-4 mb-8">
-                      {plan.features.map((feature, idx) => (
-                        <div key={idx} className="flex items-start gap-3">
-                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 mt-0.5">
-                            <CheckCircle2 className="h-3 w-3 text-green-600" />
-                          </div>
-                          <span className="text-foreground text-sm leading-relaxed">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* CTA */}
-                    <CTAButton
-                      href={plan.price === "Custom" ? "/contact" : "/signup"}
-                      variant="primary"
-                      size="lg"
-                      className="w-full justify-center gap-2"
-                    >
-                      {plan.price === "Custom" ? "Contact Sales" : "Get Started"}
-                      <ArrowRight className="h-4 w-4" />
-                    </CTAButton>
-                  </div>
-                </div>
-              </SectionTransition>
-            ))}
-          </div>
-
-          {/* Custom Quote Section */}
-          <SectionTransition variant="fade" delay={600}>
-            <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-3xl p-8 border border-border/30 text-center">
-              <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
-                Need a Custom Team?
-              </h3>
-              <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-                Have specific requirements or need a larger team? Get a custom quote tailored to your exact needs.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <CTAButton href="/contact" variant="primary" className="gap-3">
-                  <MessageCircle className="h-5 w-5" />
-                  Get Custom Quote
-                  <ArrowRight className="h-5 w-5" />
-                </CTAButton>
-                <CTAButton href="#compositions" variant="secondary" className="gap-3">
-                  <Search className="h-5 w-5" />
-                  Explore Team Types
-                  <ArrowRight className="h-5 w-5" />
-                </CTAButton>
-              </div>
-            </div>
-          </SectionTransition>
-        </div>
-      </section>
+          </>
+        }
+      />
 
       {/* TEAM COMPOSITIONS */}
       <section id="compositions" className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-muted/20 via-background to-muted/20 border-y border-border/30 relative overflow-hidden">
@@ -516,19 +318,14 @@ export default function HireTeamPage() {
             </div>
           </SectionTransition>
 
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {whyChooseTeam.map((reason, index) => (
               <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative h-full">
-                  <div className="relative h-full bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
-                    {/* Animated Background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
+                <BentoCard colSpan={index === 0 ? 2 : 1} rowSpan={index === 0 ? 2 : 1} className="group relative bg-background/80 backdrop-blur-xl hover:shadow-primary/15 group-hover:border-primary/30 overflow-hidden">
                     <div className="relative space-y-6">
                       <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20 group-hover:scale-110">
                         <reason.icon className="h-8 w-8 text-primary group-hover:scale-110 transition-transform duration-300" />
                       </div>
-
                       <div className="space-y-3">
                         <h3 className="text-xl lg:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
                           {reason.title}
@@ -537,19 +334,14 @@ export default function HireTeamPage() {
                           {reason.description}
                         </p>
                       </div>
-
-                      {/* Progress Bar Animation */}
-                      <div className="space-y-2">
-                        <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
-                          <div className="h-full w-0 bg-gradient-to-r from-primary to-secondary rounded-full group-hover:w-full transition-all duration-700 ease-out" />
-                        </div>
+                      <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
+                        <div className="h-full w-0 bg-gradient-to-r from-primary to-secondary rounded-full group-hover:w-full transition-all duration-700 ease-out" />
                       </div>
                     </div>
-                  </div>
-                </div>
+                </BentoCard>
               </SectionTransition>
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 
@@ -573,46 +365,34 @@ export default function HireTeamPage() {
             </div>
           </SectionTransition>
 
-          {/* Process Steps */}
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          {/* Process Steps - Bento Grid */}
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {processSteps.map((step, index) => (
               <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative">
-                  <div className="relative bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 overflow-hidden">
-                    {/* Step Number */}
-                    <div className="absolute -top-4 -right-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-white font-bold text-lg shadow-lg">
-                      {step.step}
+                <BentoCard colSpan={index === 0 ? 2 : 1} rowSpan={index === 0 ? 2 : 1} className="group relative bg-background/80 backdrop-blur-xl hover:shadow-primary/15 overflow-hidden">
+                  <div className="absolute -top-4 -right-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-white font-bold text-lg shadow-lg">
+                    {step.step}
+                  </div>
+                  <div className="relative space-y-6">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${step.color} shadow-lg`}>
+                      <step.icon className="h-7 w-7 text-white" />
                     </div>
-
-                    {/* Animated Background */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${step.color.replace('from-', 'from-').replace('to-', 'to-')} opacity-0 group-hover:opacity-10 transition-opacity duration-500`} />
-
-                    <div className="relative space-y-6">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20">
-                        <step.icon className="h-7 w-7 text-primary group-hover:scale-110 transition-transform duration-300" />
-                      </div>
-
-                      <div className="space-y-3">
-                        <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
-                          {step.title}
-                        </h3>
-                        <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
-                          {step.description}
-                        </p>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="space-y-2">
-                        <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
-                          <div className={`h-full w-0 bg-gradient-to-r ${step.color} rounded-full group-hover:w-full transition-all duration-700 ease-out`} />
-                        </div>
-                      </div>
+                    <div className="space-y-3">
+                      <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
+                        {step.title}
+                      </h3>
+                      <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
+                        {step.description}
+                      </p>
+                    </div>
+                    <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
+                      <div className={`h-full w-0 bg-gradient-to-r ${step.color} rounded-full group-hover:w-full transition-all duration-700 ease-out`} />
                     </div>
                   </div>
-                </div>
+                </BentoCard>
               </SectionTransition>
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 
