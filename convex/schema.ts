@@ -913,6 +913,27 @@ export default defineSchema({
     .index("by_expires", ["expiresAt"])
     .index("by_active", ["isActive"]),
 
+  // Contact enquiries from public contact form (admin/moderator can view and reply)
+  contactEnquiries: defineTable({
+    name: v.string(),
+    email: v.string(),
+    subject: v.string(),
+    category: v.string(),
+    message: v.string(),
+    status: v.union(
+      v.literal("new"),
+      v.literal("replied"),
+      v.literal("closed")
+    ),
+    repliedAt: v.optional(v.number()),
+    repliedBy: v.optional(v.id("users")),
+    replyMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_created", ["createdAt"]),
+
   // Platform pricing: base hourly rates per talent category (admin-editable)
   pricingConfig: defineTable({
     key: v.literal("baseRates"),

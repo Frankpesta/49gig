@@ -574,9 +574,6 @@ export const verifyEmail = mutation({
     if (!tokenDoc) {
       throw new Error("Invalid verification code");
     }
-    if (tokenDoc.usedAt) {
-      throw new Error("Verification code already used");
-    }
     if (tokenDoc.expiresAt < Date.now()) {
       throw new Error("Verification code expired. Please request a new one.");
     }
@@ -586,14 +583,20 @@ export const verifyEmail = mutation({
       throw new Error("User not found");
     }
 
-    if (!user.emailVerified) {
-      await ctx.db.patch(user._id, {
-        emailVerified: true,
-        updatedAt: Date.now(),
+    // Idempotent: if already verified (e.g. double-submit), return success
+    if (user.emailVerified) {
+      return { success: true };
+    }
+
+    if (!tokenDoc.usedAt) {
+      await ctx.db.patch(tokenDoc._id, {
+        usedAt: Date.now(),
       });
     }
-    await ctx.db.patch(tokenDoc._id, {
-      usedAt: Date.now(),
+
+    await ctx.db.patch(user._id, {
+      emailVerified: true,
+      updatedAt: Date.now(),
     });
 
     // Create audit log

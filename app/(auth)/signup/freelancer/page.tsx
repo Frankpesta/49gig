@@ -60,7 +60,7 @@ export default function FreelancerSignupPage() {
   const signup = useMutation(
     (api as any)["auth/mutations"].signup
   );
-  const { signInWithGoogle } = useOAuth();
+  const { signInWithGoogle, isGoogleLoading } = useOAuth();
 
   const categorySkills = formData.techField ? getSkillsForCategory(formData.techField) : [];
 
@@ -444,10 +444,17 @@ export default function FreelancerSignupPage() {
                   <div className="pt-1">
                     <Button
                       type="submit"
-                      className="w-full h-11 rounded-lg text-sm font-medium"
+                      className="w-full h-11 rounded-lg text-sm font-medium disabled:opacity-90"
                       disabled={isLoading}
                     >
-                      {isLoading ? "Creating account..." : "Create account"}
+                      {isLoading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          Creating account...
+                        </span>
+                      ) : (
+                        "Create account"
+                      )}
                     </Button>
                   </div>
                 </CardContent>
@@ -467,9 +474,16 @@ export default function FreelancerSignupPage() {
                   type="button"
                   variant="outline"
                   className="w-full h-11 rounded-lg text-sm font-medium border-border/80"
-                  disabled={isLoading}
+                  disabled={isLoading || isGoogleLoading}
                   onClick={() => signInWithGoogle("freelancer")}
                 >
+                  {isGoogleLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Redirecting to Google...
+                    </span>
+                  ) : (
+                    <>
                   <svg
                     className="mr-2 h-5 w-5"
                     viewBox="0 0 24 24"
@@ -493,6 +507,8 @@ export default function FreelancerSignupPage() {
                     />
                   </svg>
                   Sign up with Google
+                    </>
+                  )}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}

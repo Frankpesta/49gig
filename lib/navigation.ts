@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   AlertCircle,
   DollarSign,
+  Mail,
 } from "lucide-react";
 import type { UserRole } from "@/stores/authStore";
 
@@ -120,6 +121,14 @@ export const navigationItems: NavItem[] = [
     title: "Pricing",
     url: "/dashboard/pricing",
     icon: DollarSign,
+    roles: ["admin", "moderator"],
+  },
+
+  // Admin & Moderator: Contact Enquiries
+  {
+    title: "Enquiries",
+    url: "/dashboard/enquiries",
+    icon: Mail,
     roles: ["admin", "moderator"],
   },
 

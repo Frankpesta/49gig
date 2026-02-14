@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeader } from "@/components/marketing/page-header";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
+import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import {
@@ -36,71 +36,32 @@ import {
 } from "lucide-react";
 
 export default function HowItWorksPage() {
+  const breadcrumbs = [{ label: "How It Works", icon: Workflow }];
+
   return (
     <div className="w-full">
-      {/* MODERN HERO SECTION - Enhanced PageHeader */}
-      <PageHeader
-        badge={{
-          icon: Workflow,
-          text: "How It Works"
-        }}
+      <PageHero
         title="From Idea to Hired Talent in Minutes"
         description="49GIG removes the stress from hiring and working remotely by using a vetted talent system, smart matching, and milestone-based delivery—so both clients and freelancers can work with confidence."
-      >
-        {/* Enhanced Feature Pills with Better Design */}
-        <div className="flex flex-wrap justify-center gap-6 mb-8">
-          {[
-            { icon: Shield, text: "100% Vetted", color: "from-blue-500 to-blue-600" },
-            { icon: Target, text: "Smart Matching", color: "from-green-500 to-green-600" },
-            { icon: FileCheck, text: "Milestone Delivery", color: "from-purple-500 to-purple-600" },
-            { icon: DollarSign, text: "Secure Payments", color: "from-orange-500 to-orange-600" },
-          ].map((item, index) => (
-            <SectionTransition key={index} variant="scale" delay={200 + index * 100}>
-              <div className="group flex items-center gap-3 rounded-2xl bg-background/95 backdrop-blur-xl border border-border/30 px-6 py-3 shadow-xl hover:shadow-primary/20 transition-all duration-500 hover:border-primary/40 hover:scale-105 cursor-pointer">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                  <item.icon className="h-5 w-5 text-white" />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-sm font-bold text-foreground">{item.text}</span>
-                  <div className="h-0.5 w-0 bg-primary group-hover:w-full transition-all duration-300 rounded-full" />
-                </div>
-              </div>
-            </SectionTransition>
-          ))}
-        </div>
-
-        {/* Enhanced CTA Buttons with Better Design */}
-        <div className="flex flex-col sm:flex-row gap-6 justify-center">
-          <CTAButton href="#clients" variant="primary" className="gap-3">
-            <Briefcase className="h-5 w-5" />
-            For Clients
-            <ArrowRight className="h-5 w-5" />
-          </CTAButton>
-          <CTAButton href="#freelancers" variant="secondary" className="gap-3">
-            <Users className="h-5 w-5" />
-            For Freelancers
-            <ArrowRight className="h-5 w-5" />
-          </CTAButton>
-        </div>
-
-        {/* Trust Indicators */}
-        <SectionTransition variant="fade" delay={600}>
-          <div className="mt-12 flex flex-wrap justify-center items-center gap-8 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <span>Zero setup fees</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-primary" />
-              <span>Start in minutes</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-secondary-foreground" />
-              <span>100% secure</span>
-            </div>
-          </div>
-        </SectionTransition>
-      </PageHeader>
+        badge={{ icon: Workflow, text: "How It Works" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
+        imageAlt="Team collaboration"
+        actions={
+          <>
+            <CTAButton href="#clients" variant="primary" className="gap-2">
+              <Briefcase className="h-5 w-5" />
+              For Clients
+              <ArrowRight className="h-4 w-4" />
+            </CTAButton>
+            <CTAButton href="#freelancers" variant="secondary" className="gap-2">
+              <Users className="h-5 w-5" />
+              For Freelancers
+              <ArrowRight className="h-4 w-4" />
+            </CTAButton>
+          </>
+        }
+      />
 
       {/* MODERN FOR CLIENTS SECTION - Interactive Timeline */}
       <section id="clients" className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-primary/5 to-background relative overflow-hidden">
@@ -129,12 +90,9 @@ export default function HowItWorksPage() {
             </div>
           </SectionTransition>
 
-          {/* Modern Interactive Timeline */}
-          <div className="relative max-w-6xl mx-auto">
-            {/* Central Timeline Line */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-secondary to-primary transform -translate-x-1/2 hidden lg:block" />
-
-            <div className="space-y-16 lg:space-y-20">
+          {/* Complex Bento Grid - For Clients (editorial: hero, tall, wide, small) */}
+          <div className="max-w-6xl mx-auto">
+            <BentoGrid columns={3} variant="complex">
               {[
                 {
                   step: 1,
@@ -142,138 +100,88 @@ export default function HowItWorksPage() {
                   description: "Select one option:",
                   items: ["Hire a Talent", "Hire a Team"],
                   note: "No job postings. No bidding. No noise.",
-                  image: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80",
                   icon: Search,
-                  color: "from-blue-500 to-blue-600"
+                  color: "from-blue-500 to-blue-600",
+                  colSpan: 2 as const,
+                  rowSpan: 2 as const,
+                  placement: { col: 1, row: 1 },
                 },
                 {
                   step: 2,
                   title: "Share Your Project Details",
                   description: "Complete a structured project form covering:",
-                  items: ["Skills required", "Project scope and deliverables", "Timeline", "Budget", "Experience level"],
-                  image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80",
+                  items: ["Skills required", "Project scope", "Timeline", "Budget"],
                   icon: FileText,
-                  color: "from-green-500 to-green-600"
+                  color: "from-green-500 to-green-600",
+                  colSpan: 1 as const,
+                  rowSpan: 2 as const,
+                  placement: { col: 3, row: 1 },
                 },
                 {
                   step: 3,
                   title: "Get Matched with Vetted Professionals",
-                  description: "Our system matches you with top-rated freelancers or curated teams that fit your requirements.",
-                  subtitle: "Matches are based on:",
-                  items: ["Skills and specialization", "Vetting score", "Performance history", "Availability"],
-                  image: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=80",
+                  description: "Our system matches you with top-rated freelancers or curated teams.",
+                  items: ["Skills", "Vetting score", "Performance", "Availability"],
                   icon: UserCheck,
-                  color: "from-purple-500 to-purple-600"
+                  color: "from-purple-500 to-purple-600",
+                  colSpan: 2 as const,
+                  rowSpan: 1 as const,
+                  placement: { col: 1, row: 3 },
                 },
                 {
                   step: 4,
                   title: "Contract & Onboarding",
-                  description: "",
-                  items: ["A secure digital contract is generated and signed by all parties", "Once signed, the project workspace is activated"],
-                  image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80",
+                  description: "Secure digital contract signed by all parties. Project workspace activated.",
+                  items: [] as string[],
                   icon: Handshake,
-                  color: "from-orange-500 to-orange-600"
+                  color: "from-orange-500 to-orange-600",
+                  colSpan: 1 as const,
+                  rowSpan: 1 as const,
+                  placement: { col: 3, row: 3 },
                 },
                 {
                   step: 5,
                   title: "Milestones, Delivery & Payments",
-                  description: "",
-                  items: ["Projects are divided into milestones", "Payments are secured upfront", "Funds are released only after approval", "Full visibility at every stage"],
-                  image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
+                  description: "Projects divided into milestones. Payments secured upfront. Funds released after approval.",
+                  items: [] as string[],
                   icon: DollarSign,
-                  color: "from-teal-500 to-teal-600"
-                }
+                  color: "from-teal-500 to-teal-600",
+                  colSpan: 3 as const,
+                  rowSpan: 1 as const,
+                  placement: { col: 1, row: 4 },
+                },
               ].map((item, index) => (
-                <SectionTransition key={index} variant="slide" direction={index % 2 === 0 ? "left" : "right"} delay={300 + index * 150}>
-                  <div className={`relative grid gap-8 lg:grid-cols-2 lg:gap-16 items-center ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}>
-                    {/* Timeline Node */}
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 hidden lg:block">
-                      <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${item.color} shadow-2xl border-4 border-background`}>
-                        <item.icon className="h-7 w-7 text-white" />
+                <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
+                  <BentoCard colSpan={item.colSpan} rowSpan={item.rowSpan} placement={item.placement} className="bg-background/80 backdrop-blur-xl hover:shadow-primary/10">
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className={`flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} shadow-lg`}>
+                        <item.icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                       </div>
-                      <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg border-4 border-background">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
                         {item.step}
-                      </div>
+                      </span>
                     </div>
-
-                    {/* Content Card */}
-                    <div className={`lg:${index % 2 === 0 ? 'pr-16' : 'pl-16'} space-y-6`}>
-                      <div className="bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:scale-105">
-                        <div className="space-y-6">
-                          {/* Mobile Step Indicator */}
-                          <div className="flex items-center gap-4 lg:hidden">
-                            <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} shadow-lg`}>
-                              <item.icon className="h-6 w-6 text-white" />
-                            </div>
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg">
-                              {item.step}
-                            </div>
+                    <h3 className="text-xl lg:text-2xl font-bold text-foreground leading-tight mb-2">{item.title}</h3>
+                    {item.description && <p className="text-muted-foreground leading-relaxed mb-4">{item.description}</p>}
+                    {item.items.length > 0 && (
+                      <div className="space-y-2">
+                        {item.items.map((listItem, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <CheckCircle2 className={`h-4 w-4 shrink-0 text-green-600`} />
+                            <span className="text-sm text-foreground">{listItem}</span>
                           </div>
-
-                          <div className="space-y-4">
-                            <h3 className="text-2xl lg:text-3xl font-bold text-foreground leading-tight">
-                              {item.title}
-                            </h3>
-                            {item.description && (
-                              <p className="text-lg text-muted-foreground leading-relaxed">
-                                {item.description}
-                              </p>
-                            )}
-                            {item.subtitle && (
-                              <p className="text-base font-medium text-foreground">
-                                {item.subtitle}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Enhanced Feature Tags */}
-                          <div className="space-y-3">
-                            {item.items.map((listItem, idx) => (
-                              <div key={idx} className="flex items-start gap-3 group">
-                                <div className={`flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r ${item.color} mt-0.5 group-hover:scale-110 transition-transform duration-200`}>
-                                  <CheckCircle2 className="h-3 w-3 text-white" />
-                                </div>
-                                <span className="text-base text-foreground leading-relaxed">{listItem}</span>
-                              </div>
-                            ))}
-                          </div>
-
-                          {item.note && (
-                            <div className="bg-primary/10 rounded-2xl p-4 border border-primary/20">
-                              <p className="text-sm text-primary font-medium italic">
-                                💡 {item.note}
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                        ))}
                       </div>
-                    </div>
-
-                    {/* Enhanced Image Section */}
-                    <div className="relative group lg:block hidden">
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
-                        <Image
-                          src={item.image}
-                          alt={item.title}
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
-                          sizes="(max-width: 1024px) 100vw, 50vw"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                        {/* Success metrics overlay */}
-                        <div className="absolute bottom-4 left-4 bg-background/95 backdrop-blur-sm rounded-2xl px-4 py-2 border border-border/30 shadow-lg">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                            <span className="text-sm font-medium text-foreground">Success Rate: 98%</span>
-                          </div>
-                        </div>
+                    )}
+                    {item.note && (
+                      <div className="mt-4 bg-primary/10 rounded-xl p-3 border border-primary/20">
+                        <p className="text-sm text-primary font-medium">💡 {item.note}</p>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </BentoCard>
                 </SectionTransition>
               ))}
-            </div>
+            </BentoGrid>
           </div>
 
           {/* Enhanced Client CTA Section */}
@@ -331,147 +239,98 @@ export default function HowItWorksPage() {
             </div>
           </SectionTransition>
 
-          {/* Modern Interactive Timeline */}
-          <div className="relative max-w-6xl mx-auto">
-            {/* Central Timeline Line */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-secondary via-primary to-secondary transform -translate-x-1/2 hidden lg:block" />
-
-            <div className="space-y-16 lg:space-y-20">
+          {/* Complex Bento Grid - For Freelancers */}
+          <div className="max-w-6xl mx-auto">
+            <BentoGrid columns={3} variant="complex">
               {[
                 {
                   step: 1,
                   title: "Apply to Join 49GIG",
                   description: "Create your freelancer account and submit:",
                   items: ["Personal information", "Skills and experience", "Portfolio"],
-                  image: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=80",
                   icon: UserCheck,
-                  color: "from-pink-500 to-rose-500"
+                  color: "from-pink-500 to-rose-500",
+                  colSpan: 2 as const,
+                  rowSpan: 2 as const,
+                  placement: { col: 1, row: 1 },
                 },
                 {
                   step: 2,
                   title: "Automated Vetting Process",
-                  description: "All freelancers go through a strict, automated vetting process that includes:",
+                  description: "All freelancers go through a strict vetting process:",
                   items: ["English proficiency test", "Skills testing"],
                   note: "Only top-scoring professionals are approved.",
-                  image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80",
                   icon: Shield,
-                  color: "from-indigo-500 to-blue-500"
+                  color: "from-indigo-500 to-blue-500",
+                  colSpan: 1 as const,
+                  rowSpan: 2 as const,
+                  placement: { col: 3, row: 1 },
                 },
                 {
                   step: 3,
                   title: "Get Matched to Projects",
-                  description: "You don't bid for jobs. Projects are assigned based on:",
-                  items: ["Skills", "Vetting score", "Performance rating", "Availability"],
-                  image: "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80",
+                  description: "You don't bid. Projects are assigned based on:",
+                  items: ["Skills", "Vetting score", "Performance", "Availability"],
                   icon: Target,
-                  color: "from-cyan-500 to-teal-500"
+                  color: "from-cyan-500 to-teal-500",
+                  colSpan: 2 as const,
+                  rowSpan: 1 as const,
+                  placement: { col: 1, row: 3 },
                 },
                 {
                   step: 4,
                   title: "Sign Contract & Start Work",
-                  description: "Once selected, you sign a digital contract and begin work immediately.",
-                  items: [],
-                  image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80",
+                  description: "Once selected, sign a digital contract and begin work immediately.",
+                  items: [] as string[],
                   icon: Handshake,
-                  color: "from-emerald-500 to-green-500"
+                  color: "from-emerald-500 to-green-500",
+                  colSpan: 1 as const,
+                  rowSpan: 1 as const,
+                  placement: { col: 3, row: 3 },
                 },
                 {
                   step: 5,
                   title: "Deliver Work & Get Paid",
-                  description: "",
-                  items: ["Complete milestones", "Submit deliverables", "Get paid after client approval", "Secure, transparent payouts"],
-                  image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
+                  description: "Complete milestones, submit deliverables, get paid after approval.",
+                  items: ["Secure payouts", "Transparent process"],
                   icon: DollarSign,
-                  color: "from-amber-500 to-orange-500"
-                }
+                  color: "from-amber-500 to-orange-500",
+                  colSpan: 3 as const,
+                  rowSpan: 1 as const,
+                  placement: { col: 1, row: 4 },
+                },
               ].map((item, index) => (
-                <SectionTransition key={index} variant="slide" direction={index % 2 === 0 ? "left" : "right"} delay={300 + index * 150}>
-                  <div className={`relative grid gap-8 lg:grid-cols-2 lg:gap-16 items-center ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}>
-                    {/* Timeline Node */}
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 hidden lg:block">
-                      <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${item.color} shadow-2xl border-4 border-background`}>
-                        <item.icon className="h-7 w-7 text-white" />
+                <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
+                  <BentoCard colSpan={item.colSpan} rowSpan={item.rowSpan} placement={item.placement} className="bg-background/80 backdrop-blur-xl hover:shadow-secondary/10">
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className={`flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} shadow-lg`}>
+                        <item.icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                       </div>
-                      <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-lg font-bold shadow-lg border-4 border-background">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-sm font-bold">
                         {item.step}
-                      </div>
+                      </span>
                     </div>
-
-                    {/* Content Card */}
-                    <div className={`lg:${index % 2 === 0 ? 'pr-16' : 'pl-16'} space-y-6`}>
-                      <div className="bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-secondary/10 transition-all duration-500 hover:scale-105">
-                        <div className="space-y-6">
-                          {/* Mobile Step Indicator */}
-                          <div className="flex items-center gap-4 lg:hidden">
-                            <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${item.color} shadow-lg`}>
-                              <item.icon className="h-6 w-6 text-white" />
-                            </div>
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-lg font-bold shadow-lg">
-                              {item.step}
-                            </div>
+                    <h3 className="text-xl lg:text-2xl font-bold text-foreground leading-tight mb-2">{item.title}</h3>
+                    {item.description && <p className="text-muted-foreground leading-relaxed mb-4">{item.description}</p>}
+                    {item.items.length > 0 && (
+                      <div className="space-y-2">
+                        {item.items.map((listItem, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
+                            <span className="text-sm text-foreground">{listItem}</span>
                           </div>
-
-                          <div className="space-y-4">
-                            <h3 className="text-2xl lg:text-3xl font-bold text-foreground leading-tight">
-                              {item.title}
-                            </h3>
-                            {item.description && (
-                              <p className="text-lg text-muted-foreground leading-relaxed">
-                                {item.description}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* Enhanced Feature Tags */}
-                          {item.items.length > 0 && (
-                            <div className="space-y-3">
-                              {item.items.map((listItem, idx) => (
-                                <div key={idx} className="flex items-start gap-3 group">
-                                  <div className={`flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r ${item.color} mt-0.5 group-hover:scale-110 transition-transform duration-200`}>
-                                    <CheckCircle2 className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-base text-foreground leading-relaxed">{listItem}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {item.note && (
-                            <div className="bg-secondary/10 rounded-2xl p-4 border border-secondary/20">
-                              <p className="text-sm text-secondary-foreground font-medium">
-                                ⭐ {item.note}
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                        ))}
                       </div>
-                    </div>
-
-                    {/* Enhanced Image Section */}
-                    <div className="relative group lg:block hidden">
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-secondary/20 transition-all duration-500 group-hover:scale-105">
-                        <Image
-                          src={item.image}
-                          alt={item.title}
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
-                          sizes="(max-width: 1024px) 100vw, 50vw"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-tr from-secondary/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                        {/* Success metrics overlay */}
-                        <div className="absolute bottom-4 left-4 bg-background/95 backdrop-blur-sm rounded-2xl px-4 py-2 border border-border/30 shadow-lg">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                            <span className="text-sm font-medium text-foreground">Avg. Earnings: $50K+</span>
-                          </div>
-                        </div>
+                    )}
+                    {item.note && (
+                      <div className="mt-4 bg-secondary/10 rounded-xl p-3 border border-secondary/20">
+                        <p className="text-sm text-secondary-foreground font-medium">⭐ {item.note}</p>
                       </div>
-                    </div>
-                  </div>
+                    )}
+                  </BentoCard>
                 </SectionTransition>
               ))}
-            </div>
+            </BentoGrid>
           </div>
 
           {/* Enhanced Freelancer CTA Section */}
@@ -528,43 +387,51 @@ export default function HowItWorksPage() {
             </div>
           </SectionTransition>
 
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {[
               {
                 icon: Shield,
                 title: "Quality First",
                 description: "Only vetted professionals are allowed on the platform.",
                 color: "from-blue-500 to-blue-600",
-                metric: "Top 3%"
+                metric: "Top 3%",
+                colSpan: 2 as const,
+                rowSpan: 2 as const,
+                placement: { col: 1, row: 1 },
               },
               {
                 icon: FileText,
                 title: "Transparent Process",
                 description: "Clear contracts, milestones, and expectations from day one.",
                 color: "from-green-500 to-green-600",
-                metric: "100% Clear"
+                metric: "100% Clear",
+                colSpan: 1 as const,
+                rowSpan: 2 as const,
+                placement: { col: 3, row: 1 },
               },
               {
                 icon: Award,
                 title: "Built-In Protection",
                 description: "Secure payments, dispute resolution, and performance tracking.",
                 color: "from-purple-500 to-purple-600",
-                metric: "Bank-Level"
+                metric: "Bank-Level",
+                colSpan: 1 as const,
+                rowSpan: 1 as const,
+                placement: { col: 1, row: 3 },
               },
               {
                 icon: DollarSign,
                 title: "Fair & Affordable",
                 description: "Clients get great value. Freelancers get fair pay.",
                 color: "from-orange-500 to-orange-600",
-                metric: "Best Value"
+                metric: "Best Value",
+                colSpan: 2 as const,
+                rowSpan: 1 as const,
+                placement: { col: 2, row: 3 },
               },
             ].map((item, index) => (
               <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative h-full">
-                  {/* Enhanced Hover Glow Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl scale-110" />
-
-                  <div className="relative h-full bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
+                <BentoCard colSpan={item.colSpan} rowSpan={item.rowSpan} placement={item.placement} className="group relative bg-background/80 backdrop-blur-xl hover:shadow-primary/15 group-hover:border-primary/30 overflow-hidden">
                     {/* Animated Background */}
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
@@ -604,11 +471,10 @@ export default function HowItWorksPage() {
                         <ArrowRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:translate-x-1" />
                       </div>
                     </div>
-                  </div>
-                </div>
+                </BentoCard>
               </SectionTransition>
             ))}
-          </div>
+          </BentoGrid>
 
           {/* Success Metrics */}
           <SectionTransition variant="fade" delay={600}>

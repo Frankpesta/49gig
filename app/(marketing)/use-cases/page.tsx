@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
 import { CTAButton } from "@/components/marketing/cta-buttons";
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import {
   CheckCircle2,
   Users,
@@ -129,14 +129,27 @@ export default function UseCasesPage() {
 
   return (
     <div className="w-full">
-      {/* PAGE HEADER */}
-      <PageHeader
-        badge={{
-          icon: Briefcase,
-          text: "Use Cases"
-        }}
+      <PageHero
         title="How 49GIG Helps Businesses and Freelancers Succeed"
-        description="49GIG is more than a freelance marketplace. It&apos;s a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients. Here&apos;s how our platform can be applied across different projects, industries, and scenarios."
+        description="49GIG is more than a freelance marketplace. It's a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients."
+        badge={{ icon: Briefcase, text: "Use Cases" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
+        imageAlt="Business collaboration"
+        actions={
+          <>
+            <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+              <Briefcase className="h-5 w-5" />
+              Hire Talent
+              <ChevronRight className="h-4 w-4" />
+            </CTAButton>
+            <CTAButton href="/signup" variant="secondary" className="gap-2">
+              <Users className="h-5 w-5" />
+              Join as Freelancer
+              <ChevronRight className="h-4 w-4" />
+            </CTAButton>
+          </>
+        }
       />
 
       {/* FOR CLIENTS */}
@@ -151,48 +164,34 @@ export default function UseCasesPage() {
             </p>
           </div>
 
-          <div className="space-y-12">
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {clientUseCases.map((useCase, index) => (
-              <Card key={index} className="border border-border/50 hover:shadow-lg transition-shadow duration-300">
-                <CardContent className="p-8">
-                  <div className="grid gap-8 lg:grid-cols-[auto,1fr]">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/10">
-                      <useCase.icon className="h-8 w-8 text-primary" />
+              <BentoCard
+                key={index}
+                colSpan={index === 0 ? 2 : 1}
+                rowSpan={index === 0 ? 2 : 1}
+                className="border-border/50 hover:shadow-lg"
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 mb-4">
+                  <useCase.icon className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground mb-2">{useCase.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{useCase.description}</p>
+                <div className="space-y-2 mb-4">
+                  {useCase.features.map((feature, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="text-sm text-foreground">{feature}</span>
                     </div>
-
-                    <div className="space-y-6">
-                      <div>
-                        <h3 className="text-2xl font-bold text-foreground mb-3">
-                          {useCase.title}
-                        </h3>
-                        <p className="text-base text-muted-foreground leading-relaxed">
-                          {useCase.description}
-                        </p>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {useCase.features.map((feature, idx) => (
-                          <div key={idx} className="flex items-start gap-2">
-                            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
-                            <span className="text-sm text-foreground">{feature}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="rounded-lg bg-muted/50 border border-border/50 p-4">
-                        <p className="text-sm font-semibold text-foreground mb-2">
-                          Example Use Case:
-                        </p>
-                        <p className="text-sm text-muted-foreground leading-relaxed italic">
-                          {useCase.example}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  ))}
+                </div>
+                <div className="rounded-lg bg-muted/50 border border-border/50 p-3">
+                  <p className="text-xs font-semibold text-foreground mb-1">Example:</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed italic">{useCase.example}</p>
+                </div>
+              </BentoCard>
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 
@@ -208,35 +207,26 @@ export default function UseCasesPage() {
             </p>
           </div>
 
-          <div className="grid gap-8 sm:grid-cols-2">
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {freelancerUseCases.map((useCase, index) => (
-              <Card key={index} className="border border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
-                <CardContent className="p-8 space-y-6">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-secondary/10">
-                    <useCase.icon className="h-7 w-7 text-secondary" />
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground mb-3">
-                      {useCase.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {useCase.description}
-                    </p>
-                  </div>
-
-                  <div className="rounded-lg bg-muted/50 border border-border/50 p-4">
-                    <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">
-                      Example:
-                    </p>
-                    <p className="text-sm text-muted-foreground leading-relaxed italic">
-                      {useCase.example}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              <BentoCard
+                key={index}
+                colSpan={index === 0 ? 2 : 1}
+                rowSpan={index === 0 ? 2 : 1}
+                className="border-border/50 hover:border-primary/50 hover:shadow-lg"
+              >
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary/10 mb-4">
+                  <useCase.icon className="h-6 w-6 text-secondary" />
+                </div>
+                <h3 className="text-lg font-bold text-foreground mb-2">{useCase.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{useCase.description}</p>
+                <div className="rounded-lg bg-muted/50 border border-border/50 p-3">
+                  <p className="text-xs font-semibold text-foreground mb-1 uppercase tracking-wide">Example:</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed italic">{useCase.example}</p>
+                </div>
+              </BentoCard>
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 
@@ -252,20 +242,25 @@ export default function UseCasesPage() {
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {industries.map((industry, index) => (
-              <Card key={index} className="group border border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg">
-                <CardContent className="p-6 flex items-center gap-4">
+              <BentoCard
+                key={index}
+                colSpan={index === 0 ? 2 : 1}
+                rowSpan={1}
+                className="group border-border/50 hover:border-primary/50 hover:shadow-lg flex flex-col justify-center"
+              >
+                <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-transform duration-300 group-hover:scale-110">
                     <industry.icon className="h-6 w-6 text-primary" />
                   </div>
                   <h3 className="text-base font-semibold text-foreground">
                     {industry.name}
                   </h3>
-                </CardContent>
-              </Card>
+                </div>
+              </BentoCard>
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 
@@ -281,20 +276,23 @@ export default function UseCasesPage() {
             </p>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {whyUseCasesWork.map((item, index) => (
-              <Card key={index} className="border border-border/50">
-                <CardContent className="p-6 space-y-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10">
-                    <item.icon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <p className="text-sm font-medium text-foreground leading-relaxed">
-                    {item.text}
-                  </p>
-                </CardContent>
-              </Card>
+              <BentoCard
+                key={index}
+                colSpan={index === 0 ? 2 : 1}
+                rowSpan={1}
+                className="border-border/50"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/10 mb-3">
+                  <item.icon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="text-sm font-medium text-foreground leading-relaxed">
+                  {item.text}
+                </p>
+              </BentoCard>
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 
@@ -13,8 +14,11 @@ const getGoogleAuthUrlRef = convexApi["auth/oauth"].getGoogleAuthUrl;
 export function useOAuth() {
   const router = useRouter();
   const getGoogleAuthUrl = useAction(getGoogleAuthUrlRef);
+  const [isLoading, setIsLoading] = useState(false);
 
   const signInWithGoogle = async (role?: "client" | "freelancer") => {
+    if (isLoading) return;
+    setIsLoading(true);
     try {
       // Generate state for CSRF protection
       const state = `state_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -31,6 +35,7 @@ export function useOAuth() {
       // Redirect to Google OAuth
       window.location.href = authUrl;
     } catch (error) {
+      setIsLoading(false);
       console.error("Failed to initiate OAuth:", error);
       throw error;
     }
@@ -38,6 +43,7 @@ export function useOAuth() {
 
   return {
     signInWithGoogle,
+    isGoogleLoading: isLoading,
   };
 }
 

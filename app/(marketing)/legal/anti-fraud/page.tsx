@@ -1,20 +1,25 @@
 "use client";
 
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { ShieldAlert } from "lucide-react";
 
 export default function AntiFraudPage() {
+  const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Anti-Fraud", icon: ShieldAlert }];
+
   return (
     <div className="w-full">
-      <PageHeader
-        badge={{ icon: ShieldAlert, text: "Anti-Fraud Policy" }}
+      <PageHero
         title="Anti-Fraud & Anti-Money Laundering Policy"
-        description="Last updated: January 6, 2026"
+        description="Our commitment to a secure, trustworthy platform. Last updated: January 6, 2026."
+        badge={{ icon: ShieldAlert, text: "Anti-Fraud Policy" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&q=80"
+        imageAlt="Security and compliance"
       />
 
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
+      <section className="py-12 sm:py-16 lg:py-20 bg-background">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="prose prose-slate dark:prose-invert max-w-none">
+          <div className="prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-semibold prose-p:text-muted-foreground prose-p:leading-relaxed prose-li:text-muted-foreground">
             <h2>1. Introduction</h2>
             <p>
               49GIG is committed to maintaining a secure, trustworthy platform free from fraud, money laundering, and financial crime. This Anti-Fraud and Anti-Money Laundering (AML) Policy outlines our commitment to compliance and the measures we take to detect, prevent, and respond to fraudulent activity.

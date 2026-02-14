@@ -48,6 +48,7 @@ export default function DashboardPage() {
     (api as any).dashboard.queries.getDashboardMetrics,
     user?._id ? { userId: user._id } : "skip"
   );
+  const isLoading = dashboardMetrics === undefined;
   const recentActivity = useQuery(
     api.notifications.queries.getMyNotifications,
     user?._id ? { userId: user._id, limit: 10 } : "skip"
@@ -310,12 +311,12 @@ export default function DashboardPage() {
                 key={metric.title}
                 title={metric.title}
                 subtitle={metric.subtitle}
-                value={metric.value}
+                value={isLoading ? "—" : metric.value}
                 description={metric.description}
                 icon={metric.icon}
                 variant={metric.variant}
-                trend={metric.trend}
-                progress={metric.progress}
+                trend={isLoading ? undefined : metric.trend}
+                progress={isLoading ? undefined : metric.progress}
                 badge={metric.badge}
               />
             ))}

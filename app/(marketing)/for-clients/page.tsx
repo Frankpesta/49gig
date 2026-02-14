@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import {
   CheckCircle2,
   Users,
@@ -76,7 +77,7 @@ export default function ForClientsPage() {
         "Reduce hiring and operational costs",
         "Maintain high quality standards",
         "Scale efficiently",
-        "Transparent pricing",
+        "Secure payments",
       ],
     },
     {
@@ -150,97 +151,52 @@ export default function ForClientsPage() {
     { icon: Clock, text: "Time-zone flexibility" },
     { icon: Globe, text: "Cultural adaptability" },
     { icon: Target, text: "High motivation and professionalism" },
-    { icon: DollarSign, text: "Competitive pricing" },
+    { icon: DollarSign, text: "Competitive rates" },
   ];
+
+  const breadcrumbs = [{ label: "For Clients", icon: Briefcase }];
 
   return (
     <div className="w-full">
-      {/* MODERN PAGE HEADER */}
-      <PageHeader
-        badge={{
-          icon: Briefcase,
-          text: "For Clients"
-        }}
+      <PageHero
         title="Hire Vetted African Talent & Teams With Confidence"
-        description="49GIG helps companies around the world hire highly vetted African freelancers and teams—delivering global-standard work at affordable, transparent rates."
-      >
-        <div className="space-y-10">
-          {/* Enhanced Trust Badge */}
-          <div className="flex justify-center">
-            <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 via-primary/5 to-secondary/10 backdrop-blur-xl px-8 py-4 text-base font-bold text-primary shadow-2xl border border-primary/20 hover:border-primary/30 transition-all duration-300 hover:scale-105">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary">
-                <Sparkles className="h-3.5 w-3.5 text-white animate-pulse" />
-              </div>
-              No job postings. No bidding. No uncertainty.
-              <Heart className="h-5 w-5 animate-pulse" />
-            </div>
-          </div>
+        description="49GIG helps companies around the world hire highly vetted African freelancers and teams—delivering global-standard work at transparent rates. No job postings. No bidding. Just the right talent, matched to your needs."
+        badge={{ icon: Briefcase, text: "For Clients" }}
+        breadcrumbs={breadcrumbs}
+        imageSrc="https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
+        imageAlt="Team collaboration"
+        actions={
+          <>
+            <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+              <Briefcase className="h-5 w-5" />
+              Hire Vetted Talent
+              <ArrowRight className="h-4 w-4" />
+            </CTAButton>
+            <CTAButton href="/hire-team" variant="secondary" className="gap-2">
+              <Users className="h-5 w-5" />
+              Hire a Team
+              <ArrowRight className="h-4 w-4" />
+            </CTAButton>
+          </>
+        }
+      />
 
-          {/* Enhanced Value Proposition */}
-          <div className="text-center space-y-4">
-            <p className="text-xl lg:text-2xl text-muted-foreground font-medium max-w-4xl mx-auto leading-relaxed">
-              <span className="text-foreground font-black text-2xl lg:text-3xl bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                Just the right talent, matched to your needs.
-              </span>
-            </p>
-            <div className="flex flex-wrap justify-center items-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>100% Vetted</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-primary" />
-                <span>Secure Payments</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-secondary-foreground" />
-                <span>48hr Average Hire</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Enhanced CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <SectionTransition variant="slide" direction="left" delay={300}>
-              <CTAButton href="/hire-talent" variant="primary" className="gap-3">
-                <Briefcase className="h-6 w-6" />
-                Hire Vetted Talent
-                <ArrowRight className="h-6 w-6" />
-              </CTAButton>
-            </SectionTransition>
-            <SectionTransition variant="slide" direction="right" delay={400}>
-              <CTAButton href="/hire-team" variant="secondary" className="gap-3">
-                <Users className="h-6 w-6" />
-                Hire a Team
-                <ArrowRight className="h-6 w-6" />
-              </CTAButton>
-            </SectionTransition>
-          </div>
-
-          {/* Enhanced Stats Section */}
-          <SectionTransition variant="fade" delay={500}>
-            <div className="pt-12 border-t border-border/30">
-              <div className="bg-background/80 backdrop-blur-xl rounded-3xl p-8 border border-border/30 shadow-xl">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-                  {clientStats.map((stat, index) => (
-                    <div key={index} className="text-center group">
-                      <div className="flex h-16 w-16 mx-auto items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-300 shadow-lg group-hover:shadow-primary/20 mb-4">
-                        <stat.icon className="h-7 w-7 text-primary group-hover:scale-110 transition-transform duration-300" />
-                      </div>
-                      <div className="text-3xl lg:text-4xl font-black text-foreground group-hover:text-primary transition-colors duration-300">
-                        {stat.value}{stat.suffix}
-                      </div>
-                      <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground/80 transition-colors duration-300 mt-2">
-                        {stat.label}
-                      </p>
-                    </div>
-                  ))}
+      {/* Stats */}
+      <section className="py-8 sm:py-10 border-b border-border/30 bg-muted/20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+            {clientStats.map((stat, index) => (
+              <div key={index} className="text-center">
+                <div className="flex h-12 w-12 sm:h-14 sm:w-14 mx-auto items-center justify-center rounded-xl bg-primary/10 mb-3">
+                  <stat.icon className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
                 </div>
+                <div className="text-2xl sm:text-3xl font-bold text-foreground">{stat.value}{stat.suffix}</div>
+                <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
               </div>
-            </div>
-          </SectionTransition>
+            ))}
+          </div>
         </div>
-      </PageHeader>
+      </section>
 
       {/* MODERN WHY COMPANIES CHOOSE 49GIG */}
       <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-primary/5 to-background relative overflow-hidden">
@@ -424,124 +380,46 @@ export default function ForClientsPage() {
             </div>
           </SectionTransition>
 
-          {/* Interactive Timeline */}
-          <div className="relative max-w-6xl mx-auto">
-            {/* Central Timeline Line */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-secondary to-primary transform -translate-x-1/2 hidden lg:block" />
-
-            <div className="space-y-16 lg:space-y-20">
-              {hiringSteps.map((step, index) => (
-                <SectionTransition key={index} variant="slide" direction={index % 2 === 0 ? "left" : "right"} delay={300 + index * 150}>
-                  <div className={`relative grid gap-8 lg:grid-cols-2 lg:gap-16 items-center ${index % 2 === 1 ? 'lg:flex-row-reverse' : ''}`}>
-                    {/* Timeline Node */}
-                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 hidden lg:block">
-                      <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${index === 0 ? 'from-blue-500 to-blue-600' :
-                        index === 1 ? 'from-green-500 to-green-600' :
-                        index === 2 ? 'from-purple-500 to-purple-600' :
-                        index === 3 ? 'from-orange-500 to-orange-600' :
-                        'from-teal-500 to-teal-600'} shadow-2xl border-4 border-background`}>
-                        <step.icon className="h-7 w-7 text-white" />
-                      </div>
-                      <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg border-4 border-background">
-                        {step.step}
-                      </div>
-                    </div>
-
-                    {/* Content Card */}
-                    <div className={`lg:${index % 2 === 0 ? 'pr-16' : 'pl-16'} space-y-6`}>
-                      <div className="bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:scale-105">
-                        <div className="space-y-6">
-                          {/* Mobile Step Indicator */}
-                          <div className="flex items-center gap-4 lg:hidden">
-                            <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${index === 0 ? 'from-blue-500 to-blue-600' :
-                              index === 1 ? 'from-green-500 to-green-600' :
-                              index === 2 ? 'from-purple-500 to-purple-600' :
-                              index === 3 ? 'from-orange-500 to-orange-600' :
-                              'from-teal-500 to-teal-600'} shadow-lg`}>
-                              <step.icon className="h-6 w-6 text-white" />
-                            </div>
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground text-lg font-bold shadow-lg">
-                              {step.step}
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            <h3 className="text-2xl lg:text-3xl font-bold text-foreground leading-tight">
-                              {step.title}
-                            </h3>
-                            <div className="h-1 w-16 bg-gradient-to-r from-primary to-secondary rounded-full" />
-                            <p className="text-lg text-muted-foreground leading-relaxed">
-                              {step.description}
-                            </p>
-                          </div>
-
-                          {/* Step-specific features */}
-                          {index === 0 && (
-                            <div className="bg-primary/10 rounded-2xl p-4 border border-primary/20">
-                              <p className="text-sm text-primary font-medium">
-                                💡 No job postings, no bidding, no wasted time—just instant matching with pre-vetted talent.
-                              </p>
-                            </div>
-                          )}
-                          {index === 1 && (
-                            <div className="bg-secondary/10 rounded-2xl p-4 border border-secondary/20">
-                              <p className="text-sm text-secondary-foreground font-medium">
-                                🎯 Our smart form takes just 5 minutes and ensures we understand exactly what you need.
-                              </p>
-                            </div>
-                          )}
-                          {index === 2 && (
-                            <div className="bg-green-500/10 rounded-2xl p-4 border border-green-500/20">
-                              <p className="text-sm text-green-700 font-medium">
-                                ⚡ Get matched in 48 hours with professionals who fit your exact requirements.
-                              </p>
-                            </div>
-                          )}
-                          {index === 3 && (
-                            <div className="bg-purple-500/10 rounded-2xl p-4 border border-purple-500/20">
-                              <p className="text-sm text-purple-700 font-medium">
-                                🛡️ Secure contracts protect both parties with clear terms and conditions.
-                              </p>
-                            </div>
-                          )}
-                          {index === 4 && (
-                            <div className="bg-orange-500/10 rounded-2xl p-4 border border-orange-500/20">
-                              <p className="text-sm text-orange-700 font-medium">
-                                💰 Pay only for approved work with full transparency and milestone tracking.
-                              </p>
-                            </div>
-                          )}
+          {/* Complex Bento Grid - How Hiring Works */}
+          <div className="max-w-6xl mx-auto">
+            <BentoGrid columns={3} variant="complex">
+              {[
+                { stepIndex: 0, colSpan: 2 as const, rowSpan: 2 as const, placement: { col: 1, row: 1 } },
+                { stepIndex: 1, colSpan: 1 as const, rowSpan: 2 as const, placement: { col: 3, row: 1 } },
+                { stepIndex: 2, colSpan: 2 as const, rowSpan: 1 as const, placement: { col: 1, row: 3 } },
+                { stepIndex: 4, colSpan: 1 as const, rowSpan: 1 as const, placement: { col: 3, row: 3 } },
+                { stepIndex: 3, colSpan: 3 as const, rowSpan: 1 as const, placement: { col: 1, row: 4 } },
+              ].map(({ stepIndex, colSpan, rowSpan, placement }) => {
+                const step = hiringSteps[stepIndex];
+                const colors = ['from-blue-500 to-blue-600', 'from-green-500 to-green-600', 'from-purple-500 to-purple-600', 'from-orange-500 to-orange-600', 'from-teal-500 to-teal-600'];
+                const notes = [
+                  "💡 No job postings, no bidding—just instant matching with pre-vetted talent.",
+                  "🎯 Our smart form takes just 5 minutes and ensures we understand exactly what you need.",
+                  "⚡ Get matched in 48 hours with professionals who fit your exact requirements.",
+                  "🛡️ Secure contracts protect both parties with clear terms and conditions.",
+                  "💰 Pay only for approved work with full transparency and milestone tracking.",
+                ];
+                return (
+                  <SectionTransition key={stepIndex} variant="slide" direction="up" delay={300 + stepIndex * 100}>
+                    <BentoCard colSpan={colSpan} rowSpan={rowSpan} placement={placement} className="bg-background/80 backdrop-blur-xl hover:shadow-primary/10">
+                      <div className="flex items-start gap-4 mb-4">
+                        <div className={`flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${colors[stepIndex]} shadow-lg`}>
+                          <step.icon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                         </div>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                          {step.step}
+                        </span>
                       </div>
-                    </div>
-
-                    {/* Enhanced Image Section */}
-                    <div className="relative group lg:block hidden">
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-primary/20 transition-all duration-500 group-hover:scale-105">
-                        <Image
-                          src={step.image}
-                          alt={step.title}
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
-                          sizes="(max-width: 1024px) 100vw, 50vw"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-tr from-primary/10 via-transparent to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-                        {/* Time indicator */}
-                        <div className="absolute top-4 right-4 bg-background/95 backdrop-blur-sm rounded-2xl px-4 py-2 border border-border/30 shadow-lg">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-medium text-foreground">
-                              {index === 0 ? 'Instant' : index === 1 ? '5 min' : index === 2 ? '48 hrs' : index === 3 ? '1 day' : 'Ongoing'}
-                            </span>
-                          </div>
-                        </div>
+                      <h3 className="text-xl lg:text-2xl font-bold text-foreground leading-tight mb-2">{step.title}</h3>
+                      <p className="text-muted-foreground leading-relaxed mb-4">{step.description}</p>
+                      <div className="bg-primary/10 rounded-xl p-3 border border-primary/20">
+                        <p className="text-sm text-primary font-medium">{notes[stepIndex]}</p>
                       </div>
-                    </div>
-                  </div>
-                </SectionTransition>
-              ))}
-            </div>
+                    </BentoCard>
+                  </SectionTransition>
+                );
+              })}
+            </BentoGrid>
           </div>
 
           {/* Process Overview */}

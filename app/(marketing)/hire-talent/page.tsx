@@ -4,9 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeader } from "@/components/marketing/page-header";
+import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
+import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import {
   CheckCircle2,
   Users,
@@ -46,105 +47,6 @@ export default function HireTalentPage() {
   const breadcrumbs = [
     { label: "Services", href: "/hire-talent" },
     { label: "Hire Talent", icon: Users },
-  ];
-
-  const stats = [
-    { value: "48hrs", label: "Average Hire Time", icon: Clock },
-    { value: "95%", label: "Client Satisfaction", icon: Star },
-    { value: "10K+", label: "Vetted Professionals", icon: Users },
-  ];
-
-  const pricingPlans = [
-    {
-      name: "Starter",
-      price: "$25",
-      period: "per hour",
-      description: "Perfect for small tasks and short-term projects",
-      features: [
-        "Up to 10 hours of work",
-        "Basic skill verification",
-        "Email support",
-        "Basic project tracking",
-        "Payment protection",
-      ],
-      popular: false,
-      color: "border-border/50"
-    },
-    {
-      name: "Professional",
-      price: "$50",
-      period: "per hour",
-      description: "Ideal for complex projects and ongoing work",
-      features: [
-        "Up to 40 hours of work",
-        "Advanced skill verification",
-        "Priority support",
-        "Advanced project tracking",
-        "Payment protection",
-        "Milestone management",
-        "Portfolio review"
-      ],
-      popular: true,
-      color: "border-primary/50 bg-primary/5"
-    },
-    {
-      name: "Enterprise",
-      price: "$100",
-      period: "per hour",
-      description: "For large-scale projects and dedicated work",
-      features: [
-        "Unlimited hours",
-        "Premium skill verification",
-        "Dedicated account manager",
-        "Custom project tracking",
-        "Payment protection",
-        "Milestone management",
-        "Portfolio review",
-        "Contract customization",
-        "Priority matching"
-      ],
-      popular: false,
-      color: "border-secondary/50 bg-secondary/5"
-    }
-  ];
-
-  const talentShowcase = [
-    {
-      name: "Sarah Johnson",
-      role: "Senior Full-Stack Developer",
-      skills: ["React", "Node.js", "Python", "AWS"],
-      rating: 4.9,
-      completedProjects: 127,
-      hourlyRate: 65,
-      location: "Nigeria",
-      image: "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&q=80",
-      verified: true,
-      available: true
-    },
-    {
-      name: "David Kiprop",
-      role: "UI/UX Designer",
-      skills: ["Figma", "Adobe XD", "Prototyping", "User Research"],
-      rating: 4.8,
-      completedProjects: 89,
-      hourlyRate: 45,
-      location: "Kenya",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-      verified: true,
-      available: true
-    },
-    {
-      name: "Amara Okafor",
-      role: "Data Scientist",
-      skills: ["Python", "Machine Learning", "SQL", "Tableau"],
-      rating: 5.0,
-      completedProjects: 156,
-      hourlyRate: 70,
-      location: "South Africa",
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&q=80",
-      verified: true,
-      available: false
-    }
   ];
 
   const whyChooseIndividual = [
@@ -203,264 +105,56 @@ export default function HireTalentPage() {
 
   return (
     <div className="w-full">
-      <PageHeader
+      <PageHero
         title="Hire Individual Talent"
-        description="Find and hire skilled African professionals for your next project. From developers to designers, marketers to data scientists—access world-class talent at competitive rates."
-        badge={{
-          icon: Users,
-          text: "Individual Hiring"
-        }}
+        description="Find and hire skilled African professionals for your next project. From developers to designers, marketers to data scientists—access world-class talent matched to your needs."
+        badge={{ icon: Users, text: "Individual Hiring" }}
         breadcrumbs={breadcrumbs}
-      >
-        <div className="space-y-8">
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-primary">10K+</div>
-              <div className="text-sm text-muted-foreground">Verified Freelancers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-secondary">48hrs</div>
-              <div className="text-sm text-muted-foreground">Average Hire Time</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-green-600">98%</div>
-              <div className="text-sm text-muted-foreground">Success Rate</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl lg:text-3xl font-black text-purple-600">4.9★</div>
-              <div className="text-sm text-muted-foreground">Average Rating</div>
-            </div>
-          </div>
-
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <CTAButton href="#pricing" variant="primary" className="gap-3">
+        imageSrc="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=80"
+        imageAlt="Professional collaboration"
+        actions={
+          <>
+            <CTAButton href="/signup" variant="primary" className="gap-2">
               <Briefcase className="h-5 w-5" />
               Start Hiring Now
-              <ArrowRight className="h-5 w-5" />
+              <ArrowRight className="h-4 w-4" />
             </CTAButton>
-            <CTAButton href="#talent" variant="secondary" className="gap-3">
+            <CTAButton href="/talent-categories" variant="secondary" className="gap-2">
               <Users className="h-5 w-5" />
-              Browse Talent
-              <ArrowRight className="h-5 w-5" />
+              Browse Categories
+              <ArrowRight className="h-4 w-4" />
             </CTAButton>
-          </div>
-        </div>
-      </PageHeader>
+          </>
+        }
+      />
 
-      {/* PRICING SECTION */}
-      <section id="pricing" className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-primary/5 to-background relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
-
+      {/* WHY CHOOSE INDIVIDUAL - Bento Grid */}
+      <section id="talent" className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-muted/20 via-background to-muted/20 border-y border-border/30 relative overflow-hidden">
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary/20 to-secondary/20">
-                  <DollarSign className="h-3.5 w-3.5 text-primary" />
-                </div>
-                Transparent Pricing
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
-                Simple, Transparent <br className="hidden lg:block" />
-                <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Pricing</span>
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3">
+                Why Hire Individual Talent
               </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                Choose the perfect plan for your project. No hidden fees, no surprises. Pay only for the hours you need.
+              <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
+                Get matched with vetted professionals who fit your project needs.
               </p>
             </div>
           </SectionTransition>
 
-          {/* Pricing Cards */}
-          <div className="grid gap-8 md:grid-cols-3 mb-16">
-            {pricingPlans.map((plan, index) => (
+          <BentoGrid columns={3} variant="complex" className="mb-16 max-w-6xl mx-auto">
+            {whyChooseIndividual.map((item, index) => (
               <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className={`relative group ${plan.popular ? 'scale-105' : ''}`}>
-                  {/* Popular Badge */}
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                      <div className="bg-gradient-to-r from-primary to-secondary text-white px-4 py-2 rounded-full text-sm font-bold shadow-lg">
-                        Most Popular
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={`relative h-full bg-background/80 backdrop-blur-xl border-2 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 ${plan.color} ${plan.popular ? 'ring-2 ring-primary/20' : ''}`}>
-                    {/* Header */}
-                    <div className="text-center mb-8">
-                      <h3 className="text-2xl font-bold text-foreground mb-2">{plan.name}</h3>
-                      <div className="flex items-baseline justify-center gap-2 mb-4">
-                        <span className="text-4xl lg:text-5xl font-black text-foreground">{plan.price}</span>
-                        <span className="text-lg text-muted-foreground">/{plan.period}</span>
-                      </div>
-                      <p className="text-muted-foreground">{plan.description}</p>
-                    </div>
-
-                    {/* Features */}
-                    <div className="space-y-4 mb-8">
-                      {plan.features.map((feature, idx) => (
-                        <div key={idx} className="flex items-start gap-3">
-                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 mt-0.5">
-                            <CheckCircle2 className="h-3 w-3 text-green-600" />
-                          </div>
-                          <span className="text-foreground text-sm leading-relaxed">{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* CTA */}
-                    <CTAButton
-                      href="/signup"
-                      variant="primary"
-                      size="lg"
-                      className="w-full justify-center gap-2"
-                    >
-                      Get Started
-                      <ArrowRight className="h-4 w-4" />
-                    </CTAButton>
+                <BentoCard colSpan={index === 0 ? 2 : 1} rowSpan={index === 0 ? 2 : 1} className="bg-card">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
+                    <item.icon className="h-6 w-6" />
                   </div>
-                </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                </BentoCard>
               </SectionTransition>
             ))}
-          </div>
-
-          {/* Money Back Guarantee */}
-          <SectionTransition variant="fade" delay={600}>
-            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-3xl p-8 border border-green-500/20">
-              <div className="text-center">
-                <div className="flex justify-center mb-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20">
-                    <Shield className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-                <h3 className="text-xl font-bold text-foreground mb-2">30-Day Money-Back Guarantee</h3>
-                <p className="text-muted-foreground max-w-2xl mx-auto">
-                  Not satisfied with your hire? Get a full refund within 30 days. Your satisfaction is our guarantee.
-                </p>
-              </div>
-            </div>
-          </SectionTransition>
-        </div>
-      </section>
-
-      {/* TALENT SHOWCASE */}
-      <section id="talent" className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-muted/20 via-background to-muted/20 border-y border-border/30 relative overflow-hidden">
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-secondary/10 to-primary/10 px-6 py-3 text-sm font-bold text-secondary mb-6 border border-secondary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-secondary/20 to-primary/20">
-                  <Users className="h-3.5 w-3.5 text-secondary" />
-                </div>
-                Featured Talent
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
-                Meet Top <span className="bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">African Talent</span>
-              </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                Browse through our curated selection of verified professionals ready to work on your next project.
-              </p>
-            </div>
-          </SectionTransition>
-
-          {/* Talent Cards */}
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 mb-16">
-            {talentShowcase.map((talent, index) => (
-              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative">
-                  <div className="relative bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-6 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 overflow-hidden">
-                    {/* Background Gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="relative">
-                      {/* Profile Header */}
-                      <div className="flex items-start gap-4 mb-6">
-                        <div className="relative">
-                          <div className="w-16 h-16 rounded-2xl overflow-hidden">
-                            <Image
-                              src={talent.image}
-                              alt={talent.name}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          {talent.verified && (
-                            <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                              <CheckCircle2 className="h-3 w-3 text-white" />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg text-foreground truncate">{talent.name}</h3>
-                          <p className="text-primary font-medium text-sm">{talent.role}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm font-medium">{talent.rating}</span>
-                            <span className="text-sm text-muted-foreground">({talent.completedProjects} projects)</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Skills */}
-                      <div className="mb-6">
-                        <div className="flex flex-wrap gap-2">
-                          {talent.skills.slice(0, 3).map((skill, idx) => (
-                            <span key={idx} className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
-                              {skill}
-                            </span>
-                          ))}
-                          {talent.skills.length > 3 && (
-                            <span className="px-3 py-1 bg-muted text-muted-foreground text-xs font-medium rounded-full">
-                              +{talent.skills.length - 3} more
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-4 border-t border-border/30">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">{talent.location}</span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-foreground">${talent.hourlyRate}/hr</div>
-                          </div>
-                          {talent.available ? (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                              <span className="text-xs font-medium">Available</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span className="text-xs">Busy</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* CTA */}
-                      <div className="mt-6">
-                        <CTAButton href="/talent-categories" variant="primary" size="sm" className="w-full justify-center gap-2">
-                          View Profile
-                          <ArrowRight className="h-3 w-3" />
-                        </CTAButton>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SectionTransition>
-            ))}
-          </div>
+          </BentoGrid>
 
           {/* Browse More CTA */}
           <SectionTransition variant="fade" delay={600}>
@@ -490,69 +184,6 @@ export default function HireTalentPage() {
         </div>
       </section>
 
-      {/* WHY CHOOSE INDIVIDUAL TALENT */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-muted/10 to-background relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTransition variant="fade" delay={200}>
-            <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-3 text-sm font-bold text-primary mb-6 border border-primary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-primary/20 to-secondary/20">
-                  <Lightbulb className="h-3.5 w-3.5 text-primary" />
-                </div>
-                Why Choose Individual Talent
-              </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
-                The Power of <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Individual Expertise</span>
-              </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                When you need specialized skills for a specific project, hiring individual talent gives you focused expertise and flexibility.
-              </p>
-            </div>
-          </SectionTransition>
-
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {whyChooseIndividual.map((reason, index) => (
-              <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative h-full">
-                  <div className="relative h-full bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
-                    {/* Animated Background */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    <div className="relative space-y-6">
-                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20 group-hover:scale-110">
-                        <reason.icon className="h-8 w-8 text-primary group-hover:scale-110 transition-transform duration-300" />
-                      </div>
-
-                      <div className="space-y-3">
-                        <h3 className="text-xl lg:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
-                          {reason.title}
-                        </h3>
-                        <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
-                          {reason.description}
-                        </p>
-                      </div>
-
-                      {/* Progress Bar Animation */}
-                      <div className="space-y-2">
-                        <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
-                          <div className="h-full w-0 bg-gradient-to-r from-primary to-secondary rounded-full group-hover:w-full transition-all duration-700 ease-out" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SectionTransition>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* HOW IT WORKS */}
       <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-muted/20 via-background to-muted/20 border-y border-border/30 relative overflow-hidden">
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -573,46 +204,34 @@ export default function HireTalentPage() {
             </div>
           </SectionTransition>
 
-          {/* Process Steps */}
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+          {/* Process Steps - Bento Grid */}
+          <BentoGrid columns={3} variant="complex" className="max-w-6xl mx-auto">
             {processSteps.map((step, index) => (
               <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                <div className="group relative">
-                  <div className="relative bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 overflow-hidden">
-                    {/* Step Number */}
-                    <div className="absolute -top-4 -right-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-white font-bold text-lg shadow-lg">
-                      {step.step}
+                <BentoCard colSpan={index === 0 ? 2 : 1} rowSpan={index === 0 ? 2 : 1} className="group relative bg-background/80 backdrop-blur-xl hover:shadow-primary/15 overflow-hidden">
+                  <div className="absolute -top-4 -right-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-secondary text-white font-bold text-lg shadow-lg">
+                    {step.step}
+                  </div>
+                  <div className="relative space-y-6">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${step.color} shadow-lg`}>
+                      <step.icon className="h-7 w-7 text-white" />
                     </div>
-
-                    {/* Animated Background */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${step.color.replace('from-', 'from-').replace('to-', 'to-')} opacity-0 group-hover:opacity-10 transition-opacity duration-500`} />
-
-                    <div className="relative space-y-6">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-500 shadow-lg group-hover:shadow-primary/20">
-                        <step.icon className="h-7 w-7 text-primary group-hover:scale-110 transition-transform duration-300" />
-                      </div>
-
-                      <div className="space-y-3">
-                        <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
-                          {step.title}
-                        </h3>
-                        <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
-                          {step.description}
-                        </p>
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div className="space-y-2">
-                        <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
-                          <div className={`h-full w-0 bg-gradient-to-r ${step.color} rounded-full group-hover:w-full transition-all duration-700 ease-out`} />
-                        </div>
-                      </div>
+                    <div className="space-y-3">
+                      <h3 className="text-xl font-bold text-foreground group-hover:text-primary transition-colors duration-300 leading-tight">
+                        {step.title}
+                      </h3>
+                      <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
+                        {step.description}
+                      </p>
+                    </div>
+                    <div className="h-1 w-full bg-border/30 rounded-full overflow-hidden">
+                      <div className={`h-full w-0 bg-gradient-to-r ${step.color} rounded-full group-hover:w-full transition-all duration-700 ease-out`} />
                     </div>
                   </div>
-                </div>
+                </BentoCard>
               </SectionTransition>
             ))}
-          </div>
+          </BentoGrid>
         </div>
       </section>
 

@@ -75,6 +75,7 @@ function VerifyEmailContent() {
 
   const handleVerify = async (verifyCode: string) => {
     if (verifyCode.length !== 6) return;
+    if (isLoading || success) return; // Prevent double-submit
     setIsLoading(true);
     setError("");
     try {
