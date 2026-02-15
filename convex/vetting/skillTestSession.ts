@@ -36,6 +36,16 @@ export const startSkillTest = action({
       throw new Error("User not found or not an active freelancer");
     }
 
+    const failedCount = await ctx.runQuery(
+      internalAny.vetting.internalQueries.countFailedSkillTestSessions,
+      { freelancerId: args.userId }
+    );
+    if (failedCount >= 2) {
+      throw new Error(
+        "You have failed the skill test twice. Your account has been deactivated. Please contact support if you believe this is an error."
+      );
+    }
+
     const profile = user.profile ?? {};
     const path = getVettingPath({
       techField: profile.techField,

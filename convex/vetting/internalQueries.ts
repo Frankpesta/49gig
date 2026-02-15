@@ -44,6 +44,50 @@ export const getMcqCorrectAnswers = internalQuery({
   },
 });
 
+function getEffectiveScore(session: {
+  pathType: string;
+  mcqScore?: number;
+  portfolioScore?: number;
+  codingSubmissions?: Array<{ runResult?: { passed?: number; total?: number } }>;
+}): number | null {
+  if (session.mcqScore == null) return null;
+  if (session.pathType === "mcq_only") return session.mcqScore;
+  if (session.pathType === "portfolio_mcq" && session.portfolioScore != null)
+    return Math.round(session.portfolioScore * 0.3 + session.mcqScore * 0.7);
+  if (session.pathType === "coding_mcq" && session.codingSubmissions?.length) {
+    let codingTotal = 0,
+      codingPassed = 0;
+    for (const sub of session.codingSubmissions) {
+      const r = sub.runResult;
+      if (r && typeof r.passed === "number" && typeof r.total === "number" && r.total > 0) {
+        codingPassed += r.passed;
+        codingTotal += r.total;
+      }
+    }
+    const codingScore = codingTotal > 0 ? Math.round((codingPassed / codingTotal) * 100) : 0;
+    return Math.round((codingScore + session.mcqScore) / 2);
+  }
+  return session.mcqScore;
+}
+
+/** Count completed skill test sessions with effective score below 60% for a freelancer. */
+export const countFailedSkillTestSessions = internalQuery({
+  args: {
+    freelancerId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const sessions = await ctx.db
+      .query("vettingSkillTestSessions")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+      .collect();
+    return sessions.filter((s) => {
+      if (s.status !== "completed") return false;
+      const score = getEffectiveScore(s);
+      return score != null && score < 60;
+    }).length;
+  },
+});
+
 /** Return up to 5 existing coding prompt IDs for category+language+level. */
 export const getExistingCodingPromptIds = internalQuery({
   args: {

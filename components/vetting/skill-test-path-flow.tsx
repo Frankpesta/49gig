@@ -25,6 +25,26 @@ import { Textarea } from "@/components/ui/textarea";
 
 const SKILL_TEST_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
+/** Shuffle array deterministically by seed; returns [shuffledValues, originalIndexForDisplayIndex]. */
+function shuffleWithSeed<T>(arr: T[], seed: string): { values: T[]; originalIndices: number[] } {
+  const indices = arr.map((_, i) => i);
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++)
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+  const rand = () => {
+    hash = (hash * 1103515245 + 12345) & 0x7fffffff;
+    return hash / 0x7fffffff;
+  };
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return {
+    values: indices.map((i) => arr[i]),
+    originalIndices: indices,
+  };
+}
+
 function formatTimeRemaining(seconds: number): string {
   if (seconds <= 0) return "0:00";
   const m = Math.floor(seconds / 60);
@@ -141,7 +161,7 @@ export function SkillTestPathFlow() {
     }
   }, [codingPrompts, codingIndex]);
 
-  // Auto-submit MCQ when time runs out (once)
+  // Auto-submit MCQ when time runs out (once) — submit even with no answers
   useEffect(() => {
     if (
       !userId ||
@@ -149,19 +169,21 @@ export function SkillTestPathFlow() {
       session.status !== "mcq" ||
       !timeUp ||
       autoSubmittedRef.current ||
-      !session._id
+      !session._id ||
+      !mcqQuestions ||
+      mcqQuestions.length === 0
     )
       return;
-    const answers = Object.entries(mcqAnswers).map(([questionId, selectedOptionIndex]) => ({
-      questionId: questionId as Id<"vettingMcqQuestions">,
-      selectedOptionIndex,
+    const answerMap = new Map(Object.entries(mcqAnswers));
+    const answers = mcqQuestions.map((q: { _id: string }) => ({
+      questionId: q._id as Id<"vettingMcqQuestions">,
+      selectedOptionIndex: answerMap.has(q._id) ? (answerMap.get(q._id) as number) : -1,
     }));
-    if (answers.length === 0) return;
     autoSubmittedRef.current = true;
     submitMcqAnswers({ sessionId: session._id, answers, userId })
       .then(() => window.location.reload())
       .catch(() => {});
-  }, [timeUp, session?.status, session?._id, mcqAnswers, userId, submitMcqAnswers]);
+  }, [timeUp, session?.status, session?._id, mcqAnswers, mcqQuestions, userId, submitMcqAnswers]);
 
   if (!userId) return null;
 
@@ -411,6 +433,11 @@ export function SkillTestPathFlow() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {session.pathType === "coding_mcq" && (
+            <div className="mx-4 mt-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 text-sm text-blue-800 dark:text-blue-200">
+              <strong>Recommended:</strong> Complete this coding challenge on a computer for the best experience. Typing and testing code is difficult on a phone.
+            </div>
+          )}
           {timerBar && <div className="px-4 pt-3">{timerBar}</div>}
           {timeUp && (
             <div className="mx-4 rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/30 px-4 py-2 text-sm font-medium text-amber-800 dark:text-amber-200">
@@ -523,26 +550,35 @@ export function SkillTestPathFlow() {
             </div>
           )}
           <ErrorHandler error={error} onRetry={() => setError(null)} onDismiss={() => setError(null)} title="Error" />
-          <div className="space-y-4">
-            <p className="font-medium">{current.questionText}</p>
+          <div className="space-y-4 min-w-0">
+            <p className="font-medium break-words min-w-0">{current.questionText}</p>
             <div className="space-y-2">
-              {current.options.map((opt: string, optIndex: number) => (
-                <label
-                  key={optIndex}
-                  className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border hover:bg-muted/50 ${mcqAnswers[current._id] === optIndex ? "border-primary bg-primary/5" : ""}`}
-                >
-                  <input
-                    type="radio"
-                    name={current._id}
-                    checked={mcqAnswers[current._id] === optIndex}
-                    onChange={() =>
-                      setMcqAnswers((prev) => ({ ...prev, [current._id]: optIndex }))
-                    }
-                    className="w-4 h-4"
-                  />
-                  <span>{opt}</span>
-                </label>
-              ))}
+              {(() => {
+                const { values: shuffledOptions, originalIndices } = shuffleWithSeed<string>(
+                  current.options as string[],
+                  current._id
+                );
+                return shuffledOptions.map((opt, displayIdx) => {
+                  const originalIndex = originalIndices[displayIdx];
+                  return (
+                    <label
+                      key={displayIdx}
+                      className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border hover:bg-muted/50 min-w-0 ${mcqAnswers[current._id] === originalIndex ? "border-primary bg-primary/5" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name={current._id}
+                        checked={mcqAnswers[current._id] === originalIndex}
+                        onChange={() =>
+                          setMcqAnswers((prev) => ({ ...prev, [current._id]: originalIndex }))
+                        }
+                        className="w-4 h-4 shrink-0"
+                      />
+                      <span className="break-words min-w-0">{opt}</span>
+                    </label>
+                  );
+                });
+              })()}
             </div>
           </div>
           <div className="flex items-center justify-between">
