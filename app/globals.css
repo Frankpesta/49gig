@@ -383,6 +383,35 @@
   }
 }
 
+/* Dashboard: reduced heading sizes (override page-level classes) */
+.dashboard-content h1 {
+  font-size: 1.25rem !important;
+  font-weight: 700;
+}
+@media (min-width: 640px) {
+  .dashboard-content h1 {
+    font-size: 1.5rem !important;
+  }
+}
+.dashboard-content h2 {
+  font-size: 1.125rem !important;
+  font-weight: 600;
+}
+@media (min-width: 640px) {
+  .dashboard-content h2 {
+    font-size: 1.25rem !important;
+  }
+}
+.dashboard-content h3 {
+  font-size: 1rem !important;
+  font-weight: 600;
+}
+@media (min-width: 640px) {
+  .dashboard-content h3 {
+    font-size: 1.125rem !important;
+  }
+}
+
 /* Dashboard: single scroll area, minimal scrollbar */
 .dashboard-scroll {
   scrollbar-gutter: stable;
