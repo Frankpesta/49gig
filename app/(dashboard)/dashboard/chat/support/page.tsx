@@ -89,16 +89,16 @@ export default function SupportChatPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-2xl py-8">
-      <div className="mb-6 flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
+    <div className="mx-auto w-full max-w-2xl px-2 py-4 sm:px-4 sm:py-6 lg:py-8">
+      <div className="mb-4 flex items-start gap-3 sm:mb-6 sm:gap-4">
+        <Button variant="ghost" size="icon" asChild className="h-9 w-9 shrink-0">
           <Link href="/dashboard/chat">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">New Support Chat</h1>
-          <p className="text-muted-foreground mt-1">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">New Support Chat</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Create a support request to get help from our team
           </p>
         </div>

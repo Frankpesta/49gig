@@ -72,24 +72,26 @@ export function NotificationBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-[360px] max-w-[90vw] p-0"
+        side="bottom"
+        sideOffset={8}
+        className="w-[min(360px,calc(100vw-2rem))] max-h-[min(400px,70vh)] p-0"
       >
-        <div className="flex items-center justify-between px-4 py-3">
-          <DropdownMenuLabel className="p-0 text-sm font-semibold">
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
+          <DropdownMenuLabel className="p-0 text-xs font-semibold sm:text-sm">
             Notifications
           </DropdownMenuLabel>
           <Button
             variant="ghost"
             size="sm"
             onClick={handleMarkAllRead}
-            className="h-7 px-2 text-xs"
+            className="h-6 shrink-0 px-2 text-[10px] sm:h-7 sm:text-xs"
           >
-            <CheckCheck className="mr-1 h-3.5 w-3.5" />
+            <CheckCheck className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
             Mark all read
           </Button>
         </div>
         <DropdownMenuSeparator />
-        <div className="max-h-[360px] overflow-auto">
+        <div className="max-h-[min(360px,60vh)] overflow-auto overscroll-contain">
           {!inAppEnabled ? (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               In-app notifications are disabled.
@@ -103,7 +105,7 @@ export function NotificationBell() {
               <DropdownMenuItem
                 key={notification._id}
                 className={cn(
-                  "flex cursor-pointer items-start gap-3 px-4 py-3",
+                  "flex cursor-pointer items-start gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3",
                   !notification.readAt && "bg-muted/40"
                 )}
                 onClick={() =>
@@ -113,10 +115,10 @@ export function NotificationBell() {
                   })
                 }
               >
-                <div className="mt-0.5 h-2 w-2 rounded-full bg-primary opacity-80" />
-                <div className="flex-1 space-y-1">
-                  <div className="text-sm font-medium">{notification.title}</div>
-                  <div className="text-xs text-muted-foreground">
+                <div className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary opacity-80 sm:h-2 sm:w-2" />
+                <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+                  <div className="truncate text-xs font-medium sm:text-sm">{notification.title}</div>
+                  <div className="line-clamp-2 text-[11px] text-muted-foreground sm:text-xs">
                     {notification.message}
                   </div>
                   <div className="text-[11px] text-muted-foreground/70">

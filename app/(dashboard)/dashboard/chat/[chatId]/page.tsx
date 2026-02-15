@@ -223,15 +223,18 @@ export default function ChatDetailPage() {
   const otherParticipants = participantsList.filter((p) => p._id !== user._id);
 
   return (
-    <div className="container mx-auto max-w-7xl py-8">
-      <div className="mb-4 flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/chat">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{chat.title || "Chat"}</h1>
+    <div className="mx-auto w-full max-w-7xl px-2 py-4 sm:px-4 sm:py-6 lg:py-8">
+      <div className="mb-3 flex flex-col gap-2 sm:mb-4 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="ghost" size="icon" asChild className="h-9 w-9">
+            <Link href="/dashboard/chat">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Badge variant="outline" className="text-xs sm:hidden">{chat.type}</Badge>
+        </div>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-bold sm:text-xl lg:text-2xl">{chat.title || "Chat"}</h1>
           <p className="text-sm text-muted-foreground">
             {chat.type === "project" && chat.projectId && (
               <Link
@@ -243,10 +246,10 @@ export default function ChatDetailPage() {
             )}
           </p>
           {participantsList.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 mt-2">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
               {participantsList.map((p) => (
-                <div key={p._id} className="flex items-center gap-2 rounded-full bg-muted/60 px-2 py-1">
-                  <Avatar className="h-6 w-6">
+                <div key={p._id} className="flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-0.5 sm:px-2 sm:py-1">
+                  <Avatar className="h-5 w-5 sm:h-6 sm:w-6">
                     {p.imageUrl && <AvatarImage src={p.imageUrl} alt={p.name} />}
                     <AvatarFallback className="text-xs">
                       {p.name.charAt(0).toUpperCase()}
@@ -260,12 +263,12 @@ export default function ChatDetailPage() {
             </div>
           )}
         </div>
-        <Badge variant="outline">{chat.type}</Badge>
+        <Badge variant="outline" className="hidden text-xs sm:inline-flex">{chat.type}</Badge>
       </div>
 
-      <Card className="h-[calc(100vh-200px)] flex flex-col">
+      <Card className="flex min-h-[280px] flex-col sm:min-h-[320px] lg:h-[calc(100vh-220px)]">
         {/* Messages Area */}
-        <CardContent className="flex-1 overflow-y-auto p-6 space-y-4">
+        <CardContent className="flex-1 overflow-y-auto p-3 space-y-3 sm:p-4 sm:space-y-4 lg:p-6">
           {displayMessages.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <p className="text-muted-foreground">No messages yet</p>
@@ -291,7 +294,7 @@ export default function ChatDetailPage() {
                     </Avatar>
                   )}
                   <div
-                    className={`flex flex-col max-w-[70%] ${isOwnMessage ? "items-end" : "items-start"}`}
+                    className={`flex flex-col max-w-[85%] sm:max-w-[75%] lg:max-w-[70%] ${isOwnMessage ? "items-end" : "items-start"}`}
                   >
                     {!isOwnMessage && (
                       <span className="text-xs font-medium text-muted-foreground mb-1">
@@ -353,7 +356,7 @@ export default function ChatDetailPage() {
         </CardContent>
 
         {/* Input Area */}
-        <CardHeader className="border-t p-4">
+        <CardHeader className="border-t p-3 sm:p-4">
           {pendingFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {pendingFiles.map((f, i) => (

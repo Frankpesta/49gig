@@ -12,6 +12,7 @@ import { useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { DashboardFooter } from "@/components/dashboard/dashboard-footer";
 
 export default function DashboardLayout({
   children,
@@ -232,9 +233,10 @@ export default function DashboardLayout({
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.05),_transparent_55%),radial-gradient(circle_at_bottom,_rgba(15,118,110,0.08),_transparent_60%)] dark:bg-[radial-gradient(circle_at_top,_rgba(15,23,42,0.65),_transparent_60%),radial-gradient(circle_at_bottom,_rgba(59,130,246,0.22),_transparent_65%)]" />
           </div>
           <div className="relative flex flex-1 flex-col gap-4 sm:gap-5 md:gap-6 p-3 sm:p-4 md:p-6 lg:p-8">
-            <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 sm:gap-5 md:gap-6">
+            <div className="dashboard-content mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 sm:gap-5 md:gap-6">
               {children}
             </div>
+            <DashboardFooter />
           </div>
         </div>
       </SidebarInset>

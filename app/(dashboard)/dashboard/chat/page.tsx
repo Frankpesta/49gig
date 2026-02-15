@@ -135,25 +135,25 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="container mx-auto max-w-7xl py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Messages</h1>
-          <p className="text-muted-foreground mt-1">
+    <div className="mx-auto w-full max-w-7xl px-2 py-4 sm:px-4 sm:py-6 lg:py-8">
+      <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Messages</h1>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground sm:mt-1">
             {isAdminOrModerator
               ? "View all project and support chats"
               : "Communicate with clients, freelancers, and support"}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/chat/support">
+        <Button asChild className="w-full shrink-0 sm:w-auto">
+          <Link href="/dashboard/chat/support" className="flex items-center justify-center">
             <Plus className="mr-2 h-4 w-4" />
             New Support Chat
           </Link>
         </Button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
@@ -177,9 +177,9 @@ export default function ChatPage() {
               {isAdminOrModerator ? (
                 <div className="divide-y">
                   <div>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-sm font-medium">
-                      <Users className="h-4 w-4" />
-                      Project Chats (Client ↔ Freelancer)
+                    <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium sm:px-4 sm:text-sm bg-muted/50">
+                      <Users className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+                      <span className="truncate">Project Chats (Client ↔ Freelancer)</span>
                     </div>
                     <ChatListSection
                       chats={projectChatsForAdmin ?? []}
@@ -187,8 +187,8 @@ export default function ChatPage() {
                     />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 text-sm font-medium">
-                      <Headphones className="h-4 w-4" />
+                    <div className="flex items-center gap-2 px-3 py-2 text-xs font-medium sm:px-4 sm:text-sm bg-muted/50">
+                      <Headphones className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
                       Support Chats
                     </div>
                     <ChatListSection
@@ -208,12 +208,12 @@ export default function ChatPage() {
           </Card>
         </div>
 
-        <div className="lg:col-span-2">
-          <Card className="h-[600px] flex items-center justify-center">
-            <div className="text-center">
-              <MessageSquare className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Select a chat</h3>
-              <p className="text-muted-foreground">
+        <div className="hidden lg:block lg:col-span-2">
+          <Card className="flex h-[500px] min-h-[280px] items-center justify-center lg:h-[600px]">
+            <div className="text-center px-4">
+              <MessageSquare className="mx-auto mb-3 h-12 w-12 text-muted-foreground sm:mb-4 sm:h-16 sm:w-16" />
+              <h3 className="mb-1.5 text-base font-semibold sm:mb-2 sm:text-lg">Select a chat</h3>
+              <p className="text-sm text-muted-foreground">
                 Choose a chat from the list to start messaging
               </p>
             </div>
