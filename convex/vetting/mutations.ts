@@ -805,6 +805,9 @@ export const rejectVerification = mutation({
   },
 });
 
+const SKILL_TEST_PASS_THRESHOLD = 60;
+const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes for auto-submit after time up
+
 /**
  * Submit MCQ answers for a skill test session. Server scores using stored correct answers; client never sees correct answers.
  */
@@ -826,7 +829,10 @@ export const submitMcqAnswers = mutation({
     const session = await ctx.db.get(args.sessionId);
     if (!session) throw new Error("Session not found");
     if (session.freelancerId !== user._id) throw new Error("Unauthorized");
-    if (session.expiresAt != null && Date.now() > session.expiresAt) {
+    if (
+      session.expiresAt != null &&
+      Date.now() > session.expiresAt + GRACE_PERIOD_MS
+    ) {
       throw new Error("Time's up. This skill test has expired.");
     }
 
@@ -846,6 +852,56 @@ export const submitMcqAnswers = mutation({
     const mcqScore =
       questionIds.length > 0 ? Math.round((correct / questionIds.length) * 100) : 0;
 
+    // Compute combined score for this session (used for pass/fail)
+    const codingSubmissions = session.codingSubmissions ?? [];
+    let combinedScore = mcqScore;
+    if (session.pathType === "coding_mcq" && codingSubmissions.length > 0) {
+      let codingTotal = 0,
+        codingPassed = 0;
+      for (const sub of codingSubmissions) {
+        const r = sub.runResult as { passed?: number; total?: number } | undefined;
+        if (r && typeof r.passed === "number" && typeof r.total === "number" && r.total > 0) {
+          codingPassed += r.passed;
+          codingTotal += r.total;
+        }
+      }
+      const codingScore = codingTotal > 0 ? Math.round((codingPassed / codingTotal) * 100) : 0;
+      combinedScore = Math.round((codingScore + mcqScore) / 2);
+    } else if (session.pathType === "portfolio_mcq" && session.portfolioScore != null) {
+      combinedScore = Math.round(session.portfolioScore * 0.3 + mcqScore * 0.7);
+    }
+
+    // Count failed sessions before this one (for retake/delete logic)
+    const allSessions = await ctx.db
+      .query("vettingSkillTestSessions")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .collect();
+    const failedBeforeThis = allSessions.filter(
+      (s) =>
+        s._id !== args.sessionId &&
+        s.status === "completed" &&
+        s.mcqScore != null &&
+        (s.pathType === "mcq_only"
+          ? s.mcqScore < SKILL_TEST_PASS_THRESHOLD
+          : s.pathType === "portfolio_mcq" && s.portfolioScore != null
+          ? s.portfolioScore * 0.3 + s.mcqScore * 0.7 < SKILL_TEST_PASS_THRESHOLD
+          : s.pathType === "coding_mcq" && s.codingSubmissions?.length
+          ? (() => {
+              let ct = 0,
+                cp = 0;
+              for (const sub of s.codingSubmissions!) {
+                const r = sub.runResult as { passed?: number; total?: number } | undefined;
+                if (r && typeof r.passed === "number" && typeof r.total === "number" && r.total > 0) {
+                  cp += r.passed;
+                  ct += r.total;
+                }
+              }
+              const cs = ct > 0 ? Math.round((cp / ct) * 100) : 0;
+              return (cs + s.mcqScore!) / 2 < SKILL_TEST_PASS_THRESHOLD;
+            })()
+          : s.mcqScore < SKILL_TEST_PASS_THRESHOLD)
+    ).length;
+
     await ctx.db.patch(args.sessionId, {
       mcqAnswers: args.answers,
       mcqScore,
@@ -854,26 +910,20 @@ export const submitMcqAnswers = mutation({
       updatedAt: Date.now(),
     });
 
+    // If failed (combined score < 60) and this is the 2nd failure, deactivate user
+    if (
+      combinedScore < SKILL_TEST_PASS_THRESHOLD &&
+      failedBeforeThis + 1 >= 2
+    ) {
+      await ctx.db.patch(user._id, {
+        status: "deleted",
+        updatedAt: Date.now(),
+      });
+    }
+
     // Push aggregate skill assessment to vetting result so completeVerification can use it
     const vettingResult = await ctx.db.get(session.vettingResultId);
     if (vettingResult) {
-      const codingSubmissions = session.codingSubmissions ?? [];
-      let combinedScore = mcqScore;
-      if (session.pathType === "coding_mcq" && codingSubmissions.length > 0) {
-        let codingTotal = 0;
-        let codingPassed = 0;
-        for (const sub of codingSubmissions) {
-          const r = sub.runResult as { passed?: number; total?: number } | undefined;
-          if (r && typeof r.passed === "number" && typeof r.total === "number" && r.total > 0) {
-            codingPassed += r.passed;
-            codingTotal += r.total;
-          }
-        }
-        const codingScore = codingTotal > 0 ? Math.round((codingPassed / codingTotal) * 100) : 0;
-        combinedScore = Math.round((codingScore + mcqScore) / 2);
-      } else if (session.pathType === "portfolio_mcq" && session.portfolioScore != null) {
-        combinedScore = Math.round(session.portfolioScore * 0.3 + mcqScore * 0.7);
-      }
       const newAssessment = {
         skillId: "skill_test_session",
         skillName: "Skill Test",

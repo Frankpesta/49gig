@@ -236,9 +236,9 @@ export default function DashboardLayout({
             <div className="dashboard-content mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 sm:gap-5 md:gap-6">
               {children}
             </div>
-            <DashboardFooter />
           </div>
         </div>
+        <DashboardFooter />
       </SidebarInset>
     </SidebarProvider>
   );
