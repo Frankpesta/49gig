@@ -32,9 +32,9 @@ function ChatListSection({
 
   if (filtered.length === 0) {
     return (
-      <div className="p-8 text-center">
-        <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-        <p className="text-muted-foreground">
+      <div className="p-4 text-center sm:p-6 lg:p-8">
+        <MessageSquare className="mx-auto mb-3 h-10 w-10 text-muted-foreground sm:mb-4 sm:h-12 sm:w-12" />
+        <p className="text-sm text-muted-foreground sm:text-base">
           {searchQuery ? "No chats found" : "No chats yet"}
         </p>
       </div>
@@ -47,25 +47,25 @@ function ChatListSection({
         <Link
           key={chat._id}
           href={`/dashboard/chat/${chat._id}`}
-          className="block p-4 hover:bg-muted/50 transition-colors"
+          className="block p-3 hover:bg-muted/50 sm:p-4"
         >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold truncate">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                <h3 className="min-w-0 truncate text-sm font-semibold sm:text-base">
                   {chat.title || "Untitled Chat"}
                 </h3>
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs">
                   {chat.type}
                 </Badge>
               </div>
               {chat.lastMessagePreview && (
-                <p className="text-sm text-muted-foreground truncate">
+                <p className="mt-0.5 truncate text-xs text-muted-foreground sm:text-sm">
                   {chat.lastMessagePreview}
                 </p>
               )}
               {chat.lastMessageAt && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="mt-0.5 text-[10px] text-muted-foreground sm:mt-1 sm:text-xs">
                   {new Date(chat.lastMessageAt).toLocaleDateString()}
                 </p>
               )}
@@ -135,7 +135,7 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-2 py-4 sm:px-4 sm:py-6 lg:py-8">
+    <div className="mx-auto w-full min-w-0 max-w-7xl px-2 py-4 sm:px-4 sm:py-6 lg:py-8">
       <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Messages</h1>
@@ -153,27 +153,29 @@ export default function ChatPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3 lg:gap-6">
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Chats</CardTitle>
+      <div className="grid min-w-0 gap-4 lg:grid-cols-3 lg:gap-6">
+        <div className="min-w-0 lg:col-span-1">
+          <Card className="min-w-0 overflow-hidden">
+            <CardHeader className="p-3 sm:p-4 lg:p-6">
+              <div className="flex min-w-0 items-center justify-between gap-2">
+                <CardTitle className="truncate text-base sm:text-lg lg:text-xl">Chats</CardTitle>
                 {unreadCount && unreadCount > 0 && (
-                  <Badge variant="destructive">{unreadCount}</Badge>
+                  <Badge variant="destructive" className="shrink-0 text-[10px] sm:text-xs">
+                    {unreadCount}
+                  </Badge>
                 )}
               </div>
-              <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="relative mt-3 sm:mt-4">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-3" />
                 <Input
                   placeholder="Search chats..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="h-9 min-w-0 pl-8 text-sm sm:h-10 sm:pl-9"
                 />
               </div>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="min-w-0 p-0">
               {isAdminOrModerator ? (
                 <div className="divide-y">
                   <div>
