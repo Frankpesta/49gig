@@ -813,44 +813,7 @@ export default function Home() {
                 </SectionTransition>
               </div>
 
-              {/* Enhanced Guarantee Section */}
-              <SectionTransition variant="fade" delay={800}>
-                <div className="bg-background/80 backdrop-blur-xl rounded-3xl p-8 border border-border/30 shadow-xl max-w-4xl mx-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-primary">Free</div>
-                      <div className="text-sm text-muted-foreground">No setup fees</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-secondary">Instant</div>
-                      <div className="text-sm text-muted-foreground">Start immediately</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-green-600">Flexible</div>
-                      <div className="text-sm text-muted-foreground">Cancel anytime</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-8 pt-6 border-t border-border/30">
-                    <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span>30-day money-back guarantee</span>
-                      </div>
-                      <div className="w-1 h-1 bg-border rounded-full" />
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-primary" />
-                        <span>SSL encrypted & secure</span>
-                      </div>
-                      <div className="w-1 h-1 bg-border rounded-full" />
-                      <div className="flex items-center gap-2">
-                        <Heart className="h-4 w-4 text-red-500 fill-red-500" />
-                        <span>Loved by 500+ companies</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SectionTransition>
+              {/* Enhanced Guarantee Section removed (Free / Instant / Flexible) */}
             </div>
           </SectionTransition>
         </div>
