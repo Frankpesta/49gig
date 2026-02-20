@@ -119,7 +119,7 @@ A comprehensive redesign of all 49GIG marketing pages to deliver a professional,
 ## Design System Features
 
 ### Color Palette
-- **Primary**: #1B344A (Deep Blue)
+- **Primary**: #07122B (Navy)
 - **Secondary**: #FEC110 (Bright Yellow)
 - **Neutrals**: Background, foreground, muted-foreground colors
 - **Accents**: Green for success, Red for warnings, Gradient combinations

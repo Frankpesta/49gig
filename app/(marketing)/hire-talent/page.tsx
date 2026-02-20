@@ -18,7 +18,6 @@ import {
   Clock,
   Award,
   Search,
-  Filter,
   ChevronRight,
   ArrowRight,
   Crown,
@@ -114,7 +113,7 @@ export default function HireTalentPage() {
         imageAlt="Professional collaboration"
         actions={
           <>
-            <CTAButton href="/signup" variant="primary" className="gap-2">
+            <CTAButton href="/signup/client" variant="primary" className="gap-2">
               <Briefcase className="h-5 w-5" />
               Start Hiring Now
               <ArrowRight className="h-4 w-4" />
@@ -156,31 +155,6 @@ export default function HireTalentPage() {
             ))}
           </BentoGrid>
 
-          {/* Browse More CTA */}
-          <SectionTransition variant="fade" delay={600}>
-            <div className="text-center">
-              <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-3xl p-8 border border-border/30">
-                <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
-                  Find Your Perfect Match
-                </h3>
-                <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  Browse through thousands of verified professionals across all skill categories and experience levels.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <CTAButton href="/talent-categories" variant="primary" className="gap-3">
-                    <Search className="h-5 w-5" />
-                    Browse All Talent
-                    <ArrowRight className="h-5 w-5" />
-                  </CTAButton>
-                  <CTAButton href="/hire-talent" variant="secondary" className="gap-3">
-                    <Filter className="h-5 w-5" />
-                    Advanced Search
-                    <ArrowRight className="h-5 w-5" />
-                  </CTAButton>
-                </div>
-              </div>
-            </div>
-          </SectionTransition>
         </div>
       </section>
 

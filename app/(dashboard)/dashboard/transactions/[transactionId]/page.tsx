@@ -92,7 +92,7 @@ export default function TransactionDetailPage() {
             <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
             <h3 className="mb-2 text-lg font-semibold">Transaction not found</h3>
             <p className="mb-4 text-center text-sm text-muted-foreground">
-              The transaction you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+              The transaction you're looking for doesn't exist or you don't have access to it.
             </p>
             <Button asChild>
               <Link href="/dashboard/transactions">Back to Transactions</Link>

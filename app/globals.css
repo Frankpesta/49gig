@@ -11,7 +11,7 @@
 @theme inline {
   /* Fonts */
   --font-sans: var(--font-inter);
-  --font-heading: var(--font-inter-tight);
+  --font-heading: var(--font-inter);
 
   /* Border radius */
   --radius: 0.5rem;
@@ -47,7 +47,7 @@
 
 /* ============================================
    LIGHT THEME (49GIG Branding)
-   Primary: #1B344A (Blue)
+   Primary: #07122B (Navy)
    Secondary: #FEC110 (Yellow)
    ============================================ */
 :root {
@@ -57,7 +57,7 @@
   --card-foreground: oklch(15% 0 0);
   --popover: oklch(100% 0 0);
   --popover-foreground: oklch(15% 0 0);
-  --primary: oklch(28% 0.05 240); /* #1B344A - Blue */
+  --primary: #07122B; /* Footer navy */
   --primary-foreground: oklch(100% 0 0);
   --secondary: oklch(82% 0.16 90); /* #FEC110 - Yellow */
   --secondary-foreground: oklch(20% 0 0);
@@ -69,10 +69,10 @@
   --destructive-foreground: oklch(100% 0 0);
   --border: oklch(92% 0 0);
   --input: oklch(92% 0 0);
-  --ring: oklch(28% 0.05 240); /* Primary color for focus rings */
+  --ring: #07122B; /* Primary color for focus rings */
 
   /* Charts - Complementary to brand colors */
-  --chart-1: oklch(38% 0.06 240); /* Primary variant */
+  --chart-1: #07122B; /* Primary variant */
   --chart-2: oklch(78% 0.14 90); /* Secondary variant */
   --chart-3: oklch(60% 0.08 180); /* Teal complement */
   --chart-4: oklch(65% 0.12 340); /* Pink accent */
@@ -81,7 +81,7 @@
   /* Sidebar */
   --sidebar: oklch(98% 0 0);
   --sidebar-foreground: oklch(15% 0 0);
-  --sidebar-primary: oklch(28% 0.05 240); /* Primary color */
+  --sidebar-primary: #07122B; /* Primary color */
   --sidebar-primary-foreground: oklch(100% 0 0);
   --sidebar-accent: oklch(96% 0 0);
   --sidebar-accent-foreground: oklch(20% 0 0);
@@ -91,7 +91,7 @@
 
 /* ============================================
    DARK THEME (49GIG Branding)
-   Primary: Lighter variation of #1B344A
+   Primary: #07122B (Navy)
    Secondary: #FEC110 (Yellow)
    ============================================ */
 .dark {
@@ -101,7 +101,7 @@
   --card-foreground: oklch(98% 0 0);
   --popover: oklch(15% 0 0);
   --popover-foreground: oklch(98% 0 0);
-  --primary: oklch(55% 0.06 240); /* Lighter blue for dark mode */
+  --primary: #07122B; /* Footer navy */
   --primary-foreground: oklch(98% 0 0);
   --secondary: oklch(82% 0.16 90); /* #FEC110 - Yellow (same as light) */
   --secondary-foreground: oklch(10% 0 0);
@@ -113,10 +113,10 @@
   --destructive-foreground: oklch(98% 0 0);
   --border: oklch(25% 0 0);
   --input: oklch(25% 0 0);
-  --ring: oklch(55% 0.06 240); /* Primary color for focus rings */
+  --ring: #07122B; /* Primary color for focus rings */
 
   /* Charts - Complementary to brand colors (adjusted for dark mode) */
-  --chart-1: oklch(60% 0.06 240); /* Primary variant */
+  --chart-1: #07122B; /* Primary variant */
   --chart-2: oklch(80% 0.15 90); /* Secondary variant */
   --chart-3: oklch(70% 0.08 180); /* Teal complement */
   --chart-4: oklch(75% 0.12 340); /* Pink accent */
@@ -125,7 +125,7 @@
   /* Sidebar */
   --sidebar: oklch(15% 0 0);
   --sidebar-foreground: oklch(98% 0 0);
-  --sidebar-primary: oklch(55% 0.06 240); /* Primary color */
+  --sidebar-primary: #07122B; /* Primary color */
   --sidebar-primary-foreground: oklch(98% 0 0);
   --sidebar-accent: oklch(20% 0 0);
   --sidebar-accent-foreground: oklch(98% 0 0);

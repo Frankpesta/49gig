@@ -1,34 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import {
   CheckCircle2,
-  CheckCircle,
   Users,
-  Briefcase,
   Shield,
-  ChevronRight,
   Target,
   Award,
   FileCheck,
   DollarSign,
   Clock,
   Handshake,
-  Zap,
-  Globe,
   TrendingUp,
   Code,
   Palette,
   Database,
-  PenTool,
-  HeadphonesIcon,
   Search,
   UserCheck,
   FileText,
@@ -39,15 +29,11 @@ import {
   AlertCircle,
   ArrowRight,
   Play,
-  Sparkles,
   Lightbulb,
-  BarChart3,
   MessageCircle,
   ThumbsUp,
   Rocket,
   Workflow,
-  MapPin,
-  Heart,
   Brain,
   Cloud
 } from "lucide-react";
@@ -174,7 +160,7 @@ export default function ForFreelancersPage() {
         imageAlt="Freelancer working remotely"
         actions={
           <>
-            <CTAButton href="/signup" variant="primary" className="gap-2">
+            <CTAButton href="/signup/freelancer" variant="primary" className="gap-2">
               <Rocket className="h-5 w-5" />
               Apply as Freelancer
               <ArrowRight className="h-4 w-4" />
@@ -205,11 +191,11 @@ export default function ForFreelancersPage() {
                 </div>
                 Why Choose 49GIG
               </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-5 leading-tight">
                 Why Freelancers Choose <br className="hidden lg:block" />
                 <span className="bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">49GIG</span>
               </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 Join thousands of African professionals building successful global careers with verified clients and fair pay.
               </p>
             </div>
@@ -320,19 +306,19 @@ export default function ForFreelancersPage() {
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-secondary">10K+</div>
+                    <div className="text-3xl font-semibold text-secondary">10K+</div>
                     <div className="text-sm text-muted-foreground">Active Freelancers</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-primary">50+</div>
+                    <div className="text-3xl font-semibold text-primary">50+</div>
                     <div className="text-sm text-muted-foreground">Countries Served</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-green-600">$2M+</div>
+                    <div className="text-3xl font-semibold text-green-600">$2M+</div>
                     <div className="text-sm text-muted-foreground">Paid to Freelancers</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-purple-600">4.9★</div>
+                    <div className="text-3xl font-semibold text-purple-600">4.9★</div>
                     <div className="text-sm text-muted-foreground">Average Rating</div>
                   </div>
                 </div>
@@ -353,10 +339,10 @@ export default function ForFreelancersPage() {
                 </div>
                 Skill Categories
               </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-5 leading-tight">
                 Who Can Join <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">49GIG</span>
               </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 49GIG is for skilled professionals across multiple disciplines. Only professionals who meet our quality standards are approved.
               </p>
             </div>
@@ -429,12 +415,12 @@ export default function ForFreelancersPage() {
             <div className="mt-20 text-center">
               <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/5 rounded-3xl p-8 border border-border/30">
                 <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
-                  Don&apos;t See Your Skill?
+                  Don&#39;t See Your Skill?
                 </h3>
                 <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
                   We support hundreds of specialized skills. Apply anyway—we might have opportunities that match your expertise.
                 </p>
-                <CTAButton href="/signup" variant="primary" className="gap-3">
+                <CTAButton href="/signup/freelancer" variant="primary" className="gap-3">
                   <Rocket className="h-5 w-5" />
                   Apply for Any Skill
                   <ArrowRight className="h-5 w-5" />
@@ -462,11 +448,11 @@ export default function ForFreelancersPage() {
                 </div>
                 How It Works
               </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-5 leading-tight">
                 From Application to <br className="hidden lg:block" />
                 <span className="bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">Getting Paid</span>
               </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 A simple, transparent process from application to getting paid. No bidding, no uncertainty—just fair work and reliable payments.
               </p>
             </div>
@@ -485,11 +471,11 @@ export default function ForFreelancersPage() {
                 const step = howItWorksSteps[stepIndex];
                 const colors = ['from-pink-500 to-rose-500', 'from-indigo-500 to-blue-500', 'from-cyan-500 to-teal-500', 'from-emerald-500 to-green-500', 'from-amber-500 to-orange-500'];
                 const notes = [
-                  "📝 Submit your portfolio, skills, and experience. Our AI reviews your application in minutes.",
-                  "✅ Only top-scoring freelancers are approved. We maintain the highest quality standards.",
-                  "🎯 Projects come to you based on your skills and ratings. No more endless job searching.",
-                  "🚀 Start working immediately with clear contracts and expectations.",
-                  "💰 Get paid securely after client approval. Withdraw anytime through your preferred method.",
+                  "Submit your portfolio, skills, and experience. Applications are reviewed quickly.",
+                  "Only top-scoring freelancers are approved to maintain quality standards.",
+                  "Projects are matched to your skills and ratings with no bidding required.",
+                  "Start work with clear contracts, milestones, and expectations.",
+                  "Get paid securely after approvals and withdraw through your preferred method.",
                 ];
                 return (
                   <SectionTransition key={stepIndex} variant="slide" direction="up" delay={300 + stepIndex * 100}>
@@ -502,7 +488,7 @@ export default function ForFreelancersPage() {
                           {step.step}
                         </span>
                       </div>
-                      <h3 className="text-xl lg:text-2xl font-bold text-foreground leading-tight mb-2">{step.title}</h3>
+                      <h3 className="text-xl lg:text-2xl font-semibold text-foreground leading-tight mb-2">{step.title}</h3>
                       <p className="text-muted-foreground leading-relaxed mb-4">{step.description}</p>
                       <div className={[
                         "rounded-xl p-3",
@@ -563,7 +549,7 @@ export default function ForFreelancersPage() {
                   </div>
                   Professional Standards
                 </div>
-                <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground leading-tight">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground leading-tight">
                   What We Expect <br className="hidden lg:block" />
                   <span className="bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">From You</span>
                 </h2>
@@ -657,7 +643,7 @@ export default function ForFreelancersPage() {
                   </div>
                   Your Protection
                 </div>
-                <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground leading-tight">
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground leading-tight">
                   Support & <br className="hidden lg:block" />
                   <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Protection</span>
                 </h2>
@@ -733,112 +719,60 @@ export default function ForFreelancersPage() {
         </div>
       </section>
 
-      {/* MODERN FINAL CTA SECTION */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-secondary via-secondary/95 to-primary text-secondary-foreground relative overflow-hidden">
-        {/* Enhanced Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23345478' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          }} />
-        </div>
-
-        {/* Floating Elements */}
-        <div className="absolute top-20 right-20 w-4 h-4 bg-primary/30 rounded-full animate-pulse" />
-        <div className="absolute bottom-32 left-16 w-3 h-3 bg-white/20 rounded-full animate-pulse" style={{ animationDelay: "1s" }} />
-        <div className="absolute top-1/2 right-10 w-2 h-2 bg-primary/20 rounded-full animate-pulse" style={{ animationDelay: "2s" }} />
-
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      {/* FINAL CTA SECTION */}
+      <section className="border-y border-border/40 bg-linear-to-br from-secondary/15 via-background to-primary/10 py-20 sm:py-24 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTransition variant="fade" delay={200}>
-            <div className="text-center space-y-12">
-              {/* Enhanced Badge */}
-              <div className="inline-flex items-center gap-3 rounded-full bg-secondary-foreground/10 px-8 py-4 text-sm font-bold text-secondary-foreground border border-secondary-foreground/20 shadow-2xl">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary">
-                  <Rocket className="h-4 w-4 text-secondary-foreground" />
+            <div className="rounded-3xl border border-border/60 bg-background/90 p-8 shadow-xl sm:p-10 lg:p-12">
+              <div className="mx-auto max-w-4xl text-center">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-secondary/20 bg-secondary/10 px-4 py-2 text-xs font-semibold text-secondary-foreground">
+                  <Rocket className="h-3.5 w-3.5" />
+                  Start Your Journey
                 </div>
-                Ready to Work Globally?
-                <Sparkles className="h-5 w-5 animate-pulse" />
-              </div>
-
-              {/* Enhanced Headline */}
-              <div className="space-y-6">
-                <h2 className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-secondary-foreground leading-[0.9] tracking-tight">
-                  Start Your <span className="bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent">Global Career</span>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground leading-tight">
+                  Build a global freelance career with 49GIG
                 </h2>
-                <p className="text-xl lg:text-2xl text-secondary-foreground/90 max-w-4xl mx-auto leading-relaxed font-medium">
-                  Join 49GIG and start building a sustainable freelance career with international clients, fair pay, and professional growth.
+                <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
+                  Work with verified clients, deliver through structured milestones, and grow your reputation with consistent high-quality projects.
                 </p>
               </div>
 
-              {/* Enhanced Trust Indicators */}
-              <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12 pt-8">
-                <div className="group flex items-center gap-4 rounded-2xl bg-secondary-foreground/10 backdrop-blur-xl px-6 py-4 border border-secondary-foreground/20 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 group-hover:from-green-500/30 group-hover:to-emerald-500/30 transition-all duration-300 shadow-lg">
-                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="mt-8 grid gap-4 text-center sm:grid-cols-3">
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
                   </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold text-secondary-foreground">Verified Clients</div>
-                    <div className="text-xs text-secondary-foreground/70">100% legitimate</div>
-                  </div>
+                  <h4 className="text-sm font-semibold text-foreground sm:text-base">Verified Clients</h4>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Real projects with secured budgets</p>
                 </div>
-
-                <div className="group flex items-center gap-4 rounded-2xl bg-secondary-foreground/10 backdrop-blur-xl px-6 py-4 border border-secondary-foreground/20 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/30 group-hover:from-primary/30 group-hover:to-primary/40 transition-all duration-300 shadow-lg">
-                    <DollarSign className="h-6 w-6 text-primary" />
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <DollarSign className="h-4 w-4" />
                   </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold text-secondary-foreground">Secure Payments</div>
-                    <div className="text-xs text-secondary-foreground/70">Milestone-based</div>
-                  </div>
+                  <h4 className="text-sm font-semibold text-foreground sm:text-base">Secure Payouts</h4>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Milestone-based payment protection</p>
                 </div>
-
-                <div className="group flex items-center gap-4 rounded-2xl bg-secondary-foreground/10 backdrop-blur-xl px-6 py-4 border border-secondary-foreground/20 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/30 group-hover:from-secondary/30 group-hover:to-secondary/40 transition-all duration-300 shadow-lg">
-                    <Award className="h-6 w-6 text-secondary-foreground" />
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary-foreground">
+                    <Award className="h-4 w-4" />
                   </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold text-secondary-foreground">Career Growth</div>
-                    <div className="text-xs text-secondary-foreground/70">Build reputation</div>
-                  </div>
+                  <h4 className="text-sm font-semibold text-foreground sm:text-base">Career Growth</h4>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Build long-term credibility and ratings</p>
                 </div>
               </div>
 
-              {/* Enhanced CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
-                <SectionTransition variant="slide" direction="left" delay={600}>
-                  <CTAButton href="/signup" variant="primary" className="gap-3">
-                    <Play className="h-6 w-6" />
-                    Apply as Freelancer
-                    <ArrowRight className="h-6 w-6" />
-                  </CTAButton>
-                </SectionTransition>
-                <SectionTransition variant="slide" direction="right" delay={700}>
-                  <CTAButton href="/how-it-works#freelancers" variant="secondary" className="gap-3">
-                    <Workflow className="h-6 w-6" />
-                    See How It Works
-                    <ArrowRight className="h-6 w-6" />
-                  </CTAButton>
-                </SectionTransition>
+              <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+                <CTAButton href="/signup/freelancer" variant="primary" className="gap-2">
+                  <Play className="h-4 w-4" />
+                  Apply as Freelancer
+                  <ArrowRight className="h-4 w-4" />
+                </CTAButton>
+                <CTAButton href="/how-it-works#freelancers" variant="secondary" className="gap-2">
+                  <Workflow className="h-4 w-4" />
+                  See How It Works
+                  <ArrowRight className="h-4 w-4" />
+                </CTAButton>
               </div>
-
-              {/* Enhanced Guarantee Section */}
-              <SectionTransition variant="fade" delay={800}>
-                <div className="bg-secondary-foreground/10 backdrop-blur-xl rounded-3xl p-8 border border-secondary-foreground/20 shadow-xl max-w-4xl mx-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-primary">Free</div>
-                      <div className="text-sm text-secondary-foreground/80">Application & onboarding</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-secondary">5 Days</div>
-                      <div className="text-sm text-secondary-foreground/80">Average approval time</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-green-600">$2M+</div>
-                      <div className="text-sm text-secondary-foreground/80">Paid to freelancers</div>
-                    </div>
-                  </div>
-                </div>
-              </SectionTransition>
             </div>
           </SectionTransition>
         </div>

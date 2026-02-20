@@ -541,7 +541,7 @@ export default function MilestoneDetailPage() {
                   <CardHeader>
                     <CardTitle>Release payment</CardTitle>
                     <CardDescription>
-                      Send the milestone amount to the freelancer now. If you don&apos;t release manually, it will be paid automatically 48 hours after approval.
+                      Send the milestone amount to the freelancer now. If you don't release manually, it will be paid automatically 48 hours after approval.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

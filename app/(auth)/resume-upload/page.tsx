@@ -176,11 +176,11 @@ export default function ResumeUploadPage() {
   return (
     <AuthTwoColumnLayout
       leftTitle="Show us your best work."
-      leftDescription="Upload your resume to generate a professional bio and accelerate verification. We&apos;ll parse only what&apos;s needed for your profile."
+      leftDescription="Upload your resume to generate a professional bio and accelerate verification. We'll parse only what's needed for your profile."
       features={resumeUploadFeatures}
       badge="Step 1 of 3 · Resume upload"
       heading="Resume upload"
-      subline="Upload a PDF to continue. We&apos;ll enrich your profile automatically."
+      subline="Upload a PDF to continue. We'll enrich your profile automatically."
     >
       <div className="space-y-6">
         {/* Step indicator – responsive, wraps on narrow screens */}
@@ -219,7 +219,7 @@ export default function ResumeUploadPage() {
                 Upload your resume
               </CardTitle>
               <CardDescription>
-                PDF only · up to 10MB. We&apos;ll build your bio from this.
+                PDF only · up to 10MB. We'll build your bio from this.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 px-4 pb-6 pt-0 sm:px-6 lg:px-8 sm:pb-8">
@@ -240,7 +240,7 @@ export default function ResumeUploadPage() {
                   </div>
                   {resumeInfo.resumeStatus === "processing" && (
                     <p className="mt-1 text-xs">
-                      We&apos;re parsing your resume. This usually takes a few
+                      We're parsing your resume. This usually takes a few
                       seconds.
                     </p>
                   )}
@@ -307,7 +307,7 @@ export default function ResumeUploadPage() {
                 )}
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Tip: Include a concise summary, key skills, and top projects.
-                  We&apos;ll build your bio from this.
+                  We'll build your bio from this.
                 </p>
               </div>
             </CardContent>

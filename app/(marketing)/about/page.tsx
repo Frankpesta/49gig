@@ -75,7 +75,7 @@ export default function AboutPage() {
               Hire Talent
               <ArrowRight className="h-4 w-4" />
             </CTAButton>
-            <CTAButton href="/signup" variant="secondary" className="gap-2">
+            <CTAButton href="/signup/freelancer" variant="secondary" className="gap-2">
               Join as Freelancer
               <ArrowRight className="h-4 w-4" />
             </CTAButton>
@@ -96,7 +96,7 @@ export default function AboutPage() {
                   Our Mission
                 </div>
                 <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight text-foreground">
-                  Unlocking Africa&apos;s <br className="hidden lg:block" />
+                  Unlocking Africa's <br className="hidden lg:block" />
                   <span className="bg-linear-to-r from-primary to-secondary bg-clip-text text-transparent">Talent Potential</span>
                 </h2>
                 <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed">
@@ -149,7 +149,7 @@ export default function AboutPage() {
                   Our Vision
                 </div>
                 <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight text-foreground">
-                  Building Africa&apos;s <br className="hidden lg:block" />
+                  Building Africa's <br className="hidden lg:block" />
                   <span className="bg-linear-to-r from-secondary to-primary bg-clip-text text-transparent">Largest Talent Network</span>
                 </h2>
                 <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed">
@@ -264,7 +264,7 @@ export default function AboutPage() {
                   Be Part of <span className="bg-linear-to-r from-primary via-primary/90 to-secondary bg-clip-text text-transparent">Something Bigger</span>
                 </h2>
                 <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                  Whether you&apos;re a business looking for talent or a professional ready to work globally, 49GIG is here to connect you with opportunities that matter.
+                  Whether you're a business looking for talent or a professional ready to work globally, 49GIG is here to connect you with opportunities that matter.
                 </p>
               </div>
 
@@ -277,7 +277,7 @@ export default function AboutPage() {
                   </CTAButton>
                 </SectionTransition>
                 <SectionTransition variant="slide" direction="right" delay={700}>
-                  <CTAButton href="/signup" variant="secondary" className="gap-3">
+                  <CTAButton href="/signup/freelancer" variant="secondary" className="gap-3">
                     <Users className="h-6 w-6" />
                     Join as Freelancer
                     <ArrowRight className="h-6 w-6" />

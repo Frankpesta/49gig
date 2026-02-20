@@ -243,7 +243,7 @@ export default function PaymentPage() {
                 <p className="text-sm font-medium">Secure Payment</p>
                 <p className="text-xs text-muted-foreground">
                   Your payment will be processed securely. 
-                  You&apos;ll be redirected to the payment page where you can choose from multiple payment methods.
+                  You'll be redirected to the payment page where you can choose from multiple payment methods.
                 </p>
               </div>
             </div>

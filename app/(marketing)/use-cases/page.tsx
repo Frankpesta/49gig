@@ -143,7 +143,7 @@ export default function UseCasesPage() {
               Hire Talent
               <ChevronRight className="h-4 w-4" />
             </CTAButton>
-            <CTAButton href="/signup" variant="secondary" className="gap-2">
+            <CTAButton href="/signup/freelancer" variant="secondary" className="gap-2">
               <Users className="h-5 w-5" />
               Join as Freelancer
               <ChevronRight className="h-4 w-4" />
@@ -314,7 +314,7 @@ export default function UseCasesPage() {
               Hire a Team
               <ChevronRight className="h-4 w-4" />
             </CTAButton>
-            <CTAButton href="/signup" variant="secondary" className="border-2 border-white/80 bg-transparent text-white hover:bg-white/20 hover:border-white gap-2">
+            <CTAButton href="/signup/freelancer" variant="secondary" className="border-2 border-white/80 bg-transparent text-white hover:bg-white/20 hover:border-white gap-2">
               Join as a Freelancer
               <ChevronRight className="h-4 w-4" />
             </CTAButton>
