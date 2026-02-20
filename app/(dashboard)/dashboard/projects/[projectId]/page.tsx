@@ -162,7 +162,7 @@ export default function ProjectDetailPage() {
             <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
             <h3 className="mb-2 text-lg font-semibold">Project not found</h3>
             <p className="mb-4 text-center text-sm text-muted-foreground">
-              The project you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+              The project you're looking for doesn't exist or you don't have access to it.
             </p>
             <Button asChild>
               <Link href="/dashboard/projects">Back to Projects</Link>

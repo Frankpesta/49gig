@@ -119,7 +119,7 @@ function VerifyEmailContent() {
     return (
       <AuthTwoColumnLayout
         leftTitle="Email verified"
-        leftDescription="Your email has been verified successfully. You&apos;re all set to use 49GIG."
+        leftDescription="Your email has been verified successfully. You're all set to use 49GIG."
         features={loginFeatures}
         heading="Verification complete"
         subline="Your email has been verified successfully."
@@ -175,7 +175,7 @@ function VerifyEmailContent() {
           )}
           {resendSuccess && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-foreground sm:p-4">
-              We&apos;ve sent a new verification code. Check your inbox.
+              We've sent a new verification code. Check your inbox.
             </div>
           )}
           <div className="space-y-4">

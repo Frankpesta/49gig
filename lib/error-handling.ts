@@ -60,7 +60,27 @@ export async function retryWithBackoff<T>(
  */
 export function getUserFriendlyError(error: unknown): string {
   if (error instanceof Error) {
-    const message = error.message.toLowerCase();
+    // Start from the raw message
+    let rawMessage = error.message || "";
+
+    // Strip Convex-specific prefixes / jargon while keeping the human-readable part
+    if (/convexerror:/i.test(rawMessage)) {
+      // Remove leading "ConvexError: ..." prefix
+      const firstColon = rawMessage.indexOf(":");
+      if (firstColon !== -1) {
+        rawMessage = rawMessage.slice(firstColon + 1).trim();
+      }
+    }
+
+    // If Convex wrapped the original error like "Error in mutation 'x': Actual message"
+    if (/error in (mutation|query)/i.test(rawMessage)) {
+      const lastColon = rawMessage.lastIndexOf(":");
+      if (lastColon !== -1) {
+        rawMessage = rawMessage.slice(lastColon + 1).trim();
+      }
+    }
+
+    const message = rawMessage.toLowerCase();
 
     // API errors
     if (message.includes("network") || message.includes("fetch")) {
@@ -109,18 +129,13 @@ export function getUserFriendlyError(error: unknown): string {
       return "Invalid input. Please check your information and try again.";
     }
 
-    // Convex-specific errors
-    if (message.includes("convex")) {
-      return "Database error. Please try again or contact support.";
-    }
-
     // Authentication errors
     if (message.includes("not authenticated") || message.includes("login")) {
       return "Please log in to continue.";
     }
 
     // Return original message if no pattern matches
-    return error.message;
+    return rawMessage || "An unexpected error occurred. Please try again.";
   }
 
   return "An unexpected error occurred. Please try again.";

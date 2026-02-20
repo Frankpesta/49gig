@@ -175,7 +175,7 @@ export default function NewDisputePage() {
               <Label htmlFor="project">Project *</Label>
               {disputableProjects.length === 0 ? (
                 <div className="rounded-lg border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
-                  No active projects to dispute. You can only open a dispute for a project you&apos;re working on (matched, in progress, or completed).
+                  No active projects to dispute. You can only open a dispute for a project you're working on (matched, in progress, or completed).
                 </div>
               ) : (
                 <Select

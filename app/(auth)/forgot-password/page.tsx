@@ -51,17 +51,17 @@ export default function ForgotPasswordPage() {
     return (
       <AuthTwoColumnLayout
         leftTitle="Reset your password"
-        leftDescription="We&apos;ll send you a secure link to create a new password. Keep it safe."
+        leftDescription="We'll send you a secure link to create a new password. Keep it safe."
         badge="Email sent"
         heading="Check your email"
-        subline={`We&apos;ve sent a password reset link to ${email}`}
+        subline={`We've sent a password reset link to ${email}`}
       >
         <Card className={authCardClass}>
           <CardHeader className="space-y-1 px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
             <CardTitle className="text-xl font-semibold">Email sent</CardTitle>
             <CardDescription>
-              If an account exists with this email, you&apos;ll receive instructions to
-              reset your password. Check your spam folder if you don&apos;t see it.
+              If an account exists with this email, you'll receive instructions to
+              reset your password. Check your spam folder if you don't see it.
             </CardDescription>
           </CardHeader>
           <CardFooter className="border-t border-border/60 px-6 sm:px-8 py-6">
@@ -82,7 +82,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthTwoColumnLayout
       leftTitle="Reset your password"
-      leftDescription="We&apos;ll send you a secure link to create a new password. Keep it safe."
+      leftDescription="We'll send you a secure link to create a new password. Keep it safe."
       heading="Reset your password"
       subline="Enter your email to receive a reset link."
     >
@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
           <CardHeader className="space-y-1 px-6 sm:px-8 pt-6 sm:pt-8 pb-4">
             <CardTitle className="text-xl font-semibold">Forgot password</CardTitle>
             <CardDescription>
-              Enter your email address and we&apos;ll send you a link to reset your password.
+              Enter your email address and we'll send you a link to reset your password.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5 px-6 sm:px-8 pb-6 pt-0">

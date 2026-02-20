@@ -1,10 +1,10 @@
 "use client";
 
 import { ReactNode } from "react";
-import Link from "next/link";
 import Image from "next/image";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { LucideIcon, Home, ChevronRight } from "lucide-react";
+import { ChevronRight, Home, LucideIcon } from "lucide-react";
 
 interface BreadcrumbItem {
   label: string;
@@ -43,83 +43,77 @@ export function PageHero({
   return (
     <section
       className={cn(
-        "relative overflow-hidden border-b border-border/40 bg-gradient-to-b from-background via-muted/10 to-background",
+        "relative isolate overflow-hidden border-b border-border/40 bg-black",
         className
       )}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-24">
-        <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 lg:items-center">
-          {/* Left: Content */}
-          <div className="space-y-6 order-2 lg:order-1">
-            {breadcrumbs && breadcrumbs.length > 0 && (
-              <nav
-                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
-                aria-label="Breadcrumb"
-              >
-                <Link
-                  href="/"
-                  className="flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:text-foreground hover:bg-muted/50"
-                >
-                  <Home className="h-4 w-4" />
-                  <span>Home</span>
-                </Link>
-                {breadcrumbs.map((item, index) => (
-                  <span key={index} className="flex items-center gap-2">
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
-                    {item.href ? (
-                      <Link
-                        href={item.href}
-                        className="rounded-md px-1.5 py-1 transition-colors hover:text-foreground hover:bg-muted/50"
-                      >
-                        {item.icon && <item.icon className="h-4 w-4 inline mr-1.5 align-middle" />}
-                        {item.label}
-                      </Link>
-                    ) : (
-                      <span className="font-medium text-foreground px-1.5 py-1">
-                        {item.icon && <item.icon className="h-4 w-4 inline mr-1.5 align-middle" />}
-                        {item.label}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </nav>
-            )}
+      {imageSrc ? (
+        <Image
+          src={imageSrc}
+          alt={imageAlt ?? title}
+          fill
+          className="object-cover"
+          sizes="100vw"
+          priority
+        />
+      ) : (
+        <div className="absolute inset-0 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900" />
+      )}
 
-            {badge && (
-              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 border border-primary/20 px-4 py-2 text-sm font-semibold text-primary">
-                {badge.icon && <badge.icon className="h-4 w-4" />}
-                <span>{badge.text}</span>
-              </div>
-            )}
+      <div className="absolute inset-0 bg-linear-to-b from-black/50 via-black/55 to-black/95" />
+      <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/40 to-black/20" />
 
-            <div className="space-y-4">
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground leading-tight">
-                {title}
-              </h1>
-              {description && (
-                <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-xl">
-                  {description}
-                </p>
-              )}
-              {actions && <div className="flex flex-wrap gap-3 pt-2">{actions}</div>}
+      <div className="relative mx-auto flex min-h-[68svh] max-w-7xl items-end px-4 pb-10 pt-24 sm:min-h-[74svh] sm:px-6 sm:pb-14 sm:pt-28 lg:min-h-[80svh] lg:px-8 lg:pb-16 lg:pt-32">
+        <div className="w-full max-w-4xl rounded-2xl border border-white/20 bg-black/35 p-5 shadow-2xl backdrop-blur-sm sm:p-7 lg:p-9">
+          {breadcrumbs && breadcrumbs.length > 0 && (
+            <nav
+              className="mb-4 flex flex-wrap items-center gap-1.5 text-xs text-white/80 sm:text-sm"
+              aria-label="Breadcrumb"
+            >
+              <Link href="/" className="inline-flex items-center gap-1 hover:text-white">
+                <Home className="h-3.5 w-3.5" />
+                Home
+              </Link>
+              {breadcrumbs.map((item, idx) => (
+                <span key={`${item.label}-${idx}`} className="inline-flex items-center gap-1.5">
+                  <ChevronRight className="h-3.5 w-3.5 text-white/60" />
+                  {item.href ? (
+                    <Link href={item.href} className="inline-flex items-center gap-1 hover:text-white">
+                      {item.icon && <item.icon className="h-3.5 w-3.5" />}
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-white">
+                      {item.icon && <item.icon className="h-3.5 w-3.5" />}
+                      {item.label}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </nav>
+          )}
+
+          {badge && (
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white sm:text-[11px]">
+              {badge.icon && <badge.icon className="h-3.5 w-3.5" />}
+              <span>{badge.text}</span>
             </div>
-          </div>
+          )}
 
-          {/* Right: Image or custom content */}
-          <div className="order-1 lg:order-2">
-            {rightContent ?? (imageSrc && (
-              <div className="relative aspect-[4/3] sm:aspect-square lg:aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border/50 bg-muted/30 shadow-lg">
-                <Image
-                  src={imageSrc}
-                  alt={imageAlt ?? title}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  priority
-                />
-              </div>
-            ))}
-          </div>
+          <h1 className="text-3xl font-bold leading-[1.05] tracking-tight text-white sm:text-4xl lg:text-5xl xl:text-6xl">
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-4 max-w-3xl text-base leading-relaxed text-white/90 sm:text-lg lg:text-xl">
+              {description}
+            </p>
+          )}
+          {actions && (
+            <div className="mt-5 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden *:h-10 *:px-4 *:text-sm [&>*_svg]:h-4 [&>*_svg]:w-4 sm:gap-3 sm:*:h-11 sm:*:px-5 sm:*:text-base sm:[&>*_svg]:h-5 sm:[&>*_svg]:w-5">
+              {actions}
+            </div>
+          )}
+          {rightContent && <div className="pt-4">{rightContent}</div>}
         </div>
       </div>
     </section>

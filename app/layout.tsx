@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, Inter_Tight } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { ConvexClientProvider } from "@/lib/convex-provider";
 import { QueryProvider } from "@/lib/query-provider";
@@ -12,15 +12,6 @@ const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   weight: ["300", "400", "500", "600", "700"],
-  preload: true,
-});
-
-// Inter Tight - For headings and emphasis (preload for faster LCP)
-const interTight = Inter_Tight({
-  variable: "--font-inter-tight",
-  subsets: ["latin"],
-  display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
   preload: true,
 });
 
@@ -37,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${interTight.variable} font-sans antialiased bg-background text-foreground`}
+        className={`${inter.variable} font-sans antialiased bg-background text-foreground`}
       >
         <ThemeProvider
           attribute="class"

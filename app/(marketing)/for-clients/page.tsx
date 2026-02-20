@@ -25,7 +25,6 @@ import {
   UserCheck,
   FileText,
   BadgeCheck,
-  Sparkles,
   TrendingUp,
   Star,
   Heart,
@@ -215,11 +214,11 @@ export default function ForClientsPage() {
                 </div>
                 Why Choose 49GIG
               </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-5 leading-tight">
                 Why Companies Choose <br className="hidden lg:block" />
                 <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">49GIG</span>
               </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 We make hiring exceptional African talent simple, secure, and successful with our proven platform and process.
               </p>
             </div>
@@ -331,19 +330,19 @@ export default function ForClientsPage() {
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-primary">500+</div>
+                    <div className="text-3xl font-semibold text-primary">500+</div>
                     <div className="text-sm text-muted-foreground">Companies Served</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-secondary">95%</div>
+                    <div className="text-3xl font-semibold text-secondary">95%</div>
                     <div className="text-sm text-muted-foreground">Client Satisfaction</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-green-600">48hrs</div>
+                    <div className="text-3xl font-semibold text-green-600">48hrs</div>
                     <div className="text-sm text-muted-foreground">Average Hire Time</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-black text-purple-600">120+</div>
+                    <div className="text-3xl font-semibold text-purple-600">120+</div>
                     <div className="text-sm text-muted-foreground">Countries Reached</div>
                   </div>
                 </div>
@@ -370,11 +369,11 @@ export default function ForClientsPage() {
                 </div>
                 How Hiring Works
               </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-5 leading-tight">
                 From Need to Hire in <br className="hidden lg:block" />
                 <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Just 5 Steps</span>
               </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 Our streamlined process gets you from project idea to working with vetted talent in days, not weeks.
               </p>
             </div>
@@ -393,11 +392,11 @@ export default function ForClientsPage() {
                 const step = hiringSteps[stepIndex];
                 const colors = ['from-blue-500 to-blue-600', 'from-green-500 to-green-600', 'from-purple-500 to-purple-600', 'from-orange-500 to-orange-600', 'from-teal-500 to-teal-600'];
                 const notes = [
-                  "💡 No job postings, no bidding—just instant matching with pre-vetted talent.",
-                  "🎯 Our smart form takes just 5 minutes and ensures we understand exactly what you need.",
-                  "⚡ Get matched in 48 hours with professionals who fit your exact requirements.",
-                  "🛡️ Secure contracts protect both parties with clear terms and conditions.",
-                  "💰 Pay only for approved work with full transparency and milestone tracking.",
+                  "No job postings or bidding. Get matched directly with pre-vetted talent.",
+                  "Our intake form takes about 5 minutes and captures your exact needs.",
+                  "Get matched in 48 hours with professionals aligned to your project.",
+                  "Secure contracts protect both parties with clear terms and expectations.",
+                  "Pay only for approved work with transparent milestone tracking.",
                 ];
                 return (
                   <SectionTransition key={stepIndex} variant="slide" direction="up" delay={300 + stepIndex * 100}>
@@ -410,7 +409,7 @@ export default function ForClientsPage() {
                           {step.step}
                         </span>
                       </div>
-                      <h3 className="text-xl lg:text-2xl font-bold text-foreground leading-tight mb-2">{step.title}</h3>
+                      <h3 className="text-xl lg:text-2xl font-semibold text-foreground leading-tight mb-2">{step.title}</h3>
                       <p className="text-muted-foreground leading-relaxed mb-4">{step.description}</p>
                       <div className="bg-primary/10 rounded-xl p-3 border border-primary/20">
                         <p className="text-sm text-primary font-medium">{notes[stepIndex]}</p>
@@ -471,7 +470,7 @@ export default function ForClientsPage() {
                     </div>
                     100% Client Protection
                   </div>
-                  <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-foreground leading-tight">
+                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground leading-tight">
                     Your Project, <br className="hidden lg:block" />
                     <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Fully Protected</span>
                   </h2>
@@ -559,10 +558,10 @@ export default function ForClientsPage() {
                 </div>
                 Perfect For
               </div>
-              <h2 className="text-4xl sm:text-5xl lg:text-7xl font-black text-foreground mb-8 leading-tight">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-5 leading-tight">
                 Built For <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">Every Business</span>
               </h2>
-              <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 From startups to enterprises, if you value quality, affordability, and reliability, 49GIG is designed for you.
               </p>
             </div>
@@ -637,8 +636,8 @@ export default function ForClientsPage() {
                     </div>
                     Why Africa
                   </div>
-                  <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-tight">
-                    Unlocking Africa&apos;s <br className="hidden lg:block" />
+                  <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight">
+                    Unlocking Africa's <br className="hidden lg:block" />
                     <span className="text-secondary">World-Class Talent</span>
                   </h2>
                   <p className="text-xl text-primary-foreground/90 leading-relaxed">
@@ -666,11 +665,11 @@ export default function ForClientsPage() {
                   <div className="bg-primary-foreground/10 rounded-3xl p-6 border border-primary-foreground/20">
                     <div className="grid grid-cols-2 gap-4 text-center">
                       <div>
-                        <div className="text-2xl font-black text-secondary">1.4B</div>
+                        <div className="text-2xl font-semibold text-secondary">1.4B</div>
                         <div className="text-sm text-primary-foreground/80">Population</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-black text-secondary">54</div>
+                        <div className="text-2xl font-semibold text-secondary">54</div>
                         <div className="text-sm text-primary-foreground/80">Countries</div>
                       </div>
                     </div>
@@ -717,120 +716,65 @@ export default function ForClientsPage() {
         </div>
       </section>
 
-      {/* MODERN FINAL CTA SECTION */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-primary/10 via-background to-secondary/10 border-y border-border/30 relative overflow-hidden">
-        {/* Enhanced Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-10 left-10 w-32 h-32 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-10 right-10 w-40 h-40 bg-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
-          <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-primary/5 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "2s" }} />
-          <div className="absolute bottom-1/3 right-1/3 w-20 h-20 bg-secondary/5 rounded-full blur-2xl animate-pulse" style={{ animationDelay: "3s" }} />
-        </div>
-
-        <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      {/* FINAL CTA SECTION */}
+      <section className="border-y border-border/40 bg-linear-to-br from-primary/10 via-background to-secondary/10 py-20 sm:py-24 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <SectionTransition variant="fade" delay={200}>
-            <div className="text-center space-y-12">
-              {/* Enhanced Badge */}
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-primary/10 to-secondary/10 px-8 py-4 text-sm font-bold text-primary border border-primary/20 shadow-2xl">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary">
-                  <Rocket className="h-4 w-4 text-white" />
+            <div className="rounded-3xl border border-border/60 bg-background/90 p-8 shadow-xl sm:p-10 lg:p-12">
+              <div className="mx-auto max-w-4xl text-center">
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary">
+                  <Rocket className="h-3.5 w-3.5" />
+                  Ready to Hire
                 </div>
-                Ready to Get Started?
-                <Sparkles className="h-5 w-5 animate-pulse" />
-              </div>
-
-              {/* Enhanced Headline */}
-              <div className="space-y-6">
-                <h2 className="text-4xl sm:text-5xl lg:text-7xl xl:text-8xl font-black text-foreground leading-[0.9] tracking-tight">
-                  Hire African Talent <br className="hidden lg:block" />
-                  <span className="bg-gradient-to-r from-primary via-primary/90 to-secondary bg-clip-text text-transparent">With Confidence</span>
+                <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground leading-tight">
+                  Build your team with vetted African talent
                 </h2>
-                <p className="text-xl lg:text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed font-medium">
-                  Start your project today and work with vetted African talent that delivers exceptional results at competitive rates.
+                <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
+                  Start your project with a trusted hiring workflow, transparent milestones, and professionals matched to your exact needs.
                 </p>
               </div>
 
-              {/* Enhanced Trust Indicators */}
-              <div className="flex flex-wrap justify-center items-center gap-8 lg:gap-12 pt-8">
-                <div className="group flex items-center gap-4 rounded-2xl bg-background/90 backdrop-blur-xl px-6 py-4 border border-border/30 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/20 group-hover:from-green-500/30 group-hover:to-emerald-500/30 transition-all duration-300 shadow-lg">
-                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="mt-8 grid gap-4 text-center sm:grid-cols-3">
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
                   </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold text-foreground">100% Vetted</div>
-                    <div className="text-xs text-muted-foreground">Top 3% only</div>
-                  </div>
+                  <h4 className="text-sm font-semibold text-foreground sm:text-base">100% Vetted</h4>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Screened for skill and reliability</p>
                 </div>
-
-                <div className="group flex items-center gap-4 rounded-2xl bg-background/90 backdrop-blur-xl px-6 py-4 border border-border/30 shadow-xl hover:shadow-primary/20 transition-all duration-300 hover:border-primary/40 hover:scale-105">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/30 group-hover:from-primary/30 group-hover:to-primary/40 transition-all duration-300 shadow-lg">
-                    <Shield className="h-6 w-6 text-primary" />
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Shield className="h-4 w-4" />
                   </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold text-foreground">Secure Payments</div>
-                    <div className="text-xs text-muted-foreground">Milestone-based</div>
-                  </div>
+                  <h4 className="text-sm font-semibold text-foreground sm:text-base">Secure Payments</h4>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Milestone-based protection</p>
                 </div>
-
-                <div className="group flex items-center gap-4 rounded-2xl bg-background/90 backdrop-blur-xl px-6 py-4 border border-border/30 shadow-xl hover:shadow-secondary/20 transition-all duration-300 hover:border-secondary/40 hover:scale-105">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/30 group-hover:from-secondary/30 group-hover:to-secondary/40 transition-all duration-300 shadow-lg">
-                    <Award className="h-6 w-6 text-secondary-foreground" />
+                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary-foreground">
+                    <Award className="h-4 w-4" />
                   </div>
-                  <div className="text-left">
-                    <div className="text-sm font-bold text-foreground">Guaranteed Results</div>
-                    <div className="text-xs text-muted-foreground">Money-back promise</div>
-                  </div>
+                  <h4 className="text-sm font-semibold text-foreground sm:text-base">Fast Matching</h4>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Qualified talent in as little as 48 hours</p>
                 </div>
               </div>
 
-              {/* Enhanced CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
-                <SectionTransition variant="slide" direction="left" delay={600}>
-                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
-                    <Briefcase className="h-6 w-6" />
-                    Hire Vetted Talent
-                    <ArrowRight className="h-6 w-6" />
-                  </CTAButton>
-                </SectionTransition>
-                <SectionTransition variant="slide" direction="right" delay={700}>
-                  <CTAButton href="/hire-team" variant="secondary" className="gap-3">
-                    <Users className="h-6 w-6" />
-                    Hire a Team
-                    <ArrowRight className="h-6 w-6" />
-                  </CTAButton>
-                </SectionTransition>
+              <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
+                <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+                  <Briefcase className="h-4 w-4" />
+                  Hire Vetted Talent
+                  <ArrowRight className="h-4 w-4" />
+                </CTAButton>
+                <CTAButton href="/hire-team" variant="secondary" className="gap-2">
+                  <Users className="h-4 w-4" />
+                  Hire a Team
+                  <ArrowRight className="h-4 w-4" />
+                </CTAButton>
+                <CTAButton href="/contact" variant="secondary" className="gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  Contact Sales
+                  <ArrowRight className="h-4 w-4" />
+                </CTAButton>
               </div>
-
-              {/* Additional CTA */}
-              <SectionTransition variant="fade" delay={800}>
-                <div className="pt-8">
-                  <CTAButton href="/contact" variant="secondary" className="gap-3 border-primary/20 hover:bg-primary/5 hover:border-primary">
-                    <MessageCircle className="h-6 w-6" />
-                    Have Questions? Let&apos;s Talk
-                    <ArrowRight className="h-6 w-6" />
-                  </CTAButton>
-                </div>
-              </SectionTransition>
-
-              {/* Enhanced Guarantee Section */}
-              <SectionTransition variant="fade" delay={900}>
-                <div className="bg-background/80 backdrop-blur-xl rounded-3xl p-8 border border-border/30 shadow-xl max-w-4xl mx-auto">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-primary">Free</div>
-                      <div className="text-sm text-muted-foreground">No setup fees</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-secondary">48hrs</div>
-                      <div className="text-sm text-muted-foreground">Average hire time</div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="text-2xl font-bold text-green-600">Guaranteed</div>
-                      <div className="text-sm text-muted-foreground">Results or refund</div>
-                    </div>
-                  </div>
-                </div>
-              </SectionTransition>
             </div>
           </SectionTransition>
         </div>

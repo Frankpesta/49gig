@@ -6,10 +6,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronDown, LayoutDashboard } from "lucide-react";
+import { Menu, ChevronDown, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface NavLink {
   label: string;
@@ -18,7 +24,7 @@ interface NavLink {
 }
 
 const navLinks: NavLink[] = [
-  { label: "Home", href: "/" },
+  { label: "Why 49GIG?", href: "/why-49gig" },
   {
     label: "Hire Talent",
     href: "/hire-talent",
@@ -44,22 +50,16 @@ const navLinks: NavLink[] = [
 const filteredNavLinks = navLinks;
 
 export function Navbar() {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [openMobileDropdown, setOpenMobileDropdown] = useState<string | null>(
+    null
+  );
   const pathname = usePathname();
   const { isAuthenticated } = useAuth();
   const { resolvedTheme } = useTheme();
 
-  const isHome = pathname === "/";
-  const isOverHero = isHome && !isScrolled;
   const logoSrc = resolvedTheme === "dark" ? "/logo-dark.png" : "/logo-light.png";
-
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 24);
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
 
   const prevPathnameRef = useRef(pathname);
   useEffect(() => {
@@ -68,34 +68,23 @@ export function Navbar() {
       const t = setTimeout(() => {
         setIsMobileMenuOpen(false);
         setOpenDropdown(null);
+        setOpenMobileDropdown(null);
       }, 0);
       return () => clearTimeout(t);
     }
   }, [pathname]);
 
-  useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [isMobileMenuOpen]);
-
-  const toggleMobileMenu = () => setIsMobileMenuOpen((o) => !o);
-
   const linkBase =
     "relative inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 whitespace-nowrap";
-  const linkDefault = isOverHero
-    ? "text-white/90 hover:text-white hover:bg-white/10"
-    : "text-muted-foreground hover:text-foreground hover:bg-muted/80";
-  const linkActive = isOverHero
-    ? "text-white font-semibold hover:text-white after:absolute after:inset-x-1.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-white after:content-['']"
-    : "text-primary font-semibold hover:text-primary after:absolute after:inset-x-1.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary after:content-['']";
+  const linkDefault = "text-muted-foreground hover:text-foreground hover:bg-muted/80";
+  const linkActive =
+    "text-primary font-semibold hover:text-primary after:absolute after:inset-x-1.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary after:content-['']";
 
   return (
     <nav
       className={cn(
         "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isOverHero
-          ? "bg-transparent"
-          : "bg-background/95 dark:bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
+        "bg-background/95 dark:bg-background/95 backdrop-blur-md border-b border-border/50 shadow-sm"
       )}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-5 md:px-6 lg:px-8">
@@ -111,10 +100,7 @@ export function Navbar() {
               alt="49GIG"
               width={100}
               height={100}
-              className={cn(
-                "h-auto w-auto md:h-auto object-contain object-left transition-opacity hover:opacity-90",
-                isOverHero && "brightness-0 invert"
-              )}
+              className="h-auto w-auto md:h-auto object-contain object-left transition-opacity hover:opacity-90"
               priority
             />
           </Link>
@@ -190,124 +176,165 @@ export function Navbar() {
                   variant="ghost"
                   size="sm"
                   asChild
-                  className={cn(
-                    "rounded-md text-sm font-medium",
-                    isOverHero && "text-white/90 hover:bg-white/10 hover:text-white border-0"
-                  )}
+                  className="rounded-md text-sm font-medium"
                 >
                   <Link href="/login">Sign In</Link>
                 </Button>
                 <Button
                   size="sm"
                   asChild
-                  className={cn(
-                    "rounded-md text-sm font-medium",
-                    isOverHero && "border-white/80 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-                  )}
+                  className="rounded-md text-sm font-medium"
                 >
-                  <Link href="/signup">Get Started</Link>
+                  <Link href="/signup/client">Get Started</Link>
                 </Button>
               </>
             )}
           </div>
 
-          <button
-            onClick={toggleMobileMenu}
-            className={cn(
-              "lg:hidden p-2 -mr-2 rounded-md transition-colors touch-manipulation",
-              isOverHero ? "text-white hover:bg-white/10" : "text-foreground hover:bg-muted"
-            )}
-            aria-label="Toggle menu"
-            aria-expanded={isMobileMenuOpen}
-          >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-        </div>
-
-        {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-border/50 bg-background">
-            <div className="max-h-[calc(100vh-4rem)] overflow-y-auto py-4 space-y-0.5">
-              {filteredNavLinks.map((link) => (
-                <div key={link.href}>
+          <div className="lg:hidden">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <button
+                  className="p-2 -mr-2 rounded-md transition-colors touch-manipulation text-foreground hover:bg-muted"
+                  aria-label="Open menu"
+                >
+                  <Menu className="h-6 w-6" />
+                </button>
+              </SheetTrigger>
+              <SheetContent
+                side="left"
+                className="w-[90vw] max-w-[360px] p-0 border-r border-border/60"
+              >
+                <SheetHeader className="border-b border-border/50 px-4 py-2.5">
                   <Link
-                    href={link.href}
-                    onClick={() => !link.children && setIsMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg mx-2 transition-colors",
-                      pathname === link.href
-                        ? "bg-primary/10 text-primary"
-                        : "text-foreground hover:bg-muted"
-                    )}
+                    href="/"
+                    aria-label="49GIG Home"
+                    className="inline-flex items-center"
+                    onClick={() => setIsMobileMenuOpen(false)}
                   >
-                    <span>{link.label}</span>
-                    {link.children && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setOpenDropdown(openDropdown === link.label ? null : link.label);
-                        }}
-                        className="p-1 -mr-2 rounded touch-manipulation"
-                        aria-label={openDropdown === link.label ? "Collapse" : "Expand"}
-                      >
-                        <ChevronDown
-                          className={cn("h-4 w-4 transition-transform", openDropdown === link.label && "rotate-180")}
-                        />
-                      </button>
-                    )}
+                    <Image
+                      key={logoSrc}
+                      src={logoSrc}
+                      alt="49GIG"
+                      width={108}
+                      height={35}
+                      className="h-[31px] w-auto object-contain"
+                    />
                   </Link>
-                  {link.children && openDropdown === link.label && (
-                    <div className="ml-4 mt-0.5 mb-1 space-y-0.5">
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={() => setIsMobileMenuOpen(false)}
-                          className={cn(
-                            "block px-4 py-2.5 text-sm rounded-lg mx-2 transition-colors",
-                            pathname === child.href
-                              ? "bg-primary/10 text-primary font-medium"
-                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                </SheetHeader>
+                <div className="flex h-full flex-col">
+                  <div className="px-3 py-3 space-y-1 overflow-y-auto">
+                    {filteredNavLinks.map((link) => {
+                      const isActive =
+                        pathname === link.href ||
+                        link.children?.some((c) => c.href === pathname);
+                      const isOpen = openMobileDropdown === link.label;
+                      return (
+                        <div key={link.href}>
+                          <Link
+                            href={link.href}
+                            onClick={() => {
+                              if (!link.children) setIsMobileMenuOpen(false);
+                            }}
+                            className={cn(
+                              "flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-colors",
+                              isActive
+                                ? "bg-primary/10 text-primary"
+                                : "text-foreground hover:bg-muted"
+                            )}
+                          >
+                            <span>{link.label}</span>
+                            {link.children && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setOpenMobileDropdown(
+                                    isOpen ? null : link.label
+                                  );
+                                }}
+                                className="p-1 -mr-1 rounded-md"
+                                aria-label={isOpen ? "Collapse" : "Expand"}
+                              >
+                                <ChevronDown
+                                  className={cn(
+                                    "h-4 w-4 transition-transform",
+                                    isOpen && "rotate-180"
+                                  )}
+                                />
+                              </button>
+                            )}
+                          </Link>
+                          {link.children && isOpen && (
+                            <div className="ml-3 mt-1 space-y-1 border-l border-border/50 pl-3">
+                              {link.children.map((child) => (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  onClick={() => setIsMobileMenuOpen(false)}
+                                  className={cn(
+                                    "block px-3 py-2 text-sm rounded-lg transition-colors",
+                                    pathname === child.href
+                                      ? "bg-primary/10 text-primary font-medium"
+                                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                  )}
+                                >
+                                  {child.label}
+                                </Link>
+                              ))}
+                            </div>
                           )}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-auto border-t border-border/60 p-4 space-y-3 bg-muted/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Theme</span>
+                      <ThemeToggle />
                     </div>
-                  )}
+                    {isAuthenticated ? (
+                      <Button className="w-full rounded-md" size="sm" asChild>
+                        <Link
+                          href="/dashboard"
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="mr-2 h-4 w-4" />
+                          Dashboard
+                        </Link>
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="w-full rounded-md"
+                          size="sm"
+                          asChild
+                        >
+                          <Link
+                            href="/login"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            Sign In
+                          </Link>
+                        </Button>
+                        <Button className="w-full rounded-md" size="sm" asChild>
+                          <Link
+                            href="/signup/client"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            Get Started
+                          </Link>
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              ))}
-              <div className="mt-3 pt-3 border-t border-border px-4 space-y-2">
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-muted-foreground">Theme</span>
-                  <ThemeToggle />
-                </div>
-                {isAuthenticated ? (
-                  <Button className="w-full rounded-md" size="sm" asChild>
-                    <Link href="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                      <LayoutDashboard className="mr-2 h-4 w-4" />
-                      Dashboard
-                    </Link>
-                  </Button>
-                ) : (
-                  <>
-                    <Button variant="outline" className="w-full rounded-md" size="sm" asChild>
-                      <Link href="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                        Sign In
-                      </Link>
-                    </Button>
-                    <Button className="w-full rounded-md" size="sm" asChild>
-                      <Link href="/signup" onClick={() => setIsMobileMenuOpen(false)}>
-                        Get Started
-                      </Link>
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
+              </SheetContent>
+            </Sheet>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

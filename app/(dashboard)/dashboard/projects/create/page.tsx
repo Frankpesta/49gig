@@ -600,7 +600,7 @@ export default function CreateProjectPage() {
                 <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
                   <li>Examples: Design mockups, Backend API, Frontend build, Testing &amp; QA, Deployment</li>
                   <li>One per line, or comma-separated (2–5 milestones recommended)</li>
-                  <li>Leave empty and we&apos;ll generate milestones from your project description</li>
+                  <li>Leave empty and we'll generate milestones from your project description</li>
                 </ul>
                 <Textarea
                   id="deliverablesText"

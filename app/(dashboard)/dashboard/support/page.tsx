@@ -191,7 +191,7 @@ export default function SupportPage() {
             </div>
             <div className="pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                Can&apos;t find what you&apos;re looking for? Create a support request and our team will help you.
+                Can't find what you're looking for? Create a support request and our team will help you.
               </p>
             </div>
           </CardContent>

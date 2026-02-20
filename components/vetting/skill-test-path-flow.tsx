@@ -293,7 +293,7 @@ export function SkillTestPathFlow() {
           {timerBar}
           {timeUp && (
             <div className="rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-200">
-              Time&apos;s up. Submit what you have to continue to MCQ, or your session may expire.
+              Time's up. Submit what you have to continue to MCQ, or your session may expire.
             </div>
           )}
           <ErrorHandler error={error} onRetry={() => setError(null)} onDismiss={() => setError(null)} title="Error" />
@@ -441,7 +441,7 @@ export function SkillTestPathFlow() {
           {timerBar && <div className="px-4 pt-3">{timerBar}</div>}
           {timeUp && (
             <div className="mx-4 rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/30 px-4 py-2 text-sm font-medium text-amber-800 dark:text-amber-200">
-              Time&apos;s up. Submit your current solution to continue.
+              Time's up. Submit your current solution to continue.
             </div>
           )}
           <ErrorHandler error={error} onRetry={() => setError(null)} onDismiss={() => setError(null)} title="Error" />
@@ -546,7 +546,7 @@ export function SkillTestPathFlow() {
         <CardContent className="space-y-6">
           {timeUp && (
             <div className="rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-200">
-              Time&apos;s up. Your answers are being submitted automatically.
+              Time's up. Your answers are being submitted automatically.
             </div>
           )}
           <ErrorHandler error={error} onRetry={() => setError(null)} onDismiss={() => setError(null)} title="Error" />

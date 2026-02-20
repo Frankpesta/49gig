@@ -294,7 +294,7 @@ export default function DashboardPage() {
                     Welcome back, {user.name.split(" ")[0]}
                   </h1>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Here&apos;s what&apos;s happening with your {isClient ? "projects" : isFreelancer ? "projects" : "platform"} today.
+                    Here's what's happening with your {isClient ? "projects" : isFreelancer ? "projects" : "platform"} today.
                   </p>
                 </div>
               </div>
@@ -327,7 +327,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <h2 className="text-2xl font-heading font-semibold">Client feedback</h2>
               <p className="text-sm text-muted-foreground">
-                Recent ratings and feedback from clients you&apos;ve worked with.
+                Recent ratings and feedback from clients you've worked with.
               </p>
               <Card>
                 <CardHeader>
@@ -432,7 +432,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-xl">View Projects</CardTitle>
                   </div>
                   <CardDescription className="text-base">
-                    Projects you&apos;re selected for appear here
+                    Projects you're selected for appear here
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
