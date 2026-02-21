@@ -48,6 +48,10 @@ import {
 import { Loader2, Users, Shield, Ban, CheckCircle2, Search, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
 export default function UsersPage() {
   const { user, isAuthenticated } = useAuth();
@@ -146,50 +150,43 @@ export default function UsersPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={Users} title="Please log in" />;
   }
 
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Access denied. Admin or Moderator role required.</p>
-      </div>
+      <DashboardEmptyState
+        icon={Shield}
+        title="Access denied"
+        description="Admin or Moderator role required."
+      />
     );
   }
 
   if (users === undefined) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardLoadingState label="Loading users..." />;
   }
 
   if (users === null || !Array.isArray(users)) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Failed to load users. Please try again.</p>
-      </div>
+      <DashboardEmptyState
+        icon={AlertCircle}
+        title="Failed to load users"
+        description="Please try again."
+      />
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">User Management</h1>
-        <p className="text-muted-foreground">
-          Manage users, roles, and account status.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="User Management"
+        description="Manage users, roles, and account status."
+      />
 
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
+      <DashboardFilterBar>
+          <div className="flex w-full flex-col gap-4 md:flex-row">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -225,8 +222,7 @@ export default function UsersPage() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+      </DashboardFilterBar>
 
       {/* Users Table */}
       <Card>

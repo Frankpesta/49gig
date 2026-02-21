@@ -1,162 +1,151 @@
 "use client";
 
 import { PageHero } from "@/components/marketing/page-hero";
-import { Cookie } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { SectionTransition } from "@/components/ui/section-transition";
+import { Cookie } from "lucide-react";
+
+type CookieSection = {
+  id: string;
+  title: string;
+  paragraphs?: string[];
+  bullets?: string[];
+};
+
+const sections: CookieSection[] = [
+  {
+    id: "1",
+    title: "What Are Cookies?",
+    paragraphs: [
+      "Cookies are small text files stored on your device (computer, tablet, or mobile phone) when you visit a website.",
+      "They help websites function properly, improve user experience, and provide insights into platform usage.",
+      "Cookies do not give us access to your device or personal files.",
+    ],
+  },
+  {
+    id: "2",
+    title: "Why 49GIG Uses Cookies",
+    bullets: [
+      "Ensure the platform functions correctly",
+      "Secure user accounts and sessions",
+      "Improve performance and user experience",
+      "Understand how users interact with the platform",
+      "Remember preferences and settings",
+    ],
+  },
+  {
+    id: "3",
+    title: "Types of Cookies We Use",
+    paragraphs: [
+      "a. Strictly Necessary Cookies: Required for core functionality such as authentication, security, and navigation.",
+      "b. Performance & Analytics Cookies: Help us improve reliability, usability, and performance through aggregated usage data.",
+      "c. Functional Cookies: Remember preferences such as language, region, and saved options.",
+      "d. Third-Party Cookies: Set by trusted providers used for analytics, performance, and security.",
+    ],
+  },
+  {
+    id: "4",
+    title: "How Long Cookies Stay on Your Device",
+    bullets: [
+      "Session cookies: Deleted when you close your browser",
+      "Persistent cookies: Stored for a set period or until deleted manually",
+      "Duration depends on the cookie purpose",
+    ],
+  },
+  {
+    id: "5",
+    title: "Managing or Disabling Cookies",
+    paragraphs: [
+      "You can control or disable cookies through your browser settings.",
+      "Disabling certain cookies may affect platform functionality, and some features may not work properly.",
+    ],
+  },
+  {
+    id: "6",
+    title: "Data Protection & Privacy",
+    paragraphs: [
+      "Any personal data collected through cookies is handled in accordance with our Privacy Policy.",
+      "We do not use cookies to collect sensitive personal information without your consent.",
+    ],
+  },
+  {
+    id: "7",
+    title: "Changes to This Cookie Policy",
+    paragraphs: [
+      "We may update this Cookie Policy from time to time to reflect changes in technology, law, or platform functionality.",
+      "Updates will be posted on this page with a revised Last Updated date.",
+    ],
+  },
+  {
+    id: "8",
+    title: "Contact Us",
+    bullets: ["Email: support@49gig.com", "Website: www.49gig.com", "Address: Abuja, Nigeria", "Phone: +2349167656835"],
+  },
+];
 
 export default function CookiePolicyPage() {
-  const sections = [
-    {
-      title: "What Are Cookies?",
-      icon: "🍪",
-      content: "Cookies are small text files that are placed on your computer or mobile device when you visit a website. They are widely used to make websites work more efficiently and provide information to website owners."
-    },
-    {
-      title: "Essential Cookies",
-      icon: "🔒",
-      content: "These cookies are necessary for the Platform to function properly. They enable core functionality such as security, network management, authentication, session management, and accessibility features."
-    },
-    {
-      title: "Performance & Analytics",
-      icon: "📊",
-      content: "These cookies help us understand how visitors interact with the Platform by collecting and reporting information anonymously. This includes page view tracking and user behavior analysis through Google Analytics."
-    },
-    {
-      title: "Functionality Cookies",
-      icon: "⚙️",
-      content: "These cookies allow the Platform to remember choices you make and provide enhanced, personalized features such as language preferences, theme selection (light/dark mode), and user interface customization."
-    },
-    {
-      title: "Advertising Cookies",
-      icon: "📢",
-      content: "These cookies are used to deliver advertisements relevant to you and your interests. They also help measure the effectiveness of advertising campaigns and track conversion metrics."
-    }
-  ];
-
   const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Cookies", icon: Cookie }];
 
   return (
     <div className="w-full">
       <PageHero
         title="Cookie Policy"
-        description="We use cookies to improve your experience and understand how you use our platform."
-        badge={{ icon: Cookie, text: "Cookie Policy" }}
+        description="How 49GIG uses cookies and similar technologies."
+        badge={{ icon: Cookie, text: "Legal" }}
         breadcrumbs={breadcrumbs}
         imageSrc="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=800&q=80"
-        imageAlt="Privacy and cookies"
+        imageAlt="Cookie policy"
       />
 
-      <section className="py-12 sm:py-16 lg:py-20 bg-background relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
+      <section className="py-14 sm:py-18 lg:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border/60 bg-background/90 p-6 sm:p-8">
+            <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">Cookie Policy</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Last Updated: 1st March, 2026</p>
+            <p className="mt-5 text-muted-foreground">
+              This Cookie Policy explains how 49GIG ("we", "us", "our") uses cookies and similar technologies when you visit or use our website and platform.
+            </p>
+            <p className="mt-3 text-muted-foreground">
+              By continuing to use 49GIG, you agree to the use of cookies as described in this policy unless you disable them through your browser or cookie settings.
+            </p>
+          </div>
 
-        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          {/* Cookie Types */}
-          <SectionTransition variant="fade" delay={200}>
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-foreground mb-8">How We Use Cookies</h2>
-              <div className="grid gap-6 sm:grid-cols-2">
-                {sections.map((section, index) => (
-                  <SectionTransition key={index} variant="slide" direction="up" delay={300 + index * 100}>
-                    <Card className="border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 h-full">
-                      <CardContent className="p-6 space-y-4 h-full flex flex-col">
-                        <div className="flex items-start gap-3">
-                          <span className="text-3xl">{section.icon}</span>
-                          <h3 className="text-lg font-semibold text-foreground">{section.title}</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed flex-1">
-                          {section.content}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </SectionTransition>
-                ))}
-              </div>
-            </div>
-          </SectionTransition>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {sections.map((section) => (
+              <a
+                key={section.id}
+                href={`#section-${section.id}`}
+                className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground transition hover:bg-primary/10"
+              >
+                {section.id}. {section.title}
+              </a>
+            ))}
+          </div>
 
-          {/* Managing Cookies */}
-          <SectionTransition variant="fade" delay={400}>
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-foreground mb-8">Managing Cookies</h2>
-              <div className="space-y-6">
-                <Card className="border border-border/50 hover:border-primary/50 transition-all duration-300">
-                  <CardContent className="p-6 space-y-3">
-                    <h3 className="text-lg font-semibold text-foreground">Browser Settings</h3>
-                    <p className="text-muted-foreground">
-                      Most browsers allow you to refuse or accept cookies. You can usually find cookie settings in the "Options" or "Preferences" menu of your browser.
+          <div className="mt-8 space-y-4">
+            {sections.map((section) => (
+              <Card key={section.id} id={`section-${section.id}`} className="scroll-mt-24 border-border/60">
+                <CardContent className="p-6 sm:p-7">
+                  <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
+                    {section.id}. {section.title}
+                  </h2>
+                  {section.paragraphs?.map((paragraph) => (
+                    <p key={`${section.id}-${paragraph}`} className="mt-3 text-muted-foreground leading-relaxed">
+                      {paragraph}
                     </p>
-                  </CardContent>
-                </Card>
-                <Card className="border border-border/50 hover:border-primary/50 transition-all duration-300">
-                  <CardContent className="p-6 space-y-3">
-                    <h3 className="text-lg font-semibold text-foreground">Cookie Consent Tool</h3>
-                    <p className="text-muted-foreground">
-                      When you first visit our Platform, you'll see a cookie consent banner. You can manage your cookie preferences through this tool at any time.
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </SectionTransition>
-
-          {/* Third-Party Cookies */}
-          <SectionTransition variant="fade" delay={500}>
-            <div className="mb-16">
-              <h2 className="text-3xl font-bold text-foreground mb-6">Third-Party Cookies</h2>
-              <Card className="border-2 border-primary/30 bg-primary/5">
-                <CardContent className="p-6">
-                  <p className="text-muted-foreground mb-4">
-                    We may allow third-party service providers to place cookies on your device for analytics, payments, and advertising. These include:
-                  </p>
-                  <ul className="space-y-2 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-3">
-                      <span className="text-primary mt-1">•</span>
-                      <span>Google Analytics for tracking user behavior</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-primary mt-1">•</span>
-                      <span>Payment processors for secure transactions</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-primary mt-1">•</span>
-                      <span>Social media platforms for integration</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-primary mt-1">•</span>
-                      <span>Advertising networks for personalized content</span>
-                    </li>
-                  </ul>
+                  ))}
+                  {section.bullets && (
+                    <ul className="mt-4 space-y-2">
+                      {section.bullets.map((bullet) => (
+                        <li key={`${section.id}-${bullet}`} className="flex items-start gap-2 text-muted-foreground">
+                          <span className="mt-1 text-primary">•</span>
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </CardContent>
               </Card>
-            </div>
-          </SectionTransition>
-
-          {/* Impact of Blocking */}
-          <SectionTransition variant="fade" delay={600}>
-            <div className="mb-12">
-              <h2 className="text-3xl font-bold text-foreground mb-6">Impact of Blocking Cookies</h2>
-              <Card className="border border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20">
-                <CardContent className="p-6">
-                  <p className="text-sm text-amber-900 dark:text-amber-400">
-                    If you choose to block or delete cookies, some features of the Platform may not function properly or may be unavailable. Essential cookies cannot be blocked if you wish to use the Platform.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </SectionTransition>
-
-          {/* Contact */}
-          <div className="pt-8 border-t border-border/30 text-center">
-            <p className="text-sm text-muted-foreground">
-              For questions about our cookie policy, contact us at <span className="text-primary font-medium">privacy@49gig.com</span>
-            </p>
-            <p className="text-xs text-muted-foreground mt-2">
-              Last updated: January 6, 2026
-            </p>
+            ))}
           </div>
         </div>
       </section>

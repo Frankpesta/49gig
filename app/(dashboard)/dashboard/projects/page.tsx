@@ -5,8 +5,11 @@ import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
+import { DashboardStatusBadge } from "@/components/dashboard/dashboard-status-badge";
 import {
   Plus,
   FolderKanban,
@@ -78,31 +81,37 @@ export default function ProjectsPage() {
   }
 
   const isClient = user.role === "client";
+  const mapStatusTone = (status: string) => {
+    if (status === "completed" || status === "matched" || status === "funded") return "success";
+    if (status === "cancelled" || status === "disputed") return "danger";
+    if (status === "matching" || status === "pending_funding" || status === "in_progress") return "warning";
+    return "neutral";
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-heading font-bold">Projects</h1>
-          <p className="text-muted-foreground">
-            {isClient
-              ? "Manage your projects and track their progress"
-              : "View projects you're working on"}
-          </p>
-        </div>
-        {isClient && (
-          <Button asChild>
-            <Link href="/dashboard/projects/create">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Project
-            </Link>
-          </Button>
-        )}
-      </div>
+      <DashboardPageHeader
+        title="Projects"
+        description={
+          isClient
+            ? "Manage your projects and track their progress."
+            : "View projects you are currently working on."
+        }
+        actions={
+          isClient ? (
+            <Button asChild>
+              <Link href="/dashboard/projects/create">
+                <Plus className="mr-2 h-4 w-4" />
+                Create Project
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       {/* Status Filters */}
       {isClient && (
-        <div className="flex flex-wrap gap-2">
+        <DashboardFilterBar>
           <Button
             variant={!statusFilter ? "default" : "outline"}
             size="sm"
@@ -122,7 +131,7 @@ export default function ProjectsPage() {
               </Link>
             </Button>
           ))}
-        </div>
+        </DashboardFilterBar>
       )}
 
       {/* Projects List */}
@@ -141,25 +150,25 @@ export default function ProjectsPage() {
           ))}
         </div>
       ) : projects.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FolderKanban className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-semibold">No projects found</h3>
-            <p className="mb-4 text-center text-sm text-muted-foreground">
-              {isClient
-                ? "Get started by creating your first project"
-                : "No projects matched to you yet"}
-            </p>
-            {isClient && (
+        <DashboardEmptyState
+          icon={FolderKanban}
+          title="No projects found"
+          description={
+            isClient
+              ? "Get started by creating your first project."
+              : "No projects matched to you yet."
+          }
+          action={
+            isClient ? (
               <Button asChild>
                 <Link href="/dashboard/projects/create">
                   <Plus className="mr-2 h-4 w-4" />
                   Create Project
                 </Link>
               </Button>
-            )}
-          </CardContent>
-        </Card>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project: Doc<"projects">) => {
@@ -171,10 +180,11 @@ export default function ProjectsPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <CardTitle className="line-clamp-2">{project.intakeForm.title}</CardTitle>
-                    <Badge variant={statusConfig.variant}>
-                      <StatusIcon className="mr-1 h-3 w-3" />
-                      {statusConfig.label}
-                    </Badge>
+                    <DashboardStatusBadge
+                      label={statusConfig.label}
+                      tone={mapStatusTone(project.status)}
+                      icon={<StatusIcon className="h-3 w-3" />}
+                    />
                   </div>
                   <CardDescription className="line-clamp-2">
                     {project.intakeForm.description}
@@ -195,14 +205,14 @@ export default function ProjectsPage() {
                   {project.intakeForm.requiredSkills && project.intakeForm.requiredSkills.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {project.intakeForm.requiredSkills.slice(0, 3).map((skill: string) => (
-                        <Badge key={skill} variant="outline" className="text-xs">
-                          {skill}
-                        </Badge>
+                        <DashboardStatusBadge key={skill} label={skill} tone="neutral" className="text-[11px]" />
                       ))}
                       {project.intakeForm.requiredSkills.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{project.intakeForm.requiredSkills.length - 3}
-                        </Badge>
+                        <DashboardStatusBadge
+                          label={`+${project.intakeForm.requiredSkills.length - 3}`}
+                          tone="info"
+                          className="text-[11px]"
+                        />
                       )}
                     </div>
                   )}

@@ -123,7 +123,7 @@ export default function Why49GigPage() {
         imageAlt="High-performing team in discussion"
         actions={
           <>
-            <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+            <CTAButton href="/signup/client" variant="primary" className="gap-2">
               Hire Talent
               <ArrowRight className="h-4 w-4" />
             </CTAButton>
@@ -249,7 +249,7 @@ export default function Why49GigPage() {
               Whether you want to hire a freelancer, build a team, or join as a professional, 49GIG gives you the tools, talent, and support to succeed.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-              <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+              <CTAButton href="/signup/client" variant="primary" className="gap-2">
                 <Briefcase className="h-4 w-4" />
                 Hire Talent
               </CTAButton>

@@ -77,31 +77,10 @@ export function AppSidebar() {
     }
   }, [isMobile, setOpenMobile]);
 
-  const iconColorMap: Record<string, string> = {
-    Dashboard: "text-indigo-500",
-    Projects: "text-emerald-500",
-    "Create Project": "text-amber-500",
-    Messages: "text-sky-500",
-    Transactions: "text-green-500",
-    Disputes: "text-rose-500",
-    "Dispute Management": "text-rose-500",
-    Users: "text-violet-500",
-    Notifications: "text-orange-500",
-    Analytics: "text-cyan-500",
-    "Audit Logs": "text-slate-500",
-    Profile: "text-blue-500",
-    Settings: "text-zinc-500",
-    "Help & Support": "text-teal-500",
-    Enquiries: "text-amber-500",
-    "All Projects": "text-emerald-500",
-    Active: "text-emerald-500",
-    Completed: "text-emerald-500",
-  };
-
-  const getIconClass = (title: string, isActive: boolean) =>
+  const getIconClass = (isActive: boolean) =>
     cn(
-      "transition-transform duration-200 group-hover/menu-item:-translate-y-0.5 group-hover/menu-item:scale-110",
-      isActive ? "text-primary" : iconColorMap[title] || "text-muted-foreground"
+      "transition-colors duration-200",
+      isActive ? "text-primary" : "text-muted-foreground"
     );
 
   if (!user) {
@@ -109,12 +88,12 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar collapsible="icon" variant="inset" className="bg-background">
-      <SidebarHeader className="border-b border-sidebar-border">
+    <Sidebar collapsible="icon" variant="inset" className="bg-sidebar/95">
+      <SidebarHeader className="border-b border-sidebar-border/70 bg-sidebar">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard" onClick={closeMobileSidebar} className="flex items-center gap-3">
+              <Link href="/dashboard" onClick={closeMobileSidebar} className="flex items-center gap-3 rounded-lg px-1 py-1">
                 <Image
                   key={logoSrc}
                   src={logoSrc}
@@ -139,7 +118,7 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent className="scrollbar-hide">
+      <SidebarContent className="scrollbar-hide bg-sidebar">
         {navigationItems.map((item) => {
           const isActive = pathname === item.url || pathname.startsWith(item.url + "/");
           const Icon = item.icon;
@@ -147,7 +126,7 @@ export function AppSidebar() {
           if (item.children && item.children.length > 0) {
             return (
               <SidebarGroup key={item.url}>
-                <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">{item.title}</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {item.children.map((child) => {
@@ -161,7 +140,7 @@ export function AppSidebar() {
                             tooltip={child.title}
                           >
                             <Link href={child.url} onClick={closeMobileSidebar}>
-                              <ChildIcon className={getIconClass(child.title, isChildActive)} />
+                              <ChildIcon className={getIconClass(isChildActive)} />
                               <span>{child.title}</span>
                             </Link>
                           </SidebarMenuButton>
@@ -185,7 +164,7 @@ export function AppSidebar() {
                       tooltip={item.title}
                     >
                       <Link href={item.url} onClick={closeMobileSidebar}>
-                        <Icon className={getIconClass(item.title, isActive)} />
+                        <Icon className={getIconClass(isActive)} />
                         <span>{item.title}</span>
                         {item.badge !== undefined && item.badge > 0 && (
                           <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
@@ -202,7 +181,7 @@ export function AppSidebar() {
         })}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border">
+      <SidebarFooter className="border-t border-sidebar-border/70 bg-sidebar">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

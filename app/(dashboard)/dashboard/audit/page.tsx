@@ -27,6 +27,10 @@ import {
 import { Loader2, FileText, Search, Shield, CreditCard, AlertCircle, Settings, User } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Doc, Id } from "@/convex/_generated/dataModel";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 
 // Type for enriched audit log with actor information
 type EnrichedAuditLog = Doc<"auditLogs"> & {
@@ -70,27 +74,21 @@ export default function AuditLogsPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={FileText} title="Please log in" />;
   }
 
   if (user.role !== "admin") {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Access denied. Admin role required.</p>
-      </div>
+      <DashboardEmptyState
+        icon={Shield}
+        title="Access denied"
+        description="Admin role required."
+      />
     );
   }
 
   if (logs === undefined) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardLoadingState label="Loading audit logs..." />;
   }
 
   const filteredLogs = logs?.filter((log: EnrichedAuditLog) => {
@@ -109,17 +107,14 @@ export default function AuditLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">Audit Logs</h1>
-        <p className="text-muted-foreground">
-          View system audit trail and activity logs.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Audit Logs"
+        description="View system audit trail and activity logs."
+      />
 
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
+      <DashboardFilterBar>
+          <div className="flex w-full flex-col gap-4 md:flex-row">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -145,8 +140,7 @@ export default function AuditLogsPage() {
               </SelectContent>
             </Select>
           </div>
-        </CardContent>
-      </Card>
+      </DashboardFilterBar>
 
       {/* Audit Logs Table */}
       <Card>

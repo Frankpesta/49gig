@@ -87,8 +87,8 @@ export default function ContactPage() {
       icon: Phone,
       title: "Call Us",
       description: "Speak with our team during business hours",
-      contact: "+234 (0) 123 456 7890",
-      href: "tel:+2340123456789",
+      contact: "+2349167656835",
+      href: "tel:+2349167656835",
       color: "from-green-500 to-green-600"
     },
   ];
@@ -364,9 +364,7 @@ export default function ContactPage() {
                         </h3>
                       </div>
                       <div className="space-y-2 text-sm text-muted-foreground">
-                        <p><span className="font-medium text-foreground">Monday - Friday:</span> 9:00 AM - 6:00 PM (WAT)</p>
-                        <p><span className="font-medium text-foreground">Saturday:</span> 10:00 AM - 2:00 PM (WAT)</p>
-                        <p><span className="font-medium text-foreground">Sunday:</span> Closed</p>
+                        <p><span className="font-medium text-foreground">Monday - Sunday:</span> Open 24/7</p>
                       </div>
                     </CardContent>
                   </Card>

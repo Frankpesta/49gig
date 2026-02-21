@@ -32,6 +32,8 @@ import {
 import { Loader2, Settings, Lock, Bell, Shield, Trash2, CreditCard, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
 type SessionInfo = {
   _id: string;
@@ -161,11 +163,7 @@ export default function SettingsPage() {
   }, [user]);
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={Settings} title="Please log in" />;
   }
 
   const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
@@ -402,12 +400,10 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Settings"
+        description="Manage your account settings and preferences."
+      />
 
       {/* Account Settings */}
       <Card>

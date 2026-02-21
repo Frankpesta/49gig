@@ -27,7 +27,7 @@ const navLinks: NavLink[] = [
   { label: "Why 49GIG?", href: "/why-49gig" },
   {
     label: "Hire Talent",
-    href: "/hire-talent",
+    href: "/signup",
     children: [
       { label: "Hire a Team", href: "/hire-team" },
       { label: "Talent Categories", href: "/talent-categories" },
@@ -185,7 +185,7 @@ export function Navbar() {
                   asChild
                   className="rounded-md text-sm font-medium"
                 >
-                  <Link href="/signup/client">Get Started</Link>
+                  <Link href="/signup">Get Started</Link>
                 </Button>
               </>
             )}
@@ -321,7 +321,7 @@ export function Navbar() {
                         </Button>
                         <Button className="w-full rounded-md" size="sm" asChild>
                           <Link
-                            href="/signup/client"
+                            href="/signup"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
                             Get Started

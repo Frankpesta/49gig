@@ -23,7 +23,7 @@ import {
 
 export default function HireTeamPage() {
   const breadcrumbs = [
-    { label: "Hire", href: "/hire-talent" },
+    { label: "Hire", href: "/signup/client" },
     { label: "Team", icon: Users },
   ];
 

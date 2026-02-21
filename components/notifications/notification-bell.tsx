@@ -34,8 +34,8 @@ export function NotificationBell() {
         }
       : "skip"
   );
-  const markNotificationRead = useMutation(api.notifications.mutations.markNotificationRead);
-  const markAllRead = useMutation(api.notifications.mutations.markAllRead);
+  const deleteNotification = useMutation(api.notifications.mutations.deleteNotification);
+  const deleteAllNotifications = useMutation(api.notifications.mutations.deleteAllNotifications);
 
   usePusherNotifications({
     onNotification: (payload) => {
@@ -55,7 +55,14 @@ export function NotificationBell() {
   }, [notifications, inAppEnabled]);
 
   const handleMarkAllRead = async () => {
-    await markAllRead(user?._id ? { userId: user._id } : {});
+    await deleteAllNotifications(user?._id ? { userId: user._id } : {});
+  };
+
+  const handleDeleteNotification = async (notificationId: Doc<"notifications">["_id"]) => {
+    await deleteNotification({
+      notificationId,
+      ...(user?._id ? { userId: user._id } : {}),
+    });
   };
 
   return (
@@ -74,7 +81,7 @@ export function NotificationBell() {
         align="end"
         side="bottom"
         sideOffset={8}
-        className="w-[min(360px,calc(100vw-2rem))] max-h-[min(400px,70vh)] p-0"
+        className="w-[min(360px,calc(100vw-2rem))] max-h-[min(400px,70vh)] overflow-hidden p-0"
       >
         <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 sm:py-3">
           <DropdownMenuLabel className="p-0 text-xs font-semibold sm:text-sm">
@@ -91,7 +98,7 @@ export function NotificationBell() {
           </Button>
         </div>
         <DropdownMenuSeparator />
-        <div className="max-h-[min(360px,60vh)] overflow-auto overscroll-contain">
+        <div className="scrollbar-hide max-h-[min(360px,60vh)] overflow-y-auto overscroll-contain">
           {!inAppEnabled ? (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               In-app notifications are disabled.
@@ -108,12 +115,7 @@ export function NotificationBell() {
                   "flex cursor-pointer items-start gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3",
                   !notification.readAt && "bg-muted/40"
                 )}
-                onClick={() =>
-                  markNotificationRead({
-                    notificationId: notification._id,
-                    ...(user?._id ? { userId: user._id } : {}),
-                  })
-                }
+                onClick={() => handleDeleteNotification(notification._id)}
               >
                 <div className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary opacity-80 sm:h-2 sm:w-2" />
                 <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">

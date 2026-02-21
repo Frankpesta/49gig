@@ -21,7 +21,7 @@ const footerSections = [
     key: "solutions",
     title: "Solutions",
     links: [
-      { label: "Hire Talent", href: "/hire-talent" },
+      { label: "Hire Talent", href: "/signup/client" },
       { label: "Hire a Team", href: "/hire-team" },
       { label: "Use Cases", href: "/use-cases" },
       { label: "Pricing", href: "/pricing" },
@@ -43,9 +43,6 @@ const footerSections = [
       { label: "Privacy Policy", href: "/legal/privacy-policy" },
       { label: "Terms & Conditions", href: "/legal/terms" },
       { label: "Cookie Policy", href: "/legal/cookie-policy" },
-      { label: "Data Protection", href: "/legal/data-protection" },
-      { label: "IP Policy", href: "/legal/intellectual-property" },
-      { label: "Anti-Fraud Policy", href: "/legal/anti-fraud" },
       { label: "Code of Conduct", href: "/legal/code-of-conduct" },
       { label: "Refund Policy", href: "/legal/refund-policy" },
     ],
@@ -77,7 +74,7 @@ export function Footer() {
           </div>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row lg:mt-0">
             <Link
-              href="/hire-talent"
+              href="/signup/client"
               className="inline-flex items-center justify-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#07122B] transition hover:bg-white/90"
             >
               Hire Talent

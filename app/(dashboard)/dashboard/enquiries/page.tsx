@@ -20,6 +20,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { formatDistanceToNow } from "date-fns";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 
 const CATEGORY_LABELS: Record<string, string> = {
   hiring: "Hiring Talent",
@@ -59,27 +62,21 @@ export default function EnquiriesPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={Mail} title="Please log in" />;
   }
 
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground">
-              Only admins and moderators can access contact enquiries.
-            </p>
-            <Button asChild className="mt-4">
-              <Link href="/dashboard">Back to Dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardEmptyState
+        icon={Clock}
+        title="Access restricted"
+        description="Only admins and moderators can access contact enquiries."
+        action={
+          <Button asChild>
+            <Link href="/dashboard">Back to Dashboard</Link>
+          </Button>
+        }
+      />
     );
   }
 
@@ -87,24 +84,19 @@ export default function EnquiriesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-heading font-bold">Contact Enquiries</h1>
-        <p className="text-muted-foreground mt-1">
-          View and reply to enquiries from the public contact form.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Contact Enquiries"
+        description="View and reply to enquiries from the public contact form."
+      />
 
       {enquiries === undefined ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <DashboardLoadingState label="Loading enquiries..." className="min-h-[180px]" />
       ) : enquiries.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No contact enquiries yet.</p>
-          </CardContent>
-        </Card>
+        <DashboardEmptyState
+          icon={Mail}
+          title="No contact enquiries yet"
+          className="py-10"
+        />
       ) : (
         <div className="space-y-4">
           {enquiries.map((e: Doc<"contactEnquiries">) => (

@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { AdminCharts } from "@/components/dashboard/admin-charts";
 import { Loader2, Users, FolderKanban, CreditCard, Shield, AlertCircle, TrendingUp, DollarSign } from "lucide-react";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 
 export default function AnalyticsPage() {
   const { user, isAuthenticated } = useAuth();
@@ -27,45 +30,33 @@ export default function AnalyticsPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={TrendingUp} title="Please log in" />;
   }
 
   if (user.role !== "admin") {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Access denied. Admin role required.</p>
-      </div>
+      <DashboardEmptyState
+        icon={Shield}
+        title="Access denied"
+        description="Admin role required."
+      />
     );
   }
 
   if (analytics === undefined) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardLoadingState label="Loading analytics..." />;
   }
 
   if (!analytics) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Unable to load analytics</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={AlertCircle} title="Unable to load analytics" />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">Analytics</h1>
-        <p className="text-muted-foreground">
-          Platform statistics and insights.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Analytics"
+        description="Platform statistics and performance insights."
+      />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Users Stats */}
