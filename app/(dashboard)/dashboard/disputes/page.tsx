@@ -19,6 +19,11 @@ import {
 import { AlertCircle, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
+import { DashboardStatusBadge } from "@/components/dashboard/dashboard-status-badge";
 
 export default function DisputesPage() {
   const { user, isAuthenticated } = useAuth();
@@ -36,34 +41,23 @@ export default function DisputesPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={AlertCircle} title="Please log in" />;
   }
 
   if (disputes === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <DashboardLoadingState label="Loading disputes..." />;
   }
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      open: "destructive",
-      under_review: "secondary",
-      resolved: "default",
-      escalated: "destructive",
-      closed: "outline",
-    };
-    return (
-      <Badge variant={variants[status] || "outline"}>
-        {status.replace("_", " ").toUpperCase()}
-      </Badge>
-    );
+    const tone =
+      status === "resolved"
+        ? "success"
+        : status === "open" || status === "escalated"
+          ? "danger"
+          : status === "under_review"
+            ? "warning"
+            : "neutral";
+    return <DashboardStatusBadge label={status.replace("_", " ").toUpperCase()} tone={tone as any} />;
   };
 
   const getTypeLabel = (type: string) => {
@@ -83,26 +77,24 @@ export default function DisputesPage() {
   );
 
   return (
-    <div className="container mx-auto max-w-7xl py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Disputes</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage and resolve project disputes
-          </p>
-        </div>
-        {(user.role === "client" || user.role === "freelancer") && (
-          <Button asChild>
-            <Link href="/dashboard/disputes/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Dispute
-            </Link>
-          </Button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <DashboardPageHeader
+        title="Disputes"
+        description="Manage and resolve project disputes."
+        actions={
+          user.role === "client" || user.role === "freelancer" ? (
+            <Button asChild>
+              <Link href="/dashboard/disputes/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Dispute
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       {/* Filters */}
-      <div className="mb-6 flex gap-2">
+      <DashboardFilterBar className="mb-0">
         <Button
           variant={statusFilter === undefined ? "default" : "outline"}
           onClick={() => {
@@ -139,7 +131,7 @@ export default function DisputesPage() {
         >
           Resolved
         </Button>
-      </div>
+      </DashboardFilterBar>
 
       {/* Disputes Table */}
       <Card>
@@ -148,10 +140,7 @@ export default function DisputesPage() {
         </CardHeader>
         <CardContent>
           {disputes.length === 0 ? (
-            <div className="py-12 text-center">
-              <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No disputes found</p>
-            </div>
+            <DashboardEmptyState icon={AlertCircle} title="No disputes found" className="border-0 bg-transparent py-8 shadow-none" />
           ) : (
             <Table>
               <TableHeader>

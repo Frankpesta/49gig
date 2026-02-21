@@ -1,206 +1,243 @@
 "use client";
 
 import { PageHero } from "@/components/marketing/page-hero";
-import { FileText, ChevronDown } from "lucide-react";
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { FileText } from "lucide-react";
 
-interface Section {
+type TermsSection = {
   id: string;
   title: string;
-  subsections?: { title: string; content: string }[];
-  content?: string;
-}
+  paragraphs?: string[];
+  bullets?: string[];
+};
+
+const sections: TermsSection[] = [
+  {
+    id: "1",
+    title: "Definitions",
+    bullets: [
+      "Client: Any individual or company that creates a project to hire talent through 49GIG.",
+      "Freelancer: Any independent professional providing services through 49GIG.",
+      "Project: Any engagement created by a Client on the Platform.",
+      "Milestone: A defined stage of work tied to a payment release.",
+      "Escrow: Funds held securely by 49GIG until milestones are approved.",
+    ],
+  },
+  {
+    id: "2",
+    title: "Platform Role",
+    paragraphs: [
+      "49GIG is a talent marketplace and project facilitation platform. We are not an employer, agent, or partner of Clients or Freelancers.",
+    ],
+    bullets: [
+      "Freelancers are independent contractors, not employees of 49GIG.",
+      "Clients contract directly with Freelancers through the Platform under agreed terms.",
+    ],
+  },
+  {
+    id: "3",
+    title: "Eligibility",
+    paragraphs: ["To use 49GIG, you must:"],
+    bullets: [
+      "Be at least 18 years old",
+      "Have the legal capacity to enter into contracts",
+      "Provide accurate and complete information during registration",
+    ],
+  },
+  {
+    id: "4",
+    title: "Accounts & Access",
+    bullets: [
+      "Each user may maintain one account only.",
+      "You are responsible for all activity under your account.",
+      "You must keep your login credentials secure.",
+      "49GIG may suspend or terminate accounts for violations of these Terms.",
+    ],
+  },
+  {
+    id: "5",
+    title: "Project Creation & Engagement",
+    bullets: [
+      "Clients create projects by selecting engagement type, duration, and experience level.",
+      "49GIG matches projects with vetted Freelancers or Teams.",
+      "Where applicable, Clients may request optional pre-project discussions or interviews, but these are not required to proceed.",
+      "All projects must be managed entirely through the Platform.",
+    ],
+  },
+  {
+    id: "6",
+    title: "Payments & Fees",
+    bullets: [
+      "All payments must be made through 49GIG.",
+      "Funds are deposited into escrow before work begins.",
+      "Payments are released upon milestone approval.",
+      "49GIG charges a 25% platform fee on the total project value.",
+      "Freelancers receive 75% of the total project value.",
+    ],
+  },
+  {
+    id: "7",
+    title: "Non-Circumvention (No Bypassing the Platform)",
+    paragraphs: [
+      "Users agree not to bypass 49GIG by engaging or attempting to engage Clients or Freelancers outside the Platform for work originating on 49GIG.",
+      "This clause applies during the project and for a reasonable period after project completion.",
+    ],
+    bullets: [
+      "Immediate account suspension or termination",
+      "A penalty equal to 100% of the project value",
+      "Recovery of unpaid platform fees",
+      "Legal action where applicable",
+    ],
+  },
+  {
+    id: "8",
+    title: "Intellectual Property",
+    bullets: [
+      "Upon full payment of approved milestones, all deliverables become the Client's intellectual property, unless otherwise agreed in writing.",
+      "Freelancers retain ownership of work until payment is completed.",
+      "Portfolio usage by Freelancers requires Client consent.",
+    ],
+  },
+  {
+    id: "9",
+    title: "Confidentiality",
+    paragraphs: ["All parties agree to keep confidential:"],
+    bullets: [
+      "Project details",
+      "Business information",
+      "Intellectual property",
+      "Any non-public data shared during a project",
+      "Confidentiality obligations survive project completion or termination.",
+    ],
+  },
+  {
+    id: "10",
+    title: "Disputes & Resolution",
+    bullets: [
+      "49GIG provides a dispute resolution process for conflicts.",
+      "Decisions are based on project scope, milestones, communication, and delivered work.",
+      "Platform decisions are final and binding.",
+    ],
+  },
+  {
+    id: "11",
+    title: "Termination",
+    paragraphs: ["49GIG may suspend or terminate accounts for:"],
+    bullets: [
+      "Violating these Terms",
+      "Fraudulent activity",
+      "Non-circumvention breaches",
+      "Abuse of the Platform",
+      "Termination does not waive outstanding payment or legal obligations.",
+    ],
+  },
+  {
+    id: "12",
+    title: "Limitation of Liability",
+    paragraphs: ["To the maximum extent permitted by law:"],
+    bullets: [
+      "49GIG is not liable for indirect, incidental, or consequential damages.",
+      "We do not guarantee project outcomes or earnings.",
+      "Total liability is limited to fees paid to 49GIG in the previous 12 months.",
+    ],
+  },
+  {
+    id: "13",
+    title: "Indemnification",
+    paragraphs: ["You agree to indemnify and hold 49GIG harmless from claims arising from:"],
+    bullets: [
+      "Your use of the Platform",
+      "Breach of these Terms",
+      "Violation of laws or third-party rights",
+    ],
+  },
+  {
+    id: "14",
+    title: "Modifications",
+    paragraphs: [
+      "49GIG may update these Terms from time to time. Continued use of the Platform after changes constitutes acceptance.",
+    ],
+  },
+  {
+    id: "15",
+    title: "Governing Law",
+    paragraphs: [
+      "These Terms are governed by the laws of [Insert Jurisdiction / Nigeria], without regard to conflict-of-law principles.",
+    ],
+  },
+  {
+    id: "16",
+    title: "Acceptance",
+    paragraphs: [
+      "By clicking Agree, Approve, or Create Project, you confirm that you have read, understood, and accepted these Terms of Service.",
+    ],
+  },
+];
 
 export default function TermsPage() {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["1", "2"]));
-
-  const toggleSection = (id: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedSections(newExpanded);
-  };
-
-  const sections: Section[] = [
-    {
-      id: "1",
-      title: "Agreement to Terms",
-      content: "These Terms and Conditions constitute a legally binding agreement between you and 49GIG governing your access to and use of our platform. By accessing or using the Platform, you agree to be bound by these Terms."
-    },
-    {
-      id: "2",
-      title: "Eligibility",
-      content: "To use the Platform, you must be at least 18 years of age, have the legal capacity to enter into binding contracts, and provide accurate information during registration."
-    },
-    {
-      id: "3",
-      title: "User Accounts",
-      subsections: [
-        { title: "Account Creation", content: "You must provide accurate information and keep your account information up to date." },
-        { title: "Account Security", content: "You are responsible for maintaining the confidentiality of your credentials and for all activities under your account." },
-        { title: "Account Suspension", content: "We reserve the right to suspend or terminate your account if you violate these Terms or engage in fraudulent conduct." }
-      ]
-    },
-    {
-      id: "4",
-      title: "Platform Services",
-      subsections: [
-        { title: "General Description", content: "49GIG is a marketplace platform connecting clients with vetted African freelancers. We facilitate connections, contracts, and payments." },
-        { title: "Role of 49GIG", content: "49GIG acts as an intermediary platform. We do not employ freelancers, nor do we act as an agent for either party." },
-        { title: "Vetting Process", content: "Freelancers undergo an automated vetting process including English proficiency and skills testing." }
-      ]
-    },
-    {
-      id: "5",
-      title: "User Obligations",
-      subsections: [
-        { title: "Prohibited Conduct", content: "You agree not to violate laws, infringe intellectual property rights, post false information, engage in harassment, or circumvent the Platform." },
-        { title: "Content Standards", content: "All content you post must comply with applicable laws and must not contain illegal, offensive, or infringing material." }
-      ]
-    },
-    {
-      id: "6",
-      title: "Fees and Payments",
-      subsections: [
-        { title: "Service Fees", content: "49GIG charges service fees for facilitating projects. Fee structures are outlined in our Payment Terms." },
-        { title: "Taxes", content: "You are responsible for determining and paying all applicable taxes related to your use of the Platform." }
-      ]
-    },
-    {
-      id: "7",
-      title: "Intellectual Property",
-      subsections: [
-        { title: "Platform Content", content: "The Platform and its original content are owned by 49GIG and protected by international copyright and trademark laws." },
-        { title: "Work Product", content: "Intellectual property rights in work product created by freelancers are determined by the contract between the client and freelancer." }
-      ]
-    },
-    {
-      id: "8",
-      title: "Dispute Resolution",
-      subsections: [
-        { title: "Process", content: "Disputes between clients and freelancers should be resolved directly between the parties or through our mediation support." },
-        { title: "Arbitration", content: "Any dispute shall be resolved through binding arbitration in accordance with the laws of Nigeria." }
-      ]
-    },
-    {
-      id: "9",
-      title: "Disclaimers and Limitations",
-      subsections: [
-        { title: "No Warranties", content: "THE PLATFORM IS PROVIDED 'AS IS' WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED." },
-        { title: "Limitation of Liability", content: "49GIG SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, OR CONSEQUENTIAL DAMAGES." }
-      ]
-    },
-    {
-      id: "10",
-      title: "Governing Law",
-      content: "These Terms shall be governed by and construed in accordance with the laws of Nigeria."
-    }
-  ];
-
   const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Terms", icon: FileText }];
 
   return (
     <div className="w-full">
       <PageHero
-        title="Terms and Conditions"
-        description="Please read these terms carefully. By using our platform, you agree to be bound by these terms."
-        badge={{ icon: FileText, text: "Terms & Conditions" }}
+        title="Terms of Service"
+        description="These terms govern your access to and use of 49GIG."
+        badge={{ icon: FileText, text: "Legal" }}
         breadcrumbs={breadcrumbs}
         imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
-        imageAlt="Legal documents"
+        imageAlt="Terms document"
       />
 
-      <section className="py-12 sm:py-16 lg:py-20 bg-background relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          {/* Table of Contents */}
-          <div className="mb-10">
-            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4">Table of Contents</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {sections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => toggleSection(section.id)}
-                  className="text-left text-sm text-primary hover:text-primary/80 transition-colors py-2 px-3 rounded-lg hover:bg-primary/10"
-                >
-                  {section.id}. {section.title}
-                </button>
-              ))}
-            </div>
+      <section className="py-14 sm:py-18 lg:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border/60 bg-background/90 p-6 sm:p-8">
+            <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">Terms of Service</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Effective Date: 1st March, 2026</p>
+            <p className="mt-5 text-muted-foreground">
+              Welcome to 49GIG ("Platform", "we", "our", "us"). These Terms of Service ("Terms") govern your access to and use of the 49GIG website, applications, and services.
+            </p>
+            <p className="mt-3 text-muted-foreground">
+              By accessing or using 49GIG, creating an account, or approving a project, you agree to be bound by these Terms. If you do not agree, you must not use the Platform.
+            </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sections.map((section) => (
-              <div key={section.id}>
-                <button
-                  onClick={() => toggleSection(section.id)}
-                  className="w-full group"
-                >
-                  <Card className="border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-start gap-4 flex-1 text-left">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors flex-shrink-0 mt-0.5">
-                            <span className="text-sm font-semibold text-primary">{section.id}</span>
-                          </div>
-                          <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-                            {section.title}
-                          </h3>
-                        </div>
-                        <ChevronDown
-                          className={`h-5 w-5 text-muted-foreground group-hover:text-primary transition-transform duration-300 flex-shrink-0 ${
-                            expandedSections.has(section.id) ? "rotate-180" : ""
-                          }`}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </button>
-
-                {/* Expanded Content */}
-                {expandedSections.has(section.id) && (
-                  <div className="mt-2 ml-0 pl-0 sm:pl-4 border-l border-primary/30 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <Card className="border border-border/30 bg-muted/30">
-                      <CardContent className="p-6 space-y-6">
-                        {section.content ? (
-                          <p className="text-muted-foreground">{section.content}</p>
-                        ) : section.subsections ? (
-                          section.subsections.map((subsection, idx) => (
-                            <div key={idx} className="space-y-2">
-                              <h4 className="font-semibold text-foreground text-sm">{subsection.title}</h4>
-                              <p className="text-muted-foreground text-sm">{subsection.content}</p>
-                            </div>
-                          ))
-                        ) : null}
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </div>
+              <a
+                key={section.id}
+                href={`#section-${section.id}`}
+                className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground transition hover:bg-primary/10"
+              >
+                {section.id}. {section.title}
+              </a>
             ))}
           </div>
 
-          {/* Additional Info */}
-          <div className="mt-12 pt-8 border-t border-border/30 space-y-6">
-            <div>
-              <h3 className="font-semibold text-foreground mb-3">Contact Information</h3>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p><span className="font-medium text-foreground">Email:</span> legal@49gig.com</p>
-                <p><span className="font-medium text-foreground">Address:</span> 49GIG, Lagos, Nigeria</p>
-                <p><span className="font-medium text-foreground">Phone:</span> +234 (0) 123 456 7890</p>
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Last updated: January 6, 2026
-            </p>
+          <div className="mt-8 space-y-4">
+            {sections.map((section) => (
+              <Card key={section.id} id={`section-${section.id}`} className="scroll-mt-24 border-border/60">
+                <CardContent className="p-6 sm:p-7">
+                  <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
+                    {section.id}. {section.title}
+                  </h2>
+                  {section.paragraphs?.map((paragraph) => (
+                    <p key={`${section.id}-${paragraph}`} className="mt-3 text-muted-foreground leading-relaxed">
+                      {paragraph}
+                    </p>
+                  ))}
+                  {section.bullets && (
+                    <ul className="mt-4 space-y-2">
+                      {section.bullets.map((bullet) => (
+                        <li key={`${section.id}-${bullet}`} className="flex items-start gap-2 text-muted-foreground">
+                          <span className="mt-1 text-primary">•</span>
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>

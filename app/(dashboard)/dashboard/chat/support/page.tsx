@@ -13,11 +13,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 
 export default function SupportChatPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
   const createSupportChat = useMutation(api.chat.mutations.createSupportChat);
@@ -49,7 +53,9 @@ export default function SupportChatPage() {
     try {
       const chatId = await createSupportChat({
         subject: title.trim(),
-        initialMessage: `Support request: ${title.trim()}`,
+        initialMessage: details.trim()
+          ? `Support request: ${title.trim()}\n\n${details.trim()}`
+          : `Support request: ${title.trim()}`,
         userId: user._id,
       });
       router.push(`/dashboard/chat/${chatId}`);
@@ -61,19 +67,11 @@ export default function SupportChatPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={MessageSquare} title="Please log in" />;
   }
 
   if (chats === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <DashboardLoadingState label="Loading support chat..." />;
   }
 
   // If redirecting to existing chat, show loading
@@ -81,34 +79,31 @@ export default function SupportChatPage() {
     (chat: Doc<"chats">) => chat.type === "support" && chat.status === "active"
   );
   if (supportChat) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <DashboardLoadingState label="Opening existing support chat..." />;
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-2 py-4 sm:px-4 sm:py-6 lg:py-8">
-      <div className="mb-4 flex items-start gap-3 sm:mb-6 sm:gap-4">
+    <div className="space-y-5">
+      <div className="flex items-start gap-3 sm:gap-4">
         <Button variant="ghost" size="icon" asChild className="h-9 w-9 shrink-0">
           <Link href="/dashboard/chat">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">New Support Chat</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Create a support request to get help from our team
-          </p>
+          <DashboardPageHeader
+            title="New Support Chat"
+            description="Create a support request to get help from our team."
+          />
         </div>
       </div>
 
-      <Card>
+      <Card className="overflow-hidden">
+        <div className="pointer-events-none h-px w-full bg-linear-to-r from-transparent via-primary/40 to-transparent" />
         <CardHeader>
           <CardTitle>Support Request</CardTitle>
           <CardDescription>
-            Describe your issue and our support team will help you
+            Share what happened and our support team will respond as quickly as possible.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -122,6 +117,18 @@ export default function SupportChatPage() {
                 placeholder="Brief description of your issue"
                 required
                 disabled={isCreating}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="details">Issue Details (optional)</Label>
+              <Textarea
+                id="details"
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder="Add context, steps to reproduce, and expected outcome."
+                disabled={isCreating}
+                rows={5}
               />
             </div>
 

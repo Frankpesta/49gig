@@ -7,6 +7,9 @@ import { api } from "@/convex/_generated/api";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { AdminCharts } from "@/components/dashboard/admin-charts";
 import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
@@ -282,27 +285,17 @@ export default function DashboardPage() {
 
       {/* Main content */}
       <div className="space-y-6">
-          {/* Welcome Section with Gradient */}
-          <div className="relative space-y-3 overflow-hidden rounded-xl border bg-gradient-to-br from-primary/5 via-background to-background p-6 shadow-sm">
-            <div className="relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-heading font-bold tracking-tight text-foreground">
-                    Welcome back, {user.name.split(" ")[0]}
-                  </h1>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Here's what's happening with your {isClient ? "projects" : isFreelancer ? "projects" : "platform"} today.
-                  </p>
+          <DashboardPageHeader
+            title={`Welcome back, ${user.name.split(" ")[0]}`}
+            description={`Here's what's happening with your ${isClient ? "projects" : isFreelancer ? "projects" : "platform"} today.`}
+            actions={
+              <div className="hidden items-center gap-2 sm:flex">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                  <Sparkles className="h-4 w-4 text-primary" />
                 </div>
               </div>
-            </div>
-            {/* Decorative gradient */}
-            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
-            <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-primary/5 blur-3xl" />
-          </div>
+            }
+          />
 
           {/* Enhanced Stats Grid */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -397,7 +390,7 @@ export default function DashboardPage() {
           {/* Quick Actions with Enhanced Design */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {isClient && (
-              <Card className="group relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10">
+              <Card className="group relative overflow-hidden border-2 border-primary/20 bg-linear-to-br from-primary/5 to-transparent transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10">
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -423,7 +416,7 @@ export default function DashboardPage() {
             )}
 
             {isFreelancer && (
-              <Card className="group relative overflow-hidden border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10">
+              <Card className="group relative overflow-hidden border-2 border-primary/20 bg-linear-to-br from-primary/5 to-transparent transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10">
                 <CardHeader className="pb-4">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -462,7 +455,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <Button asChild variant="outline" className="w-full group-hover:scale-[1.02] transition-transform">
-                  <Link href="/dashboard/messages" className="flex items-center justify-center">
+                  <Link href="/dashboard/chat" className="flex items-center justify-center">
                     <MessageSquare className="mr-2 h-4 w-4" />
                     Open Messages
                     <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -501,11 +494,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Activity - from notifications (matches, messages, payments, etc.) */}
-      <Card className="overflow-hidden border-2">
-        <CardHeader className="bg-gradient-to-r from-muted/50 to-transparent border-b">
+      <Card className="overflow-hidden border-border/60 bg-card/90">
+        <CardHeader className="border-b border-border/50 bg-muted/20">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-2xl">Recent Activity</CardTitle>
+            <CardTitle className="text-xl">Recent Activity</CardTitle>
               <CardDescription className="mt-1">
                 Your latest updates and notifications
               </CardDescription>
@@ -517,21 +510,14 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="p-6">
           {recentActivity === undefined ? (
-            <div className="flex items-center justify-center py-12">
-              <Clock className="h-8 w-8 animate-pulse text-muted-foreground" />
-            </div>
+            <DashboardLoadingState label="Loading activity..." className="min-h-[180px] border-0 bg-transparent" />
           ) : recentActivity.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted mb-4">
-                <Activity className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-1">
-                No recent activity to display
-              </p>
-              <p className="text-xs text-muted-foreground/70">
-                Your activity will appear here as you get matches, messages, and project updates
-              </p>
-            </div>
+            <DashboardEmptyState
+              icon={Activity}
+              title="No recent activity to display"
+              description="Your activity will appear here as you get matches, messages, and project updates."
+              className="border-0 bg-transparent py-8 shadow-none"
+            />
           ) : (
             <ul className="space-y-3">
               {recentActivity.map((n: Doc<"notifications">) => {

@@ -44,12 +44,12 @@ export function DashboardBreadcrumb() {
 
   return (
     <Breadcrumb>
-      <BreadcrumbList className="flex flex-nowrap min-w-0 items-center gap-1 text-sm">
+      <BreadcrumbList className="flex min-w-0 flex-nowrap items-center gap-1 text-sm">
         <BreadcrumbItem className="shrink-0">
           <BreadcrumbLink asChild>
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors py-1 px-1.5"
+              className="inline-flex items-center gap-2 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
               title="Go to Dashboard"
             >
               <Home className="h-4 w-4" />
@@ -72,18 +72,18 @@ export function DashboardBreadcrumb() {
             )}
             {/* Desktop: full trail */}
             {breadcrumbItems.map((item) => (
-              <div key={item.href} className="hidden md:flex items-center shrink-0 gap-1">
+              <div key={item.href} className="hidden shrink-0 items-center gap-1 md:flex">
                 <BreadcrumbSeparator className="[&>svg]:size-3.5" />
                 <BreadcrumbItem>
                   {item.isLast ? (
-                    <BreadcrumbPage className="font-semibold text-foreground truncate max-w-[12rem]">
+                    <BreadcrumbPage className="max-w-[16rem] truncate font-semibold text-foreground">
                       {item.label}
                     </BreadcrumbPage>
                   ) : (
                     <BreadcrumbLink asChild>
                       <Link
                         href={item.href}
-                        className="text-muted-foreground hover:text-foreground transition-colors py-1 px-1.5 rounded-md hover:bg-muted/50 font-medium truncate max-w-[8rem] inline-block"
+                        className="inline-block max-w-[10rem] truncate rounded-md px-1.5 py-1 font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                       >
                         {item.label}
                       </Link>

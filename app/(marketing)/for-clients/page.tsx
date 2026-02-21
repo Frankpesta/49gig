@@ -166,7 +166,7 @@ export default function ForClientsPage() {
         imageAlt="Team collaboration"
         actions={
           <>
-            <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+            <CTAButton href="/signup/client" variant="primary" className="gap-2">
               <Briefcase className="h-5 w-5" />
               Hire Vetted Talent
               <ArrowRight className="h-4 w-4" />
@@ -759,7 +759,7 @@ export default function ForClientsPage() {
               </div>
 
               <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-                <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+                <CTAButton href="/signup/client" variant="primary" className="gap-2">
                   <Briefcase className="h-4 w-4" />
                   Hire Vetted Talent
                   <ArrowRight className="h-4 w-4" />

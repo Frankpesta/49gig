@@ -30,31 +30,31 @@ interface MetricCardProps {
 
 const variantStyles = {
   default: {
-    card: "border-border/50 bg-card/50 backdrop-blur-sm hover:bg-card hover:border-border transition-all",
+    card: "border-border/60 bg-card/90 backdrop-blur-sm hover:border-border",
     icon: "text-muted-foreground",
     iconBg: "bg-muted/60 backdrop-blur-sm",
     glow: "bg-muted",
   },
   primary: {
-    card: "border-primary/30 bg-gradient-to-br from-primary/8 via-primary/5 to-card/50 backdrop-blur-sm hover:from-primary/12 hover:to-primary/8 hover:border-primary/40 transition-all",
+    card: "border-primary/25 bg-linear-to-br from-primary/10 via-card/90 to-card/90 backdrop-blur-sm hover:border-primary/35",
     icon: "text-primary",
     iconBg: "bg-primary/15 backdrop-blur-sm",
     glow: "bg-primary",
   },
   success: {
-    card: "border-green-500/30 bg-gradient-to-br from-green-500/8 via-green-500/5 to-card/50 backdrop-blur-sm hover:from-green-500/12 hover:to-green-500/8 hover:border-green-500/40 transition-all",
+    card: "border-green-500/25 bg-linear-to-br from-green-500/10 via-card/90 to-card/90 backdrop-blur-sm hover:border-green-500/35",
     icon: "text-green-600 dark:text-green-400",
     iconBg: "bg-green-500/15 backdrop-blur-sm",
     glow: "bg-green-500",
   },
   warning: {
-    card: "border-yellow-500/30 bg-gradient-to-br from-yellow-500/8 via-yellow-500/5 to-card/50 backdrop-blur-sm hover:from-yellow-500/12 hover:to-yellow-500/8 hover:border-yellow-500/40 transition-all",
+    card: "border-yellow-500/25 bg-linear-to-br from-yellow-500/10 via-card/90 to-card/90 backdrop-blur-sm hover:border-yellow-500/35",
     icon: "text-yellow-600 dark:text-yellow-400",
     iconBg: "bg-yellow-500/15 backdrop-blur-sm",
     glow: "bg-yellow-500",
   },
   destructive: {
-    card: "border-red-500/30 bg-gradient-to-br from-red-500/8 via-red-500/5 to-card/50 backdrop-blur-sm hover:from-red-500/12 hover:to-red-500/8 hover:border-red-500/40 transition-all",
+    card: "border-red-500/25 bg-linear-to-br from-red-500/10 via-card/90 to-card/90 backdrop-blur-sm hover:border-red-500/35",
     icon: "text-red-600 dark:text-red-400",
     iconBg: "bg-red-500/15 backdrop-blur-sm",
     glow: "bg-red-500",
@@ -81,7 +81,7 @@ export function MetricCard({
   return (
     <Card
       className={cn(
-        "group relative overflow-hidden border transition-all duration-500 hover:shadow-lg md:hover:shadow-2xl hover:shadow-primary/10 md:hover:-translate-y-1",
+        "group relative overflow-hidden border transition-all duration-200 hover:shadow-md",
         styles.card,
         className
       )}
@@ -91,7 +91,7 @@ export function MetricCard({
           <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
             <div
               className={cn(
-                "relative flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-lg sm:rounded-xl transition-all duration-300 group-hover:scale-110",
+                "relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-all duration-200 sm:h-12 sm:w-12",
                 styles.iconBg
               )}
             >
@@ -103,7 +103,7 @@ export function MetricCard({
               />
               <Icon
                 className={cn(
-                  "h-5 w-5 sm:h-6 sm:w-6 relative z-10 transition-all duration-300 group-hover:scale-110",
+                  "relative z-10 h-5 w-5 transition-all duration-200 sm:h-6 sm:w-6",
                   styles.icon,
                   iconClassName
                 )}
@@ -180,13 +180,13 @@ export function MetricCard({
         {/* Enhanced decorative gradient overlay */}
         <div
           className={cn(
-            "absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-0 blur-2xl transition-all duration-500 group-hover:opacity-30 group-hover:scale-150",
+            "absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-0 blur-2xl transition-all duration-300 group-hover:opacity-20",
             styles.glow
           )}
         />
         <div
           className={cn(
-            "absolute -left-8 -bottom-8 h-24 w-24 rounded-full opacity-0 blur-xl transition-all duration-500 group-hover:opacity-20 group-hover:scale-125",
+            "absolute -left-8 -bottom-8 h-24 w-24 rounded-full opacity-0 blur-xl transition-all duration-300 group-hover:opacity-15",
             styles.glow
           )}
         />

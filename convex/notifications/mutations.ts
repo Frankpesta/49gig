@@ -83,3 +83,45 @@ export const markAllRead = mutation({
     return { success: true };
   },
 });
+
+export const deleteNotification = mutation({
+  args: {
+    notificationId: v.id("notifications"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const notification = await ctx.db.get(args.notificationId);
+    if (!notification || notification.userId !== user._id) {
+      throw new Error("Not authorized");
+    }
+
+    await ctx.db.delete(args.notificationId);
+    return { success: true };
+  },
+});
+
+export const deleteAllNotifications = mutation({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const notifications = await ctx.db
+      .query("notifications")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    for (const notification of notifications) {
+      await ctx.db.delete(notification._id);
+    }
+
+    return { success: true, deletedCount: notifications.length };
+  },
+});

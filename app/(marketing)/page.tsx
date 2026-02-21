@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
+import { TypingEffect } from "@/components/ui/typing-effect";
 import {
   CheckCircle2,
   Users,
@@ -33,16 +34,17 @@ import {
   Layers,
   Workflow,
   Cloud,
-  Brain
+  Brain,
+  Clock
 } from "lucide-react";
 
 export default function Home() {
 
   const stats = [
-    { value: "10,000", label: "Vetted Professionals", suffix: "+", icon: Users },
-    { value: "95", label: "Client Satisfaction", suffix: "%", icon: Trophy },
-    { value: "120", label: "Countries Served", suffix: "+", icon: Globe },
-    { value: "50", label: "Paid to Freelancers", prefix: "$", suffix: "M+", icon: DollarSign },
+    { prefix: "", value: "3,500", label: "Vetted Professionals", suffix: "+", icon: Users },
+    { prefix: "", value: "88", label: "Client Satisfaction", suffix: "%", icon: Trophy },
+    { prefix: "", value: "35", label: "Countries Served", suffix: "+", icon: Globe },
+    { prefix: "", value: "25", label: "Faster Time to Hire", suffix: "%", icon: Clock },
   ];
 
   const categories = [
@@ -148,14 +150,21 @@ export default function Home() {
     <div className="w-full">
       {/* Hero - clean editorial style */}
       <section
-        className="relative overflow-hidden border-b border-border/30 bg-[#f5f4f1] -mt-14 md:-mt-16 pt-14 md:pt-16"
+        className="relative -mt-14 overflow-hidden border-b border-border/30 bg-linear-to-b from-[#f5f4f1] to-background pt-14 md:-mt-16 md:pt-16 dark:from-[#0b1327] dark:to-background"
         aria-label="Hero"
       >
         <div className="relative z-10 px-4 pb-20 pt-28 sm:px-6 sm:pt-32 lg:px-8 lg:pt-36">
           <div className="mx-auto w-full max-w-5xl">
             <div className="max-w-3xl">
-              <h1 className="text-5xl font-semibold tracking-tight text-foreground sm:text-6xl lg:text-7xl">
-                Hire world-class African talent, faster.
+              <h1 className="text-5xl font-semibold tracking-tight text-primary sm:text-6xl lg:text-7xl dark:text-white">
+                Hire world-class African talent,{" "}
+                <span className="inline-flex align-middle text-secondary dark:text-amber-300">
+                  <TypingEffect
+                    words={["faster", "smarter", "confidently", "securely"]}
+                    className="min-w-[10ch]"
+                    cursorClassName="h-7 sm:h-8 lg:h-9"
+                  />
+                </span>
               </h1>
               <p className="mt-8 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
                 Connect with the top 3% of vetted professionals across engineering, design, and growth. Build exceptional teams with confidence.
@@ -164,7 +173,7 @@ export default function Home() {
 
             <div className="mt-10 flex flex-nowrap gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               <CTAButton
-                href="/hire-talent"
+                href="/signup/client"
                 variant="primary"
                 className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-white px-5 text-sm text-foreground shadow-sm hover:bg-white"
               >
@@ -397,7 +406,7 @@ export default function Home() {
                   Our platform supports hundreds of specialized skills. Tell us your requirements and we’ll find the perfect match.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+                  <CTAButton href="/signup/client" variant="primary" className="gap-2">
                     <Search className="h-5 w-5" />
                     Hire Custom Talent
                   </CTAButton>
@@ -469,7 +478,7 @@ export default function Home() {
                   Learn More About Our Process
                   <ArrowRight className="h-4 w-4" />
                 </CTAButton>
-                <CTAButton href="/hire-talent" variant="secondary" className="gap-2">
+                <CTAButton href="/signup/client" variant="secondary" className="gap-2">
                   <Rocket className="h-4 w-4" />
                   Start Your Project Now
                 </CTAButton>
@@ -659,7 +668,7 @@ export default function Home() {
               </div>
 
               <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-                <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+                <CTAButton href="/signup/client" variant="primary" className="gap-2">
                   <Briefcase className="h-4 w-4" />
                   Hire World-Class Talent
                   <ArrowRight className="h-4 w-4" />

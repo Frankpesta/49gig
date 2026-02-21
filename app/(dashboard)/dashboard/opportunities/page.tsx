@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Briefcase, FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
 /**
  * Opportunities page for freelancers.
@@ -16,29 +18,19 @@ export default function OpportunitiesPage() {
   const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={Briefcase} title="Please log in" />;
   }
 
   if (user.role !== "freelancer") {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">This page is for freelancers</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={Briefcase} title="This page is for freelancers" />;
   }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">How you get projects</h1>
-        <p className="text-muted-foreground">
-          Clients choose talent from their matches. When you’re selected, the project shows up in your Projects.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="How you get projects"
+        description="Clients choose talent from their matches. When you are selected, the project appears in Projects."
+      />
 
       <Card>
         <CardHeader>

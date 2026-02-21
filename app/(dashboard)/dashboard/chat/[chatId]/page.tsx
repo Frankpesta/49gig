@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +12,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Send,
   Paperclip,
-  Pin,
-  MoreVertical,
   ArrowLeft,
   Check,
   CheckCheck,
@@ -223,52 +221,57 @@ export default function ChatDetailPage() {
   const otherParticipants = participantsList.filter((p) => p._id !== user._id);
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-2 py-4 sm:px-4 sm:py-6 lg:py-8">
-      <div className="mb-3 flex flex-col gap-2 sm:mb-4 sm:flex-row sm:items-center sm:gap-4">
-        <div className="flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="icon" asChild className="h-9 w-9">
-            <Link href="/dashboard/chat">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Badge variant="outline" className="text-xs sm:hidden">{chat.type}</Badge>
-        </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg font-bold sm:text-xl lg:text-2xl">{chat.title || "Chat"}</h1>
-          <p className="text-sm text-muted-foreground">
-            {chat.type === "project" && chat.projectId && (
-              <Link
-                href={`/dashboard/projects/${chat.projectId}`}
-                className="hover:underline"
-              >
-                View Project
-              </Link>
-            )}
-          </p>
-          {participantsList.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:mt-2 sm:gap-2">
-              {participantsList.map((p) => (
-                <div key={p._id} className="flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-0.5 sm:px-2 sm:py-1">
-                  <Avatar className="h-5 w-5 sm:h-6 sm:w-6">
-                    {p.imageUrl && <AvatarImage src={p.imageUrl} alt={p.name} />}
-                    <AvatarFallback className="text-xs">
-                      {p.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-xs font-medium">
-                    {p._id === user._id ? "You" : p.name}
-                  </span>
-                </div>
-              ))}
+    <div className="space-y-4">
+      <Card className="overflow-hidden">
+        <div className="pointer-events-none h-px w-full bg-linear-to-r from-transparent via-primary/40 to-transparent" />
+        <CardContent className="px-3 py-3 sm:px-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex shrink-0 items-center gap-2">
+              <Button variant="ghost" size="icon" asChild className="h-9 w-9">
+                <Link href="/dashboard/chat">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Badge variant="outline" className="border-primary/25 bg-primary/5 text-xs sm:hidden">{chat.type}</Badge>
             </div>
-          )}
-        </div>
-        <Badge variant="outline" className="hidden text-xs sm:inline-flex">{chat.type}</Badge>
-      </div>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate text-lg font-semibold sm:text-xl">{chat.title || "Chat"}</h1>
+              <p className="text-sm text-muted-foreground">
+                {chat.type === "project" && chat.projectId && (
+                  <Link
+                    href={`/dashboard/projects/${chat.projectId}`}
+                    className="text-primary hover:underline"
+                  >
+                    View project details
+                  </Link>
+                )}
+              </p>
+              {participantsList.length > 0 && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {participantsList.map((p) => (
+                    <div key={p._id} className="flex items-center gap-1.5 rounded-full border border-border/70 bg-primary/5 px-2 py-1">
+                      <Avatar className="h-5 w-5 sm:h-6 sm:w-6">
+                        {p.imageUrl && <AvatarImage src={p.imageUrl} alt={p.name} />}
+                        <AvatarFallback className="text-xs">
+                          {p.name.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs font-medium">
+                        {p._id === user._id ? "You" : p.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Badge variant="outline" className="hidden border-primary/25 bg-primary/5 text-xs sm:inline-flex">{chat.type}</Badge>
+          </div>
+        </CardContent>
+      </Card>
 
-      <Card className="flex min-h-[280px] flex-col sm:min-h-[320px] lg:h-[calc(100vh-220px)]">
+      <Card className="flex min-h-[320px] flex-col lg:h-[calc(100vh-270px)]">
         {/* Messages Area */}
-        <CardContent className="flex-1 overflow-y-auto p-3 space-y-3 sm:p-4 sm:space-y-4 lg:p-6">
+        <CardContent className="flex-1 space-y-3 overflow-y-auto bg-linear-to-b from-transparent to-primary/5 p-3 sm:space-y-4 sm:p-4 lg:p-5">
           {displayMessages.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <p className="text-muted-foreground">No messages yet</p>
@@ -302,10 +305,10 @@ export default function ChatDetailPage() {
                       </span>
                     )}
                     <div
-                      className={`rounded-lg px-4 py-2 ${
+                      className={`rounded-2xl px-4 py-2.5 shadow-sm ${
                         isOwnMessage
                           ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
+                          : "border border-border/70 bg-card/90"
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
@@ -356,7 +359,7 @@ export default function ChatDetailPage() {
         </CardContent>
 
         {/* Input Area */}
-        <CardHeader className="border-t p-3 sm:p-4">
+        <CardHeader className="border-t border-border/70 bg-card/70 p-3 sm:p-4">
           {pendingFiles.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-2">
               {pendingFiles.map((f, i) => (
@@ -402,7 +405,7 @@ export default function ChatDetailPage() {
               placeholder="Type a message or attach files..."
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyPress}
               disabled={isSending}
               className="flex-1"
             />

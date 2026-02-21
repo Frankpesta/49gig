@@ -6,7 +6,7 @@ export function DashboardFooter() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="shrink-0 border-t border-border/50 bg-background/50 px-4 py-4 sm:px-6">
+    <footer className="shrink-0 border-t border-border/60 bg-background/90 px-4 py-4 backdrop-blur-sm sm:px-6">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row">
         <p className="text-center text-xs text-muted-foreground sm:text-left">
           © {currentYear} 49GIG. All rights reserved.

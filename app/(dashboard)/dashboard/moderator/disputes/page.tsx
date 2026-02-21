@@ -27,6 +27,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Doc } from "@/convex/_generated/dataModel";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 
 export default function ModeratorDisputesPage() {
   const { user, isAuthenticated } = useAuth();
@@ -50,36 +54,26 @@ export default function ModeratorDisputesPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={AlertCircle} title="Please log in" />;
   }
 
   if (user.role !== "moderator" && user.role !== "admin") {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground">
-              Only moderators and admins can access this page
-            </p>
-            <Button asChild className="mt-4">
-              <Link href="/dashboard">Back to Dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardEmptyState
+        icon={AlertCircle}
+        title="Access restricted"
+        description="Only moderators and admins can access this page."
+        action={
+          <Button asChild>
+            <Link href="/dashboard">Back to Dashboard</Link>
+          </Button>
+        }
+      />
     );
   }
 
   if (disputes === undefined || allDisputes === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+    return <DashboardLoadingState label="Loading disputes..." />;
   }
 
   const getStatusBadge = (status: string) => {
@@ -114,13 +108,11 @@ export default function ModeratorDisputesPage() {
   );
 
   return (
-    <div className="container mx-auto max-w-7xl py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Dispute Management</h1>
-        <p className="text-muted-foreground mt-1">
-          Review and resolve disputes as a {user.role}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <DashboardPageHeader
+        title="Dispute Management"
+        description={`Review and resolve disputes as a ${user.role}.`}
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4 mb-8">
@@ -171,7 +163,7 @@ export default function ModeratorDisputesPage() {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <DashboardFilterBar className="mb-0">
         <Select
           value={statusFilter || "all"}
           onValueChange={(value) => {
@@ -191,7 +183,7 @@ export default function ModeratorDisputesPage() {
             <SelectItem value="closed">Closed</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </DashboardFilterBar>
 
       {/* Disputes Table */}
       <Card>
@@ -202,10 +194,7 @@ export default function ModeratorDisputesPage() {
         </CardHeader>
         <CardContent>
           {allDisputes.length === 0 ? (
-            <div className="py-12 text-center">
-              <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No disputes found</p>
-            </div>
+            <DashboardEmptyState icon={AlertCircle} title="No disputes found" className="border-0 bg-transparent py-8 shadow-none" />
           ) : (
             <Table>
               <TableHeader>

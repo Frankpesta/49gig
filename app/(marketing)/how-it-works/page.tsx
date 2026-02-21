@@ -194,7 +194,7 @@ export default function HowItWorksPage() {
                   Start your project today and get matched with vetted African professionals who deliver exceptional results.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                  <CTAButton href="/signup/client" variant="primary" className="gap-3">
                     <Play className="h-5 w-5" />
                     Start a Project
                     <ArrowRight className="h-5 w-5" />
@@ -538,7 +538,7 @@ export default function HowItWorksPage() {
               </div>
 
               <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
-                <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+                <CTAButton href="/signup/client" variant="primary" className="gap-2">
                   <Briefcase className="h-4 w-4" />
                   Hire Vetted Talent
                   <ArrowRight className="h-4 w-4" />

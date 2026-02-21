@@ -26,6 +26,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TablePagination } from "@/components/ui/table-pagination";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardStatusBadge } from "@/components/dashboard/dashboard-status-badge";
 import { useAuth } from "@/hooks/use-auth";
 import {
   ArrowUpDown,
@@ -85,6 +89,13 @@ const STATUS_CONFIG: Record<
 };
 
 export default function TransactionsPage() {
+  const mapStatusTone = (status: string) => {
+    if (status === "succeeded") return "success";
+    if (status === "failed" || status === "cancelled") return "danger";
+    if (status === "processing" || status === "pending") return "warning";
+    return "neutral";
+  };
+
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -230,14 +241,10 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-heading font-bold">Transactions</h1>
-          <p className="text-muted-foreground">
-            View and manage all your payment transactions
-          </p>
-        </div>
-      </div>
+      <DashboardPageHeader
+        title="Transactions"
+        description="View, filter, and inspect all payment transactions."
+      />
 
       {/* Statistics Cards */}
       {stats && (
@@ -301,13 +308,7 @@ export default function TransactionsPage() {
       )}
 
       {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>Filter and search transactions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
+      <DashboardFilterBar>
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -360,9 +361,7 @@ export default function TransactionsPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </CardContent>
-      </Card>
+      </DashboardFilterBar>
 
       {/* Transactions Table */}
       <Card>
@@ -385,15 +384,16 @@ export default function TransactionsPage() {
               ))}
             </div>
           ) : paginatedTransactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <DollarSign className="mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="mb-2 text-lg font-semibold">No transactions found</h3>
-              <p className="text-center text-sm text-muted-foreground">
-                {searchQuery || typeFilter !== "all" || statusFilter !== "all"
-                  ? "Try adjusting your filters"
-                  : "You don't have any transactions yet"}
-              </p>
-            </div>
+            <DashboardEmptyState
+              icon={DollarSign}
+              title="No transactions found"
+              description={
+                searchQuery || typeFilter !== "all" || statusFilter !== "all"
+                  ? "Try adjusting your filters."
+                  : "You do not have any transactions yet."
+              }
+              className="border-0 bg-transparent py-8 shadow-none"
+            />
           ) : (
             <>
               <div className="rounded-md border">
@@ -487,9 +487,7 @@ export default function TransactionsPage() {
                             ) : null}
                           </TableCell>
                           <TableCell>
-                            <Badge variant={statusConfig.variant}>
-                              {statusConfig.label}
-                            </Badge>
+                            <DashboardStatusBadge label={statusConfig.label} tone={mapStatusTone(transaction.status)} />
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm" asChild>

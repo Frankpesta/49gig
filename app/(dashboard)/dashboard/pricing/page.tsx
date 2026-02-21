@@ -11,6 +11,9 @@ import { Loader2, DollarSign, Save, RotateCcw } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 
 const EXPERIENCE_LEVELS = ["junior", "mid", "senior", "expert"] as const;
 type Level = (typeof EXPERIENCE_LEVELS)[number];
@@ -118,18 +121,16 @@ export default function PricingPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in.</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={DollarSign} title="Please log in." />;
   }
 
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Only admins and moderators can manage pricing.</p>
-      </div>
+      <DashboardEmptyState
+        icon={DollarSign}
+        title="Access restricted"
+        description="Only admins and moderators can manage pricing."
+      />
     );
   }
 
@@ -137,22 +138,13 @@ export default function PricingPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-heading font-bold flex items-center gap-2">
-          <DollarSign className="h-8 w-8" />
-          Base rates by tech stack
-        </h1>
-        <p className="text-muted-foreground">
-          Set hourly base rates (USD) per talent category and experience level. These drive budget
-          estimates when clients create projects.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Base rates by tech stack"
+        description="Set hourly base rates (USD) per talent category and experience level. These rates drive budget estimates when clients create projects."
+      />
 
       {isLoading ? (
-        <div className="flex items-center gap-2 text-muted-foreground py-12">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Loading pricing…
-        </div>
+        <DashboardLoadingState label="Loading pricing..." />
       ) : (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">

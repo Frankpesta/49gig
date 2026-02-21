@@ -44,7 +44,7 @@ import {
 
 export default function HireTalentPage() {
   const breadcrumbs = [
-    { label: "Services", href: "/hire-talent" },
+    { label: "Services", href: "/signup/client" },
     { label: "Hire Talent", icon: Users },
   ];
 
@@ -241,7 +241,7 @@ export default function HireTalentPage() {
 
               <div className="flex flex-col sm:flex-row gap-8 justify-center pt-12">
                 <SectionTransition variant="slide" direction="left" delay={600}>
-                  <CTAButton href="/hire-talent" variant="primary" className="gap-3">
+                  <CTAButton href="/signup/client" variant="primary" className="gap-3">
                     <Briefcase className="h-6 w-6" />
                     Hire Individual Talent
                     <ArrowRight className="h-6 w-6" />

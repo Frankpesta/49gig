@@ -22,6 +22,8 @@ import {
 import { Loader2, Bell, Send, AlertCircle } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
 const roleOptions = ["client", "freelancer", "moderator", "admin"] as const;
 
@@ -69,18 +71,16 @@ export default function AdminNotificationsPage() {
   }, []);
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={Bell} title="Please log in" />;
   }
 
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Access denied. Admin or Moderator role required.</p>
-      </div>
+      <DashboardEmptyState
+        icon={AlertCircle}
+        title="Access denied"
+        description="Admin or Moderator role required."
+      />
     );
   }
 
@@ -148,15 +148,14 @@ export default function AdminNotificationsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">Notifications</h1>
-        <p className="text-muted-foreground">
-          Send announcements or updates to specific user groups.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <DashboardPageHeader
+        title="Notifications"
+        description="Send announcements or updates to specific user groups."
+      />
 
-      <Card>
+      <Card className="overflow-hidden">
+        <div className="pointer-events-none h-px w-full bg-linear-to-r from-transparent via-primary/40 to-transparent" />
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
@@ -166,7 +165,7 @@ export default function AdminNotificationsPage() {
             Create a system message and target roles or specific users.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5 sm:space-y-6">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
             <Input
@@ -189,7 +188,7 @@ export default function AdminNotificationsPage() {
 
           <div className="space-y-3">
             <Label>Target Audience</Label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
               <Checkbox
                 checked={sendToAll}
                 onCheckedChange={(value) => setSendToAll(Boolean(value))}
@@ -201,7 +200,7 @@ export default function AdminNotificationsPage() {
             </div>
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {roleOptions.map((role) => (
-                <label key={role} className="flex items-center gap-2 text-sm">
+                <label key={role} className="flex items-center gap-2 rounded-md border border-border/50 bg-card/70 px-2.5 py-2 text-sm">
                   <Checkbox
                     checked={selectedRoles.includes(role)}
                     onCheckedChange={() => toggleRole(role)}
@@ -219,7 +218,7 @@ export default function AdminNotificationsPage() {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
             />
-            <div className="max-h-[260px] overflow-auto rounded-md border p-3">
+            <div className="scrollbar-hide max-h-[260px] overflow-y-auto rounded-lg border border-border/60 bg-card/60 p-3">
               {users === undefined ? (
                 <div className="flex items-center justify-center py-6">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -231,7 +230,7 @@ export default function AdminNotificationsPage() {
               ) : (
                 <div className="space-y-2">
                   {filteredUsers.map((u: Doc<"users">) => (
-                    <label key={u._id} className="flex items-center gap-2 text-sm">
+                    <label key={u._id} className="flex items-center gap-2 rounded-md border border-border/50 bg-background/70 px-2.5 py-2 text-sm">
                       <Checkbox
                         checked={selectedUserIds.includes(u._id)}
                         onCheckedChange={() => toggleUser(u._id)}
@@ -246,7 +245,7 @@ export default function AdminNotificationsPage() {
           </div>
 
           <div className="flex items-center justify-end">
-            <Button onClick={handleSend} disabled={isSending}>
+            <Button onClick={handleSend} disabled={isSending} className="w-full sm:w-auto">
               {isSending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

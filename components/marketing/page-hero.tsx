@@ -62,9 +62,10 @@ export function PageHero({
 
       <div className="absolute inset-0 bg-linear-to-b from-black/50 via-black/55 to-black/95" />
       <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/40 to-black/20" />
+      <div className="absolute inset-0 bg-linear-to-tr from-primary/20 via-transparent to-secondary/20" />
 
       <div className="relative mx-auto flex min-h-[68svh] max-w-7xl items-end px-4 pb-10 pt-24 sm:min-h-[74svh] sm:px-6 sm:pb-14 sm:pt-28 lg:min-h-[80svh] lg:px-8 lg:pb-16 lg:pt-32">
-        <div className="w-full max-w-4xl rounded-2xl border border-white/20 bg-black/35 p-5 shadow-2xl backdrop-blur-sm sm:p-7 lg:p-9">
+        <div className="w-full max-w-4xl rounded-2xl border border-white/25 bg-black/35 p-5 shadow-2xl backdrop-blur-md sm:p-7 lg:p-9">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <nav
               className="mb-4 flex flex-wrap items-center gap-1.5 text-xs text-white/80 sm:text-sm"

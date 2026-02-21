@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { PageHero } from "@/components/marketing/page-hero";
 import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
@@ -138,7 +137,7 @@ export default function UseCasesPage() {
         imageAlt="Business collaboration"
         actions={
           <>
-            <CTAButton href="/hire-talent" variant="primary" className="gap-2">
+            <CTAButton href="/signup/client" variant="primary" className="gap-2">
               <Briefcase className="h-5 w-5" />
               Hire Talent
               <ChevronRight className="h-4 w-4" />
@@ -153,10 +152,10 @@ export default function UseCasesPage() {
       />
 
       {/* FOR CLIENTS */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
+      <section className="py-20 sm:py-24 lg:py-28 bg-linear-to-b from-background via-primary/5 to-background">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 lg:mb-16">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-4">
               For Clients
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -170,7 +169,7 @@ export default function UseCasesPage() {
                 key={index}
                 colSpan={index === 0 ? 2 : 1}
                 rowSpan={index === 0 ? 2 : 1}
-                className="border-border/50 hover:shadow-lg"
+                className="border-border/50 bg-background/80 backdrop-blur-sm hover:shadow-lg hover:border-primary/30"
               >
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 mb-4">
                   <useCase.icon className="h-6 w-6 text-primary" />
@@ -196,10 +195,10 @@ export default function UseCasesPage() {
       </section>
 
       {/* FOR FREELANCERS */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-muted/30 border-y border-border/50">
+      <section className="py-20 sm:py-24 lg:py-28 bg-linear-to-b from-muted/20 via-background to-muted/20 border-y border-border/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 lg:mb-16">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-4">
               For Freelancers
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -213,7 +212,7 @@ export default function UseCasesPage() {
                 key={index}
                 colSpan={index === 0 ? 2 : 1}
                 rowSpan={index === 0 ? 2 : 1}
-                className="border-border/50 hover:border-primary/50 hover:shadow-lg"
+                className="border-border/50 bg-background/80 backdrop-blur-sm hover:border-primary/40 hover:shadow-lg"
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-secondary/10 mb-4">
                   <useCase.icon className="h-6 w-6 text-secondary" />
@@ -231,10 +230,10 @@ export default function UseCasesPage() {
       </section>
 
       {/* INDUSTRIES WE SERVE */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-background">
+      <section className="py-20 sm:py-24 lg:py-28 bg-linear-to-b from-background via-secondary/5 to-background">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-4">
               Industries We Serve
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -265,10 +264,10 @@ export default function UseCasesPage() {
       </section>
 
       {/* WHY 49GIG USE CASES WORK */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-muted/30 border-y border-border/50">
+      <section className="py-20 sm:py-24 lg:py-28 bg-linear-to-b from-muted/20 via-background to-muted/20 border-y border-border/40">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-4">
               Why 49GIG Use Cases Work
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -297,27 +296,29 @@ export default function UseCasesPage() {
       </section>
 
       {/* FINAL CTA */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
-            Get Started
-          </h2>
-          <p className="text-lg text-primary-foreground/90 mb-8 max-w-2xl mx-auto">
-            Whether you are a business looking to hire talent or build a team, or a freelancer seeking global opportunities, 49GIG has a use case tailored for you
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <CTAButton href="/hire-talent" variant="primary" className="bg-white text-primary hover:bg-white/90 border-0 gap-2">
-              Hire Talent
-              <ChevronRight className="h-4 w-4" />
-            </CTAButton>
-            <CTAButton href="/hire-team" variant="primary" className="bg-white text-primary hover:bg-white/90 border-0 gap-2">
-              Hire a Team
-              <ChevronRight className="h-4 w-4" />
-            </CTAButton>
-            <CTAButton href="/signup/freelancer" variant="secondary" className="border-2 border-white/80 bg-transparent text-white hover:bg-white/20 hover:border-white gap-2">
-              Join as a Freelancer
-              <ChevronRight className="h-4 w-4" />
-            </CTAButton>
+      <section className="border-y border-border/40 bg-linear-to-br from-primary/10 via-background to-secondary/10 py-20 sm:py-24 lg:py-28">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-3xl border border-border/60 bg-background/90 p-8 shadow-xl sm:p-10 lg:p-12 text-center">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground">
+              Get started with the right model
+            </h2>
+            <p className="mt-4 text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto">
+              Whether you are hiring vetted experts, assembling a team, or growing as a freelancer, 49GIG gives you a structured path to results.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
+              <CTAButton href="/signup/client" variant="primary" className="gap-2">
+                Hire Talent
+                <ChevronRight className="h-4 w-4" />
+              </CTAButton>
+              <CTAButton href="/hire-team" variant="secondary" className="gap-2">
+                Hire a Team
+                <ChevronRight className="h-4 w-4" />
+              </CTAButton>
+              <CTAButton href="/signup/freelancer" variant="secondary" className="gap-2">
+                Join as a Freelancer
+                <ChevronRight className="h-4 w-4" />
+              </CTAButton>
+            </div>
           </div>
         </div>
       </section>

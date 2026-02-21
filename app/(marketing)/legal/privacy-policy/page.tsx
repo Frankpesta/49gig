@@ -1,280 +1,205 @@
 "use client";
 
 import { PageHero } from "@/components/marketing/page-hero";
-import { Shield, ChevronDown } from "lucide-react";
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Shield } from "lucide-react";
 
-interface Section {
+type PrivacySection = {
   id: string;
   title: string;
-  content: React.ReactNode;
-  expanded?: boolean;
-}
+  paragraphs?: string[];
+  bullets?: string[];
+};
+
+const sections: PrivacySection[] = [
+  {
+    id: "1",
+    title: "Information We Collect",
+    paragraphs: [
+      "We collect information necessary to operate a secure, trusted, and efficient talent platform.",
+      "When you register or use the Platform, we may collect personal and project-related information.",
+      "When you use the Platform, we may also collect technical and usage data automatically.",
+    ],
+    bullets: [
+      "Full name, email address, phone number, country of residence",
+      "Profile data (skills, experience, portfolio, work history)",
+      "Payment/payout details (processed securely by third-party providers)",
+      "Identification documents for verification and vetting",
+      "Project details, messages, and platform communications",
+      "IP address, device/browser info, logs, and cookie/tracking data",
+    ],
+  },
+  {
+    id: "2",
+    title: "How We Use Your Information",
+    bullets: [
+      "Create and manage user accounts",
+      "Match clients with vetted freelancers or teams",
+      "Process payments, escrow, and withdrawals",
+      "Conduct freelancer vetting and verification",
+      "Enable contracts, milestones, and project delivery",
+      "Provide support and dispute resolution",
+      "Improve performance and security",
+      "Prevent fraud, abuse, and unauthorized access",
+      "Comply with legal and regulatory obligations",
+      "We do not sell your personal data.",
+    ],
+  },
+  {
+    id: "3",
+    title: "Legal Basis for Processing",
+    bullets: [
+      "Your consent",
+      "Performance of a contract",
+      "Legal obligations",
+      "Legitimate business interests (security, fraud prevention, improvement)",
+    ],
+  },
+  {
+    id: "4",
+    title: "Sharing of Information",
+    paragraphs: ["We only share information when necessary and responsibly."],
+    bullets: [
+      "With other users where needed to complete projects",
+      "With trusted service providers (payments, verification, hosting, analytics, security)",
+      "When required by law, court order, or to protect legal rights and platform safety",
+    ],
+  },
+  {
+    id: "5",
+    title: "Data Retention",
+    bullets: [
+      "We retain personal information only as long as necessary to provide services, comply with legal obligations, resolve disputes, and enforce agreements.",
+      "When data is no longer required, it is securely deleted or anonymized.",
+    ],
+  },
+  {
+    id: "6",
+    title: "Data Security",
+    paragraphs: ["49GIG implements industry-standard security measures, including:"],
+    bullets: [
+      "Encrypted data storage and transmission",
+      "Secure access controls",
+      "Regular monitoring for unauthorized activity",
+      "While no system is 100% secure, we take reasonable steps to protect your information.",
+    ],
+  },
+  {
+    id: "7",
+    title: "Cookies and Tracking Technologies",
+    paragraphs: ["We use cookies to enable functionality, improve services, and remember preferences."],
+    bullets: [
+      "Essential platform functionality",
+      "Usage analysis and performance improvement",
+      "Preference storage",
+      "You can control cookies in your browser settings; some features may not work fully without cookies.",
+    ],
+  },
+  {
+    id: "8",
+    title: "Your Rights",
+    paragraphs: ["Depending on your location, you may have the right to:"],
+    bullets: [
+      "Access your personal data",
+      "Correct inaccurate information",
+      "Request deletion of your data",
+      "Object to or restrict processing",
+      "Withdraw consent at any time",
+      "Requests can be made via support@49gig.com.",
+    ],
+  },
+  {
+    id: "9",
+    title: "International Data Transfers",
+    paragraphs: [
+      "Your information may be processed and stored in countries outside your own. We apply appropriate safeguards in line with this Privacy Policy.",
+    ],
+  },
+  {
+    id: "10",
+    title: "Children's Privacy",
+    paragraphs: [
+      "49GIG is not intended for individuals under 18 years old. We do not knowingly collect data from minors.",
+    ],
+  },
+  {
+    id: "11",
+    title: "Changes to This Privacy Policy",
+    paragraphs: [
+      "We may update this Privacy Policy from time to time. Updates are posted on this page with a revised Last Updated date. Continued use of the Platform constitutes acceptance.",
+    ],
+  },
+  {
+    id: "12",
+    title: "Contact Us",
+    bullets: ["Email: support@49gig.com", "Company: 49GIG", "Address: Abuja, Nigeria", "Phone: +2349167656835"],
+  },
+];
 
 export default function PrivacyPolicyPage() {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["1"]));
-
-  const toggleSection = (id: string) => {
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedSections(newExpanded);
-  };
-
-  const sections: Section[] = [
-    {
-      id: "1",
-      title: "Introduction",
-      content: (
-        <div className="space-y-4 text-muted-foreground">
-          <p>
-            Welcome to 49GIG ("we," "our," or "us"). We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform at 49gig.com (the "Platform").
-          </p>
-          <p>
-            By using the Platform, you agree to the collection and use of information in accordance with this Privacy Policy. If you do not agree with our policies and practices, please do not use our Platform.
-          </p>
-        </div>
-      )
-    },
-    {
-      id: "2",
-      title: "Information We Collect",
-      content: (
-        <div className="space-y-6">
-          <div>
-            <h4 className="font-semibold text-foreground mb-2">Personal Information</h4>
-            <p className="text-muted-foreground mb-3">We collect personal information that you voluntarily provide to us when you:</p>
-            <ul className="space-y-2 text-muted-foreground">
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-1">•</span>
-                <span>Register for an account or create a user profile</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-1">•</span>
-                <span>Apply to become a freelancer or post a project</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-1">•</span>
-                <span>Make payments or receive payouts</span>
-              </li>
-              <li className="flex items-start gap-3">
-                <span className="text-primary mt-1">•</span>
-                <span>Contact us for support</span>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold text-foreground mb-2">Automatically Collected Information</h4>
-            <p className="text-muted-foreground">When you use our Platform, we automatically collect: IP address and location data, browser type, device information, pages visited, referral sources, and usage patterns.</p>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: "3",
-      title: "How We Use Your Information",
-      content: (
-        <div className="space-y-3 text-muted-foreground">
-          <p>We use the information we collect for various purposes:</p>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span>To create and maintain your account</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span>To verify your identity and conduct vetting processes</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span>To match clients with suitable freelancers</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span>To facilitate contracts, payments, and project management</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span>To detect, prevent, and address fraud and security issues</span>
-            </li>
-          </ul>
-        </div>
-      )
-    },
-    {
-      id: "4",
-      title: "How We Share Your Information",
-      content: (
-        <div className="space-y-6">
-          <div>
-            <h4 className="font-semibold text-foreground mb-2">With Other Users</h4>
-            <p className="text-muted-foreground">When you create a profile as a freelancer, certain information (name, skills, portfolio, ratings) will be visible to clients. Project information may be visible to freelancers.</p>
-          </div>
-          <div>
-            <h4 className="font-semibold text-foreground mb-2">With Service Providers</h4>
-            <p className="text-muted-foreground">We share information with third-party service providers who perform services on our behalf, including payment processing, verification and vetting, data analytics, and customer support.</p>
-          </div>
-          <div>
-            <h4 className="font-semibold text-foreground mb-2">For Legal Reasons</h4>
-            <p className="text-muted-foreground">We may disclose your information if required to do so by law or in response to valid requests by public authorities.</p>
-          </div>
-        </div>
-      )
-    },
-    {
-      id: "5",
-      title: "Data Security",
-      content: (
-        <div className="space-y-4 text-muted-foreground">
-          <p>
-            We implement appropriate technical and organizational security measures to protect your personal information from unauthorized access, disclosure, alteration, or destruction. However, no method of transmission over the internet is 100% secure.
-          </p>
-          <p>
-            We use industry-standard encryption protocols to secure sensitive information like payment details and personal identification data.
-          </p>
-        </div>
-      )
-    },
-    {
-      id: "6",
-      title: "Your Privacy Rights",
-      content: (
-        <div className="space-y-4 text-muted-foreground">
-          <p>Depending on your location, you may have the following rights:</p>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span><strong>Access:</strong> Request access to the personal information we hold about you</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span><strong>Correction:</strong> Request correction of inaccurate or incomplete information</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span><strong>Deletion:</strong> Request deletion of your personal information</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span><strong>Portability:</strong> Request a copy of your information in a structured format</span>
-            </li>
-          </ul>
-          <p className="pt-2">To exercise these rights, please contact us at privacy@49gig.com. We will respond within 30 days.</p>
-        </div>
-      )
-    },
-    {
-      id: "7",
-      title: "Contact Us",
-      content: (
-        <div className="space-y-4 text-muted-foreground">
-          <p>If you have questions or concerns about this Privacy Policy, please contact us:</p>
-          <ul className="space-y-2">
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span><strong>Email:</strong> privacy@49gig.com</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span><strong>Address:</strong> 49GIG, Lagos, Nigeria</span>
-            </li>
-            <li className="flex items-start gap-3">
-              <span className="text-primary mt-1">•</span>
-              <span><strong>Phone:</strong> +234 (0) 123 456 7890</span>
-            </li>
-          </ul>
-        </div>
-      )
-    }
-  ];
-
   const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Privacy", icon: Shield }];
 
   return (
     <div className="w-full">
       <PageHero
-        title="Your Privacy Matters"
-        description="We take data protection seriously. This privacy policy explains how we collect, use, and protect your information."
-        badge={{ icon: Shield, text: "Privacy Policy" }}
+        title="Privacy Policy"
+        description="How 49GIG collects, uses, stores, and protects your data."
+        badge={{ icon: Shield, text: "Legal" }}
         breadcrumbs={breadcrumbs}
         imageSrc="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=800&q=80"
-        imageAlt="Privacy and security"
+        imageAlt="Privacy and data security"
       />
 
-      <section className="py-12 sm:py-16 lg:py-20 bg-background relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          {/* Table of Contents */}
-          <div className="mb-10">
-            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4">Table of Contents</h2>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {sections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => toggleSection(section.id)}
-                  className="text-left text-sm text-primary hover:text-primary/80 transition-colors py-2 px-3 rounded-lg hover:bg-primary/10"
-                >
-                  {section.id}. {section.title}
-                </button>
-              ))}
-            </div>
+      <section className="py-14 sm:py-18 lg:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border/60 bg-background/90 p-6 sm:p-8">
+            <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">Privacy Policy</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Last Updated: 1st March, 2026</p>
+            <p className="mt-5 text-muted-foreground">
+              49GIG ("we", "our", "us") is committed to protecting your privacy and personal data. This Privacy Policy explains how we collect, use, store, share, and protect your information when you use our platform, website, and services.
+            </p>
+            <p className="mt-3 text-muted-foreground">
+              By accessing or using 49GIG, you agree to the collection and use of information in accordance with this Privacy Policy.
+            </p>
           </div>
 
-          <div className="space-y-4">
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {sections.map((section) => (
-              <div key={section.id}>
-                <button
-                  onClick={() => toggleSection(section.id)}
-                  className="w-full group"
-                >
-                  <Card className="border border-border/50 hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-start gap-4 flex-1 text-left">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors flex-shrink-0 mt-0.5">
-                            <span className="text-sm font-semibold text-primary">{section.id}</span>
-                          </div>
-                          <h3 className="text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-                            {section.title}
-                          </h3>
-                        </div>
-                        <ChevronDown
-                          className={`h-5 w-5 text-muted-foreground group-hover:text-primary transition-transform duration-300 flex-shrink-0 ${
-                            expandedSections.has(section.id) ? "rotate-180" : ""
-                          }`}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </button>
-
-                {/* Expanded Content */}
-                {expandedSections.has(section.id) && (
-                  <div className="mt-2 ml-0 pl-0 sm:pl-4 border-l border-primary/30 animate-in fade-in slide-in-from-top-2 duration-300">
-                    <Card className="border border-border/30 bg-muted/30">
-                      <CardContent className="p-6">
-                        {section.content}
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </div>
+              <a
+                key={section.id}
+                href={`#section-${section.id}`}
+                className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground transition hover:bg-primary/10"
+              >
+                {section.id}. {section.title}
+              </a>
             ))}
           </div>
 
-          {/* Last Updated */}
-          <div className="mt-12 pt-8 border-t border-border/30 text-center">
-            <p className="text-sm text-muted-foreground">
-              Last updated: January 6, 2026
-            </p>
+          <div className="mt-8 space-y-4">
+            {sections.map((section) => (
+              <Card key={section.id} id={`section-${section.id}`} className="scroll-mt-24 border-border/60">
+                <CardContent className="p-6 sm:p-7">
+                  <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
+                    {section.id}. {section.title}
+                  </h2>
+                  {section.paragraphs?.map((paragraph) => (
+                    <p key={`${section.id}-${paragraph}`} className="mt-3 text-muted-foreground leading-relaxed">
+                      {paragraph}
+                    </p>
+                  ))}
+                  {section.bullets && (
+                    <ul className="mt-4 space-y-2">
+                      {section.bullets.map((bullet) => (
+                        <li key={`${section.id}-${bullet}`} className="flex items-start gap-2 text-muted-foreground">
+                          <span className="mt-1 text-primary">•</span>
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>

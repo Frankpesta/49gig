@@ -20,6 +20,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2, HelpCircle, MessageSquare, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
 export default function SupportPage() {
   const { user, isAuthenticated } = useAuth();
@@ -37,11 +39,7 @@ export default function SupportPage() {
   const createSupportChat = useMutation((api as any)["chat/mutations"].createSupportChat);
 
   if (!isAuthenticated || !user) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <p className="text-muted-foreground">Please log in</p>
-      </div>
-    );
+    return <DashboardEmptyState icon={HelpCircle} title="Please log in" />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,12 +92,10 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">Help & Support</h1>
-        <p className="text-muted-foreground">
-          Get help from our support team or create a support request.
-        </p>
-      </div>
+      <DashboardPageHeader
+        title="Help & Support"
+        description="Get help from our support team or create a support request."
+      />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Create Support Request */}
