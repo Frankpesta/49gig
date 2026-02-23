@@ -175,7 +175,7 @@ export default function Home() {
               <CTAButton
                 href="/signup/client"
                 variant="primary"
-                className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-white px-5 text-sm text-foreground shadow-sm hover:bg-white"
+                className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-white px-5 text-sm text-primary shadow-sm hover:bg-gray-100 dark:bg-primary dark:text-primary-foreground dark:border-primary/50 dark:hover:bg-primary/90"
               >
                 Hire Talent
                 <ArrowRight className="h-4 w-4" />
