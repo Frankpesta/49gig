@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface TypingEffectProps {
@@ -51,19 +50,25 @@ export function TypingEffect({
     return () => clearTimeout(timeout);
   }, [currentText, isDeleting, isPaused, currentWordIndex, words]);
 
+  const longestWordLength = words.reduce((max, word) => Math.max(max, word.length), 0);
+
   return (
-    <div className={cn("flex items-center", className)}>
-      <span>{currentText}</span>
-      <motion.span
-        animate={{ opacity: [1, 0] }}
-        transition={{
-          duration: 0.8,
-          repeat: Infinity,
-          repeatType: "reverse",
-        }}
-        className={cn("ml-1 h-5 w-0.5 bg-current", cursorClassName)}
+    <span
+      className={cn("inline-flex items-baseline", className)}
+      style={{
+        width: `${longestWordLength + 1}ch`,
+        minWidth: `${longestWordLength + 1}ch`,
+        contain: "layout",
+        overflow: "hidden",
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+      }}
+    >
+      <span className="inline-block shrink-0 whitespace-nowrap align-baseline">{currentText}</span>
+      <span
+        className={cn("inline-block shrink-0 align-baseline h-5 w-0.5 animate-caret-blink bg-current", cursorClassName)}
       />
-    </div>
+    </span>
   );
 }
 
