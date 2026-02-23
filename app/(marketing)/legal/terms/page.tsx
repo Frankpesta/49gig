@@ -162,7 +162,7 @@ const sections: TermsSection[] = [
     id: "15",
     title: "Governing Law",
     paragraphs: [
-      "These Terms are governed by the laws of [Insert Jurisdiction / Nigeria], without regard to conflict-of-law principles.",
+      "These Terms are governed by and construed in accordance with the laws of the Federal Republic of Nigeria, without regard to its conflict-of-law principles.",
     ],
   },
   {

@@ -1,7 +1,126 @@
 "use client";
 
 import { PageHero } from "@/components/marketing/page-hero";
+import { Card, CardContent } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
+
+type ConductSection = {
+  id: string;
+  title: string;
+  paragraphs?: string[];
+  bullets?: string[];
+};
+
+const sections: ConductSection[] = [
+  {
+    id: "1",
+    title: "Introduction",
+    paragraphs: [
+      "49GIG is committed to fostering a professional, respectful, and trustworthy community. This Code of Conduct outlines the standards of behavior expected from all users—both clients and freelancers.",
+    ],
+  },
+  {
+    id: "2",
+    title: "Core Principles",
+    bullets: [
+      "Professionalism: Communicate respectfully, deliver high-quality work, meet deadlines, and respond promptly.",
+      "Honesty and Integrity: Provide truthful information, represent skills accurately, report genuine issues, and avoid deceptive practices.",
+      "Respect and Dignity: Treat all users with respect regardless of race, ethnicity, nationality, religion, gender, sexual orientation, age, or disability. Avoid harassment, discrimination, or abusive behavior.",
+    ],
+  },
+  {
+    id: "3",
+    title: "Prohibited Conduct",
+    paragraphs: ["Users must not:"],
+    bullets: [
+      "Create fake accounts or impersonate others",
+      "Submit false credentials, portfolios, or references",
+      "Engage in payment fraud or chargeback abuse",
+      "Manipulate ratings, reviews, or performance metrics",
+      "Harass, threaten, or intimidate other users",
+      "Use offensive, discriminatory, or hateful language",
+      "Submit plagiarized work or infringe on intellectual property",
+      "Circumvent the platform to avoid fees",
+      "Create multiple accounts to gain unfair advantages",
+      "Send unsolicited promotional messages or solicit off-platform transactions",
+    ],
+  },
+  {
+    id: "4",
+    title: "Client-Specific Rules",
+    bullets: [
+      "Provide clear, detailed project specifications",
+      "Set realistic deadlines and expectations",
+      "Fund milestones before work begins",
+      "Approve completed work in a timely manner",
+      "Do not request excessive revisions beyond contract scope",
+      "Provide honest, fair ratings and reviews",
+    ],
+  },
+  {
+    id: "5",
+    title: "Freelancer-Specific Rules",
+    bullets: [
+      "Accurately represent skills and experience",
+      "Only accept projects within your capabilities",
+      "Deliver original, high-quality work and meet deadlines",
+      "Communicate proactively about progress and issues",
+      "Respond to client messages within 24 hours",
+      "Complete projects or provide adequate notice if unable to continue",
+    ],
+  },
+  {
+    id: "6",
+    title: "Communication Standards",
+    bullets: [
+      "Use clear, polite, and professional language",
+      "Address conflicts calmly and professionally",
+      "Focus on facts and contract terms in disputes",
+      "Seek platform mediation if direct resolution fails",
+    ],
+  },
+  {
+    id: "7",
+    title: "Privacy and Confidentiality",
+    bullets: [
+      "Respect the confidentiality of project information",
+      "Do not share client information without permission",
+      "Protect sensitive data and intellectual property",
+      "Sign NDAs when required by clients",
+    ],
+  },
+  {
+    id: "8",
+    title: "Enforcement",
+    paragraphs: [
+      "Users who witness or experience violations should report them through the platform's reporting tools or by contacting support@49gig.com. All reports will be reviewed thoroughly.",
+      "Violations may result in warning, temporary suspension, permanent termination, withholding of payments, or legal action in severe cases.",
+    ],
+  },
+  {
+    id: "9",
+    title: "Appeals",
+    paragraphs: [
+      "Users who believe enforcement actions were taken in error may appeal by contacting legal@49gig.com within 14 days of the action. Appeals will be reviewed by a separate team.",
+    ],
+  },
+  {
+    id: "10",
+    title: "Updates to This Code",
+    paragraphs: [
+      "49GIG reserves the right to update this Code of Conduct at any time. Users will be notified of significant changes and continued use of the platform constitutes acceptance of the updated Code.",
+    ],
+  },
+  {
+    id: "11",
+    title: "Contact",
+    bullets: [
+      "Email: conduct@49gig.com",
+      "Support: support@49gig.com",
+      "Legal: legal@49gig.com",
+    ],
+  },
+];
 
 export default function CodeOfConductPage() {
   const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Code of Conduct", icon: ShieldCheck }];
@@ -10,207 +129,66 @@ export default function CodeOfConductPage() {
     <div className="w-full">
       <PageHero
         title="Code of Conduct & Platform Rules"
-        description="Standards of behavior expected from all users. Last updated: January 6, 2026."
-        badge={{ icon: ShieldCheck, text: "Code of Conduct" }}
+        description="Standards of behavior expected from all users."
+        badge={{ icon: ShieldCheck, text: "Legal" }}
         breadcrumbs={breadcrumbs}
         imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
         imageAlt="Professional conduct"
       />
 
-      <section className="py-12 sm:py-16 lg:py-20 bg-background">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="prose prose-slate dark:prose-invert prose-lg max-w-none prose-headings:font-semibold prose-p:text-muted-foreground prose-p:leading-relaxed prose-li:text-muted-foreground">
-            <h2>1. Introduction</h2>
-            <p>
-              49GIG is committed to fostering a professional, respectful, and trustworthy community. This Code of Conduct outlines the standards of behavior expected from all users—both clients and freelancers.
+      <section className="py-14 sm:py-18 lg:py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-border/60 bg-background/90 p-6 sm:p-8">
+            <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">Code of Conduct & Platform Rules</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Last Updated: 1st March, 2026</p>
+            <p className="mt-5 text-muted-foreground">
+              This Code of Conduct outlines the standards of behavior expected from all users on the 49GIG platform—both clients and freelancers.
             </p>
-
-            <h2>2. Core Principles</h2>
-            <h3>2.1 Professionalism</h3>
-            <p>All users must:</p>
-            <ul>
-              <li>Communicate respectfully and professionally</li>
-              <li>Deliver high-quality work as agreed</li>
-              <li>Meet deadlines and commitments</li>
-              <li>Respond promptly to messages and requests</li>
-            </ul>
-
-            <h3>2.2 Honesty and Integrity</h3>
-            <ul>
-              <li>Provide truthful and accurate information</li>
-              <li>Represent skills and experience honestly</li>
-              <li>Report genuine issues and concerns</li>
-              <li>Avoid deceptive or misleading practices</li>
-            </ul>
-
-            <h3>2.3 Respect and Dignity</h3>
-            <ul>
-              <li>Treat all users with respect regardless of race, ethnicity, nationality, religion, gender, sexual orientation, age, or disability</li>
-              <li>Avoid harassment, discrimination, or abusive behavior</li>
-              <li>Value diverse perspectives and backgrounds</li>
-            </ul>
-
-            <h2>3. Prohibited Conduct</h2>
-            <h3>3.1 Fraudulent Behavior</h3>
-            <p>Users must not:</p>
-            <ul>
-              <li>Create fake accounts or impersonate others</li>
-              <li>Submit false credentials, portfolios, or references</li>
-              <li>Engage in payment fraud or chargeback abuse</li>
-              <li>Manipulate ratings, reviews, or performance metrics</li>
-            </ul>
-
-            <h3>3.2 Harassment and Abuse</h3>
-            <p>Users must not:</p>
-            <ul>
-              <li>Harass, threaten, or intimidate other users</li>
-              <li>Use offensive, discriminatory, or hateful language</li>
-              <li>Engage in unwanted romantic or sexual advances</li>
-              <li>Bully or demean others</li>
-            </ul>
-
-            <h3>3.3 Intellectual Property Violations</h3>
-            <p>Users must not:</p>
-            <ul>
-              <li>Submit plagiarized work</li>
-              <li>Use copyrighted materials without permission</li>
-              <li>Infringe on trademarks or patents</li>
-              <li>Misrepresent ownership of work</li>
-            </ul>
-
-            <h3>3.4 Platform Manipulation</h3>
-            <p>Users must not:</p>
-            <ul>
-              <li>Circumvent the platform to avoid fees</li>
-              <li>Collude to manipulate matching or pricing systems</li>
-              <li>Create multiple accounts to gain unfair advantages</li>
-              <li>Use bots, scrapers, or automated tools</li>
-            </ul>
-
-            <h3>3.5 Spam and Solicitation</h3>
-            <p>Users must not:</p>
-            <ul>
-              <li>Send unsolicited promotional messages</li>
-              <li>Advertise competing services</li>
-              <li>Solicit users for off-platform transactions</li>
-              <li>Share contact information to bypass the platform</li>
-            </ul>
-
-            <h2>4. Client-Specific Rules</h2>
-            <h3>4.1 Project Requirements</h3>
-            <ul>
-              <li>Provide clear, detailed project specifications</li>
-              <li>Set realistic deadlines and expectations</li>
-              <li>Respond to freelancer questions promptly</li>
-              <li>Review deliverables within agreed timeframes</li>
-            </ul>
-
-            <h3>4.2 Payment Obligations</h3>
-            <ul>
-              <li>Fund milestones before work begins</li>
-              <li>Approve completed work in a timely manner</li>
-              <li>Provide constructive feedback on deliverables</li>
-              <li>Honor contractual payment terms</li>
-            </ul>
-
-            <h3>4.3 Fair Treatment</h3>
-            <ul>
-              <li>Do not request excessive revisions beyond contract scope</li>
-              <li>Respect freelancer expertise and professional judgment</li>
-              <li>Provide honest, fair ratings and reviews</li>
-            </ul>
-
-            <h2>5. Freelancer-Specific Rules</h2>
-            <h3>5.1 Skill Representation</h3>
-            <ul>
-              <li>Accurately represent your skills and experience</li>
-              <li>Only accept projects within your capabilities</li>
-              <li>Maintain an up-to-date, honest portfolio</li>
-            </ul>
-
-            <h3>5.2 Work Quality and Delivery</h3>
-            <ul>
-              <li>Deliver original, high-quality work</li>
-              <li>Meet agreed-upon deadlines</li>
-              <li>Communicate proactively about progress and issues</li>
-              <li>Provide deliverables as specified in contracts</li>
-            </ul>
-
-            <h3>5.3 Professional Conduct</h3>
-            <ul>
-              <li>Maintain availability as indicated in your profile</li>
-              <li>Respond to client messages within 24 hours</li>
-              <li>Report issues or concerns immediately</li>
-              <li>Complete projects or provide adequate notice if unable to continue</li>
-            </ul>
-
-            <h2>6. Communication Standards</h2>
-            <h3>6.1 Professional Communication</h3>
-            <ul>
-              <li>Use clear, polite, and professional language</li>
-              <li>Avoid excessive slang, jargon, or informal speech</li>
-              <li>Proofread messages before sending</li>
-              <li>Maintain professional boundaries</li>
-            </ul>
-
-            <h3>6.2 Dispute Communication</h3>
-            <ul>
-              <li>Address conflicts calmly and professionally</li>
-              <li>Focus on facts and contract terms</li>
-              <li>Avoid emotional or accusatory language</li>
-              <li>Seek platform mediation if direct resolution fails</li>
-            </ul>
-
-            <h2>7. Privacy and Confidentiality</h2>
-            <ul>
-              <li>Respect the confidentiality of project information</li>
-              <li>Do not share client information without permission</li>
-              <li>Protect sensitive data and intellectual property</li>
-              <li>Sign NDAs when required by clients</li>
-            </ul>
-
-            <h2>8. Enforcement</h2>
-            <h3>8.1 Reporting Violations</h3>
-            <p>
-              Users who witness or experience violations of this Code of Conduct should report them immediately through the platform's reporting tools or by contacting support@49gig.com.
+            <p className="mt-3 text-muted-foreground">
+              By using 49GIG, you agree to uphold these standards. Violations may result in warnings, account suspension, or other enforcement actions as described in this document.
             </p>
+          </div>
 
-            <h3>8.2 Investigation Process</h3>
-            <p>
-              All reports will be reviewed thoroughly. 49GIG may request additional information, review communications, and interview involved parties.
-            </p>
+          <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {sections.map((section) => (
+              <a
+                key={section.id}
+                href={`#section-${section.id}`}
+                className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-foreground transition hover:bg-primary/10"
+              >
+                {section.id}. {section.title}
+              </a>
+            ))}
+          </div>
 
-            <h3>8.3 Consequences</h3>
-            <p>Violations may result in:</p>
-            <ul>
-              <li>Warning and required corrective action</li>
-              <li>Temporary account suspension</li>
-              <li>Permanent account termination</li>
-              <li>Withholding or forfeiture of payments</li>
-              <li>Legal action in severe cases</li>
-            </ul>
-
-            <h2>9. Appeals</h2>
-            <p>
-              Users who believe enforcement actions were taken in error may appeal by contacting legal@49gig.com within 14 days of the action. Appeals will be reviewed by a separate team.
-            </p>
-
-            <h2>10. Updates to This Code</h2>
-            <p>
-              49GIG reserves the right to update this Code of Conduct at any time. Users will be notified of significant changes and continued use of the platform constitutes acceptance of the updated Code.
-            </p>
-
-            <h2>11. Contact</h2>
-            <p>For questions or to report violations:</p>
-            <ul>
-              <li><strong>Email:</strong> conduct@49gig.com</li>
-              <li><strong>Support:</strong> support@49gig.com</li>
-              <li><strong>Legal:</strong> legal@49gig.com</li>
-            </ul>
+          <div className="mt-8 space-y-4">
+            {sections.map((section) => (
+              <Card key={section.id} id={`section-${section.id}`} className="scroll-mt-24 border-border/60">
+                <CardContent className="p-6 sm:p-7">
+                  <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
+                    {section.id}. {section.title}
+                  </h2>
+                  {section.paragraphs?.map((paragraph) => (
+                    <p key={`${section.id}-${paragraph}`} className="mt-3 text-muted-foreground leading-relaxed">
+                      {paragraph}
+                    </p>
+                  ))}
+                  {section.bullets && (
+                    <ul className="mt-4 space-y-2">
+                      {section.bullets.map((bullet) => (
+                        <li key={`${section.id}-${bullet}`} className="flex items-start gap-2 text-muted-foreground">
+                          <span className="mt-1 text-primary">•</span>
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
       </section>
     </div>
   );
 }
-
