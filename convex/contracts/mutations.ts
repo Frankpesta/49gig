@@ -117,6 +117,41 @@ export const signContract = mutation({
       { projectId }
     );
 
+    // When both parties have signed and project is still "matched", transition to in_progress
+    if (project.status === "matched") {
+      const updatedProject = await ctx.db.get(projectId);
+      if (!updatedProject) return { success: true };
+
+      const clientSigned = !!updatedProject.clientContractSignedAt;
+      const freelancerIds = updatedProject.matchedFreelancerId
+        ? [updatedProject.matchedFreelancerId]
+        : updatedProject.matchedFreelancerIds ?? [];
+      const signatures = updatedProject.freelancerContractSignatures ?? [];
+      const allFreelancersSigned =
+        freelancerIds.length > 0 &&
+        freelancerIds.every((fid) =>
+          signatures.some((s) => s.freelancerId === fid)
+        );
+
+      if (clientSigned && allFreelancersSigned) {
+        await ctx.db.patch(projectId, {
+          status: "in_progress",
+          startedAt: updatedProject.startedAt ?? now,
+          updatedAt: now,
+        });
+        await ctx.db.insert("auditLogs", {
+          action: "project_status_updated",
+          actionType: "system",
+          actorId: user._id,
+          actorRole: user.role,
+          targetType: "project",
+          targetId: projectId,
+          details: { oldStatus: "matched", newStatus: "in_progress", reason: "contract_fully_signed" },
+          createdAt: now,
+        });
+      }
+    }
+
     return { success: true };
   },
 });

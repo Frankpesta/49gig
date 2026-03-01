@@ -24,6 +24,7 @@ import {
   Star,
   FileSignature,
   LucideIcon,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
@@ -33,6 +34,15 @@ import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ProjectContractView } from "@/components/contracts/project-contract-view";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const STATUS_CONFIG: Record<
   string,
@@ -71,6 +81,8 @@ export default function ProjectDetailPage() {
   const [rating, setRating] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
 
   // Validate the projectId from URL params
   const isValidId = isValidConvexId(projectIdParam);
@@ -104,6 +116,9 @@ export default function ProjectDetailPage() {
   );
   const submitFreelancerRating = useMutation(
     (api as any)["reviews/mutations"].submitFreelancerRating
+  );
+  const updateProjectStatus = useMutation(
+    (api as any)["projects/mutations"].updateProjectStatus
   );
 
   // Prefill rating form when existing review loads
@@ -252,6 +267,25 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleCompleteProject = async () => {
+    if (!projectId || !user?._id) return;
+    setShowCompleteDialog(false);
+    setIsCompleting(true);
+    try {
+      await updateProjectStatus({
+        projectId,
+        status: "completed",
+        userId: user._id,
+      });
+      toast.success("Project marked as completed");
+      router.refresh();
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Failed to complete project");
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -294,6 +328,41 @@ export default function ProjectDetailPage() {
                   {project.status === "draft" ? "Fund Project" : "Complete Payment"}
                 </Link>
               </Button>
+            )}
+            {project.status === "in_progress" && (
+              <>
+                <Button
+                  onClick={() => setShowCompleteDialog(true)}
+                  disabled={isCompleting}
+                  variant="default"
+                >
+                  {isCompleting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                  )}
+                  Complete Project
+                </Button>
+                <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Complete project?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Marking this project as completed will close it. Make sure all work is done and payments have been released. You can still rate the freelancer after completion.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isCompleting}>Cancel</AlertDialogCancel>
+                      <Button onClick={handleCompleteProject} disabled={isCompleting}>
+                        {isCompleting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : null}
+                        {isCompleting ? "Completing…" : "Complete project"}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
             {project.status === "draft" && (
               <Button variant="outline" asChild>
@@ -341,13 +410,44 @@ export default function ProjectDetailPage() {
             </Card>
           )}
 
-          {/* Monthly Billing */}
+          {/* Monthly Billing / Payments - role-specific content */}
           <Card id="monthly-billing">
               <CardHeader>
-                <CardTitle>Monthly Billing</CardTitle>
+                <CardTitle>{isClient ? "Monthly Billing" : "Monthly Payments"}</CardTitle>
                 <CardDescription>
-                  Payments are released monthly. Approve each month to credit the freelancer&apos;s wallet.
+                  {isClient
+                    ? "Payments are released monthly. Approve each month to credit the freelancer's wallet."
+                    : "You'll receive payment each month after the client approves. Funds are released to your wallet upon approval."}
                 </CardDescription>
+                {isClient && (
+                  <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
+                    <div className="font-medium text-foreground mb-2">Expected hours per engagement</div>
+                    <div className="grid gap-2 sm:grid-cols-2 text-muted-foreground">
+                      <div>
+                        <span className="font-medium text-foreground">Part-Time</span>
+                        <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+                          <li>20 hours per week</li>
+                          <li>~80 hours per month</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <span className="font-medium text-foreground">Full-Time</span>
+                        <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+                          <li>40 hours per week</li>
+                          <li>~160 hours per month</li>
+                        </ul>
+                      </div>
+                    </div>
+                    {project.intakeForm.roleType && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        This project: <span className="font-medium text-foreground">
+                          {project.intakeForm.roleType === "full_time" ? "Full-Time" : "Part-Time"}
+                        </span>
+                        {" "}({project.intakeForm.roleType === "full_time" ? "40 hrs/week, ~160 hrs/month" : "20 hrs/week, ~80 hrs/month"})
+                      </p>
+                    )}
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 {monthlyCycles && monthlyCycles.length > 0 ? (
@@ -355,12 +455,15 @@ export default function ProjectDetailPage() {
                   {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; amountCents: number; currency: string; status: string }) => {
                     const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", { month: "long", year: "numeric" });
                     const isPending = cycle.status === "pending";
+                    const statusLabel = isClient
+                      ? (cycle.status === "pending" ? "Awaiting your approval" : cycle.status === "approved" ? "Approved" : cycle.status === "disputed" ? "Disputed" : cycle.status)
+                      : (cycle.status === "pending" ? "Awaiting client approval" : cycle.status === "approved" ? "Approved, funds released" : cycle.status === "disputed" ? "Disputed" : cycle.status);
                     return (
                       <div key={cycle._id} className="flex items-center justify-between rounded-lg border p-4">
                         <div>
                           <div className="font-medium">Month {cycle.monthIndex}: {monthLabel}</div>
                           <div className="text-sm text-muted-foreground">
-                            ${(cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {cycle.status}
+                            ${(cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {statusLabel}
                           </div>
                         </div>
                         {isClient && isPending && (
@@ -389,7 +492,9 @@ export default function ProjectDetailPage() {
                 ) : (
                 <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center">
                   <Calendar className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-                  <p className="text-sm font-medium text-foreground mb-1">No billing cycles yet</p>
+                  <p className="text-sm font-medium text-foreground mb-1">
+                    {isClient ? "No billing cycles yet" : "No payment cycles yet"}
+                  </p>
                   <p className="text-sm text-muted-foreground max-w-sm mx-auto">
                     {isClient
                       ? "Monthly billing cycles are created automatically when the project is in progress. You'll approve each month to release payment to the freelancer."

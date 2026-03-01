@@ -34,8 +34,18 @@ export function DatePicker({
   className,
   id,
 }: DatePickerProps) {
+  const [open, setOpen] = React.useState(false)
+
+  const handleSelect = React.useCallback(
+    (selectedDate: Date | undefined) => {
+      onDateChange(selectedDate)
+      setOpen(false)
+    },
+    [onDateChange]
+  )
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -47,7 +57,7 @@ export function DatePicker({
           )}
           disabled={disabled}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
           {date ? format(date, "PPP") : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
@@ -55,7 +65,7 @@ export function DatePicker({
         <Calendar
           mode="single"
           selected={date}
-          onSelect={onDateChange}
+          onSelect={handleSelect}
           disabled={disabled}
           initialFocus
           fromDate={minDate}
