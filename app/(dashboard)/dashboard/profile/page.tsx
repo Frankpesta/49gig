@@ -22,6 +22,7 @@ import {
 import { PLATFORM_CATEGORIES, PROGRAMMING_LANGUAGES, getSkillsForCategory, type TechFieldValue, type ExperienceLevelValue } from "@/lib/platform-skills";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
@@ -173,7 +174,7 @@ export default function ProfilePage() {
       toast.success("Profile photo updated");
     } catch (err) {
       console.error("Failed to upload profile image:", err);
-      toast.error(err instanceof Error ? err.message : "Failed to upload photo");
+      toast.error(getUserFriendlyError(err) || "Failed to upload photo");
     } finally {
       setIsUploadingImage(false);
       e.target.value = "";

@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/ui/logo";
 import { CountrySelector } from "@/components/ui/country-selector";
@@ -93,7 +94,7 @@ export default function ClientOnboardingPage() {
       toast.success("Profile updated successfully");
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Failed to update profile");
+      setError(getUserFriendlyError(err) || "Failed to update profile");
     } finally {
       setIsLoading(false);
     }

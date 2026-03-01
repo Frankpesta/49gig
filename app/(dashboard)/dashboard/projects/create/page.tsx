@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ArrowRight, ArrowLeft } from "lucide-react";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAuth } from "@/hooks/use-auth";
 import { DatePicker } from "@/components/ui/date-picker";
 import {
@@ -345,7 +346,7 @@ export default function CreateProjectPage() {
       toast.success("Project created! Select your freelancer to continue.");
       router.push(`/dashboard/projects/${projectId}/matches`);
     } catch (err: any) {
-      setError(err.message || "Failed to create project");
+      setError(getUserFriendlyError(err) || "Failed to create project");
     } finally {
       setIsSubmitting(false);
     }

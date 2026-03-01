@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 
 const authCardClass =
@@ -41,7 +42,7 @@ export default function ForgotPasswordPage() {
         setSuccess(true);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to request password reset");
+      setError(getUserFriendlyError(err) || "Failed to request password reset");
     } finally {
       setIsLoading(false);
     }

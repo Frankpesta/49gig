@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, AlertCircle } from "lucide-react";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -82,7 +83,7 @@ export default function ResolveDisputePage() {
 
       router.push(`/dashboard/disputes/${disputeId}`);
     } catch (err: any) {
-      setError(err.message || "Failed to resolve dispute");
+      setError(getUserFriendlyError(err) || "Failed to resolve dispute");
     } finally {
       setIsSubmitting(false);
     }

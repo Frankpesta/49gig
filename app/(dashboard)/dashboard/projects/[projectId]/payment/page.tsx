@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -104,7 +105,7 @@ export default function PaymentPage() {
         setPaymentLink(result.paymentLink);
         setTxRef(result.txRef);
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to initialize payment";
+        const errorMessage = getUserFriendlyError(err) || "Failed to initialize payment";
         setError(errorMessage);
       } finally {
         setIsLoading(false);

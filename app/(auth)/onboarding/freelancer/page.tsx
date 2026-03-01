@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/ui/logo";
 import { toast } from "sonner";
@@ -164,7 +165,7 @@ export default function FreelancerOnboardingPage() {
       toast.success("Profile updated successfully");
       router.push("/resume-upload");
     } catch (err: any) {
-      setError(err.message || "Failed to update profile");
+      setError(getUserFriendlyError(err) || "Failed to update profile");
     } finally {
       setIsLoading(false);
     }

@@ -11,6 +11,7 @@ import { Loader2, DollarSign, Save, RotateCcw } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
@@ -107,7 +108,7 @@ export default function PricingPage() {
       setTouched(false);
       toast.success("Base rates saved. Project budgets will use these rates per tech stack.");
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to save";
+      const msg = getUserFriendlyError(e) || "Failed to save";
       toast.error(msg);
     } finally {
       setSaving(false);

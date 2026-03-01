@@ -35,6 +35,7 @@ import { ArrowLeft, Video, ChevronDown, Loader2, ShieldCheck, User } from "lucid
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PLATFORM_CATEGORIES } from "@/lib/platform-skills";
 
@@ -516,7 +517,7 @@ export default function ProjectMatchesPage() {
       }
       router.push(`/dashboard/projects/${projectId}/contract`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to save selection");
+      toast.error(getUserFriendlyError(e) || "Failed to save selection");
     }
   }, [
     projectId,
@@ -582,7 +583,7 @@ export default function ProjectMatchesPage() {
       }
       router.push(`/dashboard/projects/${projectId}/contract`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to schedule");
+      toast.error(getUserFriendlyError(e) || "Failed to schedule");
     } finally {
       setScheduling(false);
     }

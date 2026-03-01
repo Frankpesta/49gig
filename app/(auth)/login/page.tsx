@@ -10,6 +10,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSessionRotation } from "@/hooks/use-session";
 import { useOAuth } from "@/hooks/use-oauth";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { loginFeatures } from "@/components/auth/auth-icons";
 import { Eye, EyeOff } from "lucide-react";
@@ -90,8 +91,7 @@ export default function LoginPage() {
         }
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to sign in";
-      setError(errorMessage);
+      setError(getUserFriendlyError(err) || "Failed to sign in");
     } finally {
       setIsLoading(false);
     }

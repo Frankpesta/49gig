@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Doc } from "@/convex/_generated/dataModel";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -113,7 +114,7 @@ export default function UsersPage() {
       toast.success("User role updated successfully");
     } catch (error) {
       console.error("Failed to update role:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to update user role";
+      const errorMessage = getUserFriendlyError(error) || "Failed to update user role";
       setErrorDialog({
         open: true,
         title: "Update Failed",
@@ -138,7 +139,7 @@ export default function UsersPage() {
       toast.success("User status updated successfully");
     } catch (error) {
       console.error("Failed to update status:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to update user status";
+      const errorMessage = getUserFriendlyError(error) || "Failed to update user status";
       setErrorDialog({
         open: true,
         title: "Update Failed",

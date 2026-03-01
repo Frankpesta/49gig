@@ -12,6 +12,7 @@ import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-stat
 import { useAuth } from "@/hooks/use-auth";
 import { CalendarCheck, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function MonthlyApprovalsPage() {
@@ -27,7 +28,7 @@ export default function MonthlyApprovalsPage() {
       await approveCycle({ monthlyCycleId: cycleId });
       toast.success("Month approved. Funds have been released to the freelancer's wallet.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Approval failed");
+      toast.error(getUserFriendlyError(err) || "Approval failed");
     } finally {
       setApprovingId(null);
     }

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FileSignature } from "lucide-react";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 interface ProjectContractViewProps {
   projectId: string;
@@ -52,7 +53,7 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
         router.push(`/dashboard/projects/${projectId}/payment`);
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to sign contract");
+      toast.error(getUserFriendlyError(e) || "Failed to sign contract");
     }
   };
 

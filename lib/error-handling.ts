@@ -56,12 +56,43 @@ export async function retryWithBackoff<T>(
 }
 
 /**
+ * Strip Convex metadata from error messages (e.g. [CONVEX M(...)], [Request ID: ...],
+ * "Server Error Uncaught Error:", "Called by client") to show only the actual error.
+ */
+function stripConvexMetadata(rawMessage: string): string {
+  let message = rawMessage.trim();
+
+  // Remove [CONVEX M(...)] or [CONVEX ...] prefixes
+  message = message.replace(/\[CONVEX[^\]]*\]\s*/g, "");
+
+  // Remove [Request ID: ...]
+  message = message.replace(/\[Request ID: [^\]]*\]\s*/g, "");
+
+  // Extract the actual error message after "Error: " (before optional "Called by client")
+  const errorMatch = message.match(/Error:\s*([\s\S]+?)(?:\s+Called by client)?\s*$/i);
+  if (errorMatch) {
+    return errorMatch[1].trim();
+  }
+
+  // Fallback: remove common Convex prefixes/suffixes
+  message = message.replace(/^Server Error Uncaught Error:\s*/i, "");
+  message = message.replace(/\s*Called by client\s*$/i, "");
+
+  return message.trim();
+}
+
+/**
  * Get user-friendly error message from various error types
  */
 export function getUserFriendlyError(error: unknown): string {
   if (error instanceof Error) {
     // Start from the raw message
     let rawMessage = error.message || "";
+
+    // Strip Convex metadata first (e.g. [CONVEX M(...)], [Request ID: ...], etc.)
+    if (/\[CONVEX|Request ID:|Server Error Uncaught Error|Called by client/i.test(rawMessage)) {
+      rawMessage = stripConvexMetadata(rawMessage);
+    }
 
     // Strip Convex-specific prefixes / jargon while keeping the human-readable part
     if (/convexerror:/i.test(rawMessage)) {
@@ -123,6 +154,11 @@ export function getUserFriendlyError(error: unknown): string {
     // Validation errors
     if (message.includes("required") || message.includes("missing")) {
       return "Please fill in all required fields.";
+    }
+
+    // Preserve specific auth messages (e.g. "Invalid email or password")
+    if (message.includes("invalid email") || message.includes("invalid password")) {
+      return rawMessage;
     }
 
     if (message.includes("invalid")) {

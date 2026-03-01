@@ -22,6 +22,7 @@ import {
   SKILLS_FOR_MCQ_CODING,
   getSkillsForCategory,
 } from "@/lib/platform-skills";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { Eye, EyeOff } from "lucide-react";
 
 const EXPERIENCE_LEVELS = [
@@ -148,7 +149,7 @@ export default function FreelancerSignupPage() {
         }
       }
     } catch (err: any) {
-      setError(err.message || "Failed to create account");
+      setError(getUserFriendlyError(err) || "Failed to create account");
     } finally {
       setIsLoading(false);
     }

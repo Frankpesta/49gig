@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useSessionRotation } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import {
@@ -95,7 +96,7 @@ function OAuthCallbackContent() {
           }
         }
       } catch (err: any) {
-        setError(err.message || "Failed to complete OAuth login");
+        setError(getUserFriendlyError(err) || "Failed to complete OAuth login");
         setIsLoading(false);
       }
     };

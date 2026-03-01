@@ -29,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import {
   Loader2,
   ArrowLeft,
@@ -172,7 +173,7 @@ export default function MilestoneDetailPage() {
       toast.success("Milestone submitted successfully");
     } catch (error) {
       console.error("Failed to submit milestone:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to submit milestone";
+      const errorMessage = getUserFriendlyError(error) || "Failed to submit milestone";
       setErrorDialog({
         open: true,
         title: "Submission Failed",
@@ -196,7 +197,7 @@ export default function MilestoneDetailPage() {
       toast.success("Milestone approved successfully");
     } catch (error) {
       console.error("Failed to approve milestone:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to approve milestone";
+      const errorMessage = getUserFriendlyError(error) || "Failed to approve milestone";
       setErrorDialog({
         open: true,
         title: "Approval Failed",
@@ -221,7 +222,7 @@ export default function MilestoneDetailPage() {
       toast.success("Milestone rejected");
     } catch (error) {
       console.error("Failed to reject milestone:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to reject milestone";
+      const errorMessage = getUserFriendlyError(error) || "Failed to reject milestone";
       setErrorDialog({
         open: true,
         title: "Rejection Failed",
@@ -244,7 +245,7 @@ export default function MilestoneDetailPage() {
       toast.success("Milestone started successfully");
     } catch (error) {
       console.error("Failed to start milestone:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to start milestone";
+      const errorMessage = getUserFriendlyError(error) || "Failed to start milestone";
       setErrorDialog({
         open: true,
         title: "Start Failed",
@@ -266,7 +267,7 @@ export default function MilestoneDetailPage() {
       toast.success("Payment released to freelancer");
     } catch (error) {
       console.error("Failed to release payment:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to release payment";
+      const errorMessage = getUserFriendlyError(error) || "Failed to release payment";
       setErrorDialog({
         open: true,
         title: "Release Failed",

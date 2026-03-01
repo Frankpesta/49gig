@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { AuthBranding, AuthMobileLogo } from "@/components/auth/auth-branding";
 
 function ResetPasswordContent() {
@@ -77,7 +78,7 @@ function ResetPasswordContent() {
         }, 2000);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to reset password");
+      setError(getUserFriendlyError(err) || "Failed to reset password");
     } finally {
       setIsLoading(false);
     }
