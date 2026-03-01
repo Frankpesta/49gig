@@ -67,7 +67,6 @@ export default function ProjectDetailPage() {
   const { user } = useAuth();
   const projectIdParam = params.projectId;
   const [isOpeningChat, setIsOpeningChat] = useState(false);
-  const [isCreatingMilestones, setIsCreatingMilestones] = useState(false);
   const [rating, setRating] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
@@ -82,9 +81,6 @@ export default function ProjectDetailPage() {
   );
 
   const createProjectChat = useMutation(api.chat.mutations.createProjectChat);
-  const autoCreateMilestones = useMutation(
-    (api as any)["projects/mutations"].autoCreateMilestones
-  );
   const approveMonthlyCycle = useMutation(
     api.monthlyBillingCycles.mutations.approveMonthlyCycle
   );
@@ -93,12 +89,6 @@ export default function ProjectDetailPage() {
   const project = useQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)["projects/queries"].getProject,
-    user?._id && projectId ? { projectId, userId: user._id } : "skip"
-  );
-
-  const milestones = useQuery(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)["projects/queries"].getProjectMilestones,
     user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
 
@@ -350,9 +340,8 @@ export default function ProjectDetailPage() {
             </Card>
           )}
 
-          {/* Monthly Billing – for projects with monthly cycles */}
-          {monthlyCycles && monthlyCycles.length > 0 && (
-            <Card id="monthly-billing">
+          {/* Monthly Billing */}
+          <Card id="monthly-billing">
               <CardHeader>
                 <CardTitle>Monthly Billing</CardTitle>
                 <CardDescription>
@@ -360,6 +349,7 @@ export default function ProjectDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {monthlyCycles && monthlyCycles.length > 0 ? (
                 <div className="space-y-4">
                   {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; amountCents: number; currency: string; status: string }) => {
                     const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", { month: "long", year: "numeric" });
@@ -395,115 +385,24 @@ export default function ProjectDetailPage() {
                     );
                   })}
                 </div>
-                {isClient && (
+                ) : (
+                <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center">
+                  <Calendar className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+                  <p className="text-sm font-medium text-foreground mb-1">No billing cycles yet</p>
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                    {isClient
+                      ? "Monthly billing cycles are created automatically when the project is in progress. You'll approve each month to release payment to the freelancer."
+                      : "Monthly billing cycles will appear here once the project is in progress. You'll get paid each month after the client approves."}
+                  </p>
+                </div>
+                )}
+                {isClient && monthlyCycles && monthlyCycles.length > 0 && (
                   <Button variant="outline" size="sm" className="mt-4" asChild>
                     <Link href="/dashboard/monthly-approvals">View all pending approvals</Link>
                   </Button>
                 )}
               </CardContent>
             </Card>
-          )}
-
-          {/* Milestones – for legacy projects or when no monthly cycles */}
-          {(!monthlyCycles || monthlyCycles.length === 0) && (
-          <Card id="milestones">
-            <CardHeader>
-              <CardTitle>Milestones</CardTitle>
-              <CardDescription>
-                {milestones && milestones.length > 0
-                  ? `${milestones.length} milestone${milestones.length !== 1 ? "s" : ""} – submit work, review, and release payment`
-                  : isClient
-                    ? "Milestones are created automatically after you fund the project."
-                    : "Milestones will appear here once the project is funded."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {milestones && milestones.length > 0 ? (
-                <div className="space-y-4">
-                  {milestones.map((milestone: { _id: Id<"milestones">; title: string; description: string; status: string; amount: number; dueDate: number }, index: number) => (
-                    <div
-                      key={milestone._id}
-                      className="rounded-lg border p-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-1 flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <Link
-                              href={`/dashboard/projects/${projectId}/milestones/${milestone._id}`}
-                              className="font-semibold hover:text-primary hover:underline"
-                            >
-                              Milestone {index + 1}: {milestone.title}
-                            </Link>
-                            <Badge variant="outline">
-                              {milestone.status.replace("_", " ")}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {milestone.description}
-                          </p>
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <DollarSign className="h-3 w-3" />
-                              ${milestone.amount.toLocaleString()}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              Due: {new Date(milestone.dueDate).toLocaleDateString()}
-                            </div>
-                          </div>
-                        </div>
-                        <Link href={`/dashboard/projects/${projectId}/milestones/${milestone._id}`} className="shrink-0">
-                          <Button variant="default" size="sm">
-                            {user?.role === "freelancer" && (milestone.status === "pending" || milestone.status === "in_progress" || milestone.status === "rejected")
-                              ? "Open & submit"
-                              : (user?.role === "client" && milestone.status === "submitted")
-                                ? "Review & approve"
-                                : "View details"}
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-dashed bg-muted/30 p-8 text-center">
-                  <FolderKanban className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
-                  <p className="text-sm font-medium text-foreground mb-1">No milestones yet</p>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-4">
-                    {isClient
-                      ? "Fund the project to create milestones automatically. You can then review and approve each milestone from this page."
-                      : "Once the client funds the project, milestones will show here. You’ll start work, submit deliverables, and get paid per milestone."}
-                  </p>
-                  {isClient &&
-                    projectId &&
-                    user?._id &&
-                    (project.status === "funded" || project.status === "matched" || project.status === "in_progress") && (
-                      <Button
-                        onClick={async () => {
-                          setIsCreatingMilestones(true);
-                          try {
-                            await autoCreateMilestones({
-                              projectId: projectId as Id<"projects">,
-                              userId: user._id,
-                            });
-                            toast.success("Milestones created");
-                            router.refresh();
-                          } catch (e) {
-                            toast.error(e instanceof Error ? e.message : "Failed to create milestones");
-                          } finally {
-                            setIsCreatingMilestones(false);
-                          }
-                        }}
-                        disabled={isCreatingMilestones}
-                      >
-                        {isCreatingMilestones ? "Creating…" : "Create milestones now"}
-                      </Button>
-                    )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          )}
 
           {/* Additional Requirements */}
           {project.intakeForm.additionalRequirements && (

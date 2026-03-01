@@ -46,8 +46,14 @@ function formatCurrency(amount: number, currency: string) {
   return `${currency.toUpperCase()} ${amount.toFixed(2)}`;
 }
 
+/** WinAnsi encoding cannot handle newlines; sanitize before drawing. */
+function sanitizeForPdf(text: string): string {
+  return String(text ?? "").replace(/[\r\n]+/g, " ").trim() || " ";
+}
+
 function wrapText(text: string, maxWidth: number, font: any, size: number) {
-  const words = text.split(" ");
+  const safe = sanitizeForPdf(text);
+  const words = safe.split(" ");
   const lines: string[] = [];
   let currentLine = "";
   for (const word of words) {
@@ -99,10 +105,7 @@ async function generateContractPdf({
   };
 
   const drawParagraph = (text: string) => {
-    // pdf-lib's WinAnsi encoding cannot handle raw newline characters (0x0a),
-    // so we normalize any embedded newlines to spaces before wrapping.
-    const safeText = text.replace(/\n/g, " ");
-    const lines = wrapText(safeText, pageWidth - margin * 2, regular, bodySize);
+    const lines = wrapText(text, pageWidth - margin * 2, regular, bodySize);
     for (const line of lines) {
       if (y < margin) {
         page = pdfDoc.addPage([pageWidth, pageHeight]);
@@ -200,7 +203,7 @@ async function generateContractPdf({
     color: rgb(0.1, 0.1, 0.1),
   });
   y -= lineHeight;
-  page.drawText(`${client.name || "Client"} (auto-signed)`, {
+  page.drawText(sanitizeForPdf(`${client.name || "Client"} (auto-signed)`), {
     x: margin,
     y,
     size: bodySize,
@@ -217,7 +220,7 @@ async function generateContractPdf({
     color: rgb(0.1, 0.1, 0.1),
   });
   y -= lineHeight;
-  page.drawText(`${freelancer.name || "Freelancer"} (auto-signed)`, {
+  page.drawText(sanitizeForPdf(`${freelancer.name || "Freelancer"} (auto-signed)`), {
     x: margin,
     y,
     size: bodySize,
@@ -260,7 +263,7 @@ async function generateContractPdf({
   const summaryText = `Project: ${project.intakeForm.title}\nClient: ${client.name || "Client"}\nContractor: ${freelancer.name || "Freelancer"}\nTotal: ${formatCurrency(project.totalAmount, project.currency)}\nCreated on: ${formatDate()}`;
   let sy = pageHeight - margin - lineHeight * 2;
   for (const line of summaryText.split("\n")) {
-    appendixB.drawText(line, {
+    appendixB.drawText(sanitizeForPdf(line), {
       x: margin,
       y: sy,
       size: bodySize,
@@ -377,7 +380,7 @@ async function generateFullContractPdf({
   page.drawText("Client:", { x: margin, y, size: bodySize, font: bold, color: rgb(0.1, 0.1, 0.1) });
   y -= lineHeight;
   if (clientSignedAt) {
-    page.drawText(client.name || "Client", {
+    page.drawText(sanitizeForPdf(client.name || "Client"), {
       x: margin,
       y,
       size: 12,
@@ -400,7 +403,7 @@ async function generateFullContractPdf({
   for (const f of freelancers) {
     ensureSpace(lineHeight * 3);
     const sig = freelancerSignatures?.find((s) => s.freelancerId === f._id);
-    page.drawText(`Freelancer: ${f.name || "Freelancer"}`, {
+    page.drawText(sanitizeForPdf(`Freelancer: ${f.name || "Freelancer"}`), {
       x: margin,
       y,
       size: bodySize,
@@ -409,7 +412,7 @@ async function generateFullContractPdf({
     });
     y -= lineHeight;
     if (sig) {
-      page.drawText(f.name || "Freelancer", {
+      page.drawText(sanitizeForPdf(f.name || "Freelancer"), {
         x: margin,
         y,
         size: 12,
