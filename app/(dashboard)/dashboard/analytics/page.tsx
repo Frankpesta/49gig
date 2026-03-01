@@ -30,13 +30,14 @@ export default function AnalyticsPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={TrendingUp} title="Please log in" />;
+    return <DashboardEmptyState icon={TrendingUp} title="Please log in" iconTone="muted" />;
   }
 
   if (user.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={Shield}
+        iconTone="muted"
         title="Access denied"
         description="Admin role required."
       />
@@ -44,18 +45,19 @@ export default function AnalyticsPage() {
   }
 
   if (analytics === undefined) {
-    return <DashboardLoadingState label="Loading analytics..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   if (!analytics) {
-    return <DashboardEmptyState icon={AlertCircle} title="Unable to load analytics" />;
+    return <DashboardEmptyState icon={AlertCircle} title="Unable to load analytics" iconTone="danger" />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Analytics"
         description="Platform statistics and performance insights."
+        icon={TrendingUp}
       />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -350,7 +352,7 @@ export default function AnalyticsPage() {
           <Card className="flex h-[220px] items-center justify-center">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Loading charts...
+              Loading
             </div>
           </Card>
         )}

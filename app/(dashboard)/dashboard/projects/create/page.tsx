@@ -39,6 +39,7 @@ import {
 } from "@/lib/payment-calculator";
 import { PaymentBreakdownDisplay } from "@/components/payments/payment-breakdown";
 import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
+import { toast } from "sonner";
 
 const PROJECT_DURATIONS = [
   { value: "3", label: "3 months" },
@@ -341,7 +342,7 @@ export default function CreateProjectPage() {
         ...(user?._id ? { userId: user._id } : {}),
       });
 
-      // Redirect to matches page so client can select freelancer(s), then payment
+      toast.success("Project created! Select your freelancer to continue.");
       router.push(`/dashboard/projects/${projectId}/matches`);
     } catch (err: any) {
       setError(err.message || "Failed to create project");

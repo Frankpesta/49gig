@@ -15,10 +15,13 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import Link from "next/link";
+
+const BELL_LIMIT = 10;
 
 export function NotificationBell() {
   const { user } = useAuth();
@@ -28,14 +31,13 @@ export function NotificationBell() {
     api.notifications.queries.getMyNotifications,
     inAppEnabled && user?._id
       ? {
-          limit: 20,
+          limit: BELL_LIMIT,
           refreshKey,
           userId: user._id,
         }
       : "skip"
   );
-  const deleteNotification = useMutation(api.notifications.mutations.deleteNotification);
-  const deleteAllNotifications = useMutation(api.notifications.mutations.deleteAllNotifications);
+  const markAllRead = useMutation(api.notifications.mutations.markAllRead);
 
   usePusherNotifications({
     onNotification: (payload) => {
@@ -55,15 +57,16 @@ export function NotificationBell() {
   }, [notifications, inAppEnabled]);
 
   const handleMarkAllRead = async () => {
-    await deleteAllNotifications(user?._id ? { userId: user._id } : {});
+    try {
+      await markAllRead(user?._id ? { userId: user._id } : {});
+      setRefreshKey((prev) => prev + 1);
+    } catch {
+      toast.error("Failed to mark all as read");
+    }
   };
 
-  const handleDeleteNotification = async (notificationId: Doc<"notifications">["_id"]) => {
-    await deleteNotification({
-      notificationId,
-      ...(user?._id ? { userId: user._id } : {}),
-    });
-  };
+  const displayedNotifications = (notifications || []).slice(0, BELL_LIMIT);
+  const hasMore = (notifications || []).length >= BELL_LIMIT;
 
   return (
     <DropdownMenu>
@@ -87,15 +90,17 @@ export function NotificationBell() {
           <DropdownMenuLabel className="p-0 text-xs font-semibold sm:text-sm">
             Notifications
           </DropdownMenuLabel>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleMarkAllRead}
-            className="h-6 shrink-0 px-2 text-[10px] sm:h-7 sm:text-xs"
-          >
-            <CheckCheck className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            Mark all read
-          </Button>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleMarkAllRead}
+              className="h-6 shrink-0 px-2 text-[10px] sm:h-7 sm:text-xs"
+            >
+              <CheckCheck className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              Mark all read
+            </Button>
+          )}
         </div>
         <DropdownMenuSeparator />
         <div className="scrollbar-hide max-h-[min(360px,60vh)] overflow-y-auto overscroll-contain">
@@ -103,20 +108,20 @@ export function NotificationBell() {
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               In-app notifications are disabled.
             </div>
-          ) : (notifications || []).length === 0 ? (
+          ) : displayedNotifications.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
               You’re all caught up.
             </div>
           ) : (
-            (notifications || []).map((notification: Doc<"notifications">) => (
-              <DropdownMenuItem
-                key={notification._id}
-                className={cn(
-                  "flex cursor-pointer items-start gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3",
-                  !notification.readAt && "bg-muted/40"
-                )}
-                onClick={() => handleDeleteNotification(notification._id)}
-              >
+            displayedNotifications.map((notification: Doc<"notifications">) => (
+              <DropdownMenuItem key={notification._id} asChild>
+                <Link
+                  href={`/dashboard/notification-history/${notification._id}`}
+                  className={cn(
+                    "flex cursor-pointer items-start gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3",
+                    !notification.readAt && "bg-muted/40"
+                  )}
+                >
                 <div className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary opacity-80 sm:h-2 sm:w-2" />
                 <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
                   <div className="truncate text-xs font-medium sm:text-sm">{notification.title}</div>
@@ -129,10 +134,24 @@ export function NotificationBell() {
                     })}
                   </div>
                 </div>
+                </Link>
               </DropdownMenuItem>
             ))
           )}
         </div>
+        {inAppEnabled && (displayedNotifications.length > 0 || hasMore) && (
+          <>
+            <DropdownMenuSeparator />
+            <div className="px-3 py-2 sm:px-4">
+              <Button variant="ghost" size="sm" className="w-full justify-between" asChild>
+                <Link href="/dashboard/notification-history">
+                  See more notifications
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

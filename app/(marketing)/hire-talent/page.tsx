@@ -96,7 +96,7 @@ export default function HireTalentPage() {
     {
       step: 4,
       title: "Work & Pay Securely",
-      description: "Track progress, approve milestones, and pay securely. Full transparency throughout.",
+      description: "Track progress, approve deliverables, and pay securely. Full transparency throughout.",
       icon: Shield,
       color: "from-orange-500 to-orange-600"
     }

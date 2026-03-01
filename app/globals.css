@@ -9,9 +9,9 @@
    ============================================ */
 
 @theme inline {
-  /* Fonts */
-  --font-sans: var(--font-inter);
-  --font-heading: var(--font-inter);
+  /* Fonts - Plus Jakarta Sans for lively, vibrant dashboard (reference) */
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
 
   /* Border radius */
   --radius: 0.5rem;
@@ -46,46 +46,47 @@
 }
 
 /* ============================================
-   LIGHT THEME (49GIG Branding)
+   LIGHT THEME (49GIG Branding) - Lively & Vibrant
    Primary: #07122B (Navy)
    Secondary: #FEC110 (Yellow)
    ============================================ */
 :root {
-  --background: oklch(100% 0 0);
-  --foreground: oklch(15% 0 0);
+  /* Warmer, livelier background - soft warm grey (reference: light grey) */
+  --background: oklch(98.5% 0.004 85);
+  --foreground: oklch(18% 0.02 260);
   --card: oklch(100% 0 0);
-  --card-foreground: oklch(15% 0 0);
+  --card-foreground: oklch(18% 0.02 260);
   --popover: oklch(100% 0 0);
-  --popover-foreground: oklch(15% 0 0);
-  --primary: #07122B; /* Footer navy */
+  --popover-foreground: oklch(18% 0.02 260);
+  --primary: #07122B; /* Navy */
   --primary-foreground: oklch(100% 0 0);
-  --secondary: oklch(82% 0.16 90); /* #FEC110 - Yellow */
-  --secondary-foreground: oklch(20% 0 0);
-  --muted: oklch(97% 0 0);
-  --muted-foreground: oklch(55% 0 0);
-  --accent: oklch(97% 0 0);
-  --accent-foreground: oklch(20% 0 0);
+  --secondary: oklch(82% 0.16 90); /* #FEC110 - Vibrant yellow */
+  --secondary-foreground: oklch(22% 0.04 85);
+  --muted: oklch(96% 0.006 85);
+  --muted-foreground: oklch(50% 0.02 260);
+  --accent: oklch(96% 0.01 85);
+  --accent-foreground: oklch(22% 0.04 85);
   --destructive: oklch(55% 0.22 25);
   --destructive-foreground: oklch(100% 0 0);
-  --border: oklch(92% 0 0);
-  --input: oklch(92% 0 0);
-  --ring: #07122B; /* Primary color for focus rings */
+  --border: oklch(90% 0.01 85);
+  --input: oklch(94% 0.008 85);
+  --ring: #07122B;
 
-  /* Charts - Complementary to brand colors */
-  --chart-1: #07122B; /* Primary variant */
-  --chart-2: oklch(78% 0.14 90); /* Secondary variant */
-  --chart-3: oklch(60% 0.08 180); /* Teal complement */
-  --chart-4: oklch(65% 0.12 340); /* Pink accent */
-  --chart-5: oklch(55% 0.1 120); /* Green accent */
+  /* Charts - Vibrant complements */
+  --chart-1: #07122B;
+  --chart-2: oklch(78% 0.14 90); /* Yellow */
+  --chart-3: oklch(60% 0.08 180); /* Teal */
+  --chart-4: oklch(65% 0.12 340); /* Pink */
+  --chart-5: oklch(55% 0.1 120); /* Green */
 
-  /* Sidebar */
-  --sidebar: oklch(98% 0 0);
-  --sidebar-foreground: oklch(15% 0 0);
-  --sidebar-primary: #07122B; /* Primary color */
+  /* Sidebar - Light grey with warmth (reference) */
+  --sidebar: oklch(96% 0.008 85);
+  --sidebar-foreground: oklch(18% 0.02 260);
+  --sidebar-primary: #07122B;
   --sidebar-primary-foreground: oklch(100% 0 0);
-  --sidebar-accent: oklch(96% 0 0);
-  --sidebar-accent-foreground: oklch(20% 0 0);
-  --sidebar-border: oklch(92% 0 0);
+  --sidebar-accent: oklch(93% 0.012 85);
+  --sidebar-accent-foreground: oklch(22% 0.04 85);
+  --sidebar-border: oklch(88% 0.01 85);
   --sidebar-ring: oklch(70% 0 0);
 }
 
@@ -383,24 +384,31 @@
   }
 }
 
-/* Dashboard: reduced heading sizes (override page-level classes) */
+/* Dashboard: sidebar rounded corners (reference - lively) */
+[data-sidebar="sidebar"] {
+  border-radius: 0 1rem 1rem 0;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.03);
+}
+
+/* Dashboard: typography - lively, vibrant (Plus Jakarta Sans) */
 .dashboard-content h1 {
-  font-size: 1.25rem !important;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 1.375rem !important;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 @media (min-width: 640px) {
   .dashboard-content h1 {
-    font-size: 1.625rem !important;
+    font-size: 1.75rem !important;
   }
 }
 .dashboard-content h2 {
   font-size: 1.125rem !important;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 @media (min-width: 640px) {
   .dashboard-content h2 {
-    font-size: 1.25rem !important;
+    font-size: 1.375rem !important;
   }
 }
 .dashboard-content h3 {
@@ -422,22 +430,22 @@
   display: none;
 }
 
-/* Dashboard: unify card/table surfaces across all pages */
+/* Dashboard: unify card/table surfaces - lively, vibrant (reference) */
 .dashboard-content [data-slot="card"] {
-  border-color: color-mix(in oklab, var(--border) 70%, var(--primary) 30%);
+  border-color: color-mix(in oklab, var(--border) 65%, var(--primary) 35%);
   background:
     linear-gradient(
       135deg,
       color-mix(in oklab, var(--card) 96%, var(--primary) 4%),
-      color-mix(in oklab, var(--card) 98%, var(--secondary) 2%)
+      color-mix(in oklab, var(--card) 97%, var(--secondary) 3%)
     );
-  box-shadow: 0 8px 28px rgb(0 0 0 / 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
   transition: box-shadow 220ms ease, transform 220ms ease, border-color 220ms ease;
 }
 .dashboard-content [data-slot="card"]:hover {
-  border-color: color-mix(in oklab, var(--border) 55%, var(--primary) 45%);
-  box-shadow: 0 16px 34px rgb(0 0 0 / 0.1);
-  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--border) 50%, var(--primary) 50%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 16px 40px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 .dashboard-content [data-slot="table-container"] {
   border-radius: 0.75rem;
@@ -447,6 +455,7 @@
 .dashboard-content [data-slot="input"],
 .dashboard-content [data-slot="textarea"],
 .dashboard-content [data-slot="select-trigger"] {
+  border-radius: 0.5rem;
   border-color: color-mix(in oklab, var(--border) 70%, var(--primary) 30%);
   background: color-mix(in oklab, var(--card) 94%, var(--primary) 6%);
 }

@@ -23,7 +23,7 @@ export const loginFeatures: AuthFeature[] = [
   {
     icon: <Shield className={iconClass} />,
     title: "Secure Payments",
-    description: "Escrowed payments with milestone-based releases.",
+    description: "Escrowed payments with phased releases.",
   },
   {
     icon: <Zap className={iconClass} />,

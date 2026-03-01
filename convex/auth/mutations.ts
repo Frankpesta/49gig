@@ -412,7 +412,7 @@ export const signin = mutation({
     // Clear rate limit on successful login
     clearRateLimit(rateLimitKey);
 
-    return {
+    const result: Record<string, unknown> = {
       success: true,
       userId: user._id,
       sessionToken: session.sessionToken,
@@ -420,6 +420,18 @@ export const signin = mutation({
       expiresAt: session.expiresAt,
       userRole: user.role,
     };
+    if (user.role === "freelancer") {
+      const vettingResult = await ctx.db
+        .query("vettingResults")
+        .withIndex("by_freelancer", (q: any) => q.eq("freelancerId", user._id))
+        .first();
+      const isFullyVetted =
+        user.verificationStatus === "approved" &&
+        vettingResult?.status === "approved";
+      result.verificationStatus = user.verificationStatus || "not_started";
+      result.isFullyVetted = isFullyVetted;
+    }
+    return result;
   },
 });
 
@@ -953,7 +965,7 @@ export const verifyTwoFactorSignin = mutation({
       createdAt: Date.now(),
     });
 
-    return {
+    const result: Record<string, unknown> = {
       success: true,
       userId: user._id,
       sessionToken: session.sessionToken,
@@ -961,6 +973,18 @@ export const verifyTwoFactorSignin = mutation({
       expiresAt: session.expiresAt,
       userRole: user.role,
     };
+    if (user.role === "freelancer") {
+      const vettingResult = await ctx.db
+        .query("vettingResults")
+        .withIndex("by_freelancer", (q: any) => q.eq("freelancerId", user._id))
+        .first();
+      const isFullyVetted =
+        user.verificationStatus === "approved" &&
+        vettingResult?.status === "approved";
+      result.verificationStatus = user.verificationStatus || "not_started";
+      result.isFullyVetted = isFullyVetted;
+    }
+    return result;
   },
 });
 

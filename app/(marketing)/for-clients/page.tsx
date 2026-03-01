@@ -124,7 +124,7 @@ export default function ForClientsPage() {
     {
       step: "5",
       icon: BadgeCheck,
-      title: "Milestone-Based Payments",
+      title: "Phased Payments",
       description: "Funds are secured upfront and payments are released only after approval. Full transparency and control throughout.",
       image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
     },
@@ -132,7 +132,7 @@ export default function ForClientsPage() {
 
   const protectionFeatures = [
     { icon: FileCheck, text: "Secure contracts" },
-    { icon: DollarSign, text: "Milestone payments" },
+    { icon: DollarSign, text: "Phased payments" },
     { icon: Award, text: "Performance monitoring" },
     { icon: Handshake, text: "Dispute resolution support" },
     { icon: Users, text: "Talent replacement when necessary" },
@@ -396,7 +396,7 @@ export default function ForClientsPage() {
                   "Our intake form takes about 5 minutes and captures your exact needs.",
                   "Get matched in 48 hours with professionals aligned to your project.",
                   "Secure contracts protect both parties with clear terms and expectations.",
-                  "Pay only for approved work with transparent milestone tracking.",
+                  "Pay only for approved work with transparent delivery tracking.",
                 ];
                 return (
                   <SectionTransition key={stepIndex} variant="slide" direction="up" delay={300 + stepIndex * 100}>
@@ -730,7 +730,7 @@ export default function ForClientsPage() {
                   Build your team with vetted African talent
                 </h2>
                 <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
-                  Start your project with a trusted hiring workflow, transparent milestones, and professionals matched to your exact needs.
+                  Start your project with a trusted hiring workflow, transparent deliveries, and professionals matched to your exact needs.
                 </p>
               </div>
 
@@ -747,7 +747,7 @@ export default function ForClientsPage() {
                     <Shield className="h-4 w-4" />
                   </div>
                   <h4 className="text-sm font-semibold text-foreground sm:text-base">Secure Payments</h4>
-                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Milestone-based protection</p>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Phased payment protection</p>
                 </div>
                 <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
                   <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary-foreground">

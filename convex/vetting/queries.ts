@@ -177,27 +177,40 @@ export const getPendingVerifications = query({
 
 /**
  * Check if freelancer is verified and can access platform
+ * Supports both Convex Auth (identity) and session token auth
  */
 export const isFreelancerVerified = query({
   args: {
     userId: v.optional(v.id("users")),
+    sessionToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity || !identity.email) {
+    let user = null;
+
+    if (args.sessionToken) {
+      const session = await ctx.db
+        .query("sessions")
+        .withIndex("by_token", (q) => q.eq("sessionToken", args.sessionToken!))
+        .first();
+      if (session?.isActive && session.expiresAt >= Date.now()) {
+        user = await ctx.db.get(session.userId);
+      }
+    }
+
+    if (!user) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (identity?.email) {
+        user = await ctx.db
+          .query("users")
+          .withIndex("by_email", (q) => q.eq("email", identity.email!))
+          .first();
+      }
+    }
+
+    if (!user) {
       return { verified: false, reason: "not_authenticated" };
     }
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      return { verified: false, reason: "user_not_found" };
-    }
-
-    // If userId is provided, check that user instead (for admin checks)
     const targetUserId = args.userId || user._id;
     if (targetUserId !== user._id && user.role !== "admin" && user.role !== "moderator") {
       throw new Error("Unauthorized");

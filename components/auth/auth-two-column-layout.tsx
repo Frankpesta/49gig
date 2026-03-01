@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
+import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 // Lightweight fade-in for auth pages (no framer-motion dependency)
@@ -14,13 +15,20 @@ export interface AuthFeature {
   description: string;
 }
 
+export interface AuthStep {
+  label: string;
+  active?: boolean;
+}
+
 interface AuthTwoColumnLayoutProps {
   /** Left panel: headline */
   leftTitle: string;
   /** Left panel: subline */
   leftDescription: string;
-  /** Left panel: feature list (icon, title, description) */
+  /** Left panel: feature list (icon, title, description) – used when no steps */
   features?: AuthFeature[];
+  /** Left panel: step indicators (reference style) – used for signup flows */
+  steps?: AuthStep[];
   /** Right panel: optional badge above heading */
   badge?: string;
   /** Right panel: main heading */
@@ -35,12 +43,15 @@ interface AuthTwoColumnLayoutProps {
   leftClassName?: string;
   /** Optional: custom class for right column */
   rightClassName?: string;
+  /** Optional: wrap form in floating card (default true) */
+  cardForm?: boolean;
 }
 
 export function AuthTwoColumnLayout({
   leftTitle,
   leftDescription,
   features = [],
+  steps = [],
   badge,
   heading,
   subline,
@@ -48,102 +59,166 @@ export function AuthTwoColumnLayout({
   showMobileLogo = true,
   leftClassName,
   rightClassName,
+  cardForm = true,
 }: AuthTwoColumnLayoutProps) {
   return (
     <div className="relative min-h-screen bg-background">
-      {/* Subtle ambient gradient – lightweight, no heavy blurs */}
+      {/* Ambient radial gradients – soft glow behind content */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute left-0 top-0 w-[min(60%,480px)] h-full bg-gradient-to-r from-primary/[0.03] to-transparent" />
-        <div className="absolute right-0 bottom-0 w-[min(50%,400px)] h-[60%] bg-gradient-to-t from-muted/30 to-transparent" />
+        <div className="absolute -left-1/4 top-0 w-[80%] h-[80%] rounded-full bg-primary/10 blur-[100px]" />
+        <div className="absolute right-0 bottom-0 w-[60%] h-[70%] rounded-full bg-primary/5 blur-[80px]" />
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] h-[90%] rounded-full bg-muted/20 blur-[120px]" />
       </div>
 
-      <div className={cn("relative grid min-h-screen lg:grid-cols-2", fadeIn)}>
-        {/* Left column – branding (hidden on mobile) */}
+      <div className={cn("relative grid min-h-screen lg:h-screen lg:grid-cols-2", fadeIn)}>
+        {/* Left column – branding (hidden on mobile, fixed/no scroll, reference-style dark + gradients) */}
         <div
           className={cn(
-            "hidden lg:flex lg:flex-col lg:justify-between",
-            "bg-muted/30 border-r border-border/50",
+            "hidden lg:flex lg:flex-col lg:justify-between lg:overflow-hidden lg:relative",
+            "bg-muted/40 dark:bg-muted/60 border-r border-border/40",
             "px-8 xl:px-12 py-10 xl:py-12",
             leftClassName
           )}
         >
-          <div className="flex flex-col gap-12 xl:gap-16">
-            <Link href="/" className="inline-flex" aria-label="49GIG Home">
-              <Logo width={130} height={42} priority />
-            </Link>
+          {/* Left-side gradient orbs – prominent primary glow (reference style) */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute -right-1/4 top-1/4 w-[110%] h-[85%] rounded-full bg-primary/25 blur-[120px]" />
+            <div className="absolute left-0 bottom-1/4 w-[80%] h-[65%] rounded-full bg-primary/15 blur-[100px]" />
+          </div>
 
-            <div className="max-w-[360px] space-y-5">
-              <div className="space-y-2.5">
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col justify-between">
+            <div className="flex min-h-0 shrink flex-col gap-4 xl:gap-6 overflow-hidden">
+              <Link href="/" className="inline-flex shrink-0" aria-label="49GIG Home">
+                <Logo width={130} height={42} priority />
+              </Link>
+
+              <div className="min-w-0 max-w-[360px] space-y-4 xl:space-y-5 overflow-hidden">
                 <h2 className="text-xl xl:text-2xl font-semibold tracking-tight text-foreground leading-tight">
                   {leftTitle}
                 </h2>
-                <p className="text-sm xl:text-base text-muted-foreground leading-relaxed">
+                <p className="text-sm xl:text-base text-muted-foreground leading-relaxed line-clamp-3">
                   {leftDescription}
                 </p>
-              </div>
 
-              {features.length > 0 && (
-                <ul className="space-y-3.5 xl:space-y-4 pt-2">
-                  {features.map((f, i) => (
-                    <li key={i} className="flex gap-3 xl:gap-4">
-                      <span className="flex h-9 w-9 xl:h-10 xl:w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-sm xl:text-base">
-                        {f.icon}
-                      </span>
-                      <div className="space-y-0.5">
-                        <h3 className="text-xs xl:text-sm font-semibold text-foreground">
-                          {f.title}
-                        </h3>
-                        <p className="text-xs xl:text-sm text-muted-foreground leading-relaxed">
-                          {f.description}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                {steps.length > 0 ? (
+                  <ul className="space-y-2 min-h-0 overflow-hidden">
+                    {steps.map((s, i) => (
+                      <li
+                        key={i}
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors",
+                          s.active
+                            ? "border-primary/40 bg-primary/10 text-foreground"
+                            : "border-border/40 bg-muted/20 text-muted-foreground"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+                            s.active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="text-sm font-medium truncate">{s.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : features.length > 0 ? (
+                  <ul className="space-y-3 pt-1 min-h-0 overflow-hidden">
+                    {features.map((f, i) => (
+                      <li key={i} className="flex min-w-0 gap-3 shrink-0">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary ring-1 ring-primary/10">
+                          {f.icon}
+                        </span>
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <h3 className="text-sm font-semibold text-foreground truncate">
+                            {f.title}
+                          </h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
+                            {f.description}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             </div>
           </div>
 
-          <p className="text-xs xl:text-sm text-muted-foreground mt-8">
+          <p className="relative z-10 text-xs xl:text-sm text-muted-foreground mt-8 shrink-0">
             © {new Date().getFullYear()} 49GIG. All rights reserved.
           </p>
         </div>
 
-        {/* Right column – form */}
+        {/* Right column – form (scrolls when content overflows) */}
         <div
           className={cn(
-            "flex min-h-screen lg:min-h-0 flex-col justify-center overflow-y-auto",
-            "px-4 sm:px-6 md:px-8 lg:px-10 xl:px-14 py-6 sm:py-8 md:py-10 lg:py-12",
+            "flex flex-col min-h-screen lg:h-full lg:min-h-0 lg:overflow-hidden",
+            "px-4 sm:px-6 md:px-8 lg:px-10 xl:px-14",
             rightClassName
           )}
         >
-          <div className="mx-auto w-full max-w-[380px] sm:max-w-[400px] space-y-6 sm:space-y-7 md:space-y-8">
+          {/* Scrollable area – ensures all content is visible on desktop; natural scroll on mobile */}
+          <div className="py-6 sm:py-8 md:py-10 lg:py-12 lg:flex-1 lg:min-h-0 lg:overflow-y-auto lg:overflow-x-hidden">
+            <div className="flex min-h-full flex-col justify-center">
+              <div className="mx-auto w-full max-w-[420px] sm:max-w-[440px]">
             {showMobileLogo && (
-              <div className="lg:hidden flex justify-center pb-2">
+              <div className={cn("lg:hidden flex justify-center pb-6", fadeIn)}>
                 <Link href="/" aria-label="49GIG Home">
                   <Logo width={110} height={35} priority />
                 </Link>
               </div>
             )}
 
-            <header className={cn("space-y-2.5 sm:space-y-3", fadeIn)} style={{ animationDelay: "50ms" }}>
-              {badge && (
-                <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 sm:px-3.5 py-1 sm:py-1.5 text-[10px] sm:text-xs font-semibold text-primary ring-1 ring-primary/10">
-                  <span className="h-1 w-1 rounded-full bg-primary" />
-                  {badge}
+            {cardForm ? (
+              <Card className="rounded-2xl border border-border/60 bg-card/95 shadow-xl backdrop-blur-sm overflow-hidden">
+                <CardContent className="p-6 sm:p-8">
+                  <header className={cn("space-y-2.5 text-left mb-6", fadeIn)} style={{ animationDelay: "50ms" }}>
+                    {badge && (
+                      <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary ring-1 ring-primary/10">
+                        {badge}
+                      </div>
+                    )}
+                    <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+                      {heading}
+                    </h1>
+                    {subline && (
+                      <p className="text-sm text-muted-foreground">
+                        {subline}
+                      </p>
+                    )}
+                  </header>
+                  <div className="space-y-6 text-left">
+                    {children}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-6">
+                <header className={cn("space-y-2.5 text-left", fadeIn)} style={{ animationDelay: "50ms" }}>
+                  {badge && (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary ring-1 ring-primary/10">
+                      {badge}
+                    </div>
+                  )}
+                  <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
+                    {heading}
+                  </h1>
+                  {subline && (
+                    <p className="text-sm text-muted-foreground">
+                      {subline}
+                    </p>
+                  )}
+                </header>
+                <div className="space-y-6 text-left">
+                  {children}
                 </div>
-              )}
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-foreground leading-tight">
-                {heading}
-              </h1>
-              {subline && (
-                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                  {subline}
-                </p>
-              )}
-            </header>
-
-            {children}
+              </div>
+            )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

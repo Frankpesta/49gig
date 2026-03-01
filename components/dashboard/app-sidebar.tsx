@@ -19,56 +19,37 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useAuthStore } from "@/stores/authStore";
-import { getNavigationForRole } from "@/lib/navigation";
-import {
-  LogOut,
-  User,
-  Settings,
-  ChevronUp,
-} from "lucide-react";
+import { getMenuItems, getGeneralItems } from "@/lib/navigation";
+import { LogOut, User, Settings, HelpCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuthStore();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, state } = useSidebar();
   const { resolvedTheme } = useTheme();
+  const isCollapsed = state === "collapsed";
 
   const logoSrc = resolvedTheme === "dark" ? "/logo-dark.png" : "/logo-light.png";
 
-  const navigationItems = React.useMemo(() => {
+  const menuItems = React.useMemo(() => {
     if (!user) return [];
-    return getNavigationForRole(user.role);
+    return getMenuItems(user.role);
+  }, [user]);
+
+  const generalItems = React.useMemo(() => {
+    if (!user) return [];
+    return getGeneralItems(user.role);
   }, [user]);
 
   const handleLogout = () => {
-    // Clear auth state
     useAuthStore.getState().logout();
-    // Clear session tokens
     localStorage.removeItem("sessionToken");
-    // Redirect to login
     router.push("/login");
-  };
-
-  const getUserInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
   };
 
   const closeMobileSidebar = React.useCallback(() => {
@@ -79,21 +60,89 @@ export function AppSidebar() {
 
   const getIconClass = (isActive: boolean) =>
     cn(
-      "transition-colors duration-200",
-      isActive ? "text-primary" : "text-muted-foreground"
+      "transition-colors duration-200 shrink-0",
+      isActive ? "text-primary-foreground" : "text-muted-foreground"
     );
+
+  const renderNavItem = (item: { title: string; url: string; icon: React.ComponentType<{ className?: string }>; badge?: number; children?: { title: string; url: string; icon: React.ComponentType<{ className?: string }> }[] }) => {
+    const Icon = item.icon;
+
+    if (item.children && item.children.length > 0) {
+      return (
+        <SidebarGroup key={item.url}>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {item.children.map((child) => {
+                const ChildIcon = child.icon;
+                const isChildActive = pathname === child.url || pathname.startsWith(child.url + "/");
+                return (
+                  <SidebarMenuItem key={child.url}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isChildActive}
+                      tooltip={child.title}
+                      className={cn(
+                        "rounded-lg transition-all duration-200",
+                        isChildActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-l-4 border-l-secondary"
+                      )}
+                    >
+                      <Link href={child.url} onClick={closeMobileSidebar} className="relative flex items-center gap-2">
+                        {isChildActive && (
+                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-lg bg-primary-foreground/30" />
+                        )}
+                        <ChildIcon className={getIconClass(isChildActive)} />
+                        <span>{child.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      );
+    }
+
+    const isActive = pathname === item.url || pathname.startsWith(item.url + "/");
+    return (
+      <SidebarMenuItem key={item.url}>
+        <SidebarMenuButton
+          asChild
+          isActive={isActive}
+          tooltip={item.title}
+          className={cn(
+            "rounded-lg transition-all duration-200",
+                        isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-l-4 border-l-secondary"
+          )}
+        >
+          <Link href={item.url} onClick={closeMobileSidebar} className="relative flex items-center gap-2">
+            {isActive && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-lg bg-primary-foreground/30" />
+            )}
+            <Icon className={getIconClass(isActive)} />
+            <span>{item.title}</span>
+            {item.badge !== undefined && item.badge > 0 && (
+              <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary-foreground/20 text-xs font-semibold">
+                {item.badge > 9 ? "9+" : item.badge}
+              </span>
+            )}
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
 
   if (!user) {
     return null;
   }
 
   return (
-    <Sidebar collapsible="icon" variant="inset" className="bg-sidebar/95">
-      <SidebarHeader className="border-b border-sidebar-border/70 bg-sidebar">
+    <Sidebar collapsible="icon" variant="inset" className="bg-sidebar/95 border-r border-sidebar-border">
+      <SidebarHeader className="border-b border-sidebar-border/70 bg-sidebar p-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/dashboard" onClick={closeMobileSidebar} className="flex items-center gap-3 rounded-lg px-1 py-1">
+              <Link href="/dashboard" onClick={closeMobileSidebar} className="flex items-center gap-3 rounded-xl px-2 py-2">
                 <Image
                   key={logoSrc}
                   src={logoSrc}
@@ -118,147 +167,103 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent className="scrollbar-hide bg-sidebar">
-        {navigationItems.map((item) => {
-          const isActive = pathname === item.url || pathname.startsWith(item.url + "/");
-          const Icon = item.icon;
+      <SidebarContent className="scrollbar-hide bg-sidebar flex flex-col gap-1 py-2">
+        {/* MENU Section */}
+        {menuItems.length > 0 && (
+          <SidebarGroup className="px-2">
+            <SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 px-2 mb-1">
+              Menu
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-0.5">
+                {menuItems.map((item) => renderNavItem(item))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-          if (item.children && item.children.length > 0) {
-            return (
-              <SidebarGroup key={item.url}>
-              <SidebarGroupLabel className="text-[11px] uppercase tracking-wide text-sidebar-foreground/60">{item.title}</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {item.children.map((child) => {
-                      const ChildIcon = child.icon;
-                      const isChildActive = pathname === child.url;
-                      return (
-                        <SidebarMenuItem key={child.url}>
-                          <SidebarMenuButton
-                            asChild
-                            isActive={isChildActive}
-                            tooltip={child.title}
-                          >
-                            <Link href={child.url} onClick={closeMobileSidebar}>
-                              <ChildIcon className={getIconClass(isChildActive)} />
-                              <span>{child.title}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      );
-                    })}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            );
-          }
-
-          return (
-            <SidebarGroup key={item.url}>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.title}
-                    >
-                      <Link href={item.url} onClick={closeMobileSidebar}>
-                        <Icon className={getIconClass(isActive)} />
-                        <span>{item.title}</span>
-                        {item.badge !== undefined && item.badge > 0 && (
-                          <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
-                            {item.badge}
-                          </span>
+        {/* GENERAL Section */}
+        {generalItems.length > 0 && (
+          <SidebarGroup className="px-2 mt-2">
+            <SidebarGroupLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 px-2 mb-1">
+              General
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="space-y-0.5">
+                {generalItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.url;
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        tooltip={item.title}
+                        className={cn(
+                          "rounded-lg transition-all duration-200",
+                          isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
                         )}
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          );
-        })}
+                      >
+                        <Link href={item.url} onClick={closeMobileSidebar} className="flex items-center gap-2">
+                          <Icon className={getIconClass(isActive)} />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={handleLogout}
+                    tooltip="Log out"
+                    className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <LogOut className="h-4 w-4 shrink-0" />
+                    <span>Logout</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border/70 bg-sidebar">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+      {/* Bottom CTA Card - Reference style */}
+      <SidebarFooter className="border-t border-sidebar-border/70 p-3 mt-auto">
+        <div className="rounded-xl bg-primary p-4 text-primary-foreground shadow-lg">
+          {!isCollapsed ? (
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/20">
+                <HelpCircle className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="text-sm font-semibold">Need Help?</p>
+                <p className="text-xs text-primary-foreground/80 leading-snug">
+                  Get support from our team or browse our help center.
+                </p>
+                <Button
+                  asChild
+                  size="sm"
+                  className="mt-2 w-full rounded-lg bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                 >
-                  <Avatar className="size-8 rounded-lg">
-                    <AvatarImage src={user.profile?.portfolioUrl} alt={user.name} />
-                    <AvatarFallback className="rounded-lg">
-                      {getUserInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {user.email}
-                    </span>
-                  </div>
-                  <ChevronUp className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                side="bottom"
-                align="end"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="size-8 rounded-lg">
-                      <AvatarImage src={user.profile?.portfolioUrl} alt={user.name} />
-                      <AvatarFallback className="rounded-lg">
-                        {getUserInitials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{user.name}</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {user.email}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground capitalize">
-                        {user.role}
-                      </span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/profile" className="cursor-pointer">
-                    <User className="mr-2 size-4" />
-                    Profile
+                  <Link href="/dashboard/support" onClick={closeMobileSidebar}>
+                    Get Support
                   </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings" className="cursor-pointer">
-                    <Settings className="mr-2 size-4" />
-                    Settings
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="mr-2 size-4" />
-                  Log out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-center">
+              <Button asChild size="icon" variant="ghost" className="rounded-lg text-primary-foreground hover:bg-primary-foreground/20 size-9">
+                <Link href="/dashboard/support" onClick={closeMobileSidebar}>
+                  <HelpCircle className="h-5 w-5" />
+                </Link>
+              </Button>
+            </div>
+          )}
+        </div>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
 }
-
-

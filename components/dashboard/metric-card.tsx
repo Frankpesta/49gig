@@ -22,7 +22,7 @@ interface MetricCardProps {
     label?: string;
   };
   footnote?: string;
-  variant?: "default" | "primary" | "success" | "warning" | "destructive";
+  variant?: "default" | "primary" | "accent" | "success" | "warning" | "destructive";
   className?: string;
   iconClassName?: string;
   children?: ReactNode;
@@ -40,6 +40,12 @@ const variantStyles = {
     icon: "text-primary",
     iconBg: "bg-primary/15 backdrop-blur-sm",
     glow: "bg-primary",
+  },
+  accent: {
+    card: "border-primary/25 bg-primary text-primary-foreground hover:bg-primary/95 backdrop-blur-sm shadow-lg",
+    icon: "text-primary-foreground",
+    iconBg: "bg-primary-foreground/20 backdrop-blur-sm",
+    glow: "bg-primary-foreground/20",
   },
   success: {
     card: "border-green-500/25 bg-linear-to-br from-green-500/10 via-card/90 to-card/90 backdrop-blur-sm hover:border-green-500/35",
@@ -110,18 +116,29 @@ export function MetricCard({
               />
             </div>
             <div className="flex-1 min-w-0 pt-0.5 space-y-0.5 sm:space-y-1">
-              <p className="text-xs sm:text-sm font-semibold text-muted-foreground leading-tight truncate">
+              <p className={cn(
+                "text-xs sm:text-sm font-semibold leading-tight truncate",
+                variant === "accent" ? "text-primary-foreground/90" : "text-muted-foreground"
+              )}>
                 {title}
               </p>
               {subtitle && (
-                <p className="text-xs text-muted-foreground/80 leading-tight truncate">
+                <p className={cn(
+                  "text-xs leading-tight truncate",
+                  variant === "accent" ? "text-primary-foreground/75" : "text-muted-foreground/80"
+                )}>
                   {subtitle}
                 </p>
               )}
             </div>
           </div>
           {badge && (
-            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className={cn(
+              "inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide",
+              variant === "accent"
+                ? "border-primary-foreground/30 bg-primary-foreground/30 text-primary-foreground"
+                : "border-border/60 bg-background/80 text-muted-foreground"
+            )}>
               {badge}
             </span>
           )}
@@ -129,16 +146,23 @@ export function MetricCard({
 
         <div className="space-y-0.5 sm:space-y-1">
           <div className="flex items-baseline gap-2">
-            <p className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground truncate">
+            <p className={cn(
+              "text-2xl sm:text-3xl font-bold tracking-tight truncate",
+              variant === "accent" ? "text-primary-foreground" : "text-foreground"
+            )}>
               {value}
             </p>
             {trend && (
               <span
                 className={cn(
                   "inline-flex items-center gap-0.5 rounded-full px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-semibold whitespace-nowrap flex-shrink-0",
-                  trend.isPositive
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                    : "bg-red-500/10 text-red-600 dark:text-red-400"
+                  variant === "accent"
+                    ? trend.isPositive
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : "bg-red-500/20 text-red-200"
+                    : trend.isPositive
+                      ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                      : "bg-red-500/10 text-red-600 dark:text-red-400"
                 )}
               >
                 <span>{trend.isPositive ? "↑" : "↓"}</span>
@@ -147,7 +171,10 @@ export function MetricCard({
             )}
           </div>
           {description && (
-            <p className="text-xs sm:text-sm text-muted-foreground/80 leading-relaxed line-clamp-2">
+            <p className={cn(
+              "text-xs sm:text-sm leading-relaxed line-clamp-2",
+              variant === "accent" ? "text-primary-foreground/85" : "text-muted-foreground/80"
+            )}>
               {description}
             </p>
           )}
@@ -155,15 +182,21 @@ export function MetricCard({
 
         {progress && (
           <div className="space-y-1.5 sm:space-y-2">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className={cn(
+              "flex items-center justify-between text-xs",
+              variant === "accent" ? "text-primary-foreground/85" : "text-muted-foreground"
+            )}>
               <span className="truncate">{progress.label || "Progress"}</span>
               <span className="flex-shrink-0 ml-2">{Math.round(progress.value)}%</span>
             </div>
-            <div className="h-1.5 sm:h-2 w-full rounded-full bg-muted/40 overflow-hidden">
+            <div className={cn(
+              "h-1.5 sm:h-2 w-full rounded-full overflow-hidden",
+              variant === "accent" ? "bg-primary-foreground/20" : "bg-muted/40"
+            )}>
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700",
-                  styles.glow
+                  variant === "accent" ? "bg-primary-foreground" : styles.glow
                 )}
                 style={{ width: `${Math.min(100, Math.max(0, progress.value))}%` }}
               />

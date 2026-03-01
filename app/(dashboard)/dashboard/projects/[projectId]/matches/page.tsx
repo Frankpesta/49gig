@@ -281,7 +281,6 @@ function MatchCard({
   isTeam?: boolean;
 }) {
   const f = match.freelancer;
-  const vettingScore = match.vettingScore ?? 0;
   const isVetted = match.vettingStatus === "approved";
   const primaryRole = getPrimaryRoleLabel(f?.profile?.techField, f?.profile?.primaryRole);
   const skillLevel = f?.profile?.experienceLevel
@@ -324,10 +323,6 @@ function MatchCard({
               {skillLevel}
             </Badge>
           )}
-          <Badge className="gap-1 bg-primary/15 text-primary border-0 text-xs font-medium">
-            <ShieldCheck className="h-3.5 w-3.5" />
-            {vettingScore}% Vetted
-          </Badge>
           {isVetted && (
             <Badge variant="secondary" className="text-xs">Fully vetted by 49GIG</Badge>
           )}
@@ -347,11 +342,6 @@ function MatchCard({
               </Badge>
             )}
           </div>
-        )}
-        {f?.profile?.hourlyRate != null && (
-          <p className="text-sm font-semibold text-primary">
-            ${f.profile.hourlyRate}/hr
-          </p>
         )}
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="flex-1 rounded-lg" onClick={onViewProfile}>
@@ -524,7 +514,7 @@ export default function ProjectMatchesPage() {
           userId: user._id,
         });
       }
-      router.push(`/dashboard/projects/${projectId}/payment`);
+      router.push(`/dashboard/projects/${projectId}/contract`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to save selection");
     }
@@ -590,7 +580,7 @@ export default function ProjectMatchesPage() {
           userId: user._id,
         });
       }
-      router.push(`/dashboard/projects/${projectId}/payment`);
+      router.push(`/dashboard/projects/${projectId}/contract`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to schedule");
     } finally {

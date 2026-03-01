@@ -62,13 +62,14 @@ export default function EnquiriesPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={Mail} title="Please log in" />;
+    return <DashboardEmptyState icon={Mail} title="Please log in" iconTone="muted" />;
   }
 
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
       <DashboardEmptyState
         icon={Clock}
+        iconTone="muted"
         title="Access restricted"
         description="Only admins and moderators can access contact enquiries."
         action={
@@ -83,17 +84,19 @@ export default function EnquiriesPage() {
   const enquiry = selectedEnquiry && enquiries?.find((e: Doc<"contactEnquiries">) => e._id === selectedEnquiry);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Contact Enquiries"
         description="View and reply to enquiries from the public contact form."
+        icon={Mail}
       />
 
       {enquiries === undefined ? (
-        <DashboardLoadingState label="Loading enquiries..." className="min-h-[180px]" />
+        <DashboardLoadingState label="Loading" className="min-h-[180px]" />
       ) : enquiries.length === 0 ? (
         <DashboardEmptyState
           icon={Mail}
+          iconTone="muted"
           title="No contact enquiries yet"
           className="py-10"
         />

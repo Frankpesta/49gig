@@ -76,12 +76,17 @@ function OAuthCallbackContent() {
           }
 
           // CRITICAL: Check user role and redirect accordingly
-          // Freelancers: go to resume upload, then verification
           if (result.userRole === "freelancer") {
+            // Fully vetted freelancers go straight to dashboard
+            if (result.isFullyVetted) {
+              router.replace("/dashboard");
+              return;
+            }
+            // Non-fully-vetted freelancers: resume-upload (will redirect to verification if resume already processed)
             localStorage.setItem("pending_resume_upload", "freelancer");
             router.replace("/resume-upload");
           } else {
-            // Redirect other users to dashboard
+            // Redirect clients and others to dashboard
             if (result.isNewUser) {
               router.push("/dashboard?welcome=true");
             } else {
@@ -137,31 +142,10 @@ function OAuthCallbackContent() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-12">
-        <div className="text-center space-y-3">
-          <h1 className="text-4xl font-heading font-bold tracking-tight text-foreground">
-            Completing login
-          </h1>
-          <p className="text-lg text-muted-foreground">
-            Please wait while we sign you in
-          </p>
-        </div>
-        <Card className="shadow-medium border-border/50">
-          <CardHeader className="space-y-2 px-8 pt-8 pb-6">
-            <CardTitle className="text-2xl font-heading font-semibold">
-              Signing In
-            </CardTitle>
-            <CardDescription>
-              Please wait while we sign you in...
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-8 pb-8 pt-0">
-            <div className="flex items-center justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            </div>
-          </CardContent>
-        </Card>
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Loading</p>
       </div>
     </div>
   );
@@ -171,23 +155,10 @@ export default function OAuthCallbackPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center px-4 py-16 sm:px-6 lg:px-8">
-          <div className="w-full max-w-md space-y-12">
-            <div className="text-center space-y-3">
-              <h1 className="text-4xl font-heading font-bold tracking-tight text-foreground">
-                Loading
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Please wait...
-              </p>
-            </div>
-            <Card className="shadow-medium border-border/50">
-              <CardContent className="px-8 py-8">
-                <div className="flex items-center justify-center py-8">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                </div>
-              </CardContent>
-            </Card>
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-sm text-muted-foreground">Loading</p>
           </div>
         </div>
       }

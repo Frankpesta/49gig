@@ -366,6 +366,89 @@ export const refundPaymentIntent = action({
 });
 
 /**
+ * Withdraw from wallet to bank (freelancer action)
+ * Uses stored bank details from subaccount setup
+ */
+export const withdrawFromWallet = action({
+  args: {
+    amountCents: v.number(),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
+      userId: args.userId,
+    });
+
+    if (!user || user.role !== "freelancer") {
+      throw new Error("Only freelancers can withdraw from wallet");
+    }
+
+    const userDoc = user as typeof user & {
+      flutterwavePayoutBankCode?: string;
+      flutterwavePayoutAccountNumber?: string;
+    };
+
+    if (!userDoc.flutterwavePayoutBankCode || !userDoc.flutterwavePayoutAccountNumber) {
+      throw new Error(
+        "Please set up your bank account in Settings before withdrawing."
+      );
+    }
+
+    if (args.amountCents < 100) {
+      throw new Error("Minimum withdrawal is 1.00 USD");
+    }
+
+    const wallet = await ctx.runQuery(internalAny.wallets.queries.getWalletByUserIdInternal, {
+      userId: args.userId,
+    });
+
+    if (!wallet || wallet.balanceCents < args.amountCents) {
+      throw new Error("Insufficient wallet balance");
+    }
+
+    const amountDollars = args.amountCents / 100;
+    const transferRef = `49gig-wallet-${args.userId}-${Date.now()}`;
+
+    const transferData = await flutterwave.createTransfer({
+      account_bank: userDoc.flutterwavePayoutBankCode,
+      account_number: userDoc.flutterwavePayoutAccountNumber,
+      amount: amountDollars,
+      narration: `49GIG wallet withdrawal`,
+      currency: "USD",
+      reference: transferRef,
+      beneficiary_name: user.name,
+    });
+
+    await ctx.runMutation(internalAny.wallets.mutations.debitWallet, {
+      userId: args.userId,
+      amountCents: args.amountCents,
+      currency: "usd",
+      description: `Withdrawal to bank`,
+      flutterwaveTransferId: transferRef,
+    });
+
+    const paymentId = await ctx.runMutation(internalAny.payments.mutations.createPayment, {
+      type: "payout",
+      amount: amountDollars,
+      currency: "usd",
+      platformFee: 0,
+      netAmount: amountDollars,
+      flutterwaveTransferId: transferRef,
+      flutterwaveSubaccountId: (user as any).flutterwaveSubaccountId,
+      userId: args.userId,
+      recipientId: args.userId,
+      status: transferData.data.status === "NEW" ? "processing" : "succeeded",
+    });
+
+    return {
+      success: true,
+      transferId: transferRef,
+      paymentId,
+    };
+  },
+});
+
+/**
  * Create a Flutterwave transfer/payout to a freelancer
  */
 export const createPayoutTransfer = action({

@@ -15,14 +15,30 @@ import { MessageSquare, Search, Plus, Users, Headphones, Sparkles } from "lucide
 import Link from "next/link";
 import { useState } from "react";
 
+function formatRelativeTime(ts: number) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return d.toLocaleDateString();
+}
+
 function ChatListSection({
   chats,
   searchQuery,
-  unreadCount,
+  sectionLabel,
+  sectionIcon,
 }: {
   chats: Doc<"chats">[];
   searchQuery: string;
-  unreadCount?: number;
+  sectionLabel?: string;
+  sectionIcon?: React.ReactNode;
 }) {
   const filtered = chats.filter((chat) => {
     if (!searchQuery) return true;
@@ -35,41 +51,44 @@ function ChatListSection({
 
   if (filtered.length === 0) {
     return (
-      <div className="p-4 text-center sm:p-6 lg:p-8">
-        <MessageSquare className="mx-auto mb-3 h-10 w-10 text-muted-foreground sm:mb-4 sm:h-12 sm:w-12" />
-        <p className="text-sm text-muted-foreground sm:text-base">
-          {searchQuery ? "No chats found" : "No chats yet"}
+      <div className="p-6 text-center">
+        <MessageSquare className="mx-auto mb-3 h-10 w-10 text-muted-foreground/60" />
+        <p className="text-sm text-muted-foreground">
+          {searchQuery ? "No chats match your search" : "No chats yet"}
         </p>
       </div>
     );
   }
 
   return (
-    <div className="divide-y">
+    <div className="divide-y divide-border/40">
       {filtered.map((chat) => (
         <Link
           key={chat._id}
           href={`/dashboard/chat/${chat._id}`}
-          className="group block p-3 transition-colors hover:bg-primary/5 sm:p-4"
+          className="group flex items-start gap-3 p-4 transition-all hover:bg-primary/5 rounded-lg mx-2 my-1"
         >
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <div className="min-w-0 flex-1 overflow-hidden">
-              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-                <h3 className="min-w-0 truncate text-sm font-semibold text-foreground/95 group-hover:text-primary sm:text-base">
-                  {chat.title || "Untitled Chat"}
-                </h3>
-                <Badge variant="outline" className="shrink-0 border-primary/30 bg-primary/5 text-[10px] sm:text-xs">
-                  {chat.type}
-                </Badge>
-              </div>
-              {chat.lastMessagePreview && (
-                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground sm:text-sm">
-                  {chat.lastMessagePreview}
-                </p>
-              )}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="min-w-0 truncate font-semibold text-foreground group-hover:text-primary transition-colors">
+                {chat.title || "Untitled Chat"}
+              </h3>
               {chat.lastMessageAt && (
-                <p className="mt-1 text-[10px] text-muted-foreground sm:text-xs">
-                  {new Date(chat.lastMessageAt).toLocaleDateString()}
+                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                  {formatRelativeTime(chat.lastMessageAt)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <Badge variant="outline" className="shrink-0 text-[10px] font-medium border-primary/30 bg-primary/5">
+                {chat.type}
+              </Badge>
+              {chat.lastMessagePreview && (
+                <p className="min-w-0 truncate text-xs text-muted-foreground">
+                  {chat.lastMessagePreview}
                 </p>
               )}
             </div>
@@ -111,11 +130,11 @@ export default function ChatPage() {
   const isAdminOrModerator = user?.role === "admin" || user?.role === "moderator";
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={MessageSquare} title="Please log in to view chats" />;
+    return <DashboardEmptyState icon={MessageSquare} title="Please log in to view chats" iconTone="muted" />;
   }
 
   if (chats === undefined) {
-    return <DashboardLoadingState label="Loading chats..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   const filteredChats = chats?.filter((chat: Doc<"chats">) => {
@@ -128,7 +147,7 @@ export default function ChatPage() {
   });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Messages"
         description={
@@ -136,8 +155,9 @@ export default function ChatPage() {
             ? "View all project and support chats."
             : "Communicate with clients, freelancers, and support."
         }
+        icon={MessageSquare}
         actions={
-          <Button asChild className="w-full shrink-0 sm:w-auto">
+          <Button asChild className="w-full shrink-0 rounded-xl sm:w-auto">
             <Link href="/dashboard/chat/support" className="flex items-center justify-center">
               <Plus className="mr-2 h-4 w-4" />
               New Support Chat
@@ -147,18 +167,18 @@ export default function ChatPage() {
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="sm:col-span-1">
+        <Card className="sm:col-span-1 rounded-xl overflow-hidden">
           <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg bg-primary/10 p-2 text-primary"><MessageSquare className="h-4 w-4" /></div>
+            <div className="rounded-xl bg-primary/10 p-2.5 text-primary"><MessageSquare className="h-4 w-4" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Total Chats</p>
               <p className="text-lg font-semibold">{chats.length}</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="sm:col-span-1">
+        <Card className="sm:col-span-1 rounded-xl overflow-hidden">
           <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-lg bg-secondary/20 p-2 text-secondary-foreground"><Sparkles className="h-4 w-4" /></div>
+            <div className="rounded-xl bg-secondary/20 p-2.5 text-secondary-foreground"><Sparkles className="h-4 w-4" /></div>
             <div>
               <p className="text-xs text-muted-foreground">Unread</p>
               <p className="text-lg font-semibold">{unreadCount ?? 0}</p>
@@ -167,78 +187,69 @@ export default function ChatPage() {
         </Card>
       </div>
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-3 lg:gap-6">
-        <div className="min-w-0 lg:col-span-1">
-          <Card className="min-w-0 overflow-hidden">
-            <CardHeader className="p-3 sm:p-4 lg:p-5">
-              <div className="flex min-w-0 items-center justify-between gap-2">
-                <CardTitle className="truncate text-base sm:text-lg lg:text-xl">Chats</CardTitle>
-                {unreadCount && unreadCount > 0 && (
-                  <Badge variant="destructive" className="shrink-0 text-[10px] sm:text-xs">
-                    {unreadCount}
-                  </Badge>
-                )}
-              </div>
-              <div className="relative mt-3 sm:mt-4">
-                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-3" />
-                <Input
-                  placeholder="Search chats..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 min-w-0 pl-8 text-sm sm:h-10 sm:pl-9"
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[340px_1fr] lg:gap-6">
+        <Card className="min-w-0 overflow-hidden rounded-xl border-border/60 shadow-sm">
+          <CardHeader className="p-4 sm:p-5 border-b border-border/40 bg-gradient-to-b from-muted/5 to-transparent">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <CardTitle className="text-lg font-semibold">Conversations</CardTitle>
+              {unreadCount != null && unreadCount > 0 && (
+                <Badge variant="destructive" className="shrink-0 text-xs font-semibold">
+                  {unreadCount} unread
+                </Badge>
+              )}
+            </div>
+            <div className="relative mt-4">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or message..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-10 min-w-0 pl-9 rounded-lg border-border/60"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="min-w-0 p-0">
+            {isAdminOrModerator ? (
+              <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
+                <div className="sticky top-0 z-10 flex items-center gap-2 bg-primary/5 px-4 py-2.5 text-xs font-semibold text-primary uppercase tracking-wider">
+                  <Users className="h-4 w-4 shrink-0" />
+                  Project Chats
+                </div>
+                <ChatListSection
+                  chats={projectChatsForAdmin ?? []}
+                  searchQuery={searchQuery}
+                />
+                <div className="sticky top-0 z-10 flex items-center gap-2 bg-muted/50 px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  <Headphones className="h-4 w-4 shrink-0" />
+                  Support Chats
+                </div>
+                <ChatListSection
+                  chats={supportChatsForAdmin ?? []}
+                  searchQuery={searchQuery}
                 />
               </div>
-            </CardHeader>
-            <CardContent className="min-w-0 p-0">
-              {isAdminOrModerator ? (
-                <div className="max-h-[65vh] divide-y overflow-y-auto">
-                  <div>
-                    <div className="flex items-center gap-2 bg-primary/5 px-3 py-2 text-xs font-medium text-primary sm:px-4 sm:text-sm">
-                      <Users className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-                      <span className="truncate">Project Chats (Client ↔ Freelancer)</span>
-                    </div>
-                    <ChatListSection
-                      chats={projectChatsForAdmin ?? []}
-                      searchQuery={searchQuery}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 bg-primary/5 px-3 py-2 text-xs font-medium text-primary sm:px-4 sm:text-sm">
-                      <Headphones className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-                      Support Chats
-                    </div>
-                    <ChatListSection
-                      chats={supportChatsForAdmin ?? []}
-                      searchQuery={searchQuery}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="max-h-[65vh] overflow-y-auto">
-                  <ChatListSection
-                    chats={filteredChats ?? []}
-                    searchQuery={searchQuery}
-                    unreadCount={unreadCount ?? 0}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="lg:col-span-2">
-          <Card className="flex min-h-[300px] items-center justify-center bg-linear-to-br from-card via-card to-primary/5 p-2 sm:min-h-[360px] lg:h-[600px]">
-            <div className="text-center px-4">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary sm:h-16 sm:w-16">
-                <MessageSquare className="h-7 w-7 sm:h-8 sm:w-8" />
+            ) : (
+              <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
+                <ChatListSection
+                  chats={filteredChats ?? []}
+                  searchQuery={searchQuery}
+                />
               </div>
-              <h3 className="mb-2 text-base font-semibold sm:text-lg">Select a chat to start messaging</h3>
-              <p className="mx-auto max-w-md text-sm text-muted-foreground">
-                Open any conversation from the left panel to view messages, send files, and manage communication in real-time.
-              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="flex min-h-[300px] items-center justify-center rounded-xl overflow-hidden border-border/60 border-dashed sm:min-h-[360px] lg:min-h-[500px]">
+          <div className="text-center px-6 py-12">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <MessageSquare className="h-8 w-8" />
             </div>
-          </Card>
-        </div>
+            <h3 className="mb-2 text-lg font-semibold">Select a conversation</h3>
+            <p className="mx-auto max-w-sm text-sm text-muted-foreground leading-relaxed">
+              Choose a chat from the list to view messages, send replies, and share files in real time.
+            </p>
+          </div>
+        </Card>
       </div>
     </div>
   );

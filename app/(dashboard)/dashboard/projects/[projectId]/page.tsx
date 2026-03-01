@@ -22,6 +22,7 @@ import {
   Edit,
   MessageCircle,
   Star,
+  FileSignature,
   LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -84,6 +85,10 @@ export default function ProjectDetailPage() {
   const autoCreateMilestones = useMutation(
     (api as any)["projects/mutations"].autoCreateMilestones
   );
+  const approveMonthlyCycle = useMutation(
+    api.monthlyBillingCycles.mutations.approveMonthlyCycle
+  );
+  const [approvingCycleId, setApprovingCycleId] = useState<Id<"monthlyBillingCycles"> | null>(null);
 
   const project = useQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,6 +100,11 @@ export default function ProjectDetailPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (api as any)["projects/queries"].getProjectMilestones,
     user?._id && projectId ? { projectId, userId: user._id } : "skip"
+  );
+
+  const monthlyCycles = useQuery(
+    api.monthlyBillingCycles.queries.getCyclesByProjectId,
+    projectId ? { projectId } : "skip"
   );
 
   const existingReview = useQuery(
@@ -183,12 +193,20 @@ export default function ProjectDetailPage() {
     (project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0) &&
     (project.clientId === user._id || isMatchedFreelancer);
 
+  const hasSelected =
+    project.selectedFreelancerId ||
+    (project.selectedFreelancerIds && project.selectedFreelancerIds.length > 0);
   const needContractSign =
     (project.status === "matched" || project.status === "in_progress") &&
     (isClient
       ? !project.clientContractSignedAt
       : isMatchedFreelancer &&
         !project.freelancerContractSignatures?.some((s: { freelancerId: Id<"users"> }) => s.freelancerId === user._id));
+  const needContractSignPrePayment =
+    isClient &&
+    hasSelected &&
+    !project.clientContractSignedAt &&
+    (project.status === "draft" || project.status === "pending_funding");
 
   if (needContractSign && projectId && user._id) {
     return (
@@ -270,7 +288,15 @@ export default function ProjectDetailPage() {
         </div>
         {isClient && (
           <div className="flex gap-2">
-            {(project.status === "draft" || project.status === "pending_funding") && (
+            {needContractSignPrePayment && (
+              <Button asChild>
+                <Link href={`/dashboard/projects/${project._id}/contract`}>
+                  <FileSignature className="mr-2 h-4 w-4" />
+                  Sign Contract
+                </Link>
+              </Button>
+            )}
+            {(project.status === "draft" || project.status === "pending_funding") && !needContractSignPrePayment && (
               <Button asChild>
                 <Link href={`/dashboard/projects/${project._id}/payment`}>
                   <DollarSign className="mr-2 h-4 w-4" />
@@ -324,7 +350,62 @@ export default function ProjectDetailPage() {
             </Card>
           )}
 
-          {/* Milestones – always visible so freelancer and client can find them */}
+          {/* Monthly Billing – for projects with monthly cycles */}
+          {monthlyCycles && monthlyCycles.length > 0 && (
+            <Card id="monthly-billing">
+              <CardHeader>
+                <CardTitle>Monthly Billing</CardTitle>
+                <CardDescription>
+                  Payments are released monthly. Approve each month to credit the freelancer&apos;s wallet.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; amountCents: number; currency: string; status: string }) => {
+                    const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", { month: "long", year: "numeric" });
+                    const isPending = cycle.status === "pending";
+                    return (
+                      <div key={cycle._id} className="flex items-center justify-between rounded-lg border p-4">
+                        <div>
+                          <div className="font-medium">Month {cycle.monthIndex}: {monthLabel}</div>
+                          <div className="text-sm text-muted-foreground">
+                            ${(cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {cycle.status}
+                          </div>
+                        </div>
+                        {isClient && isPending && (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              setApprovingCycleId(cycle._id);
+                              try {
+                                await approveMonthlyCycle({ monthlyCycleId: cycle._id });
+                                toast.success("Month approved");
+                              } catch (e) {
+                                toast.error(e instanceof Error ? e.message : "Approval failed");
+                              } finally {
+                                setApprovingCycleId(null);
+                              }
+                            }}
+                            disabled={approvingCycleId === cycle._id}
+                          >
+                            {approvingCycleId === cycle._id ? "Approving…" : "Approve"}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {isClient && (
+                  <Button variant="outline" size="sm" className="mt-4" asChild>
+                    <Link href="/dashboard/monthly-approvals">View all pending approvals</Link>
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Milestones – for legacy projects or when no monthly cycles */}
+          {(!monthlyCycles || monthlyCycles.length === 0) && (
           <Card id="milestones">
             <CardHeader>
               <CardTitle>Milestones</CardTitle>
@@ -422,6 +503,7 @@ export default function ProjectDetailPage() {
               )}
             </CardContent>
           </Card>
+          )}
 
           {/* Additional Requirements */}
           {project.intakeForm.additionalRequirements && (

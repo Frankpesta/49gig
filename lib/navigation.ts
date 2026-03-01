@@ -21,8 +21,12 @@ import {
   AlertCircle,
   DollarSign,
   Mail,
+  Wallet,
+  CalendarCheck,
 } from "lucide-react";
 import type { UserRole } from "@/stores/authStore";
+
+export type NavSection = "menu" | "general";
 
 export interface NavItem {
   title: string;
@@ -31,6 +35,7 @@ export interface NavItem {
   badge?: number;
   roles?: UserRole[];
   children?: NavItem[];
+  section?: NavSection; // "menu" = main nav, "general" = settings/help
 }
 
 export const navigationItems: NavItem[] = [
@@ -39,6 +44,7 @@ export const navigationItems: NavItem[] = [
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboard,
+    section: "menu",
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
@@ -47,6 +53,7 @@ export const navigationItems: NavItem[] = [
     title: "Projects",
     url: "/dashboard/projects",
     icon: FolderKanban,
+    section: "menu",
     roles: ["client", "freelancer", "admin"],
     children: [
       {
@@ -72,6 +79,7 @@ export const navigationItems: NavItem[] = [
     title: "Create Project",
     url: "/dashboard/projects/create",
     icon: Briefcase,
+    section: "menu",
     roles: ["client"],
   },
 
@@ -81,7 +89,26 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/chat",
     icon: MessageSquare,
     badge: 0, // Will be updated with real-time count
+    section: "menu",
     roles: ["client", "freelancer", "admin", "moderator"],
+  },
+
+  // Wallet (Freelancers)
+  {
+    title: "Wallet",
+    url: "/dashboard/wallet",
+    icon: Wallet,
+    section: "menu",
+    roles: ["freelancer"],
+  },
+
+  // Monthly Approvals (Clients)
+  {
+    title: "Monthly Approvals",
+    url: "/dashboard/monthly-approvals",
+    icon: CalendarCheck,
+    section: "menu",
+    roles: ["client"],
   },
 
   // Transactions (All roles)
@@ -89,6 +116,7 @@ export const navigationItems: NavItem[] = [
     title: "Transactions",
     url: "/dashboard/transactions",
     icon: CreditCard,
+    section: "menu",
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
@@ -97,6 +125,7 @@ export const navigationItems: NavItem[] = [
     title: "Disputes",
     url: "/dashboard/disputes",
     icon: AlertCircle,
+    section: "menu",
     roles: ["client", "freelancer", "moderator", "admin"],
   },
 
@@ -105,6 +134,7 @@ export const navigationItems: NavItem[] = [
     title: "Dispute Management",
     url: "/dashboard/moderator/disputes",
     icon: AlertCircle,
+    section: "menu",
     roles: ["moderator", "admin"],
   },
 
@@ -113,6 +143,7 @@ export const navigationItems: NavItem[] = [
     title: "Users",
     url: "/dashboard/users",
     icon: Users,
+    section: "menu",
     roles: ["admin", "moderator"],
   },
 
@@ -121,6 +152,7 @@ export const navigationItems: NavItem[] = [
     title: "Pricing",
     url: "/dashboard/pricing",
     icon: DollarSign,
+    section: "menu",
     roles: ["admin", "moderator"],
   },
 
@@ -129,6 +161,7 @@ export const navigationItems: NavItem[] = [
     title: "Enquiries",
     url: "/dashboard/enquiries",
     icon: Mail,
+    section: "menu",
     roles: ["admin", "moderator"],
   },
 
@@ -137,6 +170,7 @@ export const navigationItems: NavItem[] = [
     title: "Notifications",
     url: "/dashboard/notifications",
     icon: Bell,
+    section: "menu",
     roles: ["admin", "moderator"],
   },
 
@@ -145,6 +179,7 @@ export const navigationItems: NavItem[] = [
     title: "Analytics",
     url: "/dashboard/analytics",
     icon: BarChart3,
+    section: "menu",
     roles: ["admin"],
   },
 
@@ -153,30 +188,43 @@ export const navigationItems: NavItem[] = [
     title: "Audit Logs",
     url: "/dashboard/audit",
     icon: FileText,
+    section: "menu",
     roles: ["admin"],
   },
 
-  // Profile (All roles)
+  // Profile (All roles) - GENERAL
   {
     title: "Profile",
     url: "/dashboard/profile",
     icon: User,
+    section: "general",
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Settings (All roles)
+  // Settings (All roles) - GENERAL
   {
     title: "Settings",
     url: "/dashboard/settings",
     icon: Settings,
+    section: "general",
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Support (All roles)
+  // Notification History (All roles) - GENERAL
+  {
+    title: "Notification History",
+    url: "/dashboard/notification-history",
+    icon: Bell,
+    section: "general",
+    roles: ["client", "freelancer", "admin", "moderator"],
+  },
+
+  // Support (All roles) - GENERAL
   {
     title: "Help & Support",
     url: "/dashboard/support",
     icon: HelpCircle,
+    section: "general",
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 ];
@@ -202,6 +250,22 @@ export function getMainNavigation(role: UserRole): NavItem[] {
  */
 export function getNavigationGroups(role: UserRole): NavItem[] {
   return getNavigationForRole(role).filter((item) => item.children);
+}
+
+/**
+ * Get MENU section items (main navigation)
+ */
+export function getMenuItems(role: UserRole): NavItem[] {
+  return getNavigationForRole(role).filter(
+    (item) => item.section !== "general" && (!item.section || item.section === "menu")
+  );
+}
+
+/**
+ * Get GENERAL section items (settings, help, profile)
+ */
+export function getGeneralItems(role: UserRole): NavItem[] {
+  return getNavigationForRole(role).filter((item) => item.section === "general");
 }
 
 

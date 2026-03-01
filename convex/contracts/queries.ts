@@ -61,8 +61,11 @@ export const getContractForProject = query({
     const isMatchedFreelancer =
       project.matchedFreelancerId === user._id ||
       (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
+    const isSelectedFreelancer =
+      project.selectedFreelancerId === user._id ||
+      (project.selectedFreelancerIds && project.selectedFreelancerIds.includes(user._id));
 
-    if (!isClient && !isMatchedFreelancer) return null;
+    if (!isClient && !isMatchedFreelancer && !isSelectedFreelancer) return null;
 
     const client = await ctx.db.get(project.clientId);
     const effectiveDate = new Date().toLocaleDateString("en-US", {
@@ -71,14 +74,17 @@ export const getContractForProject = query({
       day: "numeric",
     });
 
+    const effectiveFreelancerIds = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds?.length
+        ? project.matchedFreelancerIds
+        : project.selectedFreelancerId
+          ? [project.selectedFreelancerId]
+          : project.selectedFreelancerIds ?? [];
     let freelancerNames = "";
-    if (project.matchedFreelancerId) {
-      const f = await ctx.db.get(project.matchedFreelancerId);
-      freelancerNames = f?.name || "Freelancer";
-    }
-    if (project.matchedFreelancerIds && project.matchedFreelancerIds.length > 0) {
+    if (effectiveFreelancerIds.length > 0) {
       const names = await Promise.all(
-        project.matchedFreelancerIds.map((id) => ctx.db.get(id))
+        effectiveFreelancerIds.map((id) => ctx.db.get(id))
       );
       freelancerNames = names.map((u) => u?.name || "Freelancer").join(", ");
     }
@@ -90,8 +96,10 @@ export const getContractForProject = query({
       : project.freelancerContractSignatures?.some(
           (s) => s.freelancerId === user._id
         ) ?? false;
+    const canViewAsClient = isClient;
+    const canViewAsFreelancer = isMatchedFreelancer || isSelectedFreelancer;
 
-    if (isClient) {
+    if (canViewAsClient) {
       return {
         role: "client" as const,
         sections: CLIENT_AGREEMENT_SECTIONS,
@@ -109,21 +117,24 @@ export const getContractForProject = query({
       };
     }
 
-    return {
-      role: "freelancer" as const,
-      sections: FREELANCER_AGREEMENT_SECTIONS,
-      filledBody: getFreelancerAgreementFilled(
-        user.name || "Freelancer",
-        effectiveDate
-      ),
-      hasSigned: hasFreelancerSigned,
-      signedAt: project.freelancerContractSignatures?.find(
-        (s) => s.freelancerId === user._id
-      )?.signedAt,
-      projectTitle: project.intakeForm.title,
-      freelancerName: user.name || "Freelancer",
-      effectiveDate,
-    };
+    if (canViewAsFreelancer) {
+      return {
+        role: "freelancer" as const,
+        sections: FREELANCER_AGREEMENT_SECTIONS,
+        filledBody: getFreelancerAgreementFilled(
+          user.name || "Freelancer",
+          effectiveDate
+        ),
+        hasSigned: hasFreelancerSigned,
+        signedAt: project.freelancerContractSignatures?.find(
+          (s) => s.freelancerId === user._id
+        )?.signedAt,
+        projectTitle: project.intakeForm.title,
+        freelancerName: user.name || "Freelancer",
+        effectiveDate,
+      };
+    }
+    return null;
   },
 });
 
@@ -138,15 +149,16 @@ export const getProjectContractParties = internalQuery({
     const client = await ctx.db.get(project.clientId);
     if (!client) return null;
     const freelancers: Doc<"users">[] = [];
-    if (project.matchedFreelancerId) {
-      const f = await ctx.db.get(project.matchedFreelancerId);
+    const effectiveFreelancerIds = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds?.length
+        ? project.matchedFreelancerIds
+        : project.selectedFreelancerId
+          ? [project.selectedFreelancerId]
+          : project.selectedFreelancerIds ?? [];
+    for (const id of effectiveFreelancerIds) {
+      const f = await ctx.db.get(id);
       if (f) freelancers.push(f);
-    }
-    if (project.matchedFreelancerIds?.length) {
-      for (const id of project.matchedFreelancerIds) {
-        const f = await ctx.db.get(id);
-        if (f) freelancers.push(f);
-      }
     }
     return {
       project: project as Doc<"projects">,

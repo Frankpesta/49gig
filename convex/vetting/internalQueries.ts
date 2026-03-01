@@ -88,6 +88,30 @@ export const countFailedSkillTestSessions = internalQuery({
   },
 });
 
+/** Get freelancer verification status by userId (for OAuth callback). */
+export const getFreelancerVerificationStatusByUserId = internalQuery({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user || user.role !== "freelancer") {
+      return { isFullyVetted: false, verificationStatus: null };
+    }
+    const vettingResult = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.userId))
+      .first();
+    const isFullyVetted =
+      user.verificationStatus === "approved" &&
+      (vettingResult?.status ?? null) === "approved";
+    return {
+      isFullyVetted,
+      verificationStatus: user.verificationStatus ?? null,
+    };
+  },
+});
+
 /** Return up to 5 existing coding prompt IDs for category+language+level. */
 export const getExistingCodingPromptIds = internalQuery({
   args: {

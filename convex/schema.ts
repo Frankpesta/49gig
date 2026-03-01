@@ -666,6 +666,65 @@ export default defineSchema({
     .index("by_user", ["userId", "createdAt"])
     .index("by_read", ["userId", "readAt"]),
 
+  // Freelancer wallets (in-platform balance)
+  wallets: defineTable({
+    userId: v.id("users"),
+    balanceCents: v.number(), // Balance in smallest unit (cents for USD)
+    currency: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
+  // Wallet transaction log (credits, debits)
+  walletTransactions: defineTable({
+    walletId: v.id("wallets"),
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("credit"), // Monthly approval → wallet
+      v.literal("debit"), // Withdrawal to bank
+      v.literal("refund")
+    ),
+    amountCents: v.number(),
+    currency: v.string(),
+    balanceAfterCents: v.optional(v.number()),
+    description: v.string(),
+    projectId: v.optional(v.id("projects")),
+    monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
+    paymentId: v.optional(v.id("payments")),
+    flutterwaveTransferId: v.optional(v.string()),
+    status: v.union(
+      v.literal("completed"),
+      v.literal("pending"),
+      v.literal("failed")
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_wallet", ["walletId", "createdAt"])
+    .index("by_user", ["userId", "createdAt"]),
+
+  // Monthly billing cycles (replaces milestones)
+  monthlyBillingCycles: defineTable({
+    projectId: v.id("projects"),
+    monthIndex: v.number(), // 1, 2, 3...
+    monthStartDate: v.number(),
+    monthEndDate: v.number(),
+    amountCents: v.number(), // Amount for this month (after platform fee split)
+    currency: v.string(),
+    status: v.union(
+      v.literal("pending"), // Awaiting client approval
+      v.literal("approved"), // Client approved, funds to wallet
+      v.literal("disputed")
+    ),
+    approvedBy: v.optional(v.id("users")),
+    approvedAt: v.optional(v.number()),
+    disputeId: v.optional(v.id("disputes")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_month", ["projectId", "monthIndex"])
+    .index("by_status", ["status"]),
+
   // Client ratings of freelancers (one per project)
   reviews: defineTable({
     projectId: v.id("projects"),
@@ -781,19 +840,23 @@ export default defineSchema({
     .index("by_moderator", ["assignedModeratorId"]),
 
   payments: defineTable({
-    // Project
-    projectId: v.id("projects"),
+    // Project (optional for payout from wallet)
+    projectId: v.optional(v.id("projects")),
 
-    // Milestone (if milestone payment)
+    // Milestone (legacy - deprecated)
     milestoneId: v.optional(v.id("milestones")),
+
+    // Monthly cycle (new)
+    monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
 
     // Type
     type: v.union(
       v.literal("pre_funding"),
-      v.literal("milestone_release"),
+      v.literal("milestone_release"), // Legacy
+      v.literal("monthly_release"), // New: approval → wallet
       v.literal("refund"),
       v.literal("platform_fee"),
-      v.literal("payout")
+      v.literal("payout") // Withdrawal from wallet to bank
     ),
 
     // Amount
@@ -801,6 +864,9 @@ export default defineSchema({
     currency: v.string(),
     platformFee: v.optional(v.number()),
     netAmount: v.number(), // After platform fee
+
+    // Recipient (for payout from wallet - identifies freelancer)
+    recipientId: v.optional(v.id("users")),
 
     // Flutterwave
     flutterwaveTransactionId: v.optional(v.string()), // Payment transaction reference
@@ -838,7 +904,8 @@ export default defineSchema({
     .index("by_flutterwave_transaction", ["flutterwaveTransactionId"])
     .index("by_flutterwave_transfer", ["flutterwaveTransferId"])
     .index("by_flutterwave_refund", ["flutterwaveRefundId"])
-    .index("by_webhook", ["webhookReceived"]),
+    .index("by_webhook", ["webhookReceived"])
+    .index("by_recipient", ["recipientId"]),
 
   auditLogs: defineTable({
     // Action

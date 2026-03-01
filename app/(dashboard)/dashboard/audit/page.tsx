@@ -74,13 +74,14 @@ export default function AuditLogsPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={FileText} title="Please log in" />;
+    return <DashboardEmptyState icon={FileText} title="Please log in" iconTone="muted" />;
   }
 
   if (user.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={Shield}
+        iconTone="muted"
         title="Access denied"
         description="Admin role required."
       />
@@ -88,7 +89,7 @@ export default function AuditLogsPage() {
   }
 
   if (logs === undefined) {
-    return <DashboardLoadingState label="Loading audit logs..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   const filteredLogs = logs?.filter((log: EnrichedAuditLog) => {
@@ -106,10 +107,11 @@ export default function AuditLogsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Audit Logs"
         description="View system audit trail and activity logs."
+        icon={FileText}
       />
 
       {/* Filters */}

@@ -42,7 +42,7 @@ export default function VerificationPage() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading verification status...</p>
+          <p className="text-sm text-muted-foreground">Loading</p>
         </div>
       </div>
     );
@@ -104,6 +104,19 @@ export default function VerificationPage() {
   const stepsCompleted = vettingResult?.stepsCompleted || [];
   const currentStep = vettingResult?.currentStep || "english";
   const router = useRouter();
+
+  // Fully verified freelancers should use dashboard, not verification page
+  if (status === "approved" && vettingResult?.status === "approved") {
+    router.replace("/dashboard");
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading</p>
+        </div>
+      </div>
+    );
+  }
 
   const steps = [
     {

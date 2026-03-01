@@ -9,13 +9,13 @@ interface DashboardLoadingStateProps {
 }
 
 export function DashboardLoadingState({
-  label = "Loading...",
+  label = "Loading",
   className,
 }: DashboardLoadingStateProps) {
   return (
-    <div className={cn("flex min-h-[260px] items-center justify-center rounded-2xl border border-border/60 bg-card/70", className)}>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+    <div className={cn("flex min-h-[260px] items-center justify-center rounded-xl border border-border/60 bg-card", className)}>
+      <div className="flex items-center gap-3 text-sm font-medium text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
         {label}
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation } from "convex/react";
+import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ interface ProjectContractViewProps {
 }
 
 export function ProjectContractView({ projectId, userId }: ProjectContractViewProps) {
+  const router = useRouter();
   const contractData = useQuery(api.contracts.queries.getContractForProject, {
     projectId,
     userId,
@@ -45,7 +47,10 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
         toast.info("You have already signed this contract.");
         return;
       }
-      toast.success("Contract signed. A copy has been sent to your email.");
+      toast.success("Contract signed. A copy has been sent to your email and the freelancer(s).");
+      if (contractData.role === "client") {
+        router.push(`/dashboard/projects/${projectId}/payment`);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to sign contract");
     }
@@ -86,7 +91,7 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
               className="font-semibold text-base px-8 py-6"
               style={{ fontFamily: "'Georgia', 'Times New Roman', serif", fontStyle: "italic" }}
             >
-              Approve &amp; Sign
+              Sign manually
             </Button>
           </div>
         ) : (

@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 
 /**
- * Get current user profile
+ * Get current user profile (Convex Auth only - requires identity)
  */
 export const getCurrentUserProfile = query({
   args: {},
@@ -26,6 +26,51 @@ export const getCurrentUserProfile = query({
     }
 
     // Return user without sensitive data
+    const { passwordHash, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  },
+});
+
+/**
+ * Get full user profile for editing (supports session token for email/password users).
+ * Use this when the profile page needs to display skills, techField, etc. from signup.
+ */
+export const getProfileForEdit = query({
+  args: {
+    sessionToken: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    let user = null;
+
+    if (args.sessionToken) {
+      const session = await ctx.db
+        .query("sessions")
+        .withIndex("by_token", (q) => q.eq("sessionToken", args.sessionToken!))
+        .first();
+      if (session?.isActive && session.expiresAt >= Date.now()) {
+        user = await ctx.db.get(session.userId);
+      }
+    }
+
+    if (!user && args.userId) {
+      user = await ctx.db.get(args.userId);
+    }
+
+    if (!user && !args.sessionToken && !args.userId) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (identity?.email) {
+        user = await ctx.db
+          .query("users")
+          .withIndex("by_email", (q) => q.eq("email", identity.email!))
+          .first();
+      }
+    }
+
+    if (!user || user.status !== "active") {
+      return null;
+    }
+
     const { passwordHash, ...userWithoutPassword } = user;
     return userWithoutPassword;
   },

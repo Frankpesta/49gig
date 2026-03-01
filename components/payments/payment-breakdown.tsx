@@ -14,26 +14,24 @@ import {
   formatCurrency,
   formatPaymentBreakdown,
 } from "@/lib/payment-calculator";
-import { CheckCircle2, Info, DollarSign, Users, Clock } from "lucide-react";
+import { Info, DollarSign, Users, Clock } from "lucide-react";
 
 interface PaymentBreakdownProps {
   breakdown: PaymentBreakdown;
-  showMilestones?: boolean;
   className?: string;
 }
 
 export function PaymentBreakdownDisplay({
   breakdown,
-  showMilestones = true,
   className,
 }: PaymentBreakdownProps) {
   const formatted = formatPaymentBreakdown(breakdown);
 
   const billingModelLabels: Record<PaymentBreakdown["billingModel"], string> = {
     fixed_price: "Fixed Price",
-    milestone_based: "Milestone-Based",
+    milestone_based: "Deliverable-Based",
     hourly: "Hourly Rate",
-    hybrid: "Hybrid (Hourly + Milestones)",
+    hybrid: "Hybrid (Hourly + Deliverables)",
   };
 
   const billingModelIcons: Record<PaymentBreakdown["billingModel"], typeof DollarSign> = {
@@ -83,47 +81,6 @@ export function PaymentBreakdownDisplay({
         </div>
 
         <Separator />
-
-        {/* Milestones */}
-        {showMilestones && breakdown.milestones && breakdown.milestones.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              Payment Milestones
-            </div>
-            <div className="space-y-2">
-              {breakdown.milestones.map((milestone, index) => (
-                <div
-                  key={index}
-                  className="flex items-start justify-between rounded-lg border bg-muted/30 p-3"
-                >
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-                        {milestone.order}
-                      </span>
-                      <span className="font-medium">{milestone.title}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground pl-8">
-                      {milestone.description}
-                    </p>
-                    <p className="text-xs text-muted-foreground pl-8">
-                      Due: {new Date(milestone.dueDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-semibold">
-                      {formatCurrency(milestone.amount, breakdown.currency)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {milestone.percentage}%
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Hourly Rate Info */}
         {breakdown.billingModel === "hourly" && breakdown.hourlyRate && (
