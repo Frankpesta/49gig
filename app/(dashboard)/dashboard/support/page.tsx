@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2, LifeBuoy, MessageSquare, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
@@ -71,7 +72,7 @@ export default function SupportPage() {
       }, 2000);
     } catch (error) {
       console.error("Failed to create support chat:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to create support request. Please try again.";
+      const errorMessage = getUserFriendlyError(error) || "Failed to create support request. Please try again.";
       setErrorDialog({
         open: true,
         title: "Request Failed",

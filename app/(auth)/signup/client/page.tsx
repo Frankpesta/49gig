@@ -13,6 +13,7 @@ import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { clientSignupFeatures } from "@/components/auth/auth-icons";
 import { CountrySelector } from "@/components/ui/country-selector";
 import { getCountryByCode } from "@/lib/countries";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function ClientSignupPage() {
@@ -97,7 +98,7 @@ export default function ClientSignupPage() {
         }
       }
     } catch (err: any) {
-      setError(err.message || "Failed to create account");
+      setError(getUserFriendlyError(err) || "Failed to create account");
     } finally {
       setIsLoading(false);
     }

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 export default function PaymentCallbackPage() {
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function PaymentCallbackPage() {
           // Verification successful - payment status query will update
         } catch (err) {
           setVerificationError(
-            err instanceof Error ? err.message : "Payment verification failed"
+            getUserFriendlyError(err) || "Payment verification failed"
           );
         } finally {
           setIsVerifying(false);

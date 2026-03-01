@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ChatEvidenceSelector } from "@/components/disputes/chat-evidence-selector";
 import { useState } from "react";
 import { Id } from "@/convex/_generated/dataModel";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 interface AddEvidenceDialogProps {
   open: boolean;
@@ -63,7 +64,7 @@ export function AddEvidenceDialog({
       onSuccess();
       onOpenChange(false);
     } catch (err: any) {
-      setError(err.message || "Failed to add evidence");
+      setError(getUserFriendlyError(err) || "Failed to add evidence");
     } finally {
       setIsSubmitting(false);
     }

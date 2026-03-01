@@ -28,6 +28,7 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -226,7 +227,7 @@ export default function ProjectDetailPage() {
       const chatId = await createProjectChat({ projectId, userId: user._id });
       router.push(`/dashboard/chat/${chatId}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not open chat");
+      toast.error(getUserFriendlyError(err) || "Could not open chat");
     } finally {
       setIsOpeningChat(false);
     }
@@ -245,7 +246,7 @@ export default function ProjectDetailPage() {
       toast.success(existingReview ? "Rating updated" : "Rating submitted");
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit rating");
+      toast.error(getUserFriendlyError(err) || "Failed to submit rating");
     } finally {
       setIsSubmittingRating(false);
     }
@@ -371,7 +372,7 @@ export default function ProjectDetailPage() {
                                 await approveMonthlyCycle({ monthlyCycleId: cycle._id });
                                 toast.success("Month approved");
                               } catch (e) {
-                                toast.error(e instanceof Error ? e.message : "Approval failed");
+                                toast.error(getUserFriendlyError(e) || "Approval failed");
                               } finally {
                                 setApprovingCycleId(null);
                               }

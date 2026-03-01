@@ -18,6 +18,7 @@ import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { resumeUploadFeatures } from "@/components/auth/auth-icons";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { FileText, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -188,7 +189,7 @@ export default function ResumeUploadPage() {
       setSuccess(true);
       setTimeout(() => router.replace("/verification"), 800);
     } catch (err: any) {
-      setError(err?.message || "Failed to upload resume.");
+      setError(getUserFriendlyError(err) || "Failed to upload resume.");
     } finally {
       setIsUploading(false);
     }

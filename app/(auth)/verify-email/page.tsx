@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/input-otp";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { loginFeatures } from "@/components/auth/auth-icons";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
@@ -85,7 +86,7 @@ function VerifyEmailContent() {
       sessionStorage.removeItem("pending_verify_email");
     }
     } catch (err: unknown) {
-      setError((err as Error).message || "Failed to verify email");
+      setError(getUserFriendlyError(err) || "Failed to verify email");
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +104,7 @@ function VerifyEmailContent() {
       setResendSuccess(true);
       setCode("");
     } catch (err: unknown) {
-      setError((err as Error).message || "Failed to resend verification email");
+      setError(getUserFriendlyError(err) || "Failed to resend verification email");
     } finally {
       setIsResending(false);
     }

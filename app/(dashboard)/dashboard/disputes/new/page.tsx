@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, AlertCircle } from "lucide-react";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
 import { useState } from "react";
 import { ChatEvidenceSelector } from "@/components/disputes/chat-evidence-selector";
@@ -98,7 +99,7 @@ export default function NewDisputePage() {
 
       router.push(`/dashboard/disputes/${disputeId}`);
     } catch (err: any) {
-      setError(err.message || "Failed to initiate dispute");
+      setError(getUserFriendlyError(err) || "Failed to initiate dispute");
     } finally {
       setIsSubmitting(false);
     }

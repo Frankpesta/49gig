@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useSessionRotation } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import {
@@ -81,7 +82,7 @@ export default function SelectRolePage() {
         }
       }
     } catch (err: any) {
-      setError(err.message || "Failed to complete signup");
+      setError(getUserFriendlyError(err) || "Failed to complete signup");
       setIsLoading(false);
     }
   };

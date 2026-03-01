@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2, Bell, Send, AlertCircle, Shield } from "lucide-react";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { Doc } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -137,7 +138,7 @@ export default function AdminNotificationsPage() {
       toast.success("Notification sent successfully");
     } catch (error) {
       console.error("Failed to send notification:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to send notification.";
+      const errorMessage = getUserFriendlyError(error) || "Failed to send notification.";
       setErrorDialog({
         open: true,
         title: "Send Failed",

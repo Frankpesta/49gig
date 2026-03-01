@@ -20,6 +20,7 @@ import {
   Banknote,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { Doc } from "@/convex/_generated/dataModel";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -56,7 +57,7 @@ export default function WalletPage() {
       toast.success("Withdrawal initiated. Funds will be transferred to your bank account.");
       setWithdrawAmount("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Withdrawal failed");
+      toast.error(getUserFriendlyError(err) || "Withdrawal failed");
     } finally {
       setIsWithdrawing(false);
     }

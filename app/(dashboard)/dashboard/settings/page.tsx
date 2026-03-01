@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Settings, Lock, Bell, Shield, Trash2, CreditCard, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { formatDistanceToNow } from "date-fns";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
@@ -194,7 +195,7 @@ export default function SettingsPage() {
       });
       toast.success("Password updated");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update password");
+      toast.error(getUserFriendlyError(error) || "Failed to update password");
     } finally {
       setIsSaving(false);
     }
@@ -209,9 +210,7 @@ export default function SettingsPage() {
       });
       toast.success("Notification preferences updated");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update preferences"
-      );
+      toast.error(getUserFriendlyError(error) || "Failed to update preferences");
     } finally {
       setIsSaving(false);
     }
@@ -228,7 +227,7 @@ export default function SettingsPage() {
       setTwoFactorMode(mode);
       toast.success("Verification code sent");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send code");
+      toast.error(getUserFriendlyError(error) || "Failed to send code");
     } finally {
       setIsSaving(false);
     }
@@ -256,7 +255,7 @@ export default function SettingsPage() {
       setTwoFactorCode("");
       toast.success("Two-factor authentication updated");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Verification failed");
+      toast.error(getUserFriendlyError(error) || "Verification failed");
     } finally {
       setIsSaving(false);
     }
@@ -298,9 +297,7 @@ export default function SettingsPage() {
         handleRefreshFlutterwaveStatus();
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create subaccount"
-      );
+      toast.error(getUserFriendlyError(error) || "Failed to create subaccount");
     } finally {
       setIsSaving(false);
     }
@@ -312,9 +309,7 @@ export default function SettingsPage() {
       const result = await getSubaccountStatus({ freelancerId: user._id });
       setFlutterwaveStatus(result || null);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to refresh status"
-      );
+      toast.error(getUserFriendlyError(error) || "Failed to refresh status");
     } finally {
       setIsFlutterwaveStatusLoading(false);
     }
@@ -354,7 +349,7 @@ export default function SettingsPage() {
       await revokeSessionById({ sessionToken, sessionId: sessionId as any });
       toast.success("Session revoked");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to revoke session");
+      toast.error(getUserFriendlyError(error) || "Failed to revoke session");
     } finally {
       setIsSaving(false);
     }
@@ -367,7 +362,7 @@ export default function SettingsPage() {
       await revokeOtherSessions({ sessionToken });
       toast.success("Signed out of other sessions");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to revoke sessions");
+      toast.error(getUserFriendlyError(error) || "Failed to revoke sessions");
     } finally {
       setIsSaving(false);
     }
@@ -392,7 +387,7 @@ export default function SettingsPage() {
       toast.success("Account deleted");
       router.replace("/");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete account");
+      toast.error(getUserFriendlyError(error) || "Failed to delete account");
     } finally {
       setIsDeleting(false);
     }
