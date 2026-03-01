@@ -20,6 +20,7 @@ import {
   Banknote,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Doc } from "@/convex/_generated/dataModel";
 
 const TYPE_LABELS: Record<string, string> = {
   credit: "Credit",
@@ -228,7 +229,7 @@ export default function WalletPage() {
             />
           ) : (
             <div className="space-y-2">
-              {transactions.map((tx) => (
+              {transactions.map((tx: Doc<"walletTransactions">) => (
                 <div
                   key={tx._id}
                   className="flex items-center justify-between py-3 border-b border-border/60 last:border-0"

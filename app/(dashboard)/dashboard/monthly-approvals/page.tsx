@@ -12,7 +12,7 @@ import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-stat
 import { useAuth } from "@/hooks/use-auth";
 import { CalendarCheck, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Id } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function MonthlyApprovalsPage() {
   const { user } = useAuth();
@@ -92,7 +92,7 @@ export default function MonthlyApprovalsPage() {
             />
           ) : (
             <div className="space-y-4">
-              {pendingCycles.map((cycle) => (
+              {pendingCycles.map((cycle: Doc<"monthlyBillingCycles">) => (
                 <MonthlyApprovalCard
                   key={cycle._id}
                   cycle={cycle}
@@ -115,16 +115,7 @@ function MonthlyApprovalCard({
   onApprove,
   isApproving,
 }: {
-  cycle: {
-    _id: Id<"monthlyBillingCycles">;
-    projectId: Id<"projects">;
-    monthIndex: number;
-    monthStartDate: number;
-    monthEndDate: number;
-    amountCents: number;
-    currency: string;
-    status: string;
-  };
+  cycle: Doc<"monthlyBillingCycles">;
   userId: Id<"users">;
   onApprove: () => void;
   isApproving: boolean;

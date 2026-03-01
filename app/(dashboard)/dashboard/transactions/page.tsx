@@ -48,7 +48,7 @@ import { Id } from "@/convex/_generated/dataModel";
 
 type Transaction = {
   _id: Id<"payments">;
-  type: "pre_funding" | "milestone_release" | "refund" | "platform_fee" | "payout";
+  type: "pre_funding" | "milestone_release" | "monthly_release" | "refund" | "platform_fee" | "payout";
   amount: number;
   currency: string;
   status: "pending" | "processing" | "succeeded" | "failed" | "refunded" | "cancelled";
