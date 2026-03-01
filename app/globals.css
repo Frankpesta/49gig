@@ -135,6 +135,25 @@
 }
 
 /* ============================================
+   REACT-DAY-PICKER (Calendar) Theme
+   ============================================ */
+.rdp-root {
+  --rdp-accent-color: var(--primary);
+  --rdp-accent-background-color: var(--accent);
+  --rdp-day-height: 2.25rem;
+  --rdp-day-width: 2.25rem;
+  --rdp-day_button-height: 2rem;
+  --rdp-day_button-width: 2rem;
+  --rdp-day_button-border-radius: var(--radius);
+  --rdp-nav_button-height: 2rem;
+  --rdp-nav_button-width: 2rem;
+  --rdp-range_middle-background-color: var(--accent);
+  --rdp-range_start-date-background-color: var(--primary);
+  --rdp-range_end-date-background-color: var(--primary);
+  --rdp-today-color: var(--primary);
+}
+
+/* ============================================
    BASE STYLES
    ============================================ */
 @layer base {

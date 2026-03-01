@@ -390,6 +390,10 @@ export const updateProjectStatus = mutation({
       throw new Error("Only client, moderator, or admin can dispute project");
     }
 
+    if (args.status === "completed" && !isClient && !isAdmin) {
+      throw new Error("Only the client or admin can mark a project as completed");
+    }
+
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
