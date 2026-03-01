@@ -135,7 +135,9 @@ export default function NotificationDetailPage() {
             {notification.title}
           </CardTitle>
           <CardDescription>
-            {notification.type ? `Type: ${notification.type}` : "Notification"}
+            {notification.type
+              ? `Type: ${notification.type.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}`
+              : "Notification"}
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
@@ -169,39 +171,63 @@ export default function NotificationDetailPage() {
               </div>
             )}
 
-          {/* Raw data only when we have extra fields beyond projectId/matchId */}
+          {/* Resolved references (human-readable labels) */}
           {notification.data &&
             (() => {
               const d = notification.data as Record<string, unknown>;
+              const resolved = (notification as { resolved?: Record<string, string> }).resolved ?? {};
               const keys = Object.keys(d);
               const hasProject = keys.includes("projectId");
               const hasMatch = keys.includes("matchId");
-              const hasOther = keys.some((k) => !["projectId", "matchId"].includes(k));
-              if (hasOther || (keys.length > 2)) {
+              const hasDispute = keys.includes("disputeId");
+              const hasOther = keys.some(
+                (k) => !["projectId", "matchId", "disputeId"].includes(k)
+              );
+              const labelMap: Record<string, { label: string; value: string }> = {};
+              if (hasProject)
+                labelMap.project = {
+                  label: "Project",
+                  value: resolved.projectTitle ?? String(d.projectId),
+                };
+              if (hasMatch)
+                labelMap.match = {
+                  label: "Match",
+                  value: resolved.matchLabel ?? String(d.matchId),
+                };
+              if (hasDispute)
+                labelMap.dispute = {
+                  label: "Dispute",
+                  value: resolved.disputeLabel ?? String(d.disputeId),
+                };
+              if (hasOther) {
+                const keyToResolved: Record<string, string> = {
+                  userId: "userLabel",
+                  milestoneId: "milestoneLabel",
+                  paymentId: "paymentLabel",
+                  vettingResultId: "vettingLabel",
+                };
+                for (const k of keys.filter(
+                  (key) => !["projectId", "matchId", "disputeId"].includes(key)
+                )) {
+                  const resolvedKey = keyToResolved[k] ?? `${k.replace(/Id$/, "")}Label`;
+                  labelMap[k] = {
+                    label: k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()),
+                    value: resolved[resolvedKey] ?? String(d[k]),
+                  };
+                }
+              }
+              if (Object.keys(labelMap).length > 0) {
                 return (
                   <div className="mt-6 rounded-lg border border-border/60 bg-muted/20 p-4">
                     <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                      Reference IDs
+                      References
                     </div>
-                    <div className="text-sm space-y-1 font-mono">
-                      {hasProject && (
-                        <div>
-                          Project: <span className="text-muted-foreground">{String(d.projectId)}</span>
+                    <div className="text-sm space-y-1">
+                      {Object.entries(labelMap).map(([key, { label, value }]) => (
+                        <div key={key}>
+                          {label}: <span className="text-foreground font-medium">{value}</span>
                         </div>
-                      )}
-                      {hasMatch && (
-                        <div>
-                          Match: <span className="text-muted-foreground">{String(d.matchId)}</span>
-                        </div>
-                      )}
-                      {hasOther &&
-                        keys
-                          .filter((k) => !["projectId", "matchId"].includes(k))
-                          .map((k) => (
-                            <div key={k}>
-                              {k}: <span className="text-muted-foreground">{JSON.stringify(d[k])}</span>
-                            </div>
-                          ))}
+                      ))}
                     </div>
                   </div>
                 );

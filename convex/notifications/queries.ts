@@ -21,7 +21,56 @@ export const getNotificationById = query({
 
     const notification = await ctx.db.get(args.notificationId);
     if (!notification || notification.userId !== user._id) return null;
-    return notification;
+
+    // Resolve IDs to human-readable labels for display
+    const resolved: Record<string, string> = {};
+    const data = notification.data as Record<string, unknown> | undefined;
+    if (data) {
+      if (typeof data.projectId === "string") {
+        const project = await ctx.db.get(data.projectId as Doc<"projects">["_id"]);
+        resolved.projectTitle = project?.intakeForm?.title ?? "Unknown project";
+      }
+      if (typeof data.matchId === "string") {
+        const match = await ctx.db.get(data.matchId as Doc<"matches">["_id"]);
+        if (match) {
+          const freelancer = await ctx.db.get(match.freelancerId);
+          const project = await ctx.db.get(match.projectId);
+          resolved.matchLabel = freelancer?.name
+            ? `${freelancer.name}${project?.intakeForm?.title ? ` – ${project.intakeForm.title}` : ""}`
+            : project?.intakeForm?.title ?? "Match";
+        }
+      }
+      if (typeof data.disputeId === "string") {
+        const dispute = await ctx.db.get(data.disputeId as Doc<"disputes">["_id"]);
+        if (dispute) {
+          const project = await ctx.db.get(dispute.projectId);
+          resolved.disputeLabel = project?.intakeForm?.title
+            ? `Dispute for ${project.intakeForm.title}`
+            : "Dispute";
+        }
+      }
+      if (typeof data.userId === "string") {
+        const u = await ctx.db.get(data.userId as Doc<"users">["_id"]);
+        resolved.userLabel = u?.name ?? "User";
+      }
+      if (typeof data.milestoneId === "string") {
+        const milestone = await ctx.db.get(data.milestoneId as Doc<"milestones">["_id"]);
+        resolved.milestoneLabel = milestone?.title ?? "Milestone";
+      }
+      if (typeof data.paymentId === "string") {
+        const payment = await ctx.db.get(data.paymentId as Doc<"payments">["_id"]);
+        if (payment) {
+          const curr = payment.currency?.toUpperCase() ?? "USD";
+          resolved.paymentLabel =
+            curr === "USD" ? `$${payment.amount.toFixed(2)}` : `${payment.amount} ${curr}`;
+        }
+      }
+      if (typeof data.vettingResultId === "string") {
+        resolved.vettingLabel = "Verification";
+      }
+    }
+
+    return { ...notification, resolved };
   },
 });
 
