@@ -121,13 +121,14 @@ export default function PricingPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={DollarSign} title="Please log in." />;
+    return <DashboardEmptyState icon={DollarSign} title="Please log in." iconTone="muted" />;
   }
 
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
       <DashboardEmptyState
         icon={DollarSign}
+        iconTone="muted"
         title="Access restricted"
         description="Only admins and moderators can manage pricing."
       />
@@ -137,14 +138,15 @@ export default function PricingPage() {
   const isLoading = config === undefined;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Base rates by tech stack"
         description="Set hourly base rates (USD) per talent category and experience level. These rates drive budget estimates when clients create projects."
+        icon={DollarSign}
       />
 
       {isLoading ? (
-        <DashboardLoadingState label="Loading pricing..." />
+        <DashboardLoadingState label="Loading" />
       ) : (
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2">

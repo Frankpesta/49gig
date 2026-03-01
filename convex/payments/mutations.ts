@@ -37,10 +37,11 @@ async function getCurrentUserInMutation(
  */
 export const createPayment = internalMutation({
   args: {
-    projectId: v.id("projects"),
+    projectId: v.optional(v.id("projects")),
     type: v.union(
       v.literal("pre_funding"),
       v.literal("milestone_release"),
+      v.literal("monthly_release"),
       v.literal("refund"),
       v.literal("platform_fee"),
       v.literal("payout")
@@ -55,7 +56,9 @@ export const createPayment = internalMutation({
     flutterwaveCustomerEmail: v.optional(v.string()),
     flutterwaveSubaccountId: v.optional(v.string()),
     milestoneId: v.optional(v.id("milestones")),
+    monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
     userId: v.id("users"),
+    recipientId: v.optional(v.id("users")),
     status: v.optional(
       v.union(
         v.literal("pending"),
@@ -73,6 +76,9 @@ export const createPayment = internalMutation({
     // CRITICAL: Check for existing payment to prevent duplicates
     // This is a safety check in case the action's check didn't catch it
     if (args.type === "pre_funding") {
+      if (!args.projectId) {
+        throw new Error("projectId is required for pre_funding payments");
+      }
       const existingPayment = await ctx.db
         .query("payments")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -108,8 +114,10 @@ export const createPayment = internalMutation({
     }
 
     const paymentId = await ctx.db.insert("payments", {
-      projectId: args.projectId,
+      projectId: args.projectId ?? undefined,
       milestoneId: args.milestoneId,
+      monthlyCycleId: args.monthlyCycleId,
+      recipientId: args.recipientId,
       type: args.type,
       amount: args.amount,
       currency: args.currency,
@@ -278,14 +286,17 @@ export const handlePaymentSuccess = internalMutation({
       updatedAt: now,
     });
 
-    // Get project to access clientId for audit logs
-    const project = await ctx.db.get(payment.projectId);
+    // Get project to access clientId for audit logs (projectId optional for payouts)
+    const projectId = payment.projectId;
+    const project = projectId
+      ? (await ctx.db.get(projectId)) as Doc<"projects"> | null
+      : null;
     const clientId = project?.clientId;
 
     // Update project based on payment type
-    if (payment.type === "pre_funding" && project) {
+    if (payment.type === "pre_funding" && project && projectId) {
       // Update project to funded status
-      await ctx.db.patch(payment.projectId, {
+      await ctx.db.patch(projectId, {
         status: "funded",
         escrowedAmount: payment.amount,
         updatedAt: now,
@@ -293,7 +304,7 @@ export const handlePaymentSuccess = internalMutation({
 
       // Accept client's selected freelancer(s) and then auto-create milestones
       await ctx.scheduler.runAfter(0, internalAny.projects.mutations.acceptSelectedMatchInternal, {
-        projectId: payment.projectId,
+        projectId,
       });
 
       // Log audit
@@ -304,7 +315,7 @@ export const handlePaymentSuccess = internalMutation({
           actorId: clientId, // Use project owner as actor for system events
           actorRole: "system",
           targetType: "project",
-          targetId: payment.projectId,
+          targetId: projectId,
           details: {
             paymentId: payment._id,
             amount: payment.amount,
@@ -338,7 +349,7 @@ export const handlePaymentSuccess = internalMutation({
         title: "Payment received",
         message: `We received ${amountLabel} for ${project.intakeForm.title}.`,
         type: "payment",
-        data: { paymentId: payment._id, projectId: payment.projectId },
+        data: { paymentId: payment._id, projectId },
       });
 
       if (project.matchedFreelancerId && payment.type === "milestone_release") {
@@ -347,7 +358,7 @@ export const handlePaymentSuccess = internalMutation({
           title: "Milestone payout released",
           message: `A milestone payment was released for ${project.intakeForm.title}.`,
           type: "payment",
-          data: { paymentId: payment._id, projectId: payment.projectId },
+          data: { paymentId: payment._id, projectId },
         });
       }
     }
@@ -394,7 +405,10 @@ export const handlePaymentFailure = internalMutation({
     });
 
     // Get project to access clientId for audit log
-    const project = await ctx.db.get(payment.projectId);
+    const projectId = payment.projectId;
+    const project = projectId
+      ? (await ctx.db.get(projectId)) as Doc<"projects"> | null
+      : null;
     const clientId = project?.clientId;
 
     // Log audit
@@ -414,13 +428,13 @@ export const handlePaymentFailure = internalMutation({
       });
     }
 
-    if (project) {
+    if (project && projectId) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
         userIds: [project.clientId],
         title: "Payment failed",
         message: `A payment attempt for ${project.intakeForm.title} failed.`,
         type: "payment",
-        data: { paymentId: payment._id, projectId: payment.projectId },
+        data: { paymentId: payment._id, projectId },
       });
     }
 
@@ -464,12 +478,15 @@ export const handlePaymentCancellation = internalMutation({
     });
 
     // Get project to access clientId for audit log
-    const project = await ctx.db.get(payment.projectId);
+    const projectId = payment.projectId;
+    const project = projectId
+      ? (await ctx.db.get(projectId)) as Doc<"projects"> | null
+      : null;
     const clientId = project?.clientId;
 
     // If pre-funding was cancelled, revert project to draft
-    if (payment.type === "pre_funding" && project) {
-      await ctx.db.patch(payment.projectId, {
+    if (payment.type === "pre_funding" && project && projectId) {
+      await ctx.db.patch(projectId, {
         status: "draft",
         updatedAt: now,
       });
@@ -491,13 +508,13 @@ export const handlePaymentCancellation = internalMutation({
       });
     }
 
-    if (project) {
+    if (project && projectId) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
         userIds: [project.clientId],
         title: "Payment cancelled",
         message: `A payment for ${project.intakeForm.title} was cancelled.`,
         type: "payment",
-        data: { paymentId: payment._id, projectId: payment.projectId },
+        data: { paymentId: payment._id, projectId },
       });
     }
 

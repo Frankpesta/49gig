@@ -41,6 +41,8 @@ import type * as matching_mutations from "../matching/mutations.js";
 import type * as matching_queries from "../matching/queries.js";
 import type * as matching_teamMatching from "../matching/teamMatching.js";
 import type * as milestones_mutations from "../milestones/mutations.js";
+import type * as monthlyBillingCycles_mutations from "../monthlyBillingCycles/mutations.js";
+import type * as monthlyBillingCycles_queries from "../monthlyBillingCycles/queries.js";
 import type * as notifications_actions from "../notifications/actions.js";
 import type * as notifications_mutations from "../notifications/mutations.js";
 import type * as notifications_queries from "../notifications/queries.js";
@@ -77,6 +79,8 @@ import type * as vetting_questions from "../vetting/questions.js";
 import type * as vetting_skillTestComplexity from "../vetting/skillTestComplexity.js";
 import type * as vetting_skillTestSession from "../vetting/skillTestSession.js";
 import type * as vetting_testSessions from "../vetting/testSessions.js";
+import type * as wallets_mutations from "../wallets/mutations.js";
+import type * as wallets_queries from "../wallets/queries.js";
 
 import type {
   ApiFromModules,
@@ -118,6 +122,8 @@ declare const fullApi: ApiFromModules<{
   "matching/queries": typeof matching_queries;
   "matching/teamMatching": typeof matching_teamMatching;
   "milestones/mutations": typeof milestones_mutations;
+  "monthlyBillingCycles/mutations": typeof monthlyBillingCycles_mutations;
+  "monthlyBillingCycles/queries": typeof monthlyBillingCycles_queries;
   "notifications/actions": typeof notifications_actions;
   "notifications/mutations": typeof notifications_mutations;
   "notifications/queries": typeof notifications_queries;
@@ -154,6 +160,8 @@ declare const fullApi: ApiFromModules<{
   "vetting/skillTestComplexity": typeof vetting_skillTestComplexity;
   "vetting/skillTestSession": typeof vetting_skillTestSession;
   "vetting/testSessions": typeof vetting_testSessions;
+  "wallets/mutations": typeof wallets_mutations;
+  "wallets/queries": typeof wallets_queries;
 }>;
 
 /**

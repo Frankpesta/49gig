@@ -36,6 +36,7 @@ export const getTransactions = query({
       v.union(
         v.literal("pre_funding"),
         v.literal("milestone_release"),
+        v.literal("monthly_release"),
         v.literal("refund"),
         v.literal("platform_fee"),
         v.literal("payout")
@@ -93,32 +94,34 @@ export const getTransactions = query({
 
       payments = allPayments;
     } else if (user.role === "freelancer") {
-      // Freelancers see payouts for their projects
+      // Freelancers see milestone/monthly releases and payouts
+      const allPayments: any[] = [];
+
+      // From projects (milestone_release, monthly_release, project payouts)
       const userProjects = await ctx.db
         .query("projects")
         .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
         .collect();
-
       const projectIds = userProjects.map((p) => p._id);
-      
-      if (projectIds.length === 0) {
-        return [];
-      }
 
-      // Get milestone releases and payouts for freelancer's projects
-      const allPayments: any[] = [];
       for (const projectId of projectIds) {
         const projectPayments = await ctx.db
           .query("payments")
           .withIndex("by_project", (q) => q.eq("projectId", projectId))
           .collect();
-        
-        // Filter for milestone releases and payouts
         const filteredPayments = projectPayments.filter(
-          (p) => p.type === "milestone_release" || p.type === "payout"
+          (p) => p.type === "milestone_release" || p.type === "monthly_release" || p.type === "payout"
         );
         allPayments.push(...filteredPayments);
       }
+
+      // Wallet payouts (no projectId, identified by recipientId)
+      const walletPayouts = await ctx.db
+        .query("payments")
+        .withIndex("by_recipient", (q) => q.eq("recipientId", user._id))
+        .filter((q) => q.eq(q.field("type"), "payout"))
+        .collect();
+      allPayments.push(...walletPayouts);
 
       payments = allPayments;
     } else {
@@ -140,7 +143,9 @@ export const getTransactions = query({
     // Enrich with project and milestone info
     const enrichedTransactions = await Promise.all(
       payments.map(async (payment) => {
-        const project = await ctx.db.get(payment.projectId) as Doc<"projects"> | null;
+        const project = payment.projectId
+          ? (await ctx.db.get(payment.projectId) as Doc<"projects"> | null)
+          : null;
         const milestone = payment.milestoneId
           ? (await ctx.db.get(payment.milestoneId) as Doc<"milestones"> | null)
           : null;
@@ -187,22 +192,33 @@ export const getTransaction = query({
       return null;
     }
 
-    // Get project to check authorization
-    const project = await ctx.db.get(payment.projectId);
+    const isAdmin = user.role === "admin";
+    const isModerator = user.role === "moderator";
+
+    // Wallet payout (no project) - check recipientId
+    if (!payment.projectId && payment.type === "payout") {
+      if (payment.recipientId === user._id || isAdmin || isModerator) {
+        return {
+          ...payment,
+          project: null,
+          milestone: null,
+        };
+      }
+      return null;
+    }
+
+    const project = await ctx.db.get(payment.projectId!);
     if (!project) {
       return null;
     }
 
-    // Authorization checks
-    const isAdmin = user.role === "admin";
-    const isModerator = user.role === "moderator";
     const isClient = project.clientId === user._id;
     const isFreelancer =
       project.matchedFreelancerId === user._id &&
-      (payment.type === "milestone_release" || payment.type === "payout");
+      (payment.type === "milestone_release" || payment.type === "monthly_release" || payment.type === "payout");
 
     if (!isAdmin && !isModerator && !isClient && !isFreelancer) {
-      return null; // Not authorized
+      return null;
     }
 
     // Get milestone if applicable

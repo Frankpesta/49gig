@@ -9,14 +9,14 @@ import { Button } from "@/components/ui/button";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { AlertCircle, Plus, Search } from "lucide-react";
+  DataTable,
+  DataTableHeader,
+  DataTableHead,
+  DataTableBody,
+  DataTableRow,
+  DataTableCell,
+} from "@/components/dashboard/data-table";
+import { Scale, Plus } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -41,11 +41,11 @@ export default function DisputesPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={AlertCircle} title="Please log in" />;
+    return <DashboardEmptyState icon={Scale} title="Please log in" iconTone="muted" />;
   }
 
   if (disputes === undefined) {
-    return <DashboardLoadingState label="Loading disputes..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   const getStatusBadge = (status: string) => {
@@ -62,7 +62,7 @@ export default function DisputesPage() {
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      milestone_quality: "Milestone Quality",
+      milestone_quality: "Deliverable Quality",
       payment: "Payment",
       communication: "Communication",
       freelancer_replacement: "Freelancer Replacement",
@@ -77,13 +77,14 @@ export default function DisputesPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Disputes"
         description="Manage and resolve project disputes."
+        icon={Scale}
         actions={
           user.role === "client" || user.role === "freelancer" ? (
-            <Button asChild>
+            <Button asChild className="rounded-xl">
               <Link href="/dashboard/disputes/new">
                 <Plus className="mr-2 h-4 w-4" />
                 New Dispute
@@ -97,6 +98,7 @@ export default function DisputesPage() {
       <DashboardFilterBar className="mb-0">
         <Button
           variant={statusFilter === undefined ? "default" : "outline"}
+          className="rounded-lg"
           onClick={() => {
             setStatusFilter(undefined);
             setCurrentPage(1);
@@ -106,6 +108,7 @@ export default function DisputesPage() {
         </Button>
         <Button
           variant={statusFilter === "open" ? "default" : "outline"}
+          className="rounded-lg"
           onClick={() => {
             setStatusFilter("open");
             setCurrentPage(1);
@@ -115,6 +118,7 @@ export default function DisputesPage() {
         </Button>
         <Button
           variant={statusFilter === "under_review" ? "default" : "outline"}
+          className="rounded-lg"
           onClick={() => {
             setStatusFilter("under_review");
             setCurrentPage(1);
@@ -124,6 +128,7 @@ export default function DisputesPage() {
         </Button>
         <Button
           variant={statusFilter === "resolved" ? "default" : "outline"}
+          className="rounded-lg"
           onClick={() => {
             setStatusFilter("resolved");
             setCurrentPage(1);
@@ -134,63 +139,61 @@ export default function DisputesPage() {
       </DashboardFilterBar>
 
       {/* Disputes Table */}
-      <Card>
+      <Card className="rounded-xl overflow-hidden">
         <CardHeader>
           <CardTitle>Dispute List</CardTitle>
         </CardHeader>
         <CardContent>
           {disputes.length === 0 ? (
-            <DashboardEmptyState icon={AlertCircle} title="No disputes found" className="border-0 bg-transparent py-8 shadow-none" />
+            <DashboardEmptyState icon={Scale} title="No disputes found" iconTone="muted" className="border-0 bg-transparent py-8 shadow-none" />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Initiator</TableHead>
-                  <TableHead>Amount Locked</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <DataTable>
+              <DataTableHeader>
+                <DataTableHead>ID</DataTableHead>
+                <DataTableHead>Project</DataTableHead>
+                <DataTableHead>Type</DataTableHead>
+                <DataTableHead>Status</DataTableHead>
+                <DataTableHead>Initiator</DataTableHead>
+                <DataTableHead>Amount Locked</DataTableHead>
+                <DataTableHead>Created</DataTableHead>
+                <DataTableHead className="text-right">Actions</DataTableHead>
+              </DataTableHeader>
+              <DataTableBody>
                 {paginatedDisputes.map((dispute: Doc<"disputes">) => (
-                  <TableRow key={dispute._id}>
-                    <TableCell className="font-mono text-xs">
+                  <DataTableRow key={dispute._id}>
+                    <DataTableCell className="font-mono text-xs">
                       {dispute._id.slice(-8)}
-                    </TableCell>
-                    <TableCell>
+                    </DataTableCell>
+                    <DataTableCell>
                       <Link
                         href={`/dashboard/projects/${dispute.projectId}`}
                         className="text-primary hover:underline"
                       >
                         View Project
                       </Link>
-                    </TableCell>
-                    <TableCell>{getTypeLabel(dispute.type)}</TableCell>
-                    <TableCell>{getStatusBadge(dispute.status)}</TableCell>
-                    <TableCell>
+                    </DataTableCell>
+                    <DataTableCell>{getTypeLabel(dispute.type)}</DataTableCell>
+                    <DataTableCell>{getStatusBadge(dispute.status)}</DataTableCell>
+                    <DataTableCell>
                       {dispute.initiatorRole === "client" ? "Client" : "Freelancer"}
-                    </TableCell>
-                    <TableCell>
+                    </DataTableCell>
+                    <DataTableCell>
                       ${(dispute.lockedAmount / 100).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
+                    </DataTableCell>
+                    <DataTableCell>
                       {new Date(dispute.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm" asChild>
+                    </DataTableCell>
+                    <DataTableCell className="text-right">
+                      <Button variant="outline" size="sm" asChild className="rounded-lg">
                         <Link href={`/dashboard/disputes/${dispute._id}`}>
                           View
                         </Link>
                       </Button>
-                    </TableCell>
-                  </TableRow>
+                    </DataTableCell>
+                  </DataTableRow>
                 ))}
-              </TableBody>
-            </Table>
+              </DataTableBody>
+            </DataTable>
           )}
           <TablePagination
             currentPage={currentPage}

@@ -188,7 +188,15 @@ async function createGoogleCalendarEventWithMeet(
 }
 
 /**
- * Schedule a one-on-one or team kickoff session: check conflicts, create Google Meet, store and send emails.
+ * Generate a unique Jitsi Meet link for the session (fallback when Google Calendar is not configured).
+ */
+function createJitsiMeetLink(projectId: string, startTime: number): string {
+  const slug = `${projectId}-${startTime}`.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 50);
+  return `https://meet.jit.si/49gig-${slug}`;
+}
+
+/**
+ * Schedule a one-on-one or team kickoff session: check conflicts, create Google Meet (or Jitsi fallback), store and send emails.
  */
 export const scheduleOneOnOneSession = action({
   args: {
@@ -233,14 +241,24 @@ export const scheduleOneOnOneSession = action({
     });
     attendeeEmails.filter(Boolean);
 
-    const accessToken = await getGoogleCalendarAccessToken();
-    const { meetLink, eventId } = await createGoogleCalendarEventWithMeet(
-      accessToken,
-      args.title,
-      args.startTime,
-      args.endTime,
-      attendeeEmails
-    );
+    let meetLink: string;
+    let googleEventId: string | undefined;
+
+    try {
+      const accessToken = await getGoogleCalendarAccessToken();
+      const result = await createGoogleCalendarEventWithMeet(
+        accessToken,
+        args.title,
+        args.startTime,
+        args.endTime,
+        attendeeEmails
+      );
+      meetLink = result.meetLink;
+      googleEventId = result.eventId;
+    } catch (googleErr) {
+      // Fallback to Jitsi Meet when Google Calendar is not configured
+      meetLink = createJitsiMeetLink(args.projectId, args.startTime);
+    }
 
     await ctx.runMutation(
       internalAny.scheduledCalls.mutations.createScheduledCallInternal,
@@ -250,7 +268,7 @@ export const scheduleOneOnOneSession = action({
         startTime: args.startTime,
         endTime: args.endTime,
         meetLink,
-        googleEventId: eventId,
+        googleEventId,
         title: args.title,
       }
     );
@@ -325,6 +343,6 @@ export const scheduleOneOnOneSession = action({
       }
     }
 
-    return { meetLink, eventId };
+    return { meetLink, eventId: googleEventId };
   },
 });

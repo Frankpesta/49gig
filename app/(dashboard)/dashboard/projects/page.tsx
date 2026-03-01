@@ -89,9 +89,10 @@ export default function ProjectsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Projects"
+        icon={FolderKanban}
         description={
           isClient
             ? "Manage your projects and track their progress."
@@ -99,7 +100,7 @@ export default function ProjectsPage() {
         }
         actions={
           isClient ? (
-            <Button asChild>
+            <Button asChild className="rounded-xl">
               <Link href="/dashboard/projects/create">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Project
@@ -116,6 +117,7 @@ export default function ProjectsPage() {
             variant={!statusFilter ? "default" : "outline"}
             size="sm"
             asChild
+            className="rounded-lg"
           >
             <Link href="/dashboard/projects">All</Link>
           </Button>
@@ -125,6 +127,7 @@ export default function ProjectsPage() {
               variant={statusFilter === status ? "default" : "outline"}
               size="sm"
               asChild
+              className="rounded-lg"
             >
               <Link href={`/dashboard/projects?status=${status}`}>
                 {config.label}
@@ -138,13 +141,13 @@ export default function ProjectsPage() {
       {projects === undefined ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
+            <Card key={i} className="rounded-xl overflow-hidden">
               <CardHeader>
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-6 w-3/4 rounded" />
+                <Skeleton className="h-4 w-1/2 rounded" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full rounded" />
               </CardContent>
             </Card>
           ))}
@@ -152,6 +155,7 @@ export default function ProjectsPage() {
       ) : projects.length === 0 ? (
         <DashboardEmptyState
           icon={FolderKanban}
+          iconTone="muted"
           title="No projects found"
           description={
             isClient
@@ -160,7 +164,7 @@ export default function ProjectsPage() {
           }
           action={
             isClient ? (
-              <Button asChild>
+              <Button asChild className="rounded-xl">
                 <Link href="/dashboard/projects/create">
                   <Plus className="mr-2 h-4 w-4" />
                   Create Project
@@ -176,7 +180,7 @@ export default function ProjectsPage() {
             const StatusIcon = statusConfig.icon;
 
             return (
-              <Card key={project._id} className="hover:shadow-md transition-shadow">
+              <Card key={project._id} className="rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <CardTitle className="line-clamp-2">{project.intakeForm.title}</CardTitle>
@@ -217,7 +221,7 @@ export default function ProjectsPage() {
                     </div>
                   )}
 
-                  <Button variant="outline" className="w-full" asChild>
+                  <Button variant="outline" className="w-full rounded-xl" asChild>
                     <Link href={`/dashboard/projects/${project._id}`}>
                       View Details
                       <ArrowRight className="ml-2 h-4 w-4" />

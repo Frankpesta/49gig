@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlertCircle, CheckCircle2, Clock, User } from "lucide-react";
+import { Scale, AlertCircle, CheckCircle2, Clock, User } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -54,13 +54,14 @@ export default function ModeratorDisputesPage() {
   );
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={AlertCircle} title="Please log in" />;
+    return <DashboardEmptyState icon={Scale} title="Please log in" iconTone="muted" />;
   }
 
   if (user.role !== "moderator" && user.role !== "admin") {
     return (
       <DashboardEmptyState
-        icon={AlertCircle}
+        icon={Scale}
+        iconTone="muted"
         title="Access restricted"
         description="Only moderators and admins can access this page."
         action={
@@ -73,7 +74,7 @@ export default function ModeratorDisputesPage() {
   }
 
   if (disputes === undefined || allDisputes === undefined) {
-    return <DashboardLoadingState label="Loading disputes..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   const getStatusBadge = (status: string) => {
@@ -93,7 +94,7 @@ export default function ModeratorDisputesPage() {
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      milestone_quality: "Milestone Quality",
+      milestone_quality: "Deliverable Quality",
       payment: "Payment",
       communication: "Communication",
       freelancer_replacement: "Freelancer Replacement",
@@ -108,10 +109,11 @@ export default function ModeratorDisputesPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Dispute Management"
         description={`Review and resolve disputes as a ${user.role}.`}
+        icon={Scale}
       />
 
       {/* Stats Cards */}
@@ -194,7 +196,7 @@ export default function ModeratorDisputesPage() {
         </CardHeader>
         <CardContent>
           {allDisputes.length === 0 ? (
-            <DashboardEmptyState icon={AlertCircle} title="No disputes found" className="border-0 bg-transparent py-8 shadow-none" />
+            <DashboardEmptyState icon={Scale} title="No disputes found" iconTone="muted" className="border-0 bg-transparent py-8 shadow-none" />
           ) : (
             <Table>
               <TableHeader>

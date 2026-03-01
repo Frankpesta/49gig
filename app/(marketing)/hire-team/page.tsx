@@ -36,7 +36,7 @@ export default function HireTeamPage() {
 
   const oneContractItems = [
     "A single project structure",
-    "Unified milestones",
+    "Unified deliverables",
     "Clear responsibilities",
     "One secure contract",
   ];
@@ -84,9 +84,9 @@ export default function HireTeamPage() {
         "A secure digital contract is created for the team engagement. Once signed, the team is onboarded and work begins immediately.",
     },
     {
-      title: "Milestone-Based Delivery & Payments",
+      title: "Phased Delivery & Payments",
       bullets: [
-        "Projects are broken into milestones",
+        "Projects are broken into phases",
         "Payments are secured upfront",
         "Funds are released upon approval",
         "Full transparency throughout",

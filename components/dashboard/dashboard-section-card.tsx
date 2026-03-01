@@ -22,12 +22,12 @@ export function DashboardSectionCard({
   contentClassName,
 }: DashboardSectionCardProps) {
   return (
-    <Card className={cn("rounded-2xl border-border/60 bg-linear-to-br from-card via-card to-primary/5 shadow-sm", className)}>
+    <Card className={cn("rounded-xl border-border/60 shadow-sm overflow-hidden", "bg-linear-to-br from-card via-card to-primary/[0.02]", className)}>
       <CardHeader className="border-b border-border/50 pb-4">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <CardTitle className="text-base font-semibold">{title}</CardTitle>
-            {description ? <CardDescription>{description}</CardDescription> : null}
+            <CardTitle className="text-base font-bold">{title}</CardTitle>
+            {description ? <CardDescription className="text-sm">{description}</CardDescription> : null}
           </div>
           {action ? <div className="shrink-0">{action}</div> : null}
         </div>

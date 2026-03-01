@@ -163,7 +163,7 @@ export default function SettingsPage() {
   }, [user]);
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={Settings} title="Please log in" />;
+    return <DashboardEmptyState icon={Settings} title="Please log in" iconTone="muted" />;
   }
 
   const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
@@ -399,10 +399,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Settings"
         description="Manage your account settings and preferences."
+        icon={Settings}
       />
 
       {/* Account Settings */}

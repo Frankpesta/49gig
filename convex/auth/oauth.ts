@@ -174,6 +174,18 @@ export const handleGoogleCallback = action({
       { userId }
     );
 
+    const finalRole = userRoleFromDb || userRole;
+
+    // For freelancers, get verification status for redirect logic
+    let isFullyVetted: boolean | undefined;
+    if (finalRole === "freelancer") {
+      const verification = await ctx.runQuery(
+        (internal as any)["vetting/internalQueries"].getFreelancerVerificationStatusByUserId,
+        { userId }
+      );
+      isFullyVetted = verification?.isFullyVetted ?? false;
+    }
+
     return {
       success: true,
       needsRoleSelection: false,
@@ -183,7 +195,8 @@ export const handleGoogleCallback = action({
       refreshToken: session.refreshToken,
       expiresAt: session.expiresAt,
       isNewUser: session.isNewUser || isNewUserFromSignup,
-      userRole: userRoleFromDb || userRole,
+      userRole: finalRole,
+      isFullyVetted,
     };
   },
 });

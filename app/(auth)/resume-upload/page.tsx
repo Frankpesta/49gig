@@ -39,6 +39,21 @@ export default function ResumeUploadPage() {
         }
       : "skip"
   );
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSessionToken(localStorage.getItem("sessionToken"));
+    }
+  }, []);
+  const isVerified = useQuery(
+    (api as any).vetting.queries.isFreelancerVerified,
+    sessionToken || user?._id || profile?._id
+      ? {
+          userId: (user?._id || profile?._id) ?? undefined,
+          sessionToken: sessionToken ?? undefined,
+        }
+      : "skip"
+  );
   const getUploadUrl = useAction(
     (api as any).resume.actions.getResumeUploadUrl
   );
@@ -76,11 +91,17 @@ export default function ResumeUploadPage() {
     }
   }, [user, profile, isAuthenticated, isInitializing, router]);
 
-  // Only leave upload page when extraction succeeded (processed). Failed users stay to re-upload.
+  // When resume is processed: verified freelancers → dashboard, others → verification
   useEffect(() => {
     const status = resumeInfo?.resumeStatus;
-    if (status === "processed") router.replace("/verification");
-  }, [resumeInfo?.resumeStatus, router]);
+    if (status !== "processed") return;
+    if (isVerified === undefined) return;
+    if (isVerified?.verified) {
+      router.replace("/dashboard");
+    } else {
+      router.replace("/verification");
+    }
+  }, [resumeInfo?.resumeStatus, isVerified, router]);
 
   if (isInitializing || (profile === undefined && user === undefined)) {
     return (
@@ -88,14 +109,14 @@ export default function ResumeUploadPage() {
         leftTitle="Resume upload"
         leftDescription="Upload your resume to generate a professional bio and accelerate verification."
         features={resumeUploadFeatures}
-        heading="Loading…"
-        subline="Please wait."
+        heading="Loading"
+        subline=""
       >
         <Card className={authCardClass}>
           <CardContent className="flex flex-col items-center justify-center gap-3 px-4 py-12 sm:px-6 lg:px-8">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             <p className="text-sm text-muted-foreground">
-              Loading resume upload…
+              Loading
             </p>
           </CardContent>
         </Card>

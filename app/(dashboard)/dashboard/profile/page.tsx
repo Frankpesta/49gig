@@ -7,10 +7,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FormField, FormSection } from "@/components/forms/form-field";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, User, Building2, Briefcase, Globe, Link as LinkIcon, FileText, Star, Camera } from "lucide-react";
+import { Loader2, Save, User, Building2, Briefcase, FileText, Star } from "lucide-react";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import {
   Select,
   SelectContent,
@@ -18,8 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PLATFORM_CATEGORIES, PROGRAMMING_LANGUAGES, getSkillsForCategory, type TechFieldValue, type ExperienceLevelValue } from "@/lib/platform-skills";
+import { ProfileCard } from "@/components/profile/profile-card";
 import { toast } from "sonner";
 
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
@@ -46,50 +47,62 @@ export default function ProfilePage() {
   });
   const [newSkill, setNewSkill] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isProfileCardEditMode, setIsProfileCardEditMode] = useState(false);
 
   const updateProfile = useMutation(api.users.mutations.updateProfile);
   const generateProfileImageUploadUrl = useMutation(api.users.mutations.generateProfileImageUploadUrl);
   const setProfileImageFromStorageId = useMutation(api.users.mutations.setProfileImageFromStorageId);
+  const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
+  const profileForEdit = useQuery(
+    api.users.queries.getProfileForEdit,
+    (sessionToken || user?._id)
+      ? { sessionToken: sessionToken ?? undefined, userId: user?._id }
+      : "skip"
+  );
+  const displayUser = profileForEdit ?? user;
+  const effectiveUser = displayUser ?? user;
   const resumeInfo = useQuery(
     // @ts-ignore dynamic path cast for generated types
     (api as any).resume.queries.getFreelancerResume,
-    user?._id ? { freelancerId: user._id, requesterId: user._id } : "skip"
+    effectiveUser?._id ? { freelancerId: effectiveUser._id, requesterId: effectiveUser._id } : "skip"
   );
   const ratingStats = useQuery(
     (api as any)["reviews/queries"].getFreelancerRatingStats,
-    user?._id && user?.role === "freelancer" ? { freelancerId: user._id } : "skip"
+    effectiveUser?._id && effectiveUser?.role === "freelancer" ? { freelancerId: effectiveUser._id } : "skip"
   );
   const freelancerReviews = useQuery(
     (api as any)["reviews/queries"].getReviewsForFreelancer,
-    user?._id && user?.role === "freelancer"
-      ? { freelancerId: user._id, userId: user._id, limit: 10 }
+    effectiveUser?._id && effectiveUser?.role === "freelancer"
+      ? { freelancerId: effectiveUser._id, userId: effectiveUser._id, limit: 10 }
       : "skip"
   );
 
-  // Initialize form data from user
+  // Initialize form data from user (profileForEdit ensures we get fresh data including signup skills/techField)
   useEffect(() => {
-    if (user) {
+    const source = displayUser ?? user;
+    if (source) {
       setFormData({
-        name: user.name || "",
-        companyName: user.profile?.companyName || "",
-        companySize: user.profile?.companySize || "",
-        industry: user.profile?.industry || "",
-        bio: user.profile?.bio || "",
-        techField: user.profile?.techField || "",
-        experienceLevel: user.profile?.experienceLevel || "",
-        skills: user.profile?.skills || [],
-        languagesWritten: user.profile?.languagesWritten || [],
-        hourlyRate: user.profile?.hourlyRate?.toString() || "",
-        availability: user.profile?.availability || "available",
-        timezone: user.profile?.timezone || "",
-        portfolioUrl: user.profile?.portfolioUrl || "",
+        name: source.name || "",
+        companyName: source.profile?.companyName || "",
+        companySize: source.profile?.companySize || "",
+        industry: source.profile?.industry || "",
+        bio: source.profile?.bio || "",
+        techField: source.profile?.techField || "",
+        experienceLevel: source.profile?.experienceLevel || "",
+        skills: source.profile?.skills || [],
+        languagesWritten: source.profile?.languagesWritten || [],
+        hourlyRate: source.profile?.hourlyRate?.toString() || "",
+        availability: source.profile?.availability || "available",
+        timezone: source.profile?.timezone || "",
+        portfolioUrl: source.profile?.portfolioUrl || "",
       });
     }
-  }, [user]);
+  }, [displayUser, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?._id) return;
+    const targetUser = displayUser ?? user;
+    if (!targetUser?._id) return;
 
     setIsSaving(true);
     try {
@@ -110,12 +123,14 @@ export default function ProfilePage() {
           timezone: formData.timezone || undefined,
           portfolioUrl: formData.portfolioUrl || undefined,
         },
-        userId: user._id,
+        userId: targetUser._id,
         sessionToken: sessionToken || undefined,
       });
-      // Show success message (you can add a toast here)
+      toast.success("Profile updated successfully");
+      setIsProfileCardEditMode(false);
     } catch (error) {
       console.error("Failed to update profile:", error);
+      toast.error("Failed to save. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -123,7 +138,8 @@ export default function ProfilePage() {
 
   const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user?._id) return;
+    const targetUser = displayUser ?? user;
+    if (!file || !targetUser?._id) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please choose an image file (JPEG, PNG, etc.)");
       e.target.value = "";
@@ -137,7 +153,7 @@ export default function ProfilePage() {
     setIsUploadingImage(true);
     try {
       const uploadUrl = await generateProfileImageUploadUrl({
-        userId: user._id,
+        userId: targetUser._id,
         sessionToken: typeof window !== "undefined" ? localStorage.getItem("sessionToken") ?? undefined : undefined,
       });
       const response = await fetch(uploadUrl, {
@@ -151,7 +167,7 @@ export default function ProfilePage() {
       if (!storageId) throw new Error("Upload did not return storageId");
       await setProfileImageFromStorageId({
         storageId,
-        userId: user._id,
+        userId: targetUser._id,
         sessionToken: typeof window !== "undefined" ? localStorage.getItem("sessionToken") ?? undefined : undefined,
       });
       toast.success("Profile photo updated");
@@ -189,136 +205,107 @@ export default function ProfilePage() {
     );
   }
 
-  const isClient = user.role === "client";
-  const isFreelancer = user.role === "freelancer";
+  const isClient = effectiveUser?.role === "client";
+  const isFreelancer = effectiveUser?.role === "freelancer";
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-heading font-bold">Profile</h1>
-        <p className="text-muted-foreground">
-          Manage your profile information and preferences.
-        </p>
-      </div>
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
+      <DashboardPageHeader
+        title="Profile"
+        description="Manage your profile information and preferences."
+        icon={User}
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Basic Information
-            </CardTitle>
-            <CardDescription>Your personal information</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-start gap-4">
-              <div className="flex flex-col items-center gap-2">
-                <Avatar className="h-24 w-24 rounded-full border-2 border-border/60">
-                  <AvatarImage src={user?.profile?.imageUrl} alt={user?.name} />
-                  <AvatarFallback className="bg-primary/10 text-primary text-2xl font-semibold">
-                    {user?.name?.slice(0, 2).toUpperCase() ?? "?"}
-                  </AvatarFallback>
-                </Avatar>
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    disabled={isUploadingImage}
-                    onChange={handleProfileImageChange}
-                  />
-                  <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
-                    <span>
-                      {isUploadingImage ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Camera className="h-4 w-4" />
-                      )}
-                      {isUploadingImage ? "Uploading…" : "Upload photo"}
-                    </span>
-                  </Button>
-                </label>
-                <p className="text-xs text-muted-foreground">JPEG or PNG, max 2MB</p>
-              </div>
-              <div className="flex-1 space-y-4 min-w-0">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+        {/* Profile Hero Card */}
+        <ProfileCard
+          name={formData.name || effectiveUser?.name || ""}
+          email={effectiveUser?.email ?? ""}
+          role={effectiveUser?.role ?? ""}
+          imageUrl={effectiveUser?.profile?.imageUrl}
+          techField={formData.techField || effectiveUser?.profile?.techField}
+          experienceLevel={formData.experienceLevel || effectiveUser?.profile?.experienceLevel}
+          availability={formData.availability}
+          averageRating={ratingStats?.averageRating}
+          reviewCount={ratingStats?.count}
+          onPhotoChange={handleProfileImageChange}
+          isUploading={isUploadingImage}
+          isEditMode={isProfileCardEditMode}
+          onEditClick={() => setIsProfileCardEditMode((prev) => !prev)}
+        >
+          <div className="space-y-4">
+            <FormField label="Full Name" htmlFor="name" required>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="rounded-lg h-11"
                 required
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" value={user.email} disabled />
-              <p className="text-xs text-muted-foreground">
-                Email cannot be changed. Contact support if needed.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="role">Role</Label>
-              <Input id="role" value={user.role} disabled />
-            </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </FormField>
+            <FormField label="Email" description="Email cannot be changed. Contact support if needed.">
+              <Input id="email" value={effectiveUser?.email ?? ""} disabled className="rounded-lg h-11 bg-muted/50" />
+            </FormField>
+            <FormField label="Role">
+              <Input id="role" value={effectiveUser?.role ?? ""} disabled className="rounded-lg h-11 bg-muted/50" />
+            </FormField>
+          </div>
+        </ProfileCard>
 
         {/* Client-Specific Fields */}
         {isClient && (
-          <Card>
-            <CardHeader>
+          <Card className="rounded-xl overflow-hidden border-border/60">
+            <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent">
               <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
+                <Building2 className="h-5 w-5 text-primary" />
                 Company Information
               </CardTitle>
               <CardDescription>Your company details</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input
-                  id="companyName"
-                  value={formData.companyName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, companyName: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="companySize">Company Size</Label>
-                <Select
-                  value={formData.companySize}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, companySize: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select company size" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1-10">1-10 employees</SelectItem>
-                    <SelectItem value="11-50">11-50 employees</SelectItem>
-                    <SelectItem value="51-200">51-200 employees</SelectItem>
-                    <SelectItem value="201-500">201-500 employees</SelectItem>
-                    <SelectItem value="500+">500+ employees</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="industry">Industry</Label>
-                <Input
-                  id="industry"
-                  value={formData.industry}
-                  onChange={(e) =>
-                    setFormData({ ...formData, industry: e.target.value })
-                  }
-                  placeholder="e.g., Technology, Healthcare, Finance"
-                />
-              </div>
+            <CardContent className="pt-6">
+              <FormSection title="Company details" description="Used for project matching and verification.">
+                <FormField label="Company Name" htmlFor="companyName">
+                  <Input
+                    id="companyName"
+                    value={formData.companyName}
+                    onChange={(e) =>
+                      setFormData({ ...formData, companyName: e.target.value })
+                    }
+                    placeholder="Your company name"
+                    className="rounded-lg h-11"
+                  />
+                </FormField>
+                <FormField label="Company Size" htmlFor="companySize">
+                  <Select
+                    value={formData.companySize}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, companySize: value })
+                    }
+                  >
+                    <SelectTrigger className="rounded-lg h-11">
+                      <SelectValue placeholder="Select company size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1-10">1-10 employees</SelectItem>
+                      <SelectItem value="11-50">11-50 employees</SelectItem>
+                      <SelectItem value="51-200">51-200 employees</SelectItem>
+                      <SelectItem value="201-500">201-500 employees</SelectItem>
+                      <SelectItem value="500+">500+ employees</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Industry" htmlFor="industry" description="e.g., Technology, Healthcare, Finance">
+                  <Input
+                    id="industry"
+                    value={formData.industry}
+                    onChange={(e) =>
+                      setFormData({ ...formData, industry: e.target.value })
+                    }
+                    placeholder="e.g., Technology, Healthcare, Finance"
+                    className="rounded-lg h-11"
+                  />
+                </FormField>
+              </FormSection>
             </CardContent>
           </Card>
         )}
@@ -326,10 +313,10 @@ export default function ProfilePage() {
         {/* Freelancer-Specific Fields */}
         {isFreelancer && (
           <>
-            <Card>
-              <CardHeader>
+            <Card className="rounded-xl overflow-hidden border-border/60">
+              <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent">
                 <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
+                  <FileText className="h-5 w-5 text-primary" />
                   Executive Summary
                 </CardTitle>
                 <CardDescription>
@@ -351,10 +338,10 @@ export default function ProfilePage() {
 
             {/* Client feedback / reputation */}
             {isFreelancer && (
-              <Card>
-                <CardHeader>
+              <Card className="rounded-xl overflow-hidden border-border/60">
+                <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent">
                   <CardTitle className="flex items-center gap-2">
-                    <Star className="h-5 w-5" />
+                    <Star className="h-5 w-5 text-primary" />
                     Client feedback
                   </CardTitle>
                   <CardDescription>
@@ -398,17 +385,17 @@ export default function ProfilePage() {
               </Card>
             )}
 
-            <Card>
-              <CardHeader>
+            <Card className="rounded-xl overflow-hidden border-border/60">
+              <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent">
                 <CardTitle className="flex items-center gap-2">
-                  <Briefcase className="h-5 w-5" />
+                  <Briefcase className="h-5 w-5 text-primary" />
                   Professional Information
                 </CardTitle>
                 <CardDescription>Category, skills, and programming languages (used for matching and verification)</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Tech category</Label>
+              <CardContent className="pt-6">
+                <FormSection title="Professional details" description="Used for project matching and client verification.">
+                <FormField label="Tech category" htmlFor="techField">
                   <Select
                     value={formData.techField}
                     onValueChange={(value) =>
@@ -419,7 +406,7 @@ export default function ProfilePage() {
                       })
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="rounded-lg h-11">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -430,17 +417,16 @@ export default function ProfilePage() {
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </FormField>
                 {formData.techField && (
-                  <div className="space-y-2">
-                    <Label>Experience level</Label>
+                  <FormField label="Experience level" htmlFor="experienceLevel">
                     <Select
                       value={formData.experienceLevel}
                       onValueChange={(value) =>
                         setFormData({ ...formData, experienceLevel: value })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-lg h-11">
                         <SelectValue placeholder="Select level" />
                       </SelectTrigger>
                       <SelectContent>
@@ -450,11 +436,10 @@ export default function ProfilePage() {
                         <SelectItem value="expert">Expert</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  </FormField>
                 )}
                 {formData.techField && getSkillsForCategory(formData.techField).length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Skills (from category)</Label>
+                  <FormField label="Skills (from category)" description="Select skills that match your expertise.">
                     <div className="flex flex-wrap gap-2">
                       {getSkillsForCategory(formData.techField).map((skill) => (
                         <Button
@@ -472,17 +457,16 @@ export default function ProfilePage() {
                                 skills: [...formData.skills, skill],
                               });
                             }
-                          }}
-                        >
-                          {skill}
-                        </Button>
-                      ))}
-                    </div>
+                        }}
+                      >
+                        {skill}
+                      </Button>
+                    ))}
                   </div>
+                </FormField>
                 )}
-                <div className="space-y-2">
-                  <Label>Programming languages</Label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 border rounded-md">
+                <FormField label="Programming languages" description="Languages you're proficient in.">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 border border-border/60 rounded-lg">
                     {PROGRAMMING_LANGUAGES.map((lang) => (
                       <label
                         key={lang}
@@ -503,19 +487,18 @@ export default function ProfilePage() {
                       </label>
                     ))}
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="bio">About you</Label>
+                </FormField>
+                <FormField label="About you" htmlFor="bio" description="Share a short overview of your experience and focus.">
                   <Textarea
                     id="bio"
                     value={formData.bio}
                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                     placeholder="Share a short overview of your experience and focus..."
                     rows={4}
+                    className="rounded-lg"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="skills">Skills</Label>
+                </FormField>
+                <FormField label="Additional skills" htmlFor="skills" description="Add custom skills not in the category list.">
                   <div className="flex gap-2">
                     <Input
                       id="skills"
@@ -528,8 +511,9 @@ export default function ProfilePage() {
                         }
                       }}
                       placeholder="Add a skill"
+                      className="rounded-lg h-11"
                     />
-                    <Button type="button" onClick={addSkill} variant="outline">
+                    <Button type="button" onClick={addSkill} variant="outline" className="rounded-lg">
                       Add
                     </Button>
                   </div>
@@ -549,10 +533,9 @@ export default function ProfilePage() {
                       ))}
                     </div>
                   )}
-                </div>
+                </FormField>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="hourlyRate">Hourly Rate ($)</Label>
+                  <FormField label="Hourly Rate ($)" htmlFor="hourlyRate">
                     <Input
                       id="hourlyRate"
                       type="number"
@@ -563,17 +546,17 @@ export default function ProfilePage() {
                       placeholder="0.00"
                       min="0"
                       step="0.01"
+                      className="rounded-lg h-11"
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="availability">Availability</Label>
+                  </FormField>
+                  <FormField label="Availability" htmlFor="availability">
                     <Select
                       value={formData.availability}
                       onValueChange={(value: "available" | "busy" | "unavailable") =>
                         setFormData({ ...formData, availability: value })
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="rounded-lg h-11">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -582,10 +565,9 @@ export default function ProfilePage() {
                         <SelectItem value="unavailable">Unavailable</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
+                  </FormField>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
+                <FormField label="Timezone" htmlFor="timezone" description="e.g., America/New_York">
                   <Input
                     id="timezone"
                     value={formData.timezone}
@@ -593,13 +575,10 @@ export default function ProfilePage() {
                       setFormData({ ...formData, timezone: e.target.value })
                     }
                     placeholder="e.g., America/New_York"
+                    className="rounded-lg h-11"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="portfolioUrl" className="flex items-center gap-2">
-                    <LinkIcon className="h-4 w-4" />
-                    Portfolio URL
-                  </Label>
+                </FormField>
+                <FormField label="Portfolio URL" htmlFor="portfolioUrl" description="Link to your portfolio or website.">
                   <Input
                     id="portfolioUrl"
                     type="url"
@@ -608,8 +587,10 @@ export default function ProfilePage() {
                       setFormData({ ...formData, portfolioUrl: e.target.value })
                     }
                     placeholder="https://yourportfolio.com"
+                    className="rounded-lg h-11"
                   />
-                </div>
+                </FormField>
+              </FormSection>
               </CardContent>
             </Card>
           </>

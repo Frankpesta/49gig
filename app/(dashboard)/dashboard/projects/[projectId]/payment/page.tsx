@@ -68,6 +68,16 @@ export default function PaymentPage() {
       return;
     }
 
+    // Require contract signature before payment (for draft/pending_funding with selection)
+    if (
+      (project.status === "draft" || project.status === "pending_funding") &&
+      (project.selectedFreelancerId || (project.selectedFreelancerIds && project.selectedFreelancerIds.length > 0)) &&
+      !project.clientContractSignedAt
+    ) {
+      router.push(`/dashboard/projects/${projectId}/contract`);
+      return;
+    }
+
     // Prevent multiple simultaneous calls
     if (initializationRef.current || isInitializing || paymentLink) {
       return;

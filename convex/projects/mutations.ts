@@ -1037,7 +1037,7 @@ export const acceptSelectedMatchInternal = internalMutation({
       }
     }
 
-    await ctx.scheduler.runAfter(0, internalAny.projects.mutations.autoCreateMilestonesInternal, {
+    await ctx.scheduler.runAfter(0, internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal, {
       projectId: args.projectId,
     });
 

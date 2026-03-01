@@ -120,14 +120,14 @@ export default function ForFreelancersPage() {
       step: "4",
       icon: UserCheck,
       title: "Sign Contract & Start Working",
-      description: "A digital contract is created for every project. Once signed, you begin work immediately with clear expectations and milestones.",
+      description: "A digital contract is created for every project. Once signed, you begin work immediately with clear expectations and deliverables.",
       image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80",
     },
     {
       step: "5",
       icon: BadgeCheck,
       title: "Deliver Work & Get Paid",
-      description: "Complete milestones, submit deliverables, get paid after approval, and withdraw earnings securely through your preferred method.",
+      description: "Complete deliverables, submit work, get paid after approval, and withdraw earnings securely through your preferred method.",
       image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80",
     },
   ];
@@ -474,7 +474,7 @@ export default function ForFreelancersPage() {
                   "Submit your portfolio, skills, and experience. Applications are reviewed quickly.",
                   "Only top-scoring freelancers are approved to maintain quality standards.",
                   "Projects are matched to your skills and ratings with no bidding required.",
-                  "Start work with clear contracts, milestones, and expectations.",
+                  "Start work with clear contracts, deliverables, and expectations.",
                   "Get paid securely after approvals and withdraw through your preferred method.",
                 ];
                 return (
@@ -733,7 +733,7 @@ export default function ForFreelancersPage() {
                   Build a global freelance career with 49GIG
                 </h2>
                 <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
-                  Work with verified clients, deliver through structured milestones, and grow your reputation with consistent high-quality projects.
+                  Work with verified clients, deliver through structured phases, and grow your reputation with consistent high-quality projects.
                 </p>
               </div>
 
@@ -750,7 +750,7 @@ export default function ForFreelancersPage() {
                     <DollarSign className="h-4 w-4" />
                   </div>
                   <h4 className="text-sm font-semibold text-foreground sm:text-base">Secure Payouts</h4>
-                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Milestone-based payment protection</p>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Phased payment protection</p>
                 </div>
                 <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
                   <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary-foreground">

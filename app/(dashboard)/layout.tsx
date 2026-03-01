@@ -1,17 +1,13 @@
 "use client";
 
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/dashboard/app-sidebar";
-import { DashboardBreadcrumb } from "@/components/dashboard/dashboard-breadcrumb";
-import { ThemeToggle } from "@/components/dashboard/theme-toggle";
-import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
-import { Separator } from "@/components/ui/separator";
+import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { NotificationBell } from "@/components/notifications/notification-bell";
 import { DashboardFooter } from "@/components/dashboard/dashboard-footer";
 
 export default function DashboardLayout({
@@ -21,17 +17,27 @@ export default function DashboardLayout({
 }) {
   const { user, isAuthenticated, isInitializing } = useAuth();
   const router = useRouter();
-  
-  // Get user profile to check role
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSessionToken(localStorage.getItem("sessionToken"));
+    }
+  }, [isAuthenticated]);
+
+  // Get user profile to check role (from useAuth user or profile query)
   const userProfile = useQuery(
     api.users.queries.getCurrentUserProfile,
     isAuthenticated ? {} : "skip"
   );
+  const effectiveUser = user || userProfile;
   
-  // Check if freelancer is verified
+  // Check if freelancer is verified (supports session token for email/password users)
   const isVerified = useQuery(
     api.vetting.queries.isFreelancerVerified,
-    isAuthenticated && userProfile?.role === "freelancer" ? {} : "skip"
+    isAuthenticated && (effectiveUser?.role === "freelancer" || userProfile?.role === "freelancer")
+      ? { sessionToken: sessionToken ?? undefined, userId: effectiveUser?._id }
+      : "skip"
   );
 
   // Resume status for freelancers
@@ -66,7 +72,7 @@ export default function DashboardLayout({
   // Enforce resume upload only for *unverified* freelancers (verified can use dashboard and be matched without resume)
   useEffect(() => {
     if (!isAuthenticated || isInitializing) return;
-    if (!userProfile || userProfile.role !== "freelancer") return;
+    if (!effectiveUser || effectiveUser.role !== "freelancer") return;
     if (resumeInfo === undefined) return;
     // Verified freelancers can access dashboard and be matched without a resume
     if (isVerified?.verified) return;
@@ -82,7 +88,7 @@ export default function DashboardLayout({
     if (!hasUploaded && !onResumeUpload) {
       router.replace("/resume-upload");
     }
-  }, [isAuthenticated, isInitializing, isVerified, resumeInfo, router, userProfile]);
+  }, [isAuthenticated, isInitializing, isVerified, resumeInfo, router, effectiveUser]);
 
   // CRITICAL: Check if freelancer is verified - ENFORCE STRICTLY
   // This runs whenever auth state, user profile, or verification status changes
@@ -93,11 +99,11 @@ export default function DashboardLayout({
     // If not authenticated, let the auth check handle it
     if (!isAuthenticated) return;
 
-    // If user profile is still loading, wait
-    if (userProfile === undefined) return;
+    // If user profile is still loading, wait (use effectiveUser from useAuth when profile is null)
+    if (effectiveUser === undefined && userProfile === undefined) return;
 
     // Check if user is a freelancer
-    if (userProfile?.role === "freelancer") {
+    if (effectiveUser?.role === "freelancer" || userProfile?.role === "freelancer") {
       // Only require resume before verification check for unverified freelancers (verified can use dashboard without resume)
       if (!isVerified?.verified && resumeInfo && resumeInfo.resumeStatus !== "processed") {
         return;
@@ -124,7 +130,7 @@ export default function DashboardLayout({
         }
       }
     }
-  }, [isAuthenticated, isInitializing, userProfile, isVerified, router]);
+  }, [isAuthenticated, isInitializing, userProfile, effectiveUser, isVerified, router]);
 
   // Additional safeguard: Check on mount and when userProfile first loads
   useEffect(() => {
@@ -135,7 +141,7 @@ export default function DashboardLayout({
     if (
       !isInitializing &&
       isAuthenticated &&
-      userProfile?.role === "freelancer" &&
+      (effectiveUser?.role === "freelancer" || userProfile?.role === "freelancer") &&
       resumeInfo &&
       resumeInfo.resumeStatus === "processed" &&
       isVerified !== undefined &&
@@ -146,7 +152,7 @@ export default function DashboardLayout({
         router.replace("/verification");
       }
     }
-  }, [userProfile?._id, isAuthenticated, isInitializing, isVerified, router, userProfile]);
+  }, [userProfile?._id, effectiveUser?._id, isAuthenticated, isInitializing, isVerified, router, userProfile, effectiveUser]);
 
   // Show loading state while initializing or checking verification
   if (isInitializing) {
@@ -154,7 +160,7 @@ export default function DashboardLayout({
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 animate-in fade-in duration-200">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Loading dashboard...</p>
+          <p className="text-sm text-muted-foreground">Loading</p>
         </div>
       </div>
     );
@@ -163,14 +169,14 @@ export default function DashboardLayout({
   // Show loading state while checking verification for freelancers
   if (
     isAuthenticated &&
-    userProfile?.role === "freelancer" &&
+    (effectiveUser?.role === "freelancer" || userProfile?.role === "freelancer") &&
     isVerified === undefined
   ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 animate-in fade-in duration-200">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-          <p className="text-sm text-muted-foreground">Checking verification status...</p>
+          <p className="text-sm text-muted-foreground">Loading</p>
         </div>
       </div>
     );
@@ -185,7 +191,7 @@ export default function DashboardLayout({
   // (they should be redirected, but this is a safeguard)
   // BUT: Allow rendering if already on verification page
   if (
-    userProfile?.role === "freelancer" &&
+    (effectiveUser?.role === "freelancer" || userProfile?.role === "freelancer") &&
     isVerified !== undefined &&
     !isVerified.verified
   ) {
@@ -201,7 +207,7 @@ export default function DashboardLayout({
         <div className="flex min-h-screen items-center justify-center bg-background">
           <div className="flex flex-col items-center gap-4 animate-in fade-in duration-200">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">Redirecting to verification...</p>
+            <p className="text-sm text-muted-foreground">Loading</p>
           </div>
         </div>
       );
@@ -212,25 +218,15 @@ export default function DashboardLayout({
     <SidebarProvider className="overflow-hidden">
       <AppSidebar />
       <SidebarInset className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border/70 bg-background/90 px-4 backdrop-blur-md supports-backdrop-filter:bg-background/75">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/40 to-transparent" />
-          <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="hidden h-4 sm:block" />
-            <nav className="flex-1 min-w-0 overflow-hidden">
-              <DashboardBreadcrumb />
-            </nav>
-          </div>
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <NotificationBell />
-            <ThemeToggle />
-          </div>
-        </header>
+        <DashboardHeader />
         <div className="dashboard-scroll relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="pointer-events-none absolute inset-0">
-            <div className="absolute -top-28 right-0 h-72 w-72 rounded-full bg-primary/12 blur-3xl" />
-            <div className="absolute -bottom-28 left-0 h-64 w-64 rounded-full bg-secondary/14 blur-3xl" />
-            <div className="absolute left-1/2 top-1/3 h-56 w-56 -translate-x-1/2 rounded-full bg-primary/6 blur-3xl" />
+          {/* Lively, vibrant background orbs (reference style) */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -top-20 right-0 h-96 w-96 rounded-full bg-primary/18 blur-3xl" />
+            <div className="absolute -bottom-20 left-0 h-80 w-80 rounded-full bg-secondary/25 blur-3xl" />
+            <div className="absolute left-1/2 top-1/4 h-72 w-72 -translate-x-1/2 rounded-full bg-secondary/12 blur-3xl" />
+            <div className="absolute right-1/4 top-2/3 h-48 w-48 rounded-full bg-primary/10 blur-2xl" />
+            <div className="absolute left-1/4 bottom-1/4 h-40 w-40 rounded-full bg-secondary/15 blur-2xl" />
           </div>
           <div className="relative flex flex-1 flex-col gap-4 p-3 sm:gap-5 sm:p-4 md:gap-6 md:p-6 lg:p-8">
             <div className="dashboard-content mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 sm:gap-5 md:gap-6">

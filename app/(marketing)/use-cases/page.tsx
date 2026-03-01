@@ -39,7 +39,7 @@ export default function UseCasesPage() {
       example: "A startup building a SaaS platform can hire a team of developers and designers, complete with project management support, all coordinated through 49GIG.",
       features: [
         "End-to-end product development",
-        "Track project milestones",
+        "Track project progress",
         "Quality delivery assurance",
         "Efficient scaling",
       ],

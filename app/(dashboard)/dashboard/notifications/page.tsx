@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Bell, Send, AlertCircle } from "lucide-react";
+import { Loader2, Bell, Send, AlertCircle, Shield } from "lucide-react";
 import { Doc } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -77,7 +77,8 @@ export default function AdminNotificationsPage() {
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
       <DashboardEmptyState
-        icon={AlertCircle}
+        icon={Shield}
+        iconTone="muted"
         title="Access denied"
         description="Admin or Moderator role required."
       />
@@ -148,10 +149,11 @@ export default function AdminNotificationsPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Notifications"
         description="Send announcements or updates to specific user groups."
+        icon={Bell}
       />
 
       <Card className="overflow-hidden">

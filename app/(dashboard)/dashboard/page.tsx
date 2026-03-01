@@ -1,35 +1,39 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { AdminCharts } from "@/components/dashboard/admin-charts";
 import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
-import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
-import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
-import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
+import {
+  ProjectAnalyticsCard,
+  ProjectListCard,
+  TeamCollaborationCard,
+  ProjectProgressCard,
+  EarningsWidget,
+} from "@/components/dashboard/dashboard-widgets";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Briefcase, 
-  MessageSquare, 
-  TrendingUp,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
+import {
+  Briefcase,
+  MessageSquare,
   ArrowRight,
   Sparkles,
   DollarSign,
   Users,
   Activity,
-  ShieldCheck,
+  Star,
+  Target,
   Wallet,
   Timer,
   Gauge,
-  Star,
-  Target,
+  ShieldCheck,
+  AlertCircle,
+  TrendingUp,
+  Plus,
+  FileDown,
 } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
@@ -39,9 +43,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [adminRangeDays, setAdminRangeDays] = useState(90);
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   const isClient = user.role === "client";
   const isFreelancer = user.role === "freelancer";
@@ -52,16 +54,24 @@ export default function DashboardPage() {
     user?._id ? { userId: user._id } : "skip"
   );
   const isLoading = dashboardMetrics === undefined;
+
+  const projects = useQuery(
+    api.projects.queries.getProjects,
+    user?._id ? { userId: user._id } : "skip"
+  );
+
   const recentActivity = useQuery(
     api.notifications.queries.getMyNotifications,
     user?._id ? { userId: user._id, limit: 10 } : "skip"
   );
+
   const freelancerReviews = useQuery(
     (api as any)["reviews/queries"].getReviewsForFreelancer,
     isFreelancer && user?._id
       ? { freelancerId: user._id, userId: user._id, limit: 5 }
       : "skip"
   );
+
   const adminCharts = useQuery(
     (api as any)["analytics/queries"].getAdminChartData,
     isAdmin && user?._id ? { userId: user._id, rangeDays: adminRangeDays } : "skip"
@@ -70,150 +80,132 @@ export default function DashboardPage() {
   const formatCurrency = (value: number) =>
     `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
+  // Build weekly activity for Project Analytics
+  const projectAnalyticsData = useMemo(() => {
+    if (!projects || projects.length === 0) return undefined;
+    const days = ["S", "M", "T", "W", "T", "F", "S"];
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    return days.map((day, i) => {
+      const start = now - (6 - i) * dayMs;
+      const end = start + dayMs;
+      const count = projects.filter(
+        (p: any) => p.createdAt >= start && p.createdAt < end
+      ).length;
+      return { day, count };
+    });
+  }, [projects]);
+
+  // Project progress (completed, in progress, pending)
+  const projectProgress = useMemo(() => {
+    if (!projects) return { completed: 0, inProgress: 0, pending: 0 };
+    const completed = projects.filter((p: any) => p.status === "completed").length;
+    const inProgress = projects.filter((p: any) =>
+      ["matched", "in_progress"].includes(p.status)
+    ).length;
+    const pending = projects.filter((p: any) =>
+      ["draft", "pending_funding", "funded", "matching"].includes(p.status)
+    ).length;
+    return { completed, inProgress, pending };
+  }, [projects]);
+
+  // Team collaboration - for clients: freelancers on active projects
+  const teamMembers = useMemo(() => {
+    if (!projects || !isClient) return [];
+    const active = projects.filter((p: any) =>
+      ["matched", "in_progress"].includes(p.status)
+    );
+    return active.slice(0, 4).map((p: any) => ({
+      name: p.matchedFreelancerName ?? "Freelancer",
+      task: p.intakeForm?.title ?? "Working on project",
+      status: p.status === "completed" ? "completed" : "in_progress",
+    }));
+  }, [projects, isClient]);
+
   const metrics = isClient
     ? [
         {
-          title: "Active Projects",
-          subtitle: "Currently in progress",
-          value: dashboardMetrics?.metrics?.activeProjects ?? 0,
-          description: "Live projects being worked on",
+          title: "Total Projects",
+          subtitle: "All time",
+          value: projects?.length ?? 0,
+          description: "Increased from last month",
           icon: Briefcase,
-          variant: "primary" as const,
+          variant: "accent" as const,
           trend: dashboardMetrics?.metrics?.trends?.activeProjects,
-          progress: {
-            value: dashboardMetrics?.metrics?.activeProjectsProgress ?? 0,
-            label: "Milestones",
-          },
           badge: "Client",
         },
         {
-          title: "Proposals",
-          subtitle: "New this week",
-          value: dashboardMetrics?.metrics?.proposals ?? 0,
-          description: "Freelancer offers received",
-          icon: Target,
+          title: "Completed",
+          subtitle: "Ended successfully",
+          value: projects?.filter((p: any) => p.status === "completed").length ?? 0,
+          description: "Projects delivered",
+          icon: Briefcase,
           variant: "default" as const,
-          trend: dashboardMetrics?.metrics?.trends?.proposals,
-          badge: "Inbox",
-        },
-        {
-          title: "Budget in Escrow",
-          subtitle: "Secured payments",
-          value: formatCurrency(dashboardMetrics?.metrics?.escrowed ?? 0),
-          description: "Funds protected for milestones",
-          icon: Wallet,
-          variant: "success" as const,
-          trend: dashboardMetrics?.metrics?.trends?.escrowed,
-          badge: "Secure",
-        },
-        {
-          title: "Total Spend",
-          subtitle: "All time",
-          value: formatCurrency(dashboardMetrics?.metrics?.totalSpend ?? 0),
-          description: "Cumulative project spend",
-          icon: DollarSign,
-          variant: "success" as const,
-          trend: dashboardMetrics?.metrics?.trends?.totalSpend,
-          badge: "Lifetime",
-        },
-        {
-          title: "Avg. Match Time",
-          subtitle: "Time to hire",
-          value: `${dashboardMetrics?.metrics?.avgMatchHours ?? 0}h`,
-          description: "Average time from project creation to match",
-          icon: Timer,
-          variant: "warning" as const,
           trend: undefined,
-          badge: "SLA",
+          badge: "Done",
         },
         {
-          title: "Satisfaction",
-          subtitle: "Your ratings",
-          value: `${dashboardMetrics?.metrics?.satisfactionRate ?? 0}%`,
-          description: "From your freelancer ratings (1–5 stars)",
-          icon: Star,
+          title: "Active",
+          subtitle: "In progress",
+          value: dashboardMetrics?.metrics?.activeProjects ?? 0,
+          description: "Currently running",
+          icon: Briefcase,
           variant: "default" as const,
-          progress: {
-            value: dashboardMetrics?.metrics?.satisfactionRate ?? 0,
-            label: "Quality",
-          },
-          badge: "Top",
+          trend: dashboardMetrics?.metrics?.trends?.activeProjects,
+          badge: "Live",
+        },
+        {
+          title: "Pending",
+          subtitle: "Awaiting",
+          value: projects?.filter((p: any) =>
+            ["draft", "pending_funding", "funded", "matching"].includes((p as any).status)
+          ).length ?? 0,
+          description: "In discussion",
+          icon: Briefcase,
+          variant: "default" as const,
+          badge: "Queue",
         },
       ]
     : isFreelancer
     ? [
         {
-          title: "Active Projects",
-          subtitle: "Currently assigned",
-          value: dashboardMetrics?.metrics?.activeProjects ?? 0,
-          description: "Projects you’re working on",
+          title: "Total Projects",
+          subtitle: "All time",
+          value: projects?.length ?? 0,
+          description: "Increased from last month",
           icon: Briefcase,
-          variant: "primary" as const,
+          variant: "accent" as const,
           trend: dashboardMetrics?.metrics?.trends?.activeProjects,
           badge: "Freelancer",
+        },
+        {
+          title: "Completed",
+          subtitle: "Delivered",
+          value: projects?.filter((p: any) => p.status === "completed").length ?? 0,
+          description: "Projects finished",
+          icon: Briefcase,
+          variant: "default" as const,
+          badge: "Done",
+        },
+        {
+          title: "Active",
+          subtitle: "In progress",
+          value: dashboardMetrics?.metrics?.activeProjects ?? 0,
+          description: "Currently working",
+          icon: Briefcase,
+          variant: "default" as const,
+          trend: dashboardMetrics?.metrics?.trends?.activeProjects,
+          badge: "Live",
         },
         {
           title: "Earnings",
           subtitle: "This month",
           value: formatCurrency(dashboardMetrics?.metrics?.earnings ?? 0),
-          description: "Payouts and approved milestones",
+          description: "From completed projects",
           icon: DollarSign,
-          variant: "success" as const,
+          variant: "default" as const,
           trend: dashboardMetrics?.metrics?.trends?.earnings,
           badge: "MTD",
-        },
-        {
-          title: "Client Ratings",
-          subtitle: "Your reputation",
-          value: dashboardMetrics?.metrics?.avgRating
-            ? `${dashboardMetrics.metrics.avgRating}/5 (${dashboardMetrics.metrics.reviewCount ?? 0} reviews)`
-            : "No reviews yet",
-          description: "Client feedback from completed projects",
-          icon: Star,
-          variant: "warning" as const,
-          progress:
-            dashboardMetrics?.metrics?.avgRating
-              ? { value: (dashboardMetrics.metrics.avgRating / 5) * 100, label: "Reputation" }
-              : undefined,
-          badge: "Reputation",
-        },
-        {
-          title: "Match Score",
-          subtitle: "Profile strength",
-          value: `${dashboardMetrics?.metrics?.matchScore ?? 0}%`,
-          description: "Completeness & relevance",
-          icon: Gauge,
-          variant: "default" as const,
-          progress: { value: dashboardMetrics?.metrics?.matchScore ?? 0, label: "Profile" },
-          badge: "Improve",
-        },
-        {
-          title: "Estimated Hours",
-          subtitle: "This week",
-          value: `${dashboardMetrics?.metrics?.estimatedHours ?? 0}h`,
-          description: "Projected workload",
-          icon: Clock,
-          variant: "default" as const,
-          badge: "Weekly",
-        },
-        {
-          title: "Pending Reviews",
-          subtitle: "Client feedback",
-          value: dashboardMetrics?.metrics?.pendingReviews ?? 0,
-          description: "Awaiting approvals",
-          icon: ShieldCheck,
-          variant: "warning" as const,
-          badge: "Pending",
-        },
-        {
-          title: "Response Rate",
-          subtitle: "Last 30 days",
-          value: `${dashboardMetrics?.metrics?.responseRate ?? 0}%`,
-          description: "Client reply efficiency",
-          icon: Activity,
-          variant: "default" as const,
-          progress: { value: dashboardMetrics?.metrics?.responseRate ?? 0, label: "Engagement" },
-          badge: "Goal",
         },
       ]
     : [
@@ -223,28 +215,26 @@ export default function DashboardPage() {
           value: dashboardMetrics?.metrics?.totalProjects ?? 0,
           description: "All projects in the system",
           icon: Briefcase,
-          variant: "primary" as const,
+          variant: "accent" as const,
           trend: { value: 12, label: "30d", isPositive: true },
           badge: "Admin",
         },
         {
           title: "Active Clients",
-          subtitle: "Engaged accounts",
+          subtitle: "Engaged",
           value: dashboardMetrics?.metrics?.activeClients ?? 0,
           description: "Currently hiring",
           icon: Users,
           variant: "default" as const,
-          trend: { value: 3, label: "30d", isPositive: true },
           badge: "Clients",
         },
         {
           title: "Active Freelancers",
-          subtitle: "Verified & available",
+          subtitle: "Verified",
           value: dashboardMetrics?.metrics?.activeFreelancers ?? 0,
           description: "Delivering projects",
-          icon: TrendingUp,
-          variant: "success" as const,
-          trend: { value: 9, label: "30d", isPositive: true },
+          icon: Users,
+          variant: "default" as const,
           badge: "Talent",
         },
         {
@@ -253,271 +243,227 @@ export default function DashboardPage() {
           value: formatCurrency(dashboardMetrics?.metrics?.revenue ?? 0),
           description: "Platform earnings",
           icon: DollarSign,
-          variant: "success" as const,
+          variant: "default" as const,
           trend: { value: 5, label: "30d", isPositive: true },
           badge: "MTD",
-        },
-        {
-          title: "Open Disputes",
-          subtitle: "Needs attention",
-          value: dashboardMetrics?.metrics?.openDisputes ?? 0,
-          description: "Cases in review",
-          icon: AlertCircle,
-          variant: "warning" as const,
-          badge: "Risk",
-        },
-        {
-          title: "System Health",
-          subtitle: "Operational status",
-          value: `${dashboardMetrics?.metrics?.systemHealth ?? 100}%`,
-          description: "Uptime and reliability",
-          icon: Activity,
-          variant: "default" as const,
-          progress: { value: dashboardMetrics?.metrics?.systemHealth ?? 100, label: "Uptime" },
-          badge: "Stable",
         },
       ];
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
-      {/* Warning Checklist - Show at top for freelancers */}
       {isFreelancer && <FreelancerChecklist />}
 
-      {/* Main content */}
-      <div className="space-y-6">
-          <DashboardPageHeader
-            title={`Welcome back, ${user.name.split(" ")[0]}`}
-            description={`Here's what's happening with your ${isClient ? "projects" : isFreelancer ? "projects" : "platform"} today.`}
-            actions={
-              <div className="hidden items-center gap-2 sm:flex">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                </div>
-              </div>
-            }
-          />
-
-          {/* Enhanced Stats Grid */}
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {metrics.map((metric) => (
-              <MetricCard
-                key={metric.title}
-                title={metric.title}
-                subtitle={metric.subtitle}
-                value={isLoading ? "—" : metric.value}
-                description={metric.description}
-                icon={metric.icon}
-                variant={metric.variant}
-                trend={isLoading ? undefined : metric.trend}
-                progress={isLoading ? undefined : metric.progress}
-                badge={metric.badge}
-              />
-            ))}
-          </div>
-
-          {/* Client feedback (freelancer) */}
-          {isFreelancer && freelancerReviews && freelancerReviews.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-2xl font-heading font-semibold">Client feedback</h2>
-              <p className="text-sm text-muted-foreground">
-                Recent ratings and feedback from clients you've worked with.
-              </p>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Star className="h-5 w-5" />
-                    Your reviews
-                  </CardTitle>
-                  <CardDescription>
-                    {freelancerReviews.length} review{freelancerReviews.length !== 1 ? "s" : ""} from clients
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {freelancerReviews.map((review: { _id: string; rating: number; comment?: string; createdAt: number }) => (
-                      <div key={review._id} className="rounded-lg border p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <Star
-                              key={s}
-                              className={`h-4 w-4 ${
-                                review.rating >= s
-                                  ? "fill-amber-400 text-amber-500"
-                                  : "text-muted-foreground"
-                              }`}
-                            />
-                          ))}
-                          <span className="text-sm text-muted-foreground ml-2">
-                            {new Date(review.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        {review.comment && (
-                          <p className="text-sm text-foreground">&quot;{review.comment}&quot;</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+      {/* Page header - reference style, lively typography */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Plan, prioritize, and accomplish your projects with ease.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isClient && (
+            <Button asChild className="rounded-xl">
+              <Link href="/dashboard/projects/create">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Project
+              </Link>
+            </Button>
           )}
-
-          {isAdmin && (
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-2xl font-heading font-semibold">Platform trends</h2>
-                <p className="text-sm text-muted-foreground">
-                  Real-time operational charts for admins.
-                </p>
-              </div>
-              {adminCharts ? (
-                <AdminCharts
-                  data={adminCharts}
-                  timeRangeDays={adminRangeDays}
-                  onTimeRangeChange={setAdminRangeDays}
-                />
-              ) : (
-                <Card className="flex h-[220px] items-center justify-center">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    Loading charts...
-                  </div>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* Quick Actions with Enhanced Design */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {isClient && (
-              <Card className="group relative overflow-hidden border-2 border-primary/20 bg-linear-to-br from-primary/5 to-transparent transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                      <Briefcase className="h-5 w-5 text-primary" />
-                    </div>
-                    <CardTitle className="text-xl">Get Started</CardTitle>
-                  </div>
-                  <CardDescription className="text-base">
-                    Create your first project to get matched with vetted freelancers
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button asChild className="w-full group-hover:scale-[1.02] transition-transform">
-                    <Link href="/dashboard/projects/create" className="flex items-center justify-center">
-                      <Briefcase className="mr-2 h-4 w-4" />
-                      Create Project
-                      <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </Link>
-                  </Button>
-                </CardContent>
-                <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              </Card>
-            )}
-
-            {isFreelancer && (
-              <Card className="group relative overflow-hidden border-2 border-primary/20 bg-linear-to-br from-primary/5 to-transparent transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                      <TrendingUp className="h-5 w-5 text-primary" />
-                    </div>
-                    <CardTitle className="text-xl">View Projects</CardTitle>
-                  </div>
-                  <CardDescription className="text-base">
-                    Projects you're selected for appear here
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button asChild variant="outline" className="w-full group-hover:scale-[1.02] transition-transform">
-                    <Link href="/dashboard/projects" className="flex items-center justify-center">
-                      <TrendingUp className="mr-2 h-4 w-4" />
-                      View Projects
-                      <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </Link>
-                  </Button>
-                </CardContent>
-                <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-primary/5 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              </Card>
-            )}
-
-            <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted group-hover:bg-accent transition-colors">
-                    <MessageSquare className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-xl">Messages</CardTitle>
-                </div>
-                <CardDescription className="text-base">
-                  Check your latest messages and conversations
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button asChild variant="outline" className="w-full group-hover:scale-[1.02] transition-transform">
-                  <Link href="/dashboard/chat" className="flex items-center justify-center">
-                    <MessageSquare className="mr-2 h-4 w-4" />
-                    Open Messages
-                    <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted group-hover:bg-accent transition-colors">
-                    <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <CardTitle className="text-xl">Complete Profile</CardTitle>
-                </div>
-                <CardDescription className="text-base">
-                  {isClient 
-                    ? "Add company details to improve project matching"
-                    : isFreelancer
-                    ? "Complete your profile to get more projects"
-                    : "Update your profile information"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button asChild variant="outline" className="w-full group-hover:scale-[1.02] transition-transform">
-                  <Link href="/dashboard/profile" className="flex items-center justify-center">
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Go to Profile
-                    <ArrowRight className="ml-2 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          <Button asChild variant="outline" className="rounded-xl border-primary/50 text-primary hover:bg-primary/10 hover:border-secondary/50 hover:text-secondary-foreground">
+            <Link href="/dashboard/projects">
+              <Briefcase className="mr-2 h-4 w-4" />
+              View Projects
+            </Link>
+          </Button>
+        </div>
       </div>
 
-      {/* Recent Activity - from notifications (matches, messages, payments, etc.) */}
-      <Card className="overflow-hidden border-border/60 bg-card/90">
-        <CardHeader className="border-b border-border/50 bg-muted/20">
-          <div className="flex items-center justify-between">
-            <div>
-            <CardTitle className="text-xl">Recent Activity</CardTitle>
-              <CardDescription className="mt-1">
-                Your latest updates and notifications
-              </CardDescription>
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Activity className="h-5 w-5 text-primary" />
-            </div>
+      {/* 4 metric cards - reference style (first one accent) */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {metrics.map((metric) => (
+          <MetricCard
+            key={metric.title}
+            title={metric.title}
+            subtitle={metric.subtitle}
+            value={isLoading ? "—" : metric.value}
+            description={metric.description}
+            icon={metric.icon}
+            variant={metric.variant}
+            trend={isLoading ? undefined : metric.trend}
+            badge={metric.badge}
+          />
+        ))}
+      </div>
+
+      {/* Main grid - Project Analytics, Project List, Team, Progress, Earnings */}
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <ProjectAnalyticsCard data={projectAnalyticsData} isLoading={isLoading} />
+
+        <ProjectListCard
+          projects={projects}
+          isLoading={projects === undefined}
+          onCreateHref={isClient ? "/dashboard/projects/create" : undefined}
+        />
+
+        <TeamCollaborationCard
+          members={teamMembers}
+          isLoading={projects === undefined}
+          onAddHref={isClient ? "/dashboard/projects/create" : undefined}
+        />
+
+        <ProjectProgressCard
+          completed={projectProgress.completed}
+          inProgress={projectProgress.inProgress}
+          pending={projectProgress.pending}
+          isLoading={projects === undefined}
+        />
+
+        {isFreelancer && (
+          <EarningsWidget
+            amount={formatCurrency(dashboardMetrics?.metrics?.earnings ?? 0)}
+            label="Earnings this month"
+            isLoading={isLoading}
+          />
+        )}
+      </div>
+
+      {/* Admin charts */}
+      {isAdmin && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold">Platform trends</h2>
+            <p className="text-sm text-muted-foreground">
+              Real-time operational charts for admins.
+            </p>
           </div>
+          {adminCharts ? (
+            <AdminCharts
+              data={adminCharts}
+              timeRangeDays={adminRangeDays}
+              onTimeRangeChange={setAdminRangeDays}
+            />
+          ) : (
+            <Card className="flex h-[220px] items-center justify-center">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                Loading
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Client feedback (freelancer) */}
+      {isFreelancer && freelancerReviews && freelancerReviews.length > 0 && (
+        <Card className="overflow-hidden rounded-xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5" />
+              Client feedback
+            </CardTitle>
+            <CardDescription>
+              Recent ratings from clients you&apos;ve worked with
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {freelancerReviews.map((review: { _id: string; rating: number; comment?: string; createdAt: number }) => (
+                <div key={review._id} className="rounded-lg border p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`h-4 w-4 ${
+                          review.rating >= s ? "fill-amber-400 text-amber-500" : "text-muted-foreground"
+                        }`}
+                      />
+                    ))}
+                    <span className="text-sm text-muted-foreground ml-2">
+                      {new Date(review.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {review.comment && (
+                    <p className="text-sm text-foreground">&quot;{review.comment}&quot;</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick actions */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {isClient && (
+          <Card className="group rounded-xl border-2 border-primary/20 transition-all hover:border-primary/40 hover:shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">Create Project</CardTitle>
+              <CardDescription>Get matched with vetted freelancers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/dashboard/projects/create">
+                  <Briefcase className="mr-2 h-4 w-4" />
+                  Create Project
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+        <Card className="group rounded-xl transition-all hover:shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">Messages</CardTitle>
+            <CardDescription>Check your latest conversations</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/chat">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Open Messages
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="group rounded-xl transition-all hover:shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">Profile</CardTitle>
+            <CardDescription>
+              {isClient ? "Add company details" : isFreelancer ? "Complete your profile" : "Update your profile"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/profile">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Go to Profile
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <Card className="overflow-hidden rounded-xl border-border/60">
+        <CardHeader className="border-b bg-muted/20">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Your latest updates and notifications</CardDescription>
         </CardHeader>
         <CardContent className="p-6">
           {recentActivity === undefined ? (
-            <DashboardLoadingState label="Loading activity..." className="min-h-[180px] border-0 bg-transparent" />
+            <div className="flex h-32 items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
           ) : recentActivity.length === 0 ? (
-            <DashboardEmptyState
-              icon={Activity}
-              title="No recent activity to display"
-              description="Your activity will appear here as you get matches, messages, and project updates."
-              className="border-0 bg-transparent py-8 shadow-none"
-            />
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No recent activity. Your activity will appear here as you get matches, messages, and project updates.
+            </p>
           ) : (
             <ul className="space-y-3">
               {recentActivity.map((n: Doc<"notifications">) => {
@@ -527,28 +473,28 @@ export default function DashboardPage() {
                     : n.type === "message" && n.data?.chatId
                       ? `/dashboard/chat/${n.data.chatId}`
                       : null;
-                const content = (
-                  <>
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="font-medium text-sm">{n.title}</p>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatDistanceToNow(n.createdAt, { addSuffix: true })}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
-                  </>
-                );
                 return (
-                  <li
-                    key={n._id}
-                    className="flex flex-col gap-0.5 rounded-lg border p-3 transition-colors hover:bg-muted/50"
-                  >
+                  <li key={n._id} className="rounded-lg border p-3 transition-colors hover:bg-muted/50">
                     {href ? (
                       <Link href={href} className="block -m-3 p-3">
-                        {content}
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-sm">{n.title}</p>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNow(n.createdAt, { addSuffix: true })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{n.message}</p>
                       </Link>
                     ) : (
-                      content
+                      <>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-sm">{n.title}</p>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNow(n.createdAt, { addSuffix: true })}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{n.message}</p>
+                      </>
                     )}
                   </li>
                 );

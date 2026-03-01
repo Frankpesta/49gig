@@ -67,11 +67,11 @@ export default function SupportChatPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={MessageSquare} title="Please log in" />;
+    return <DashboardEmptyState icon={MessageSquare} title="Please log in" iconTone="muted" />;
   }
 
   if (chats === undefined) {
-    return <DashboardLoadingState label="Loading support chat..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   // If redirecting to existing chat, show loading
@@ -79,7 +79,7 @@ export default function SupportChatPage() {
     (chat: Doc<"chats">) => chat.type === "support" && chat.status === "active"
   );
   if (supportChat) {
-    return <DashboardLoadingState label="Opening existing support chat..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   return (
@@ -94,6 +94,7 @@ export default function SupportChatPage() {
           <DashboardPageHeader
             title="New Support Chat"
             description="Create a support request to get help from our team."
+            icon={MessageSquare}
           />
         </div>
       </div>

@@ -18,18 +18,19 @@ export default function OpportunitiesPage() {
   const { user, isAuthenticated } = useAuth();
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={Briefcase} title="Please log in" />;
+    return <DashboardEmptyState icon={Briefcase} title="Please log in" iconTone="muted" />;
   }
 
   if (user.role !== "freelancer") {
-    return <DashboardEmptyState icon={Briefcase} title="This page is for freelancers" />;
+    return <DashboardEmptyState icon={Briefcase} title="This page is for freelancers" iconTone="muted" />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="How you get projects"
         description="Clients choose talent from their matches. When you are selected, the project appears in Projects."
+        icon={Briefcase}
       />
 
       <Card>

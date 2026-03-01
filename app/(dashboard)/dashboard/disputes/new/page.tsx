@@ -28,11 +28,9 @@ export default function NewDisputePage() {
   const { user, isAuthenticated } = useAuth();
 
   const projectId = searchParams.get("projectId");
-  const milestoneId = searchParams.get("milestoneId");
 
   const [formData, setFormData] = useState({
     projectId: projectId || "",
-    milestoneId: milestoneId || "",
     type: "" as
       | "milestone_quality"
       | "payment"
@@ -58,13 +56,6 @@ export default function NewDisputePage() {
 
   const project = useQuery(
     (api as any)["projects/queries"].getProject,
-    formData.projectId && isAuthenticated && user?._id
-      ? { projectId: formData.projectId as any, userId: user._id }
-      : "skip"
-  );
-
-  const milestones = useQuery(
-    (api as any)["projects/queries"].getProjectMilestones,
     formData.projectId && isAuthenticated && user?._id
       ? { projectId: formData.projectId as any, userId: user._id }
       : "skip"
@@ -98,7 +89,6 @@ export default function NewDisputePage() {
 
       const disputeId = await initiateDispute({
         projectId: formData.projectId as any,
-        milestoneId: formData.milestoneId ? (formData.milestoneId as any) : undefined,
         type: formData.type as any,
         reason: formData.reason,
         description: formData.description,
@@ -150,7 +140,7 @@ export default function NewDisputePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Initiate Dispute</h1>
           <p className="text-muted-foreground mt-1">
-            File a dispute for a project or milestone
+            File a dispute for a project
           </p>
         </div>
       </div>
@@ -181,7 +171,7 @@ export default function NewDisputePage() {
                 <Select
                   value={formData.projectId}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, projectId: value, milestoneId: "" })
+                    setFormData({ ...formData, projectId: value })
                   }
                   required
                   disabled={!!projectId}
@@ -205,30 +195,6 @@ export default function NewDisputePage() {
               )}
             </div>
 
-            {milestones && milestones.length > 0 && (
-              <div className="space-y-2">
-                <Label htmlFor="milestoneId">Milestone (Optional)</Label>
-                <Select
-                  value={formData.milestoneId}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, milestoneId: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select milestone (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">None (Project-level dispute)</SelectItem>
-                    {milestones.map((milestone: Doc<"milestones">) => (
-                      <SelectItem key={milestone._id} value={milestone._id}>
-                        {milestone.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="type">Dispute Type *</Label>
               <Select
@@ -243,7 +209,7 @@ export default function NewDisputePage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="milestone_quality">
-                    Milestone Quality
+                    Deliverable Quality
                   </SelectItem>
                   <SelectItem value="payment">Payment</SelectItem>
                   <SelectItem value="communication">Communication</SelectItem>

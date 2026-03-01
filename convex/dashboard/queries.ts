@@ -85,6 +85,7 @@ export const getDashboardMetrics = query({
       const totalSpend = payments
         .filter(
           (payment) =>
+            payment.projectId != null &&
             projectIds.has(payment.projectId) &&
             (payment.type === "pre_funding" || payment.type === "milestone_release")
         )
@@ -181,6 +182,7 @@ export const getDashboardMetrics = query({
       const totalSpend30DaysAgo = payments
         .filter(
           (payment) =>
+            payment.projectId != null &&
             projectIds.has(payment.projectId) &&
             (payment.type === "pre_funding" || payment.type === "milestone_release") &&
             payment.createdAt < thirtyDaysAgo
@@ -228,6 +230,7 @@ export const getDashboardMetrics = query({
       const earnings = payments
         .filter(
           (payment) =>
+            payment.projectId != null &&
             projectIds.has(payment.projectId) &&
             (payment.type === "payout" || payment.type === "milestone_release")
         )
@@ -295,6 +298,7 @@ export const getDashboardMetrics = query({
       const earnings30DaysAgo = payments
         .filter(
           (payment) =>
+            payment.projectId != null &&
             projectIds.has(payment.projectId) &&
             (payment.type === "payout" || payment.type === "milestone_release") &&
             payment.createdAt < thirtyDaysAgo
@@ -376,5 +380,59 @@ export const getDashboardMetrics = query({
         systemHealth,
       },
     };
+  },
+});
+
+/**
+ * Get upcoming milestones for the current user's projects
+ */
+export const getUpcomingMilestones = query({
+  args: {
+    userId: v.optional(v.id("users")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) return [];
+
+    const now = Date.now();
+    const limit = args.limit ?? 5;
+
+    let projectIds: Set<Doc<"projects">["_id"]> = new Set();
+
+    if (user.role === "client") {
+      const projects = await ctx.db
+        .query("projects")
+        .withIndex("by_client", (q) => q.eq("clientId", user._id))
+        .collect();
+      projectIds = new Set(projects.map((p) => p._id));
+    } else if (user.role === "freelancer") {
+      const projects = await ctx.db
+        .query("projects")
+        .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
+        .collect();
+      projectIds = new Set(projects.map((p) => p._id));
+    } else {
+      return [];
+    }
+
+    const allMilestones = await ctx.db.query("milestones").collect();
+    const upcoming = allMilestones
+      .filter(
+        (m) =>
+          projectIds.has(m.projectId) &&
+          m.dueDate >= now &&
+          (m.status === "pending" || m.status === "in_progress")
+      )
+      .sort((a, b) => a.dueDate - b.dueDate)
+      .slice(0, limit);
+
+    return upcoming.map((m) => ({
+      _id: m._id,
+      title: m.title,
+      dueDate: m.dueDate,
+      status: m.status,
+      projectId: m.projectId,
+    }));
   },
 });

@@ -3,6 +3,28 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 
+export const getNotificationById = query({
+  args: {
+    notificationId: v.id("notifications"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    let user: Doc<"users"> | null = null;
+    if (args.userId) {
+      const u = await ctx.db.get(args.userId);
+      if (u && u.status === "active") user = u;
+    } else {
+      const u = await getCurrentUser(ctx);
+      if (u && (u as Doc<"users">).status === "active") user = u as Doc<"users">;
+    }
+    if (!user) return null;
+
+    const notification = await ctx.db.get(args.notificationId);
+    if (!notification || notification.userId !== user._id) return null;
+    return notification;
+  },
+});
+
 export const getMyNotifications = query({
   args: {
     limit: v.optional(v.number()),

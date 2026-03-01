@@ -141,7 +141,7 @@ export default function Home() {
       step: "4",
       icon: Rocket,
       title: "Deliver Results",
-      description: "Work through milestones with full transparency, real-time updates, and secure payments. Pay only when you're satisfied.",
+      description: "Work through deliverables with full transparency, real-time updates, and secure payments. Pay only when you're satisfied.",
       image: "https://images.unsplash.com/photo-1556761175-b413da4baf72?w=800&q=80",
     },
   ];
@@ -563,7 +563,7 @@ export default function Home() {
                       {[
                         "Complete profile and verification",
                         "Get matched to serious client projects",
-                        "Deliver milestones and build ratings",
+                        "Deliver work and build ratings",
                         "Earn repeatedly from global opportunities",
                       ].map((item, idx) => (
                         <div key={item} className="flex items-center gap-3">

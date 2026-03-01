@@ -8,8 +8,8 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FormField, FormSection } from "@/components/forms/form-field";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, HelpCircle, MessageSquare, Send, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, LifeBuoy, MessageSquare, Send, CheckCircle2, AlertCircle } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
@@ -28,6 +28,7 @@ export default function SupportPage() {
   const router = useRouter();
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ subject?: string; message?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorDialog, setErrorDialog] = useState<{ open: boolean; title: string; message: string }>({
@@ -39,12 +40,21 @@ export default function SupportPage() {
   const createSupportChat = useMutation((api as any)["chat/mutations"].createSupportChat);
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={HelpCircle} title="Please log in" />;
+    return <DashboardEmptyState icon={LifeBuoy} title="Please log in" iconTone="muted" />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?._id || !subject.trim() || !message.trim()) return;
+    setFieldErrors({});
+
+    const errors: { subject?: string; message?: string } = {};
+    if (!subject.trim()) errors.subject = "Subject is required";
+    if (!message.trim()) errors.message = "Message is required";
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+    if (!user?._id) return;
 
     setIsSubmitting(true);
     try {
@@ -91,48 +101,70 @@ export default function SupportPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Help & Support"
         description="Get help from our support team or create a support request."
+        icon={LifeBuoy}
       />
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Create Support Request */}
-        <Card>
-          <CardHeader>
+        <Card className="rounded-xl overflow-hidden border-border/60">
+          <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent">
             <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
+              <MessageSquare className="h-5 w-5 text-primary" />
               Create Support Request
             </CardTitle>
             <CardDescription>
-              Submit a support request and our team will get back to you.
+              Submit a support request and our team will respond within 24 hours.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject</Label>
-                <Input
-                  id="subject"
-                  placeholder="What do you need help with?"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <FormSection
+                title="Request details"
+                description="Provide a clear subject and description so we can help you quickly."
+              >
+                <FormField
+                  label="Subject"
+                  htmlFor="subject"
+                  description="Brief summary of your issue (e.g. Payment not received, Account verification)"
+                  error={fieldErrors.subject}
                   required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="message">Message</Label>
-                <Textarea
-                  id="message"
-                  placeholder="Describe your issue or question..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={6}
+                >
+                  <Input
+                    id="subject"
+                    placeholder="What do you need help with?"
+                    value={subject}
+                    onChange={(e) => {
+                      setSubject(e.target.value);
+                      if (fieldErrors.subject) setFieldErrors((p) => ({ ...p, subject: undefined }));
+                    }}
+                    className={`rounded-lg h-11 ${fieldErrors.subject ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                </FormField>
+                <FormField
+                  label="Message"
+                  htmlFor="message"
+                  description="Include any relevant details, project IDs, or error messages."
+                  error={fieldErrors.message}
                   required
-                />
-              </div>
-              <Button type="submit" disabled={isSubmitting} className="w-full">
+                >
+                  <Textarea
+                    id="message"
+                    placeholder="Describe your issue or question in detail..."
+                    value={message}
+                    onChange={(e) => {
+                      setMessage(e.target.value);
+                      if (fieldErrors.message) setFieldErrors((p) => ({ ...p, message: undefined }));
+                    }}
+                    rows={6}
+                    className={`rounded-lg min-h-[140px] ${fieldErrors.message ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                </FormField>
+              </FormSection>
+              <Button type="submit" disabled={isSubmitting} className="w-full rounded-xl h-11">
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -150,10 +182,10 @@ export default function SupportPage() {
         </Card>
 
         {/* Help Resources */}
-        <Card>
-          <CardHeader>
+        <Card className="rounded-xl overflow-hidden border-border/60">
+          <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent">
             <CardTitle className="flex items-center gap-2">
-              <HelpCircle className="h-5 w-5" />
+              <LifeBuoy className="h-5 w-5 text-primary" />
               Help Resources
             </CardTitle>
             <CardDescription>

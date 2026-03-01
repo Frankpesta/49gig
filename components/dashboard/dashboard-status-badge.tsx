@@ -30,7 +30,7 @@ export function DashboardStatusBadge({
   return (
     <Badge
       variant="outline"
-      className={cn("rounded-full border px-2 py-0.5 text-xs font-medium", toneClassMap[tone], className)}
+      className={cn("rounded-lg border px-2.5 py-0.5 text-xs font-semibold", toneClassMap[tone], className)}
     >
       {icon}
       {label}

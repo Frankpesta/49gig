@@ -150,13 +150,14 @@ export default function UsersPage() {
   };
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={Users} title="Please log in" />;
+    return <DashboardEmptyState icon={Users} title="Please log in" iconTone="muted" />;
   }
 
   if (user.role !== "admin" && user.role !== "moderator") {
     return (
       <DashboardEmptyState
         icon={Shield}
+        iconTone="muted"
         title="Access denied"
         description="Admin or Moderator role required."
       />
@@ -164,13 +165,14 @@ export default function UsersPage() {
   }
 
   if (users === undefined) {
-    return <DashboardLoadingState label="Loading users..." />;
+    return <DashboardLoadingState label="Loading" />;
   }
 
   if (users === null || !Array.isArray(users)) {
     return (
       <DashboardEmptyState
         icon={AlertCircle}
+        iconTone="danger"
         title="Failed to load users"
         description="Please try again."
       />
@@ -178,10 +180,11 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="User Management"
         description="Manage users, roles, and account status."
+        icon={Users}
       />
 
       {/* Filters */}
