@@ -22,7 +22,7 @@ export default function PaymentCallbackPage() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const projectId = params.projectId as string;
-  const txRef = searchParams.get("tx_ref");
+  const txRef = searchParams.get("tx_ref") ?? searchParams.get("transaction_id");
   const status = searchParams.get("status");
 
   const verifyPayment = useAction(
@@ -45,8 +45,8 @@ export default function PaymentCallbackPage() {
       return;
     }
 
-    // Only verify if status is "successful" (Flutterwave's success status)
-    if (status === "successful") {
+    // Only verify if status indicates success (Flutterwave uses "successful" or "succeeded")
+    if (status === "successful" || status === "succeeded") {
       const verify = async () => {
         setIsVerifying(true);
         try {
@@ -87,9 +87,10 @@ export default function PaymentCallbackPage() {
     return null;
   }
 
-  const isSuccess = status === "successful" && paymentStatus?.isFunded;
+  const isSuccessStatus = status === "successful" || status === "succeeded";
+  const isSuccess = isSuccessStatus && paymentStatus?.isFunded;
   const isCancelled = status === "cancelled";
-  const isPending = status === "successful" && !paymentStatus?.isFunded && !verificationError;
+  const isPending = isSuccessStatus && !paymentStatus?.isFunded && !verificationError;
 
   return (
     <div className="flex min-h-[400px] items-center justify-center">
