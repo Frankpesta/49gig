@@ -161,7 +161,10 @@ export const verifyPayment = action({
     // Verify payment with Flutterwave
     const verification = await flutterwave.verifyPayment(args.txRef);
 
-    if (verification.data.status !== "successful") {
+    // Flutterwave verify API returns "successful"; some flows use "succeeded"
+    const isSuccess =
+      verification.data.status === "successful" || verification.data.status === "succeeded";
+    if (!isSuccess) {
       throw new Error(`Payment verification failed: ${verification.data.status}`);
     }
 
@@ -224,10 +227,15 @@ export const handleFlutterwaveWebhook = action({
       });
 
       switch (args.event) {
-      case "charge.completed":
-        if (args.data.tx_ref) {
-          const txRef = args.data.tx_ref;
-          
+      case "charge.completed": {
+        // Flutterwave may send tx_ref or reference; reference can be our tx_ref (49gig-*)
+        const txRef =
+          args.data?.tx_ref ||
+          (typeof args.data?.reference === "string" && args.data.reference.startsWith("49gig-")
+            ? args.data.reference
+            : null);
+
+        if (txRef) {
           // Find payment by transaction reference
           const payment = await ctx.runQuery(
             internalAny.payments.queries.getPaymentByTransactionId,
@@ -237,7 +245,11 @@ export const handleFlutterwaveWebhook = action({
           );
 
           if (payment) {
-            if (args.data.status === "successful") {
+            // Flutterwave webhook uses "succeeded"; verify API uses "successful" - accept both
+            const isSuccess =
+              args.data?.status === "successful" || args.data?.status === "succeeded";
+
+            if (isSuccess) {
               await ctx.runMutation(internalAny.payments.mutations.handlePaymentSuccess, {
                 transactionId: txRef,
                 eventId: args.data.id?.toString() || txRef,
@@ -262,9 +274,20 @@ export const handleFlutterwaveWebhook = action({
                 errorMessage: args.data.processor_response || "Payment failed",
               });
             }
+          } else {
+            console.warn(`Payment not found for tx_ref: ${txRef}`, {
+              event: args.event,
+              dataKeys: args.data ? Object.keys(args.data) : [],
+            });
           }
+        } else {
+          console.warn("charge.completed webhook missing tx_ref/reference", {
+            tx_ref: args.data?.tx_ref,
+            reference: args.data?.reference,
+          });
         }
         break;
+      }
 
       case "transfer.completed":
         if (args.data.reference) {

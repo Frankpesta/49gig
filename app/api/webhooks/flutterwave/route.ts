@@ -44,10 +44,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // It's a good idea to log all received events
+  // Log received events for debugging (Flutterwave may use tx_ref or reference)
   console.log("Received Flutterwave webhook:", {
     event: event.event || event.type || "unknown",
-    txRef: event.data?.tx_ref || event.tx_ref,
+    txRef: event.data?.tx_ref || event.data?.reference || event.tx_ref,
     status: event.data?.status || event.status,
   });
 
