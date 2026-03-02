@@ -167,7 +167,6 @@ export const verifyPayment = action({
     if (!isSuccess) {
       throw new Error(`Payment verification failed: ${verification.data.status}`);
     }
-    }
 
     // Find payment record
     const payment = await ctx.runQuery(
