@@ -3,7 +3,8 @@
  * Placeholders: [Client Name], [Freelancer Name(s)], [Date], [Project Title].
  */
 
-const RULE = "⸻";
+/** Divider line; must be WinAnsi-safe for PDF generation (no ⸻ U+2E3B) */
+const RULE = "---";
 
 export const CLIENT_AGREEMENT_SECTIONS = [
   { title: "49GIG Client Project Agreement (Digital Contract)", level: "title" as const },

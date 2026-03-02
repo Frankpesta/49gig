@@ -149,6 +149,12 @@ export const signContract = mutation({
           details: { oldStatus: "matched", newStatus: "in_progress", reason: "contract_fully_signed" },
           createdAt: now,
         });
+        // Ensure monthly cycles exist (idempotent; creates if missing, e.g. for projects that skipped payment flow)
+        await ctx.scheduler.runAfter(
+          0,
+          apiModule.internal.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
+          { projectId }
+        );
       }
     }
 
