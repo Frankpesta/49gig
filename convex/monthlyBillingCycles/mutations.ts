@@ -130,6 +130,39 @@ export const approveMonthlyCycle = mutation({
 });
 
 /**
+ * Ensure monthly cycles exist for a project (client/admin). Idempotent.
+ * Use when cycles are missing for an in_progress project.
+ */
+export const ensureMonthlyCycles = mutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user || (user as Doc<"users">).status !== "active") {
+      throw new Error("Not authenticated");
+    }
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+
+    const isClient = project.clientId === (user as Doc<"users">)._id;
+    const isAdmin = (user as Doc<"users">).role === "admin";
+    if (!isClient && !isAdmin) {
+      throw new Error("Only the project client or admin can create monthly cycles");
+    }
+
+    if (project.status !== "matched" && project.status !== "in_progress") {
+      throw new Error("Monthly cycles can only be created for matched or in-progress projects");
+    }
+
+    await ctx.scheduler.runAfter(0, internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal, {
+      projectId: args.projectId,
+    });
+
+    return { success: true, message: "Monthly cycles will be created shortly" };
+  },
+});
+
+/**
  * Internal: create monthly billing cycles for a project (called after match acceptance)
  */
 export const autoCreateMonthlyCyclesInternal = internalMutation({
@@ -146,10 +179,18 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
       .first();
     if (existing) return [];
 
-    const startMs = project.intakeForm.startDate;
-    const endMs = project.intakeForm.endDate;
-    const durationMs = endMs - startMs;
-    const durationMonths = Math.max(1, Math.ceil(durationMs / (30 * 24 * 60 * 60 * 1000)));
+    const monthMs = 30 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    let startMs = project.intakeForm.startDate ?? 0;
+    let endMs = project.intakeForm.endDate ?? 0;
+    let durationMs = endMs - startMs;
+    if (!Number.isFinite(durationMs) || durationMs <= 0) {
+      // Fallback when dates missing/invalid: 3 months from now
+      startMs = now;
+      endMs = now + 3 * monthMs;
+      durationMs = 3 * monthMs;
+    }
+    const durationMonths = Math.max(1, Math.ceil(durationMs / monthMs));
 
     const platformFeePercent = project.platformFee ?? 25;
     const netPercent = 100 - platformFeePercent;
@@ -157,9 +198,7 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
     const amountPerMonth = totalNet / durationMonths;
     const amountPerMonthCents = Math.round(amountPerMonth * 100);
 
-    const now = Date.now();
     const cycleIds: Doc<"monthlyBillingCycles">["_id"][] = [];
-    const monthMs = 30 * 24 * 60 * 60 * 1000;
 
     for (let i = 0; i < durationMonths; i++) {
       const monthStart = startMs + i * monthMs;

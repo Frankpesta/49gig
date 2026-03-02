@@ -97,7 +97,11 @@ export default function ProjectDetailPage() {
   const approveMonthlyCycle = useMutation(
     api.monthlyBillingCycles.mutations.approveMonthlyCycle
   );
+  const ensureMonthlyCycles = useMutation(
+    api.monthlyBillingCycles.mutations.ensureMonthlyCycles
+  );
   const [approvingCycleId, setApprovingCycleId] = useState<Id<"monthlyBillingCycles"> | null>(null);
+  const [isCreatingCycles, setIsCreatingCycles] = useState(false);
 
   const project = useQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -495,11 +499,35 @@ export default function ProjectDetailPage() {
                   <p className="text-sm font-medium text-foreground mb-1">
                     {isClient ? "No billing cycles yet" : "No payment cycles yet"}
                   </p>
-                  <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                  <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-4">
                     {isClient
                       ? "Monthly billing cycles are created automatically when the project is in progress. You'll approve each month to release payment to the freelancer."
                       : "Monthly billing cycles will appear here once the project is in progress. You'll get paid each month after the client approves."}
                   </p>
+                  {(project.status === "in_progress" || project.status === "matched") && isClient && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isCreatingCycles}
+                      onClick={async () => {
+                        if (!projectId) return;
+                        setIsCreatingCycles(true);
+                        try {
+                          await ensureMonthlyCycles({ projectId });
+                          toast.success("Monthly cycles created. The page will update shortly.");
+                        } catch (e) {
+                          toast.error(getUserFriendlyError(e) || "Failed to create cycles");
+                        } finally {
+                          setIsCreatingCycles(false);
+                        }
+                      }}
+                    >
+                      {isCreatingCycles ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      Create monthly cycles
+                    </Button>
+                  )}
                 </div>
                 )}
                 {isClient && monthlyCycles && monthlyCycles.length > 0 && (

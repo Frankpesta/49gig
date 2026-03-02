@@ -46,9 +46,21 @@ function formatCurrency(amount: number, currency: string) {
   return `${currency.toUpperCase()} ${amount.toFixed(2)}`;
 }
 
-/** WinAnsi encoding cannot handle newlines; sanitize before drawing. */
+/** WinAnsi encoding cannot handle newlines or certain Unicode (e.g. ⸻ U+2E3B); sanitize before drawing. */
 function sanitizeForPdf(text: string): string {
-  return String(text ?? "").replace(/[\r\n]+/g, " ").trim() || " ";
+  let s = String(text ?? "").replace(/[\r\n]+/g, " ").trim() || " ";
+  // pdf-lib StandardFonts use WinAnsi; replace chars it cannot encode
+  return s.replace(/[\s\S]/g, (c) => {
+    const code = c.charCodeAt(0);
+    if (code >= 0x20 && code <= 0x7e) return c; // ASCII printable
+    if (code >= 0xa0 && code <= 0xff) return c; // Latin-1 supplement
+    // Map common Unicode punctuation to ASCII
+    const map: Record<number, string> = {
+      0x2014: "-", 0x2013: "-", 0x2e3a: "-", 0x2e3b: "-",
+      0x201c: '"', 0x201d: '"', 0x2018: "'", 0x2019: "'",
+    };
+    return map[code] ?? "-";
+  });
 }
 
 function wrapText(text: string, maxWidth: number, font: any, size: number) {
