@@ -129,6 +129,7 @@ export default function CreateProjectPage() {
     startDate: "",
     // Notes
     specialRequirements: "",
+    fundUpfrontMonths: 0,
   });
 
   // Derive endDate from startDate + projectDuration (use local date to match calendar)
@@ -274,6 +275,7 @@ export default function CreateProjectPage() {
       const platformFee = platformFeePct ?? 25;
 
       const projectId = await createProject({
+        fundUpfrontMonths: formData.fundUpfrontMonths,
         intakeForm: {
           hireType: formData.hireType,
           teamSize: formData.teamSize,
@@ -634,9 +636,34 @@ export default function CreateProjectPage() {
                       </p>
                     </div>
                     <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-3">
-                      <div className="font-medium text-foreground">Fund upfront</div>
-                      <p className="text-sm text-muted-foreground">
-                        Choose how many months to fund upfront. You can pay 1 month, 3 months, or 6 months upfront. All payments are securely held in escrow and released monthly to the freelancer only after your approval of the completed work for that month, even when you fund multiple months upfront. This ensures transparency, accountability, and protection for both parties throughout the engagement.
+                      <div className="font-medium text-foreground">Fund upfront (optional)</div>
+                      <p className="text-xs text-muted-foreground">
+                        How many months to release to the freelancer immediately after payment. 0 = release monthly with your approval only.
+                      </p>
+                      <Select
+                        value={String(formData.fundUpfrontMonths)}
+                        onValueChange={(v) => setFormData({ ...formData, fundUpfrontMonths: parseInt(v, 10) })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select months" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">
+                            0 months — Release monthly with your approval only
+                          </SelectItem>
+                          {Array.from({ length: formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10) }, (_, i) => i + 1).map((n) => {
+                            const durMonths = formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10);
+                            const perMonth = budgetCalculation.estimatedBudget / durMonths;
+                            return (
+                              <SelectItem key={n} value={String(n)}>
+                                {n} month{n > 1 ? "s" : ""} — {formatBudget(perMonth * n)} released immediately
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        All payments are securely held in escrow and released monthly to the freelancer only after your approval of the completed work for that month.
                       </p>
                     </div>
                   </div>

@@ -138,6 +138,7 @@ export const createProject = mutation({
     totalAmount: v.number(),
     platformFee: v.number(), // Percentage (e.g., 10)
     currency: v.string(), // "usd"
+    fundUpfrontMonths: v.optional(v.number()),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -165,6 +166,7 @@ export const createProject = mutation({
       escrowedAmount,
       platformFee: args.platformFee,
       currency: args.currency,
+      fundUpfrontMonths: args.fundUpfrontMonths,
       createdAt: now,
       updatedAt: now,
     });
@@ -208,42 +210,7 @@ export const createProject = mutation({
 export const updateProject = mutation({
   args: {
     projectId: v.id("projects"),
-    intakeForm: v.optional(
-      v.object({
-        title: v.string(),
-        description: v.string(),
-        category: v.string(),
-        requiredSkills: v.array(v.string()),
-        budget: v.number(),
-        timeline: v.string(),
-        engagementType: v.optional(v.union(v.literal("individual"), v.literal("team"))),
-        durationValue: v.optional(v.number()),
-        durationUnit: v.optional(
-          v.union(v.literal("week"), v.literal("month"), v.literal("year"))
-        ),
-        hoursPerWeek: v.optional(v.number()),
-        pricingPlan: v.optional(
-          v.union(
-            v.literal("starter"),
-            v.literal("professional"),
-            v.literal("enterprise")
-          )
-        ),
-        teamSize: v.optional(v.number()),
-        teamPricingTier: v.optional(
-          v.union(
-            v.literal("startup"),
-            v.literal("growth"),
-            v.literal("enterprise"),
-            v.literal("custom")
-          )
-        ),
-        estimatedHours: v.optional(v.number()),
-        estimatedBudget: v.optional(v.number()),
-        deliverables: v.array(v.string()),
-        additionalRequirements: v.optional(v.string()),
-      })
-    ),
+    intakeForm: v.optional(v.any()), // Partial merge with existing; must match schema when merged
     totalAmount: v.optional(v.number()),
     platformFee: v.optional(v.number()),
     fundUpfrontMonths: v.optional(v.number()),
@@ -278,7 +245,7 @@ export const updateProject = mutation({
     };
 
     if (args.intakeForm) {
-      updates.intakeForm = args.intakeForm;
+      updates.intakeForm = { ...project.intakeForm, ...args.intakeForm };
     }
 
     if (args.totalAmount !== undefined) {
