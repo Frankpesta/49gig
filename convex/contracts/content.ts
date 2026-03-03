@@ -1,9 +1,10 @@
 /**
  * 49GIG Client and Freelancer Agreement text for in-app display and PDF.
- * Placeholders: [Client Name], [Freelancer Name(s)], [Date], [Project Title].
+ * Placeholders: [Client Name], [Freelancer Name(s)], [Date].
+ * Effective date is auto-generated at document generation time.
  */
 
-/** Divider line; must be WinAnsi-safe for PDF generation (no ⸻ U+2E3B) */
+/** Divider line; must be WinAnsi-safe for PDF generation */
 const RULE = "---";
 
 export const CLIENT_AGREEMENT_SECTIONS = [
@@ -43,39 +44,38 @@ export const CLIENT_AGREEMENT_SECTIONS = [
 ];
 
 export const FREELANCER_AGREEMENT_SECTIONS = [
-  { title: "49GIG Freelancer Project Agreement (Digital Contract)", level: "title" as const },
-  { title: "Parties", level: "heading" as const },
-  { body: "This Agreement is entered into between:\n• Freelancer: [Freelancer Name] (“Freelancer”)\n• Platform: 49GIG (“Platform”)\n• Client: Assigned by 49GIG (“Client”)\n\nEffective Date: [Date]\n\nThis Agreement governs the terms under which the Freelancer will perform services for Client projects through the 49GIG platform." },
-  { title: RULE, level: "divider" as const },
-  { title: "1. Project Scope", level: "heading" as const },
-  { body: "1.1 Freelancer agrees to deliver work according to the project description, scope, and milestones provided by Client and 49GIG.\n1.2 Deliverables, deadlines, and milestones are defined and agreed upon before the project begins.\n1.3 Optional: Freelancer may participate in a client interview prior to project start, if requested. Interviews are not mandatory." },
-  { title: RULE, level: "divider" as const },
-  { title: "2. Payment Terms", level: "heading" as const },
-  { body: "2.1 Milestone-Based Payment:\n• Freelancer payments are released upon Client approval of each milestone.\n• Funds are held securely in 49GIG escrow until approved.\n\n2.2 Platform Fee:\n• 49GIG collects 25% of total project value.\n• Freelancer receives 75% of total project value.\n\n2.3 All payments must go through 49GIG. Freelancers may not accept payments directly from clients outside the platform." },
-  { title: RULE, level: "divider" as const },
-  { title: "3. Project Timeline", level: "heading" as const },
-  { body: "3.1 Freelancer agrees to deliver work according to milestone deadlines.\n3.2 If Freelancer cannot meet a deadline, they must notify the Client and Platform immediately.\n3.3 Revisions may be requested by Client within reasonable limits of the agreed scope." },
-  { title: RULE, level: "divider" as const },
-  { title: "4. Intellectual Property", level: "heading" as const },
-  { body: "4.1 Upon full payment of milestones, all work created for the Client becomes the property of the Client.\n4.2 Freelancer retains the right to showcase work in portfolios or marketing materials, with Client's consent." },
-  { title: RULE, level: "divider" as const },
-  { title: "5. Non-Circumvention Clause", level: "heading" as const },
-  { body: "5.1 Freelancer agrees not to bypass 49GIG to work directly with any Client assigned via the platform.\n\n5.2 Violation of this clause will result in:\n• Immediate suspension of Freelancer account\n• Payment of a penalty equal to 100% of the project value to 49GIG\n• A fine of $10,000\n• Possible legal action to recover damages and unpaid platform fees\n\nThis protects the platform, clients, and other freelancers." },
-  { title: RULE, level: "divider" as const },
-  { title: "6. Confidentiality", level: "heading" as const },
-  { body: "6.1 Freelancer must keep all project-related information, sensitive materials, and intellectual property confidential.\n6.2 Confidential information may not be shared or used outside the project without explicit consent." },
-  { title: RULE, level: "divider" as const },
-  { title: "7. Dispute Resolution", level: "heading" as const },
-  { body: "7.1 All disputes between Freelancer and Client are mediated by 49GIG.\n7.2 Platform decisions are final and binding, based on milestones, approved deliverables, and communications.\n7.3 Failure to comply with the platform's dispute resolution may result in account suspension or termination." },
-  { title: RULE, level: "divider" as const },
-  { title: "8. Termination", level: "heading" as const },
-  { body: "8.1 Projects may be terminated by Client or Platform for valid reasons, including violation of platform rules.\n8.2 Freelancer is entitled to payment for all completed and approved milestones.\n8.3 Freelancers who bypass the platform or violate rules may forfeit payments and face account suspension." },
-  { title: RULE, level: "divider" as const },
-  { title: "9. Governing Law", level: "heading" as const },
-  { body: "This Agreement is governed by the laws of the Federal Capital Territory, Abuja, Nigeria and enforceable in relevant courts." },
-  { title: RULE, level: "divider" as const },
-  { title: "10. Freelancer Acceptance", level: "heading" as const },
-  { body: "By clicking “Approve / Sign”, Freelancer agrees to:\n• Complete the project as per scope and milestones\n• Accept platform fees (25% of total project value)\n• Respect intellectual property, confidentiality, and non-circumvention clauses\n• Follow 49GIG dispute resolution process" },
+  { title: "49GIG FREELANCER AGREEMENT", level: "title" as const },
+  { body: "Effective Date: [Date]\n\nThis Freelancer Agreement (“Agreement”) is entered into between 49GIG (“Platform”, “we”, “us”) and the individual professional providing services through the Platform (“Freelancer”, “Talent”, “you”).\n\nBy clicking “Accept Offer”, “Confirm Engagement”, or “Agree”, you confirm that you have read, understood, and agreed to be bound by this Agreement." },
+  { title: "1. Independent Contractor Status", level: "heading" as const },
+  { body: "1.1 You acknowledge and agree that you are an independent contractor, not an employee, agent, or partner of 49GIG or any Client.\n1.2 Nothing in this Agreement creates an employment relationship, joint venture, or partnership.\n1.3 You are responsible for all taxes, levies, and statutory obligations related to your earnings." },
+  { title: "2. Eligibility & Vetting", level: "heading" as const },
+  { body: "2.1 You confirm that all information provided during registration and vetting is accurate and truthful.\n2.2 49GIG reserves the right to suspend or terminate your account if any information is found to be false or misleading.\n2.3 Acceptance into the Platform does not guarantee continuous work or income." },
+  { title: "3. Scope of Engagement", level: "heading" as const },
+  { body: "3.1 You may be engaged by Clients on a Part-Time or Full-Time basis.\n3.2 Engagement details (role, duration, start date, and working hours) are defined at the time of hire and form part of this Agreement.\n3.3 Optional interviews or discussions do not constitute a binding engagement until the hire is confirmed and escrow is funded." },
+  { title: "4. Working Hours & Availability", level: "heading" as const },
+  { body: "4.1 Standard working hours are:\n• Part-Time: 20 hours per week (approximately 80 hours per month)\n• Full-Time: 40 hours per week (approximately 160 hours per month)\n\n4.2 You agree to:\n• Maintain availability during agreed working hours\n• Accurately log time and activity using Platform tools\n• Communicate proactively with Clients\n\n4.3 Repeated failure to meet expected hours or availability may result in termination." },
+  { title: "5. Performance Standards", level: "heading" as const },
+  { body: "5.1 You agree to perform services with reasonable skill, care, professionalism, and diligence.\n5.2 You are responsible for delivering work consistent with the role and experience level accepted.\n5.3 Poor performance, misconduct, or misrepresentation may result in suspension or removal from the Platform." },
+  { title: "6. Payments & Fees", level: "heading" as const },
+  { body: "6.1 Client payments are funded monthly in advance and held in escrow.\n6.2 Payment is released after:\n• Completion of the billing month, and\n• Client approval or automatic release.\n\n6.3 Platform Fee:\n• 49GIG retains 25% of the total engagement value.\n• You receive 75% of the total amount paid by the Client.\n\n6.4 You acknowledge that the platform fee is non-negotiable." },
+  { title: "7. Disputes", level: "heading" as const },
+  { body: "7.1 If a dispute arises, you agree to participate in 49GIG's dispute resolution process.\n7.2 Dispute decisions are based on:\n• Logged hours\n• Communication records\n• Work summaries\n• Agreed role expectations\n\n7.3 Decisions by 49GIG are final and binding." },
+  { title: "8. Intellectual Property", level: "heading" as const },
+  { body: "8.1 All work produced during a paid engagement becomes the Client's intellectual property upon full payment.\n8.2 Until payment is completed, intellectual property remains with you.\n8.3 You may not reuse, resell, or disclose Client deliverables without written permission." },
+  { title: "9. Confidentiality", level: "heading" as const },
+  { body: "9.1 You agree to keep confidential all non-public information relating to Clients, their businesses, and the Platform.\n9.2 Confidentiality obligations survive termination of this Agreement." },
+  { title: "10. Non-Circumvention (Anti-Bypass)", level: "heading" as const },
+  { body: "10.1 You agree not to bypass the Platform by engaging or attempting to engage Clients outside 49GIG for work introduced through the Platform.\n\n10.2 This restriction applies:\n• During the engagement, and\n• For 12 months after termination.\n\n10.3 Violation may result in:\n• Immediate account termination\n• Forfeiture of pending payments\n• A penalty equal to 100% of the engagement value\n• Legal action where applicable" },
+  { title: "11. Termination", level: "heading" as const },
+  { body: "11.1 Either party may terminate an engagement after the minimum duration with notice through the Platform.\n11.2 You are entitled to payment for approved work completed up to the termination date.\n11.3 Serious breaches may result in immediate termination without notice." },
+  { title: "12. Suspension & Removal", level: "heading" as const },
+  { body: "49GIG may suspend or permanently remove you from the Platform for:\n• Policy violations\n• Fraud or misrepresentation\n• Repeated poor performance\n• Anti-bypass violations\n• Abuse of Clients or Platform systems" },
+  { title: "13. Limitation of Liability", level: "heading" as const },
+  { body: "To the maximum extent permitted by law:\n• 49GIG is not liable for lost income or future opportunities.\n• Total liability is limited to fees earned through the Platform in the preceding 12 months." },
+  { title: "14. Governing Law", level: "heading" as const },
+  { body: "This Agreement is governed by the laws of the Federal Republic of Nigeria, without regard to conflict-of-law principles." },
+  { title: "15. Acceptance", level: "heading" as const },
+  { body: "By clicking “Accept Offer”, “Confirm Engagement”, or “Agree”, you confirm that you have read, understood, and accepted this Freelancer Agreement." },
 ];
 
 export function getClientAgreementFilled(clientName: string, freelancerNames: string, effectiveDate: string): string {
@@ -100,7 +100,6 @@ export function getFreelancerAgreementFilled(freelancerName: string, effectiveDa
   for (const s of FREELANCER_AGREEMENT_SECTIONS) {
     if (s.level === "title") text += s.title + "\n\n";
     else if (s.level === "heading") text += s.title + "\n\n";
-    else if (s.level === "divider") text += s.title + "\n\n";
     else if ("body" in s) {
       text += (s.body as string)
         .replace("[Freelancer Name]", freelancerName || "Freelancer")
