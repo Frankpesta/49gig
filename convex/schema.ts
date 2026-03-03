@@ -1017,6 +1017,14 @@ export default defineSchema({
     updatedBy: v.optional(v.id("users")),
   }).index("by_key", ["key"]),
 
+  // Platform settings (admin-editable, e.g. platform fee %)
+  platformSettings: defineTable({
+    key: v.string(),
+    value: v.union(v.number(), v.string(), v.boolean()),
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.id("users")),
+  }).index("by_key", ["key"]),
+
   // --- Vetting: generated questions and skill test sessions ---
 
   // Generated MCQ questions (server holds correct answer; client never receives it)

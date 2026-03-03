@@ -43,7 +43,7 @@ export default function MonthlyApprovalsPage() {
       <div className="space-y-6 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
           title="Monthly Approvals"
-          description="Approve monthly payments for your projects."
+          description="Approve monthly payments for your hires."
           icon={CalendarCheck}
         />
         <Card>
@@ -51,7 +51,7 @@ export default function MonthlyApprovalsPage() {
             <DashboardEmptyState
               icon={CalendarCheck}
               title="Clients only"
-              description="Monthly approvals are for project clients. At the end of each month, you can approve or dispute payments."
+              description="Monthly approvals are for clients. At the end of each month, you can approve or dispute payments for your hires."
               iconTone="muted"
             />
           </CardContent>
@@ -64,7 +64,7 @@ export default function MonthlyApprovalsPage() {
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Monthly Approvals"
-        description="Approve or dispute monthly payments for your active projects."
+        description="Approve or dispute monthly payments for your active hires."
         icon={CalendarCheck}
       />
 
@@ -130,13 +130,20 @@ function MonthlyApprovalCard({
     month: "long",
     year: "numeric",
   });
-  const amountDollars = (cycle.amountCents / 100).toFixed(2);
+  const durMonths = project?.intakeForm?.projectDuration
+    ? project.intakeForm.projectDuration === "12+"
+      ? 12
+      : parseInt(project.intakeForm.projectDuration, 10) || 1
+    : 1;
+  const amountDollars = project
+    ? (project.totalAmount / durMonths).toFixed(2)
+    : (cycle.amountCents / 100).toFixed(2);
 
   return (
     <div className="flex items-center justify-between p-4 rounded-lg border border-border/60 bg-muted/20">
       <div>
         <div className="font-medium">
-          {project?.intakeForm?.title ?? "Project"} – {monthLabel}
+          {project?.intakeForm?.title ?? "Hire"} – {monthLabel}
         </div>
         <div className="text-sm text-muted-foreground">
           Month {cycle.monthIndex} • ${amountDollars} {cycle.currency.toUpperCase()}
@@ -144,7 +151,7 @@ function MonthlyApprovalCard({
       </div>
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/dashboard/projects/${cycle.projectId}`}>View Project</Link>
+          <Link href={`/dashboard/projects/${cycle.projectId}`}>View Hire</Link>
         </Button>
         <Button
           size="sm"

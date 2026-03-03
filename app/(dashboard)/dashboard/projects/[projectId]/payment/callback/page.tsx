@@ -103,7 +103,7 @@ export default function PaymentCallbackPage() {
               </div>
               <CardTitle className="text-2xl">Payment Successful!</CardTitle>
               <CardDescription>
-                Your project has been funded and is ready for matching.
+                Your hire has been funded and is ready for matching.
               </CardDescription>
             </>
           ) : isCancelled ? (
@@ -143,20 +143,20 @@ export default function PaymentCallbackPage() {
             <>
               <p className="text-center text-sm text-muted-foreground">
                 {redirecting
-                  ? "Redirecting to your project..."
-                  : "You will be redirected to your project in a few seconds."}
+                  ? "Redirecting to your hire..."
+                  : "You will be redirected to your hire in a few seconds."}
               </p>
               <Button
                 onClick={() => router.push(`/dashboard/projects/${projectId}`)}
                 className="w-full"
               >
-                Go to Project
+                Go to Hire
               </Button>
             </>
           ) : isCancelled ? (
             <>
               <p className="text-center text-sm text-muted-foreground">
-                You can return to your project and try again when you're ready.
+                You can return to your hire and try again when you're ready.
               </p>
               <div className="flex gap-2">
                 <Button
@@ -170,7 +170,7 @@ export default function PaymentCallbackPage() {
                   onClick={() => router.push(`/dashboard/projects/${projectId}`)}
                   className="flex-1"
                 >
-                  Back to Project
+                  Back to Hire
                 </Button>
               </div>
             </>
@@ -185,7 +185,7 @@ export default function PaymentCallbackPage() {
                   onClick={() => router.push(`/dashboard/projects/${projectId}`)}
                   className="flex-1"
                 >
-                  Back to Project
+                  Back to Hire
                 </Button>
                 <Button
                   onClick={() => router.push(`/dashboard/projects/${projectId}/payment`)}

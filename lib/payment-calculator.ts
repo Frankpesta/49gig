@@ -292,16 +292,6 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
       value: formatCurrency(breakdown.totalAmount),
       description: "Full amount charged for the project",
     },
-    {
-      label: "Service fee",
-      value: formatCurrency(breakdown.platformFee),
-      description: `${breakdown.platformFeePercentage}% — vetting, escrow, contracts, support`,
-    },
-    {
-      label: "Freelancer receives",
-      value: formatCurrency(breakdown.netAmount),
-      description: "Amount talent gets after platform fee",
-    },
   ];
 
   if (breakdown.billingModel === "hourly" && breakdown.hourlyRate) {
@@ -324,7 +314,7 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
     });
   }
 
-  const summary = `${formatCurrency(breakdown.totalAmount)} total (${breakdown.platformFeePercentage}% service fee — includes vetting, escrow, contracts, support)`;
+  const summary = `${formatCurrency(breakdown.totalAmount)} total (service fee included)`;
 
   return { summary, details };
 }

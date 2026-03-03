@@ -30,7 +30,7 @@ export default function PaymentCancelPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-center text-sm text-muted-foreground">
-            You can return to your project and try again when you're ready.
+            You can return to your hire and try again when you're ready.
           </p>
           <div className="flex gap-2">
             <Button
@@ -44,7 +44,7 @@ export default function PaymentCancelPage() {
               onClick={() => router.push(`/dashboard/projects/${projectId}`)}
               className="flex-1"
             >
-              Back to Project
+              Back to Hire
             </Button>
           </div>
         </CardContent>

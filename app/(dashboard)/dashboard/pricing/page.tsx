@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, DollarSign, Save, RotateCcw } from "lucide-react";
+import { Loader2, DollarSign, Save, RotateCcw, Percent } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
@@ -41,10 +41,14 @@ export default function PricingPage() {
   const { user, isAuthenticated } = useAuth();
   const config = useQuery(api.pricing.queries.getPricingConfig);
   const setPricingBaseRates = useMutation(api.pricing.mutations.setPricingBaseRates);
+  const platformFeePct = useQuery(api.platformSettings.queries.getPlatformFeePercentage);
+  const setPlatformFeePct = useMutation(api.platformSettings.mutations.setPlatformFeePercentage);
 
   const [rates, setRates] = useState<Record<string, { junior: number; mid: number; senior: number; expert: number }>>(buildEmptyRates);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
+  const [platformFee, setPlatformFee] = useState<number>(25);
+  const [platformFeeTouched, setPlatformFeeTouched] = useState(false);
 
   const hydrateFromConfig = useCallback(() => {
     if (config === undefined) return;
@@ -68,6 +72,12 @@ export default function PricingPage() {
   useEffect(() => {
     hydrateFromConfig();
   }, [hydrateFromConfig]);
+
+  useEffect(() => {
+    if (platformFeePct !== undefined) {
+      setPlatformFee(platformFeePct);
+    }
+  }, [platformFeePct]);
 
   const handleChange = (category: string, level: Level, value: string) => {
     const parsed = value.trim() === "" ? 0 : parseFloat(value);
@@ -121,6 +131,23 @@ export default function PricingPage() {
     toast.info("Reset to platform defaults. Click Save to apply.");
   };
 
+  const handleSavePlatformFee = async () => {
+    if (!user?._id) return;
+    setSaving(true);
+    try {
+      await setPlatformFeePct({
+        percentage: platformFee,
+        userId: user._id,
+      });
+      setPlatformFeeTouched(false);
+      toast.success("Platform fee updated.");
+    } catch (e) {
+      toast.error(getUserFriendlyError(e) || "Failed to save platform fee");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!isAuthenticated || !user) {
     return <DashboardEmptyState icon={DollarSign} title="Please log in." iconTone="muted" />;
   }
@@ -141,10 +168,63 @@ export default function PricingPage() {
   return (
     <div className="space-y-8 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
-        title="Base rates by tech stack"
-        description="Set hourly base rates (USD) per talent category and experience level. These rates drive budget estimates when clients create projects."
+        title="Pricing & Platform Settings"
+        description="Manage base rates and platform fee. Changes apply to new hires only."
         icon={DollarSign}
       />
+
+      {/* Platform Fee (Admin only) */}
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Percent className="h-4 w-4" />
+            Platform Fee
+          </CardTitle>
+          <CardDescription>
+            Percentage of each hire that goes to the company. Default 25%. Applies to new hires only.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={platformFee}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v) && v >= 0 && v <= 100) {
+                    setPlatformFee(v);
+                    setPlatformFeeTouched(true);
+                  }
+                }}
+                className="w-24 h-9"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSavePlatformFee}
+              disabled={saving || !platformFeeTouched}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save
+            </Button>
+            {platformFeeTouched && (
+              <span className="text-sm text-amber-600 dark:text-amber-400">Unsaved</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h2 className="text-lg font-semibold mb-1">Base rates by tech stack</h2>
+        <p className="text-sm text-muted-foreground">
+          Set hourly base rates (USD) per talent category and experience level. These rates drive budget estimates when clients create hires.
+        </p>
+      </div>
 
       {isLoading ? (
         <DashboardLoadingState label="Loading" />

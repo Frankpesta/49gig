@@ -36,6 +36,8 @@ export interface NavItem {
   roles?: UserRole[];
   children?: NavItem[];
   section?: NavSection; // "menu" = main nav, "general" = settings/help
+  /** Override title for client role (e.g. "Projects" → "Hires") */
+  clientTitle?: string;
 }
 
 export const navigationItems: NavItem[] = [
@@ -48,9 +50,10 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Projects Section
+  // Projects / Hires Section (client sees "Hires", freelancer sees "Projects")
   {
     title: "Projects",
+    clientTitle: "Hires",
     url: "/dashboard/projects",
     icon: FolderKanban,
     section: "menu",
@@ -58,6 +61,7 @@ export const navigationItems: NavItem[] = [
     children: [
       {
         title: "All Projects",
+        clientTitle: "Hired Talents",
         url: "/dashboard/projects",
         icon: FolderKanban,
       },
@@ -74,9 +78,10 @@ export const navigationItems: NavItem[] = [
     ],
   },
 
-  // Client-specific: Create Project
+  // Client-specific: Hire Talents
   {
     title: "Create Project",
+    clientTitle: "Hire Talents",
     url: "/dashboard/projects/create",
     icon: Briefcase,
     section: "menu",
@@ -228,6 +233,14 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 ];
+
+/**
+ * Get display title for nav item (uses clientTitle when role is client)
+ */
+export function getNavItemTitle(item: NavItem, role: UserRole): string {
+  if (role === "client" && item.clientTitle) return item.clientTitle;
+  return item.title;
+}
 
 /**
  * Get navigation items filtered by user role

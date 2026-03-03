@@ -32,13 +32,13 @@ export default function PaymentTermsPage() {
             </p>
             <ul>
               <li><strong>Client Service Fee:</strong> 5% of total project value</li>
-              <li><strong>Service Fee:</strong> 25% — includes vetting, escrow, contracts, replacements, and support</li>
+              <li><strong>Platform Fee:</strong> A service fee applies and includes vetting, escrow, contracts, replacements, and support</li>
             </ul>
 
             <h3>2.2 Platform Fee</h3>
-            <p>The service fee is 25% of the project or milestone amount, and includes vetting, escrow, contracts, replacements, and support.</p>
+            <p>A platform fee applies to project and milestone amounts, and includes vetting, escrow, contracts, replacements, and support.</p>
             <ul>
-              <li>Service fee (25%): vetting, escrow, contracts, replacements, support</li>
+              <li>Platform fee covers: vetting, escrow, contracts, replacements, support</li>
             </ul>
 
             <h3>2.3 Fee Changes</h3>

@@ -107,7 +107,11 @@ export const createPaymentIntent = action({
     });
 
     // Create payment record in database
-    const platformFee = project.platformFee ?? 25; // Default 25% to company
+    const defaultPlatformFee = project.platformFee ?? await ctx.runQuery(
+      internalAny.platformSettings.queries.getPlatformFeePercentageInternal,
+      {}
+    );
+    const platformFee = defaultPlatformFee;
     const platformFeeAmount = (args.amount * platformFee) / 100;
     const netAmount = args.amount - platformFeeAmount;
 
@@ -795,7 +799,11 @@ export const releaseMilestonePayment = action({
     }
 
     // Calculate platform fee
-    const platformFee: number = project.platformFee ?? 25; // Default 25% to company
+    const defaultFee = await ctx.runQuery(
+      internalAny.platformSettings.queries.getPlatformFeePercentageInternal,
+      {}
+    );
+    const platformFee: number = project.platformFee ?? defaultFee;
     const platformFeeAmount: number = (milestone.amount * platformFee) / 100;
     const netAmount: number = milestone.amount - platformFeeAmount;
 

@@ -50,9 +50,11 @@ type ProjectWithDue = {
 export function ProjectAnalyticsCard({
   data,
   isLoading,
+  isClient,
 }: {
   data?: Array<{ day: string; count: number; pct?: number }>;
   isLoading?: boolean;
+  isClient?: boolean;
 }) {
   const chartData = data ?? [
     { day: "S", count: 2 },
@@ -67,7 +69,7 @@ export function ProjectAnalyticsCard({
   return (
     <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Project Analytics</CardTitle>
+        <CardTitle className="text-base font-semibold">{isClient ? "Hire Analytics" : "Project Analytics"}</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
@@ -82,7 +84,7 @@ export function ProjectAnalyticsCard({
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <Tooltip
                   contentStyle={{ borderRadius: 8, border: "1px solid var(--border)" }}
-                  formatter={(value: number | undefined) => [`${value ?? 0} projects`, "Activity"]}
+                  formatter={(value: number | undefined) => [`${value ?? 0} ${isClient ? "hires" : "projects"}`, "Activity"]}
                 />
                 <Bar
                   dataKey="count"
@@ -103,17 +105,20 @@ export function ProjectListCard({
   projects,
   isLoading,
   onCreateHref,
+  isClient,
 }: {
   projects?: ProjectWithDue[];
   isLoading?: boolean;
   onCreateHref?: string;
+  isClient?: boolean;
 }) {
   const displayProjects = (projects ?? []).slice(0, 5);
+  const title = isClient ? "Hires" : "Projects";
 
   return (
     <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold">Projects</CardTitle>
+        <CardTitle className="text-base font-semibold">{title}</CardTitle>
         {onCreateHref && (
           <Button asChild variant="ghost" size="sm" className="h-7 rounded-lg text-xs">
             <Link href={onCreateHref}>
@@ -131,7 +136,7 @@ export function ProjectListCard({
             ))}
           </div>
         ) : displayProjects.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No projects yet</p>
+          <p className="text-sm text-muted-foreground py-4">{isClient ? "No hires yet" : "No projects yet"}</p>
         ) : (
           <ul className="space-y-2">
             {displayProjects.map((project, i) => {

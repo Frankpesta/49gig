@@ -603,18 +603,19 @@ export default function ProjectMatchesPage() {
   ]);
 
   if (!user) return null;
+  const isClient = user.role === "client";
   if (!projectId) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
-            <CardTitle>Invalid project</CardTitle>
+            <CardTitle>{isClient ? "Invalid hire" : "Invalid project"}</CardTitle>
             <CardDescription>
-              This project could not be found.
+              {isClient ? "This hire could not be found." : "This project could not be found."}
             </CardDescription>
           </CardHeader>
           <Link href="/dashboard/projects">
-            <Button variant="outline">Back to projects</Button>
+            <Button variant="outline">{isClient ? "Back to hires" : "Back to projects"}</Button>
           </Link>
         </Card>
       </div>
@@ -641,10 +642,10 @@ export default function ProjectMatchesPage() {
     return (
       <div className="space-y-6">
         <p className="text-muted-foreground">
-          This project is no longer in the matching phase.
+          {isClient ? "This hire is no longer in the matching phase." : "This project is no longer in the matching phase."}
         </p>
         <Link href={`/dashboard/projects/${projectId}`}>
-          <Button variant="outline">View project</Button>
+          <Button variant="outline">{isClient ? "View hire" : "View project"}</Button>
         </Link>
       </div>
     );
@@ -679,8 +680,16 @@ export default function ProjectMatchesPage() {
 
       {!matchingRunning && pendingMatches.length === 0 && (
         <Card className="rounded-xl border-border/60">
-          <CardContent className="py-12 px-4 text-center text-muted-foreground text-sm sm:text-base">
-            No matches yet. Try again in a moment or contact support.
+          <CardContent className="py-12 px-4 sm:px-8 text-center space-y-4">
+            <p className="font-medium text-foreground text-base sm:text-lg">
+              Thank you for submitting your hire request!
+            </p>
+            <div className="text-muted-foreground text-sm sm:text-base space-y-2 max-w-lg mx-auto">
+              <p>We&apos;re currently matching your role with the most qualified freelancers.</p>
+              <p>This may take a short moment as we ensure you get the best fit for your hire.</p>
+              <p>Matches usually appear within 24 hours.</p>
+              <p>You&apos;ll be notified as soon as we have suitable matches ready for review.</p>
+            </div>
           </CardContent>
         </Card>
       )}
