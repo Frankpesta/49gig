@@ -125,7 +125,6 @@ export default function CreateProjectPage() {
     roleType: "full_time" as RoleType,
     description: "",
     projectDuration: "3" as ProjectDuration,
-    budgetOverride: "" as string,
     experienceLevel: "mid" as ExperienceLevel,
     startDate: "",
     // Notes
@@ -174,10 +173,6 @@ export default function CreateProjectPage() {
       });
       const discount = DURATION_DISCOUNT[formData.projectDuration];
       const discountedBudget = Math.round(calc.estimatedBudget * discount);
-      const override = formData.budgetOverride ? parseFloat(formData.budgetOverride) : undefined;
-      if (override != null && !isNaN(override) && override > 0) {
-        return { ...calc, estimatedBudget: override };
-      }
       return { ...calc, estimatedBudget: discountedBudget };
     } catch (err) {
       return null;
@@ -189,7 +184,6 @@ export default function CreateProjectPage() {
     derivedEndDate,
     formData.experienceLevel,
     formData.roleType,
-    formData.budgetOverride,
     formData.skillsRequired,
     pricingConfig,
   ]);
@@ -559,19 +553,6 @@ export default function CreateProjectPage() {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="budgetOverride" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Budget (optional)</Label>
-                <p className="mt-1 text-sm text-muted-foreground">Leave empty to use our estimate from duration and experience.</p>
-                <Input
-                  id="budgetOverride"
-                  type="number"
-                  placeholder="e.g., 5000"
-                  value={formData.budgetOverride}
-                  onChange={(e) => setFormData({ ...formData, budgetOverride: e.target.value })}
-                  className="mt-3 h-11 rounded-lg border-border/60"
-                />
               </div>
 
               <div>

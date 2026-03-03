@@ -300,6 +300,7 @@ export default defineSchema({
     escrowedAmount: v.number(),
     platformFee: v.number(), // Percentage (e.g., 10)
     currency: v.string(), // "usd"
+    fundUpfrontMonths: v.optional(v.number()), // Months to release immediately after funding (1..duration)
 
     // Flutterwave
     flutterwaveTransactionId: v.optional(v.string()),

@@ -246,6 +246,7 @@ export const updateProject = mutation({
     ),
     totalAmount: v.optional(v.number()),
     platformFee: v.optional(v.number()),
+    fundUpfrontMonths: v.optional(v.number()),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -286,6 +287,10 @@ export const updateProject = mutation({
 
     if (args.platformFee !== undefined) {
       updates.platformFee = args.platformFee;
+    }
+
+    if (args.fundUpfrontMonths !== undefined) {
+      updates.fundUpfrontMonths = args.fundUpfrontMonths;
     }
 
     await ctx.db.patch(args.projectId, updates);
