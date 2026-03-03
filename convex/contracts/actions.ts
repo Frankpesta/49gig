@@ -305,6 +305,7 @@ async function generateFullContractPdf({
   const pdfDoc = await PDFDocument.create();
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  // Signature names use italic font (handwritten-style); custom script font can be added via fontkit
   const signatureFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
 
   const pageWidth = 612;
@@ -368,7 +369,7 @@ async function generateFullContractPdf({
   }
 
   ensureSpace(lineHeight * 4);
-  drawHeading("49GIG Freelancer Project Agreement (Digital Contract)");
+  drawHeading("49GIG FREELANCER AGREEMENT");
   for (const f of freelancers) {
     const freelancerBody = getFreelancerAgreementFilled(
       f.name || "Freelancer",
