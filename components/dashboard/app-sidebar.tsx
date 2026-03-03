@@ -67,7 +67,7 @@ export function AppSidebar() {
 
   const renderNavItem = (item: NavItem) => {
     const Icon = item.icon;
-    const itemTitle = getNavItemTitle(item, user.role);
+    const itemTitle = getNavItemTitle(item, user?.role ?? "client");
 
     if (item.children && item.children.length > 0) {
       return (
@@ -76,7 +76,7 @@ export function AppSidebar() {
             <SidebarMenu>
               {item.children.map((child) => {
                 const ChildIcon = child.icon;
-                const childTitle = getNavItemTitle(child, user.role);
+                const childTitle = getNavItemTitle(child, user?.role ?? "client");
                 const isChildActive = pathname === child.url || pathname.startsWith(child.url + "/");
                 return (
                   <SidebarMenuItem key={child.url}>
@@ -195,7 +195,7 @@ export function AppSidebar() {
               <SidebarMenu className="space-y-0.5">
                 {generalItems.map((item) => {
                   const Icon = item.icon;
-                  const itemTitle = getNavItemTitle(item, user.role);
+                  const itemTitle = getNavItemTitle(item, user?.role ?? "client");
                   const isActive = pathname === item.url;
                   return (
                     <SidebarMenuItem key={item.url}>
