@@ -117,7 +117,7 @@ export default function DashboardPage() {
     );
     return active.slice(0, 4).map((p: any) => ({
       name: p.matchedFreelancerName ?? "Freelancer",
-      task: p.intakeForm?.title ?? "Working on project",
+      task: p.intakeForm?.title ?? (isClient ? "Working on hire" : "Working on project"),
       status: p.status === "completed" ? "completed" : "in_progress",
     }));
   }, [projects, isClient]);
@@ -125,7 +125,7 @@ export default function DashboardPage() {
   const metrics = isClient
     ? [
         {
-          title: "Total Projects",
+          title: "Total Hires",
           subtitle: "All time",
           value: projects?.length ?? 0,
           description: "Increased from last month",
@@ -138,7 +138,7 @@ export default function DashboardPage() {
           title: "Completed",
           subtitle: "Ended successfully",
           value: projects?.filter((p: any) => p.status === "completed").length ?? 0,
-          description: "Projects delivered",
+          description: "Hires delivered",
           icon: Briefcase,
           variant: "default" as const,
           trend: undefined,
@@ -148,7 +148,7 @@ export default function DashboardPage() {
           title: "Active",
           subtitle: "In progress",
           value: dashboardMetrics?.metrics?.activeProjects ?? 0,
-          description: "Currently running",
+          description: "Currently active",
           icon: Briefcase,
           variant: "default" as const,
           trend: dashboardMetrics?.metrics?.trends?.activeProjects,
@@ -258,7 +258,9 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Plan, prioritize, and accomplish your projects with ease.
+            {isClient
+              ? "Plan, prioritize, and manage your hires with ease."
+              : "Plan, prioritize, and accomplish your projects with ease."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -266,14 +268,14 @@ export default function DashboardPage() {
             <Button asChild className="rounded-xl">
               <Link href="/dashboard/projects/create">
                 <Plus className="mr-2 h-4 w-4" />
-                Add Project
+                Hire Talents
               </Link>
             </Button>
           )}
           <Button asChild variant="outline" className="rounded-xl border-primary/50 text-primary hover:bg-primary/10 hover:border-secondary/50 hover:text-secondary-foreground">
             <Link href="/dashboard/projects">
               <Briefcase className="mr-2 h-4 w-4" />
-              View Projects
+              {isClient ? "View Hires" : "View Projects"}
             </Link>
           </Button>
         </div>
@@ -298,12 +300,13 @@ export default function DashboardPage() {
 
       {/* Main grid - Project Analytics, Project List, Team, Progress, Earnings */}
       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        <ProjectAnalyticsCard data={projectAnalyticsData} isLoading={isLoading} />
+        <ProjectAnalyticsCard data={projectAnalyticsData} isLoading={isLoading} isClient={isClient} />
 
         <ProjectListCard
           projects={projects}
           isLoading={projects === undefined}
           onCreateHref={isClient ? "/dashboard/projects/create" : undefined}
+          isClient={isClient}
         />
 
         <TeamCollaborationCard
@@ -398,14 +401,14 @@ export default function DashboardPage() {
         {isClient && (
           <Card className="group rounded-xl border-2 border-primary/20 transition-all hover:border-primary/40 hover:shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">Create Project</CardTitle>
+              <CardTitle className="flex items-center gap-2">Hire Talents</CardTitle>
               <CardDescription>Get matched with vetted freelancers</CardDescription>
             </CardHeader>
             <CardContent>
               <Button asChild>
                 <Link href="/dashboard/projects/create">
                   <Briefcase className="mr-2 h-4 w-4" />
-                  Create Project
+                  Hire Talents
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>

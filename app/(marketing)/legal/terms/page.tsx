@@ -71,8 +71,7 @@ const sections: TermsSection[] = [
       "All payments must be made through 49GIG.",
       "Funds are deposited into escrow before work begins.",
       "Payments are released upon milestone approval.",
-      "49GIG charges a 25% platform fee on the total project value.",
-      "Freelancers receive 75% of the total project value.",
+      "A platform fee applies to cover vetting, escrow, contracts, and support.",
     ],
   },
   {

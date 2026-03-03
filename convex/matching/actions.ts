@@ -712,7 +712,8 @@ export const generateMatchesForDraft = action({
       }
 
       groupScores.sort((a, b) => b.score - a.score);
-      const top5 = groupScores.slice(0, 5);
+      // Show freelancers who match this skill (skillOverlap > 0); take up to 5
+      const top5 = groupScores.filter((m) => m.breakdown.skillOverlap > 0).slice(0, 5);
 
       for (const match of top5) {
         const explanation = generateExplanation(

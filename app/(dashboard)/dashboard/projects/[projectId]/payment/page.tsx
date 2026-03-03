@@ -89,15 +89,15 @@ export default function PaymentPage() {
       if (initializationRef.current || isInitializing || paymentLink) {
         return;
       }
-      
+
       try {
         initializationRef.current = true;
         setIsInitializing(true);
         setIsLoading(true);
-        
+
         const result = await createPaymentIntent({
           projectId: projectId as any,
-          amount: project.totalAmount, // Flutterwave uses currency units, not cents
+          amount: project.totalAmount,
           currency: project.currency || "USD",
           userId: user._id,
         });
@@ -122,7 +122,6 @@ export default function PaymentPage() {
 
   const handlePayNow = () => {
     if (paymentLink) {
-      // Redirect to payment page
       window.location.href = paymentLink;
     }
   };
@@ -164,7 +163,7 @@ export default function PaymentPage() {
               onClick={() => router.push(`/dashboard/projects/${projectId}`)}
               variant="outline"
             >
-              Back to Project
+              Back to Hire
             </Button>
           </CardContent>
         </Card>
@@ -176,8 +175,6 @@ export default function PaymentPage() {
     return null;
   }
 
-  const platformFee = project.platformFee ?? 25;
-  const platformFeeAmount = (project.totalAmount * platformFee) / 100;
   const totalAmount = project.totalAmount;
 
   return (
@@ -185,19 +182,19 @@ export default function PaymentPage() {
       <div className="space-y-2">
         <h1 className="text-3xl font-heading font-bold">Complete Payment</h1>
         <p className="text-muted-foreground">
-          Fund your project to start matching with vetted freelancers.
+          Fund your hire to start matching with vetted freelancers.
         </p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Project Details</CardTitle>
+            <CardTitle>Hire Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">
-                Project Title
+                Role Title
               </p>
               <p className="text-lg font-semibold">
                 {project.intakeForm.title}
@@ -217,23 +214,34 @@ export default function PaymentPage() {
             <CardTitle>Payment Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Project Budget</span>
-              <span className="font-semibold">
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total amount to pay</span>
+              <span>
                 {totalAmount.toFixed(2)} {project.currency.toUpperCase()}
               </span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Platform Fee ({platformFee}%)</span>
-              <span>{platformFeeAmount.toFixed(2)}</span>
-            </div>
-            <div className="border-t pt-4">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total</span>
-                <span>
-                  {totalAmount.toFixed(2)} {project.currency.toUpperCase()}
-                </span>
-              </div>
+            {(() => {
+              const durMonths = project.intakeForm?.projectDuration
+                ? project.intakeForm.projectDuration === "12+"
+                  ? 12
+                  : parseInt(project.intakeForm.projectDuration, 10) || 1
+                : 1;
+              const perMonth = totalAmount / durMonths;
+              return (
+                <div className="space-y-2 text-sm text-muted-foreground">
+                  <p>Fund upfront:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>1 month: {perMonth.toFixed(2)} {project.currency.toUpperCase()}</li>
+                    <li>3 months: {Math.min(3, durMonths) * perMonth} {project.currency.toUpperCase()}</li>
+                    <li>6 months: {Math.min(6, durMonths) * perMonth} {project.currency.toUpperCase()}</li>
+                  </ul>
+                </div>
+              );
+            })()}
+            <div className="rounded-lg border border-border bg-muted/50 p-4">
+              <p className="text-sm text-muted-foreground">
+                All payments are securely held in escrow and released monthly to the freelancer only after your approval of the completed work for that month, even when you fund multiple months upfront. This ensures transparency, accountability, and protection for both parties throughout the engagement.
+              </p>
             </div>
           </CardContent>
         </Card>

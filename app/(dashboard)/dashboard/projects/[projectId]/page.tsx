@@ -462,12 +462,14 @@ export default function ProjectDetailPage() {
                     const statusLabel = isClient
                       ? (cycle.status === "pending" ? "Awaiting your approval" : cycle.status === "approved" ? "Approved" : cycle.status === "disputed" ? "Disputed" : cycle.status)
                       : (cycle.status === "pending" ? "Awaiting client approval" : cycle.status === "approved" ? "Approved, funds released" : cycle.status === "disputed" ? "Disputed" : cycle.status);
+                    const durMonths = project?.intakeForm?.projectDuration ? (project.intakeForm.projectDuration === "12+" ? 12 : parseInt(project.intakeForm.projectDuration, 10) || 1) : monthlyCycles.length || 1;
+                    const displayAmount = isClient ? (project ? project.totalAmount / durMonths : cycle.amountCents / 100) : cycle.amountCents / 100;
                     return (
                       <div key={cycle._id} className="flex items-center justify-between rounded-lg border p-4">
                         <div>
                           <div className="font-medium">Month {cycle.monthIndex}: {monthLabel}</div>
                           <div className="text-sm text-muted-foreground">
-                            ${(cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {statusLabel}
+                            ${typeof displayAmount === "number" ? displayAmount.toFixed(2) : (cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {statusLabel}
                           </div>
                         </div>
                         {isClient && isPending && (
@@ -571,10 +573,12 @@ export default function ProjectDetailPage() {
               <div>
                 <div className="text-sm font-medium">Budget</div>
                 <div className="text-lg font-semibold">
-                  ${project.totalAmount.toLocaleString()}
+                  {isClient
+                    ? `$${project.totalAmount.toLocaleString()}`
+                    : `$${((project.totalAmount * (100 - (project.platformFee ?? 25))) / 100).toLocaleString()}`}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Service fee ({project.platformFee}%): vetting, escrow, contracts, support
+                  {isClient ? "Total amount for this hire" : "Your share for this engagement"}
                 </div>
               </div>
               <Separator />

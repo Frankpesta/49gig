@@ -34,11 +34,6 @@ import {
   type HireType,
   type TeamSize,
 } from "@/lib/budget-calculator";
-import {
-  calculatePayment,
-  type PaymentBreakdown,
-} from "@/lib/payment-calculator";
-import { PaymentBreakdownDisplay } from "@/components/payments/payment-breakdown";
 import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
 import { toast } from "sonner";
 
@@ -54,6 +49,13 @@ const DURATION_DAYS: Record<ProjectDuration, number> = {
   "3": 90,
   "6": 180,
   "12+": 365,
+};
+
+/** Duration discount: 3% for 3 months, 5% for 6+ months */
+const DURATION_DISCOUNT: Record<ProjectDuration, number> = {
+  "3": 0.97,
+  "6": 0.95,
+  "12+": 0.95,
 };
 
 const EXPERIENCE_LEVELS = [
@@ -103,6 +105,9 @@ export default function CreateProjectPage() {
   const createProject = useMutation(
     (api as any)["projects/mutations"].createProject
   );
+  const platformFeePct = useQuery(
+    (api as any)["platformSettings/queries"].getPlatformFeePercentage
+  );
   const pricingConfig = useQuery(api.pricing.queries.getPricingConfig);
 
   const [step, setStep] = useState(1);
@@ -120,7 +125,6 @@ export default function CreateProjectPage() {
     roleType: "full_time" as RoleType,
     description: "",
     projectDuration: "3" as ProjectDuration,
-    deliverablesText: "",
     budgetOverride: "" as string,
     experienceLevel: "mid" as ExperienceLevel,
     startDate: "",
@@ -168,11 +172,13 @@ export default function CreateProjectPage() {
         talentCategory,
         baseRatesByCategory: pricingConfig ?? undefined,
       });
+      const discount = DURATION_DISCOUNT[formData.projectDuration];
+      const discountedBudget = Math.round(calc.estimatedBudget * discount);
       const override = formData.budgetOverride ? parseFloat(formData.budgetOverride) : undefined;
       if (override != null && !isNaN(override) && override > 0) {
         return { ...calc, estimatedBudget: override };
       }
-      return calc;
+      return { ...calc, estimatedBudget: discountedBudget };
     } catch (err) {
       return null;
     }
@@ -187,34 +193,6 @@ export default function CreateProjectPage() {
     formData.skillsRequired,
     pricingConfig,
   ]);
-
-  // Calculate payment breakdown
-  const paymentBreakdown = useMemo<PaymentBreakdown | null>(() => {
-    if (!budgetCalculation || !derivedEndDate) return null;
-
-    try {
-      const startDate = parseLocalDateString(formData.startDate);
-      if (!startDate) return null;
-      const deliverables = formData.deliverablesText
-        .split(/[\n,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      return calculatePayment({
-        totalAmount: budgetCalculation.estimatedBudget,
-        projectType,
-        hireType: formData.hireType,
-        experienceLevel: formData.experienceLevel,
-        startDate,
-        endDate: derivedEndDate,
-        deliverables: deliverables.length > 0 ? deliverables : undefined,
-        estimatedHours: budgetCalculation.breakdown.totalHours,
-      });
-    } catch (err) {
-      return null;
-    }
-  }, [budgetCalculation, formData, derivedEndDate]);
-
 
   const toggleSkill = (skill: string) => {
     setFormData({
@@ -241,7 +219,7 @@ export default function CreateProjectPage() {
     } else if (step === 2) {
       // Validate Section 2: Project Requirements
       if (!formData.title.trim()) {
-        setError("Project title / role is required");
+        setError("Role title is required");
         return;
       }
       if (!formData.skillsRequired.length) {
@@ -249,7 +227,7 @@ export default function CreateProjectPage() {
         return;
       }
       if (!formData.description.trim()) {
-        setError("Project scope / description is required");
+        setError("Role requirements / job details are required");
         return;
       }
       if (!formData.startDate) {
@@ -257,7 +235,7 @@ export default function CreateProjectPage() {
         return;
       }
       if (!formData.projectDuration) {
-        setError("Please select project duration");
+        setError("Please select hire duration");
         return;
       }
       const startDate = parseLocalDateString(formData.startDate);
@@ -289,11 +267,6 @@ export default function CreateProjectPage() {
     setIsSubmitting(true);
     setError(null);
 
-    if (!paymentBreakdown) {
-      setError("Unable to calculate payment breakdown");
-      return;
-    }
-
     try {
       const startDate = parseLocalDateString(formData.startDate);
       if (!startDate || !derivedEndDate) {
@@ -303,14 +276,8 @@ export default function CreateProjectPage() {
       }
       const endDate = derivedEndDate;
 
-      // Use payment breakdown for platform fee
-      const totalAmount = paymentBreakdown.totalAmount;
-      const platformFee = paymentBreakdown.platformFeePercentage;
-
-      const deliverables = formData.deliverablesText
-        .split(/[\n,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const totalAmount = budgetCalculation.estimatedBudget;
+      const platformFee = platformFeePct ?? 25;
 
       const projectId = await createProject({
         intakeForm: {
@@ -335,7 +302,6 @@ export default function CreateProjectPage() {
               : `${formData.projectDuration} months`,
           category: skillsToTalentCategory(formData.skillsRequired),
           estimatedBudget: totalAmount,
-          deliverables: deliverables.length > 0 ? deliverables : undefined,
         },
         totalAmount,
         platformFee,
@@ -343,10 +309,10 @@ export default function CreateProjectPage() {
         ...(user?._id ? { userId: user._id } : {}),
       });
 
-      toast.success("Project created! Select your freelancer to continue.");
+      toast.success("Hire created! Select your freelancer to continue.");
       router.push(`/dashboard/projects/${projectId}/matches`);
     } catch (err: any) {
-      setError(getUserFriendlyError(err) || "Failed to create project");
+      setError(getUserFriendlyError(err) || "Failed to create hire");
     } finally {
       setIsSubmitting(false);
     }
@@ -359,7 +325,7 @@ export default function CreateProjectPage() {
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              Only clients can create projects.
+              Only clients can create hires.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -378,7 +344,7 @@ export default function CreateProjectPage() {
       {/* Header with gradient accent */}
       <div className="border-b border-border/60 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 px-6 py-8">
         <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight text-foreground">
-          Create new project
+          Hire Talents
         </h1>
         <p className="mt-1.5 text-sm sm:text-base text-muted-foreground max-w-xl">
           Fill out the steps below and we’ll match you with vetted freelancers.
@@ -423,11 +389,11 @@ export default function CreateProjectPage() {
           <CardHeader className="pb-4">
             <CardTitle className="text-xl">
               {step === 1 && "What would you like to hire?"}
-              {step === 2 && "Project requirements"}
+              {step === 2 && "Role requirements"}
               {step === 3 && "Budget & review"}
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              {step === 1 && "Choose a single talent or a team for this project."}
+              {step === 1 && "Choose a single talent or a team for this hire."}
               {step === 2 && "Define the role, scope, duration, and skills."}
               {step === 3 && "Confirm the budget and add any final notes."}
             </CardDescription>
@@ -504,12 +470,12 @@ export default function CreateProjectPage() {
             </div>
           )}
 
-          {/* Step 2: Project Requirements */}
+          {/* Step 2: Role Requirements */}
           {step === 2 && (
             <div className="space-y-8">
               <div>
-                <Label htmlFor="title" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project title</Label>
-                <p className="mt-1 text-sm text-muted-foreground">A clear title for the role or outcome (e.g. Build an e‑commerce site, Mobile app for inventory).</p>
+                <Label htmlFor="title" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Role Title (s)</Label>
+                <p className="mt-1 text-sm text-muted-foreground">For hiring talent or a team (e.g. Senior React Developer, Full-stack Engineer).</p>
                 <Input
                   id="title"
                   placeholder="e.g., Build a modern e-commerce website, Mobile app for inventory management"
@@ -561,10 +527,10 @@ export default function CreateProjectPage() {
               </div>
 
               <div>
-                <Label htmlFor="description" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project scope / description</Label>
+                <Label htmlFor="description" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Role Requirements / Job Details</Label>
                 <Textarea
                   id="description"
-                  placeholder="Describe scope, deliverables, and any constraints..."
+                  placeholder="Describe role requirements, responsibilities, and any constraints..."
                   rows={5}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -573,7 +539,10 @@ export default function CreateProjectPage() {
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project duration</Label>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Duration</Label>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Select the minimum duration for this hire. Longer engagements may receive a reduced monthly rate automatically, rewarding extended commitments.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {PROJECT_DURATIONS.map((d) => (
                     <button
@@ -590,29 +559,6 @@ export default function CreateProjectPage() {
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label htmlFor="deliverablesText" className="text-base font-semibold">
-                  Deliverables Expected
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  List the main phases or outcomes you expect. These become payment milestones. Use clear, outcome-based descriptions.
-                </p>
-                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>Examples: Design mockups, Backend API, Frontend build, Testing &amp; QA, Deployment</li>
-                  <li>One per line, or comma-separated (2–5 milestones recommended)</li>
-                  <li>Leave empty and we'll generate milestones from your project description</li>
-                </ul>
-                <Textarea
-                  id="deliverablesText"
-                  placeholder={"e.g., Design mockups\nBackend API\nFrontend & integration\nTesting & handoff"}
-                  rows={4}
-                  value={formData.deliverablesText}
-                  onChange={(e) =>
-                    setFormData({ ...formData, deliverablesText: e.target.value })
-                  }
-                />
               </div>
 
               <div>
@@ -673,40 +619,16 @@ export default function CreateProjectPage() {
               {budgetCalculation && (
                 <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated budget</span>
+                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated total</span>
                     <span className="text-xl font-bold text-primary tabular-nums">
                       {formatBudget(budgetCalculation.estimatedBudget)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Total you pay. Includes 25% service fee (vetting, escrow, contracts, support). Talent receives 75%.
+                    Total you pay for this hire. {formData.projectDuration === "3" && "3% discount applied for 3-month commitment."}
+                    {formData.projectDuration === "6" && "5% discount applied for 6-month commitment."}
+                    {formData.projectDuration === "12+" && "5% discount applied for 12+ month commitment."}
                   </p>
-                  <div className="text-xs text-muted-foreground space-y-2 pt-2 border-t border-border/40">
-                    <div className="font-medium text-foreground/80">How we calculated it</div>
-                    <div>
-                      Base rate: {formatBudget(budgetCalculation.breakdown.baseRate)}
-                      {budgetCalculation.breakdown.totalHours != null && (
-                        <span>/hr × {budgetCalculation.breakdown.totalHours} hrs</span>
-                      )}
-                      {budgetCalculation.breakdown.totalDays != null && (
-                        <span>/day × {budgetCalculation.breakdown.totalDays} days</span>
-                      )}
-                      {budgetCalculation.breakdown.monthlyRate != null && (
-                        <span>/mo (ongoing)</span>
-                      )}
-                    </div>
-                    <div>
-                      Timeline factor: {(budgetCalculation.breakdown.timelineMultiplier * 100).toFixed(0)}%
-                      {budgetCalculation.breakdown.timelineMultiplier < 1 && " (discount for longer timeline)"}
-                    </div>
-                    <div>
-                      Project type factor: {(budgetCalculation.breakdown.projectTypeMultiplier * 100).toFixed(0)}%
-                      {budgetCalculation.breakdown.projectTypeMultiplier < 1 && " (e.g. ongoing discount)"}
-                    </div>
-                    {budgetCalculation.breakdown.teamMultiplier != null && (
-                      <div>Team size: {budgetCalculation.breakdown.teamMultiplier} equivalent members</div>
-                    )}
-                  </div>
                 </div>
               )}
             </div>
@@ -716,35 +638,25 @@ export default function CreateProjectPage() {
           {step === 3 && (
             <div className="space-y-8">
               <div>
-                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Payment breakdown</Label>
-                {paymentBreakdown ? (
-                  <div className="mt-3">
-                    <PaymentBreakdownDisplay breakdown={paymentBreakdown} />
-                  </div>
-                ) : budgetCalculation ? (
-                  <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-6 space-y-4">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total project budget</span>
-                      <span className="text-2xl font-bold text-primary tabular-nums">
-                        {formatBudget(budgetCalculation.estimatedBudget)}
-                      </span>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Payment</Label>
+                {budgetCalculation ? (
+                  <div className="mt-3 space-y-4">
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total amount</span>
+                        <span className="text-2xl font-bold text-primary tabular-nums">
+                          {formatBudget(budgetCalculation.estimatedBudget)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        This is the total you pay for this hire.
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      You pay this total. 25% is the platform service fee; 75% goes to talent.
-                    </p>
-                    <div className="grid grid-cols-1 gap-4 pt-3 border-t border-border/40 text-sm sm:grid-cols-2">
-                      <div className="rounded-lg border border-border/60 bg-background/50 p-3 sm:border-0 sm:bg-transparent sm:p-0">
-                        <span className="text-muted-foreground">Service fee (25%)</span>
-                        <div className="font-semibold tabular-nums">
-                          {formatBudget(budgetCalculation.estimatedBudget * 0.25)}
-                        </div>
-                      </div>
-                      <div className="rounded-lg border border-border/60 bg-background/50 p-3 sm:border-0 sm:bg-transparent sm:p-0">
-                        <span className="text-muted-foreground">Talent receives (75%)</span>
-                        <div className="font-semibold tabular-nums">
-                          {formatBudget(budgetCalculation.estimatedBudget * 0.75)}
-                        </div>
-                      </div>
+                    <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-3">
+                      <div className="font-medium text-foreground">Fund upfront</div>
+                      <p className="text-sm text-muted-foreground">
+                        Choose how many months to fund upfront. You can pay 1 month, 3 months, or 6 months upfront. All payments are securely held in escrow and released monthly to the freelancer only after your approval of the completed work for that month, even when you fund multiple months upfront. This ensures transparency, accountability, and protection for both parties throughout the engagement.
+                      </p>
                     </div>
                   </div>
                 ) : (
@@ -790,7 +702,7 @@ export default function CreateProjectPage() {
           </Button>
         ) : (
           <Button onClick={handleSubmit} disabled={isSubmitting || !budgetCalculation}>
-            {isSubmitting ? "Creating..." : "Create Project"}
+            {isSubmitting ? "Creating..." : "Hire Talents"}
           </Button>
         )}
       </div>

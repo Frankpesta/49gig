@@ -91,11 +91,11 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
-        title="Projects"
+        title={isClient ? "Hired Talents" : "Projects"}
         icon={FolderKanban}
         description={
           isClient
-            ? "Manage your projects and track their progress."
+            ? "Manage your hires and track their progress."
             : "View projects you are currently working on."
         }
         actions={
@@ -103,7 +103,7 @@ export default function ProjectsPage() {
             <Button asChild className="rounded-xl">
               <Link href="/dashboard/projects/create">
                 <Plus className="mr-2 h-4 w-4" />
-                Create Project
+                Hire Talents
               </Link>
             </Button>
           ) : null
@@ -156,10 +156,10 @@ export default function ProjectsPage() {
         <DashboardEmptyState
           icon={FolderKanban}
           iconTone="muted"
-          title="No projects found"
+          title={isClient ? "No hires found" : "No projects found"}
           description={
             isClient
-              ? "Get started by creating your first project."
+              ? "Get started by hiring your first talent."
               : "No projects matched to you yet."
           }
           action={
@@ -167,7 +167,7 @@ export default function ProjectsPage() {
               <Button asChild className="rounded-xl">
                 <Link href="/dashboard/projects/create">
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Project
+                  Hire Talents
                 </Link>
               </Button>
             ) : undefined
@@ -198,7 +198,12 @@ export default function ProjectsPage() {
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <DollarSign className="h-4 w-4" />
-                      <span>${project.totalAmount.toLocaleString()}</span>
+                      <span>
+                        $
+                        {isClient
+                          ? project.totalAmount.toLocaleString()
+                          : ((project.totalAmount * (100 - (project.platformFee ?? 25))) / 100).toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <Clock className="h-4 w-4" />

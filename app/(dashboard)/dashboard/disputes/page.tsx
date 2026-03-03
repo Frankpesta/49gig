@@ -80,7 +80,7 @@ export default function DisputesPage() {
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Disputes"
-        description="Manage and resolve project disputes."
+        description={user.role === "client" ? "Manage and resolve hire disputes." : "Manage and resolve project disputes."}
         icon={Scale}
         actions={
           user.role === "client" || user.role === "freelancer" ? (
@@ -150,7 +150,7 @@ export default function DisputesPage() {
             <DataTable>
               <DataTableHeader>
                 <DataTableHead>ID</DataTableHead>
-                <DataTableHead>Project</DataTableHead>
+                <DataTableHead>{user.role === "client" ? "Hire" : "Project"}</DataTableHead>
                 <DataTableHead>Type</DataTableHead>
                 <DataTableHead>Status</DataTableHead>
                 <DataTableHead>Initiator</DataTableHead>
@@ -169,7 +169,7 @@ export default function DisputesPage() {
                         href={`/dashboard/projects/${dispute.projectId}`}
                         className="text-primary hover:underline"
                       >
-                        View Project
+                        {user.role === "client" ? "View Hire" : "View Project"}
                       </Link>
                     </DataTableCell>
                     <DataTableCell>{getTypeLabel(dispute.type)}</DataTableCell>

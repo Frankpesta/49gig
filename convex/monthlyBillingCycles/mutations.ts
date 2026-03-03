@@ -192,7 +192,14 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
     }
     const durationMonths = Math.max(1, Math.ceil(durationMs / monthMs));
 
-    const platformFeePercent = project.platformFee ?? 25;
+    const platformFeeDoc = await ctx.db
+      .query("platformSettings")
+      .withIndex("by_key", (q) => q.eq("key", "platformFeePercentage"))
+      .first();
+    const defaultFee = platformFeeDoc && typeof platformFeeDoc.value === "number"
+      ? (platformFeeDoc.value >= 0 && platformFeeDoc.value <= 100 ? platformFeeDoc.value : 25)
+      : 25;
+    const platformFeePercent = project.platformFee ?? defaultFee;
     const netPercent = 100 - platformFeePercent;
     const totalNet = (project.totalAmount * netPercent) / 100;
     const amountPerMonth = totalNet / durationMonths;

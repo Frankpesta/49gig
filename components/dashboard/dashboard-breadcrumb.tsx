@@ -107,7 +107,7 @@ function formatSegmentLabel(segment: string): string {
   // Handle special cases
   const labelMap: Record<string, string> = {
     dashboard: "Dashboard",
-    projects: "Projects",
+    projects: "Projects", // Client sees "Hires" via nav; breadcrumb uses URL segment
     messages: "Messages",
     payments: "Payments",
     profile: "Profile",

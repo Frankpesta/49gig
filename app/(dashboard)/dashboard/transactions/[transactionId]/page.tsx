@@ -157,27 +157,18 @@ export default function TransactionDetailPage() {
                   </Badge>
                 </div>
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Amount</div>
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    {user.role === "client" ? "Amount paid" : "Amount received"}
+                  </div>
                   <div className="text-xl font-bold text-primary">
-                    ${transaction.amount.toLocaleString()} {transaction.currency.toUpperCase()}
+                    $
+                    {(user.role === "client"
+                      ? transaction.amount
+                      : (transaction.netAmount ?? transaction.amount)
+                    ).toLocaleString()}{" "}
+                    {transaction.currency.toUpperCase()}
                   </div>
                 </div>
-                {transaction.platformFee != null && (
-                  <div className="rounded-lg border border-border/40 bg-muted/20 p-4">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Platform Fee</div>
-                    <div className="text-sm font-semibold">
-                      ${transaction.platformFee.toLocaleString()}
-                    </div>
-                  </div>
-                )}
-                {(transaction.type === "milestone_release" || transaction.type === "payout") && transaction.netAmount != null && (
-                  <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-4">
-                    <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Net Amount</div>
-                    <div className="text-lg font-bold text-green-700 dark:text-green-400">
-                      ${transaction.netAmount.toLocaleString()} {transaction.currency.toUpperCase()}
-                    </div>
-                  </div>
-                )}
               </div>
 
               <Separator />

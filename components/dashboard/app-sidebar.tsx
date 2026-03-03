@@ -20,7 +20,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuthStore } from "@/stores/authStore";
-import { getMenuItems, getGeneralItems } from "@/lib/navigation";
+import { getMenuItems, getGeneralItems, getNavItemTitle } from "@/lib/navigation";
+import type { NavItem } from "@/lib/navigation";
 import { LogOut, User, Settings, HelpCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -64,8 +65,9 @@ export function AppSidebar() {
       isActive ? "text-primary-foreground" : "text-muted-foreground"
     );
 
-  const renderNavItem = (item: { title: string; url: string; icon: React.ComponentType<{ className?: string }>; badge?: number; children?: { title: string; url: string; icon: React.ComponentType<{ className?: string }> }[] }) => {
+  const renderNavItem = (item: NavItem) => {
     const Icon = item.icon;
+    const itemTitle = getNavItemTitle(item, user?.role ?? "client");
 
     if (item.children && item.children.length > 0) {
       return (
@@ -74,13 +76,14 @@ export function AppSidebar() {
             <SidebarMenu>
               {item.children.map((child) => {
                 const ChildIcon = child.icon;
+                const childTitle = getNavItemTitle(child, user?.role ?? "client");
                 const isChildActive = pathname === child.url || pathname.startsWith(child.url + "/");
                 return (
                   <SidebarMenuItem key={child.url}>
                     <SidebarMenuButton
                       asChild
                       isActive={isChildActive}
-                      tooltip={child.title}
+                      tooltip={childTitle}
                       className={cn(
                         "rounded-lg transition-all duration-200",
                         isChildActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-l-4 border-l-secondary"
@@ -91,7 +94,7 @@ export function AppSidebar() {
                           <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-lg bg-primary-foreground/30" />
                         )}
                         <ChildIcon className={getIconClass(isChildActive)} />
-                        <span>{child.title}</span>
+                        <span>{childTitle}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -109,7 +112,7 @@ export function AppSidebar() {
         <SidebarMenuButton
           asChild
           isActive={isActive}
-          tooltip={item.title}
+          tooltip={itemTitle}
           className={cn(
             "rounded-lg transition-all duration-200",
                         isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground border-l-4 border-l-secondary"
@@ -120,7 +123,7 @@ export function AppSidebar() {
               <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-lg bg-primary-foreground/30" />
             )}
             <Icon className={getIconClass(isActive)} />
-            <span>{item.title}</span>
+            <span>{itemTitle}</span>
             {item.badge !== undefined && item.badge > 0 && (
               <span className="ml-auto flex size-5 items-center justify-center rounded-full bg-primary-foreground/20 text-xs font-semibold">
                 {item.badge > 9 ? "9+" : item.badge}
@@ -192,13 +195,14 @@ export function AppSidebar() {
               <SidebarMenu className="space-y-0.5">
                 {generalItems.map((item) => {
                   const Icon = item.icon;
+                  const itemTitle = getNavItemTitle(item, user?.role ?? "client");
                   const isActive = pathname === item.url;
                   return (
                     <SidebarMenuItem key={item.url}>
                       <SidebarMenuButton
                         asChild
                         isActive={isActive}
-                        tooltip={item.title}
+                        tooltip={itemTitle}
                         className={cn(
                           "rounded-lg transition-all duration-200",
                           isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
@@ -206,7 +210,7 @@ export function AppSidebar() {
                       >
                         <Link href={item.url} onClick={closeMobileSidebar} className="flex items-center gap-2">
                           <Icon className={getIconClass(isActive)} />
-                          <span>{item.title}</span>
+                          <span>{itemTitle}</span>
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

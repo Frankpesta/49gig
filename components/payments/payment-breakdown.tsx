@@ -117,7 +117,7 @@ export function PaymentBreakdownDisplay({
             <div className="space-y-1 min-w-0">
               <div className="font-semibold">What the service fee covers</div>
               <div className="text-muted-foreground">
-                The service fee ({breakdown.platformFeePercentage}% of the total) is included in the amount you pay.
+                A service fee is included in the amount you pay.
                 It covers vetting, escrow, contracts, replacements, and support.
               </div>
             </div>
