@@ -240,6 +240,68 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
       createdAt: now,
     });
 
+    // Auto-approve upfront cycles if client selected fundUpfrontMonths
+    const fundUpfront = project.fundUpfrontMonths ?? 0;
+    if (fundUpfront > 0 && cycleIds.length > 0) {
+      const cyclesToApprove = Math.min(fundUpfront, cycleIds.length);
+      const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
+        ? [project.matchedFreelancerId]
+        : project.matchedFreelancerIds ?? [];
+
+      for (let i = 0; i < cyclesToApprove; i++) {
+        const cycleId = cycleIds[i];
+        const cycle = await ctx.db.get(cycleId);
+        if (!cycle || cycle.status !== "pending") continue;
+
+        const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
+        const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
+
+        for (let j = 0; j < freelancerIds.length; j++) {
+          const fid = freelancerIds[j];
+          const shareCents = amountPerFreelancerCents + (j === 0 ? remainder : 0);
+          if (shareCents <= 0) continue;
+
+          const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
+            month: "short",
+            year: "numeric",
+          });
+          await ctx.scheduler.runAfter(0, internalAny.wallets.mutations.creditWallet, {
+            userId: fid,
+            amountCents: shareCents,
+            currency: cycle.currency,
+            description: `Upfront release: ${project.intakeForm.title} - ${monthLabel}`,
+            projectId: cycle.projectId,
+            monthlyCycleId: cycleId,
+          });
+
+          await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
+            projectId: cycle.projectId,
+            monthlyCycleId: cycleId,
+            type: "monthly_release",
+            amount: shareCents / 100,
+            currency: cycle.currency,
+            platformFee: 0,
+            netAmount: shareCents / 100,
+            userId: fid,
+            status: "succeeded",
+          });
+        }
+
+        await ctx.db.patch(cycleId, {
+          status: "approved",
+          approvedBy: project.clientId,
+          approvedAt: now,
+          updatedAt: now,
+        });
+      }
+
+      const totalReleasedCents = amountPerMonthCents * cyclesToApprove;
+      await ctx.db.patch(args.projectId, {
+        escrowedAmount: Math.max(0, project.escrowedAmount - totalReleasedCents / 100),
+        updatedAt: now,
+      });
+    }
+
     return cycleIds;
   },
 });

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
@@ -24,6 +32,9 @@ export default function PaymentPage() {
 
   const createPaymentIntent = useAction(
     (api as any)["payments/actions"].createPaymentIntent
+  );
+  const updateProject = useMutation(
+    (api as any)["projects/mutations"].updateProject
   );
   const project = useQuery(
     (api as any)["projects/queries"].getProject,
@@ -38,28 +49,24 @@ export default function PaymentPage() {
 
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [txRef, setTxRef] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [fundUpfrontMonths, setFundUpfrontMonths] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
-  const initializationRef = useRef(false);
 
   useEffect(() => {
     if (!user || user.role !== "client") {
       router.push("/dashboard/projects");
       return;
     }
+  }, [user, router]);
 
-    if (!project) {
-      return;
-    }
-
-    // Check if already paid
-    if (paymentStatus?.isFunded) {
+  useEffect(() => {
+    if (!project || !paymentStatus) return;
+    if (paymentStatus.isFunded) {
       router.push(`/dashboard/projects/${projectId}`);
       return;
     }
-
-    // Require freelancer selection before payment (for draft/pending_funding)
     if (
       (project.status === "draft" || project.status === "pending_funding") &&
       !project.selectedFreelancerId &&
@@ -68,8 +75,6 @@ export default function PaymentPage() {
       router.push(`/dashboard/projects/${projectId}/matches`);
       return;
     }
-
-    // Require contract signature before payment (for draft/pending_funding with selection)
     if (
       (project.status === "draft" || project.status === "pending_funding") &&
       (project.selectedFreelancerId || (project.selectedFreelancerIds && project.selectedFreelancerIds.length > 0)) &&
@@ -78,51 +83,39 @@ export default function PaymentPage() {
       router.push(`/dashboard/projects/${projectId}/contract`);
       return;
     }
+  }, [project, paymentStatus, projectId, router]);
 
-    // Prevent multiple simultaneous calls
-    if (initializationRef.current || isInitializing || paymentLink) {
-      return;
-    }
+  const handleProceedToPayment = async () => {
+    if (!project || !user) return;
+    if (isInitializing) return;
 
-    // Create payment
-    const initializePayment = async () => {
-      if (initializationRef.current || isInitializing || paymentLink) {
-        return;
-      }
+    try {
+      setIsInitializing(true);
+      setIsLoading(true);
+      setError(null);
 
-      try {
-        initializationRef.current = true;
-        setIsInitializing(true);
-        setIsLoading(true);
+      await updateProject({
+        projectId: projectId as any,
+        fundUpfrontMonths,
+        userId: user._id,
+      });
 
-        const result = await createPaymentIntent({
-          projectId: projectId as any,
-          amount: project.totalAmount,
-          currency: project.currency || "USD",
-          userId: user._id,
-        });
+      const result = await createPaymentIntent({
+        projectId: projectId as any,
+        amount: project.totalAmount,
+        currency: project.currency || "USD",
+        userId: user._id,
+      });
 
-        setPaymentLink(result.paymentLink);
-        setTxRef(result.txRef);
-      } catch (err: unknown) {
-        const errorMessage = getUserFriendlyError(err) || "Failed to initialize payment";
-        setError(errorMessage);
-      } finally {
-        setIsLoading(false);
-        setIsInitializing(false);
-        if (error) {
-          initializationRef.current = false;
-        }
-      }
-    };
-
-    initializePayment();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?._id, project?._id, projectId, paymentStatus?.isFunded]);
-
-  const handlePayNow = () => {
-    if (paymentLink) {
-      window.location.href = paymentLink;
+      setPaymentLink(result.paymentLink);
+      setTxRef(result.txRef);
+      window.location.href = result.paymentLink;
+    } catch (err: unknown) {
+      const errorMessage = getUserFriendlyError(err) || "Failed to initialize payment";
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+      setIsInitializing(false);
     }
   };
 
@@ -130,7 +123,22 @@ export default function PaymentPage() {
     return null;
   }
 
-  if (isLoading) {
+  if (!project) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-4">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading && isInitializing) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Card className="w-full max-w-md">
@@ -171,11 +179,15 @@ export default function PaymentPage() {
     );
   }
 
-  if (!paymentLink || !project) {
-    return null;
-  }
-
   const totalAmount = project.totalAmount;
+  const durMonths = project.intakeForm?.projectDuration
+    ? project.intakeForm.projectDuration === "12+"
+      ? 12
+      : parseInt(project.intakeForm.projectDuration, 10) || 1
+    : 1;
+  const fundUpfrontOptions = Array.from({ length: durMonths }, (_, i) => i + 1);
+  const perMonth = totalAmount / durMonths;
+  const upfrontAmount = perMonth * fundUpfrontMonths;
 
   return (
     <div className="space-y-6">
@@ -220,24 +232,40 @@ export default function PaymentPage() {
                 {totalAmount.toFixed(2)} {project.currency.toUpperCase()}
               </span>
             </div>
-            {(() => {
-              const durMonths = project.intakeForm?.projectDuration
-                ? project.intakeForm.projectDuration === "12+"
-                  ? 12
-                  : parseInt(project.intakeForm.projectDuration, 10) || 1
-                : 1;
-              const perMonth = totalAmount / durMonths;
-              return (
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>Fund upfront:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>1 month: {perMonth.toFixed(2)} {project.currency.toUpperCase()}</li>
-                    <li>3 months: {Math.min(3, durMonths) * perMonth} {project.currency.toUpperCase()}</li>
-                    <li>6 months: {Math.min(6, durMonths) * perMonth} {project.currency.toUpperCase()}</li>
-                  </ul>
-                </div>
-              );
-            })()}
+
+            <div className="space-y-2">
+              <Label>Fund upfront (optional)</Label>
+              <p className="text-xs text-muted-foreground">
+                How many months to release to the freelancer immediately after payment. Leave at 0 to release monthly with your approval only.
+              </p>
+              <Select
+                value={String(fundUpfrontMonths)}
+                onValueChange={(v) => setFundUpfrontMonths(parseInt(v, 10))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select months" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">
+                    0 months — Release monthly with your approval only
+                  </SelectItem>
+                  {fundUpfrontOptions.map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n} month{n > 1 ? "s" : ""} — {(perMonth * n).toFixed(2)} {project.currency.toUpperCase()} released immediately
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fundUpfrontMonths > 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {upfrontAmount.toFixed(2)} {project.currency.toUpperCase()} will be released to the freelancer immediately. The remaining {(totalAmount - upfrontAmount).toFixed(2)} stays in escrow.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  All funds stay in escrow. Release to the freelancer monthly after approving each month&apos;s work.
+                </p>
+              )}
+            </div>
             <div className="rounded-lg border border-border bg-muted/50 p-4">
               <p className="text-sm text-muted-foreground">
                 All payments are securely held in escrow and released monthly to the freelancer only after your approval of the completed work for that month, even when you fund multiple months upfront. This ensures transparency, accountability, and protection for both parties throughout the engagement.
@@ -269,17 +297,29 @@ export default function PaymentPage() {
           </div>
 
           <Button
-            onClick={handlePayNow}
+            onClick={handleProceedToPayment}
             className="w-full"
             size="lg"
+            disabled={isInitializing}
           >
-            <span>Proceed to Payment</span>
-            <ExternalLink className="ml-2 h-4 w-4" />
+            {isInitializing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Initializing...
+              </>
+            ) : (
+              <>
+                <span>Proceed to Payment</span>
+                <ExternalLink className="ml-2 h-4 w-4" />
+              </>
+            )}
           </Button>
 
-          <p className="text-center text-xs text-muted-foreground">
-            Transaction Reference: {txRef}
-          </p>
+          {txRef && (
+            <p className="text-center text-xs text-muted-foreground">
+              Transaction Reference: {txRef}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
