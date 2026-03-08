@@ -21,8 +21,10 @@ export const getCyclesByProjectId = query({
       (project.matchedFreelancerIds?.includes((user as Doc<"users">)._id) ?? false) ||
       project.selectedFreelancerId === (user as Doc<"users">)._id ||
       (project.selectedFreelancerIds?.includes((user as Doc<"users">)._id) ?? false);
+    const isAdmin = (user as Doc<"users">).role === "admin";
+    const isModerator = (user as Doc<"users">).role === "moderator";
 
-    if (!isClient && !isFreelancer && (user as Doc<"users">).role !== "admin") {
+    if (!isClient && !isFreelancer && !isAdmin && !isModerator) {
       return [];
     }
 
@@ -34,7 +36,8 @@ export const getCyclesByProjectId = query({
 });
 
 /**
- * Get pending cycles awaiting client approval (for client dashboard)
+ * Get pending cycles awaiting client approval (for client dashboard).
+ * Admins see all pending cycles across projects.
  */
 export const getPendingCyclesForClient = query({
   args: {},
@@ -42,24 +45,31 @@ export const getPendingCyclesForClient = query({
     const user = await getCurrentUser(ctx);
     if (!user || (user as Doc<"users">).status !== "active") return [];
 
-    const clientId = (user as Doc<"users">)._id;
-    if ((user as Doc<"users">).role !== "client") return [];
+    const isAdmin = (user as Doc<"users">).role === "admin";
+    let allCycles: Doc<"monthlyBillingCycles">[];
 
-    const myProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_client", (q) => q.eq("clientId", clientId))
-      .collect();
-
-    const projectIds = myProjects.map((p) => p._id);
-    const allCycles: Doc<"monthlyBillingCycles">[] = [];
-
-    for (const pid of projectIds) {
-      const cycles = await ctx.db
+    if (isAdmin) {
+      allCycles = await ctx.db
         .query("monthlyBillingCycles")
-        .withIndex("by_project", (q) => q.eq("projectId", pid))
-        .filter((q) => q.eq(q.field("status"), "pending"))
+        .withIndex("by_status", (q) => q.eq("status", "pending"))
         .collect();
-      allCycles.push(...cycles);
+    } else {
+      const clientId = (user as Doc<"users">)._id;
+      if ((user as Doc<"users">).role !== "client") return [];
+      const myProjects = await ctx.db
+        .query("projects")
+        .withIndex("by_client", (q) => q.eq("clientId", clientId))
+        .collect();
+      const projectIds = myProjects.map((p) => p._id);
+      allCycles = [];
+      for (const pid of projectIds) {
+        const cycles = await ctx.db
+          .query("monthlyBillingCycles")
+          .withIndex("by_project", (q) => q.eq("projectId", pid))
+          .filter((q) => q.eq(q.field("status"), "pending"))
+          .collect();
+        allCycles.push(...cycles);
+      }
     }
 
     return allCycles.sort((a, b) => a.monthStartDate - b.monthStartDate);

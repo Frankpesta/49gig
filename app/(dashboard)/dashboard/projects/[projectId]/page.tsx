@@ -472,14 +472,18 @@ export default function ProjectDetailPage() {
             </Card>
           )}
 
-          {/* Monthly Billing / Payments - role-specific content */}
+          {/* Monthly Billing / Payments - visible to all (client, freelancer, admin, moderator) */}
           <Card id="monthly-billing">
               <CardHeader>
-                <CardTitle>{isClient ? "Monthly Billing" : "Monthly Payments"}</CardTitle>
+                <CardTitle>
+                  {isClient ? "Monthly Billing" : isMatchedFreelancer ? "Monthly Payments" : "Monthly Billing Cycles"}
+                </CardTitle>
                 <CardDescription>
                   {isClient
-                    ? "Payments are released monthly. Approve each month to credit the freelancer's wallet."
-                    : "You'll receive payment each month after the client approves. Funds are released to your wallet upon approval."}
+                    ? "Approve each month to release funds to the freelancer's wallet. They withdraw to their bank when ready."
+                    : isMatchedFreelancer
+                      ? "Funds are released to your wallet when the client approves each month. Withdraw to your bank account from the Wallet page."
+                      : "Payment cycles for this project. Funds go to freelancer wallets; they withdraw to their bank accounts."}
                 </CardDescription>
                 {isClient && (
                   <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
@@ -540,7 +544,7 @@ export default function ProjectDetailPage() {
                             ${typeof displayAmount === "number" ? displayAmount.toFixed(2) : (cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {statusLabel}
                           </div>
                         </div>
-                        {isClient && isPending && (
+                        {(isClient || user?.role === "admin") && isPending && (
                           <Button
                             size="sm"
                             onClick={async () => {
@@ -574,7 +578,7 @@ export default function ProjectDetailPage() {
                       ? "Monthly billing cycles are created automatically when the project is in progress. You'll approve each month to release payment to the freelancer."
                       : "Monthly billing cycles will appear here once the project is in progress. You'll get paid each month after the client approves."}
                   </p>
-                  {(project.status === "in_progress" || project.status === "matched") && isClient && (
+                  {(project.status === "in_progress" || project.status === "matched") && (isClient || user?.role === "admin") && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -600,7 +604,7 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 )}
-                {isClient && monthlyCycles && monthlyCycles.length > 0 && (
+                {(isClient || user?.role === "admin") && monthlyCycles && monthlyCycles.length > 0 && (
                   <Button variant="outline" size="sm" className="mt-4" asChild>
                     <Link href="/dashboard/monthly-approvals">View all pending approvals</Link>
                   </Button>

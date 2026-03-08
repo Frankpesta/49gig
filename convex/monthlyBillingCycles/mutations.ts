@@ -3,12 +3,65 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
+import type { MutationCtx } from "../_generated/server";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
   api: { notifications: { actions: { sendSystemNotification: unknown } } };
 };
 const internalAny: any = apiModule.internal;
+
+/** Credit wallet inline (no scheduler) - ensures immediate balance update */
+async function creditWalletInline(
+  ctx: MutationCtx,
+  args: {
+    userId: Doc<"users">["_id"];
+    amountCents: number;
+    currency: string;
+    description: string;
+    projectId?: Doc<"projects">["_id"];
+    monthlyCycleId?: Doc<"monthlyBillingCycles">["_id"];
+  }
+) {
+  let wallet = await ctx.db
+    .query("wallets")
+    .withIndex("by_user", (q) => q.eq("userId", args.userId))
+    .first();
+
+  if (!wallet) {
+    const walletId = await ctx.db.insert("wallets", {
+      userId: args.userId,
+      balanceCents: 0,
+      currency: args.currency,
+      updatedAt: Date.now(),
+    });
+    wallet = (await ctx.db.get(walletId))!;
+  }
+
+  const newBalance = wallet.balanceCents + args.amountCents;
+  const now = Date.now();
+
+  await ctx.db.patch(wallet._id, {
+    balanceCents: newBalance,
+    updatedAt: now,
+  });
+
+  await ctx.db.insert("walletTransactions", {
+    walletId: wallet._id,
+    userId: args.userId,
+    type: "credit",
+    amountCents: args.amountCents,
+    currency: args.currency,
+    balanceAfterCents: newBalance,
+    description: args.description,
+    projectId: args.projectId,
+    monthlyCycleId: args.monthlyCycleId,
+    status: "completed",
+    createdAt: now,
+  });
+
+  return { walletId: wallet._id, newBalanceCents: newBalance };
+}
 
 /**
  * Approve a monthly billing cycle (client action).
@@ -36,8 +89,10 @@ export const approveMonthlyCycle = mutation({
     if (!project) {
       throw new Error("Project not found");
     }
-    if (project.clientId !== (user as Doc<"users">)._id) {
-      throw new Error("Only the project client can approve monthly cycles");
+    const isClient = project.clientId === (user as Doc<"users">)._id;
+    const isAdmin = (user as Doc<"users">).role === "admin";
+    if (!isClient && !isAdmin) {
+      throw new Error("Only the project client or admin can approve monthly cycles");
     }
 
     const now = Date.now();
@@ -87,7 +142,7 @@ export const approveMonthlyCycle = mutation({
       );
     }
 
-    // Credit each freelancer's wallet (creates wallet if needed)
+    // Credit each freelancer's wallet (creates wallet if needed) - inline for immediate balance update
     for (let i = 0; i < freelancerIds.length; i++) {
       const fid = freelancerIds[i];
       const shareCents = shareCentsByFreelancer[i] ?? 0;
@@ -97,7 +152,7 @@ export const approveMonthlyCycle = mutation({
         month: "short",
         year: "numeric",
       });
-      await ctx.scheduler.runAfter(0, internalAny.wallets.mutations.creditWallet, {
+      await creditWalletInline(ctx, {
         userId: fid,
         amountCents: shareCents,
         currency: cycle.currency,
@@ -332,7 +387,7 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
             month: "short",
             year: "numeric",
           });
-          await ctx.scheduler.runAfter(0, internalAny.wallets.mutations.creditWallet, {
+          await creditWalletInline(ctx, {
             userId: fid,
             amountCents: shareCents,
             currency: cycle.currency,
@@ -439,7 +494,7 @@ export const autoReleaseMonthlyCycleInternal = internalMutation({
       const shareCents = shareCentsByFreelancer[i] ?? 0;
       if (shareCents <= 0) continue;
 
-      await ctx.scheduler.runAfter(0, internalAny.wallets.mutations.creditWallet, {
+      await creditWalletInline(ctx, {
         userId: fid,
         amountCents: shareCents,
         currency: cycle.currency,
@@ -568,7 +623,7 @@ export const processUpfrontReleaseForProjectInternal = internalMutation({
           month: "short",
           year: "numeric",
         });
-        await ctx.scheduler.runAfter(0, internalAny.wallets.mutations.creditWallet, {
+        await creditWalletInline(ctx, {
           userId: fid,
           amountCents: shareCents,
           currency: cycle.currency,
