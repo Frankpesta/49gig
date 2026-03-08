@@ -54,6 +54,13 @@ export default function PaymentPage() {
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
 
+  // Sync salary deposit from project when it loads (client may have selected it on edit page)
+  useEffect(() => {
+    if (project?.fundUpfrontMonths !== undefined) {
+      setFundUpfrontMonths(project.fundUpfrontMonths);
+    }
+  }, [project?.fundUpfrontMonths]);
+
   useEffect(() => {
     if (!user || user.role !== "client") {
       router.push("/dashboard/projects");
@@ -226,6 +233,14 @@ export default function PaymentPage() {
             <CardTitle>Payment Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Salary Deposit</span>
+              <span>
+                {fundUpfrontMonths === 0
+                  ? "0 months — Release monthly with your approval only"
+                  : `${fundUpfrontMonths} month${fundUpfrontMonths > 1 ? "s" : ""} — ${upfrontAmount.toFixed(2)} ${project.currency.toUpperCase()} released immediately`}
+              </span>
+            </div>
             <div className="flex justify-between text-lg font-bold">
               <span>Total amount to pay</span>
               <span>
