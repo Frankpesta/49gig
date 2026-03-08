@@ -22,7 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Info } from "lucide-react";
 import Link from "next/link";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAuth } from "@/hooks/use-auth";
@@ -549,8 +549,20 @@ export default function EditProjectPage() {
                 <span className="text-sm font-medium text-muted-foreground">Estimated total</span>
                 <span className="text-2xl font-bold">{formatBudget(budgetCalculation.estimatedBudget)}</span>
               </div>
-              <div>
-                <Label>Fund upfront (optional)</Label>
+              <div className="space-y-2">
+                <Label>Salary Deposit</Label>
+                <p className="text-sm text-muted-foreground">
+                  Choose how many months of salary you would like to deposit to begin this hire.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  The deposited amount will be held securely in escrow by 49GIG. Funds will not be released immediately.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  At the end of each completed month: You will review the freelancer&apos;s work. If satisfied, you approve the month. Once approved, the payment for that month will be released to the freelancer.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Your approval confirms that the freelancer has completed the expected work for that month.
+                </p>
                 <Select
                   value={String(formData.fundUpfrontMonths)}
                   onValueChange={(v) => setFormData({ ...formData, fundUpfrontMonths: parseInt(v, 10) })}
@@ -567,6 +579,12 @@ export default function EditProjectPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 flex gap-3 mt-2">
+                  <Info className="h-5 w-5 shrink-0 text-primary mt-0.5" />
+                  <p className="text-sm text-muted-foreground">
+                    Note: Depositing multiple months does not release all payments at once. Funds remain in escrow and are released monthly after approval.
+                  </p>
+                </div>
               </div>
             </div>
           ) : null}

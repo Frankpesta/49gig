@@ -173,11 +173,11 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-10 flex flex-col gap-4 border-t border-white/15 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-10 flex flex-col items-center gap-4 border-t border-white/15 pt-6 text-center sm:flex-row sm:justify-between sm:text-left">
           <p className="text-sm text-white/60">
             © {currentYear} 49GIG. All rights reserved.
           </p>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-center gap-4">
             {socialLinks.map((social) => {
               const Icon = social.icon;
               return (
@@ -186,7 +186,7 @@ export function Footer() {
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-white/65 transition hover:text-white"
+                  className="text-secondary transition hover:text-white"
                   aria-label={social.label}
                 >
                   <Icon className="h-4 w-4" />
@@ -194,7 +194,7 @@ export function Footer() {
               );
             })}
           </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/60">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-white/60 sm:justify-start">
             <Link href="/legal/privacy-policy" className="transition hover:text-white">
               Privacy
             </Link>
