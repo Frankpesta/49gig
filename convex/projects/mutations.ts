@@ -93,7 +93,9 @@ export const createProject = mutation({
         v.literal("Data Analytics"),
         v.literal("DevOps and Cloud Engineering"),
         v.literal("Cyber Security and IT Infrastructure"),
-        v.literal("AI, Machine Learning and Blockchain"),
+        v.literal("AI"),
+        v.literal("Machine Learning"),
+        v.literal("Blockchain"),
         v.literal("Quality Assurance and Testing")
       ),
       experienceLevel: v.union(
@@ -139,6 +141,8 @@ export const createProject = mutation({
     platformFee: v.number(), // Percentage (e.g., 10)
     currency: v.string(), // "usd"
     fundUpfrontMonths: v.optional(v.number()),
+    /** Role → monthly amount in cents per person (for team role-based payment split) */
+    teamBudgetBreakdown: v.optional(v.record(v.string(), v.number())),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -167,6 +171,7 @@ export const createProject = mutation({
       platformFee: args.platformFee,
       currency: args.currency,
       fundUpfrontMonths: args.fundUpfrontMonths,
+      teamBudgetBreakdown: args.teamBudgetBreakdown,
       createdAt: now,
       updatedAt: now,
     });
@@ -214,6 +219,7 @@ export const updateProject = mutation({
     totalAmount: v.optional(v.number()),
     platformFee: v.optional(v.number()),
     fundUpfrontMonths: v.optional(v.number()),
+    teamBudgetBreakdown: v.optional(v.record(v.string(), v.number())),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -258,6 +264,10 @@ export const updateProject = mutation({
 
     if (args.fundUpfrontMonths !== undefined) {
       updates.fundUpfrontMonths = args.fundUpfrontMonths;
+    }
+
+    if (args.teamBudgetBreakdown !== undefined) {
+      updates.teamBudgetBreakdown = args.teamBudgetBreakdown;
     }
 
     await ctx.db.patch(args.projectId, updates);

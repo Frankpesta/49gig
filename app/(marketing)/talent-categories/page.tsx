@@ -91,20 +91,46 @@ export default function TalentCategoriesPage() {
         "Protect systems, data, and operations with modern security and IT expertise.",
     },
     {
-      title: "6. AI, Machine Learning & Blockchain",
+      title: "6. AI",
+      icon: Brain,
+      roles: [
+        "AI Engineers",
+        "LLM and NLP Specialists",
+        "Prompt Engineers",
+        "AI Application Developers",
+        "Chatbot and Conversational AI Developers",
+      ],
+      description:
+        "Build intelligent applications with LLMs, NLP, and modern AI tools.",
+    },
+    {
+      title: "7. Machine Learning",
       icon: Brain,
       roles: [
         "Machine Learning Engineers",
-        "AI Application Developers",
-        "NLP and Computer Vision Specialists",
-        "Data and MLOps Engineers",
-        "Blockchain Developers",
+        "Data Scientists",
+        "MLOps Engineers",
+        "Computer Vision Specialists",
+        "Deep Learning Engineers",
       ],
       description:
-        "Create intelligent products and decentralized solutions for next-generation use cases.",
+        "Design and deploy ML models, predictive systems, and data-driven solutions.",
     },
     {
-      title: "7. Quality Assurance & Testing",
+      title: "8. Blockchain",
+      icon: Brain,
+      roles: [
+        "Blockchain Developers",
+        "Smart Contract Engineers",
+        "Web3 Developers",
+        "DeFi and DApp Developers",
+        "Solidity Engineers",
+      ],
+      description:
+        "Create decentralized applications, smart contracts, and Web3 solutions.",
+    },
+    {
+      title: "9. Quality Assurance & Testing",
       icon: CheckCircle2,
       roles: [
         "Manual QA Engineers",

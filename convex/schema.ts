@@ -55,7 +55,9 @@ export default defineSchema({
             v.literal("data_analytics"),
             v.literal("devops_cloud"),
             v.literal("cybersecurity_it"),
-            v.literal("ai_ml_blockchain"),
+            v.literal("ai"),
+            v.literal("machine_learning"),
+            v.literal("blockchain"),
             v.literal("qa_testing")
           )
         ),
@@ -221,7 +223,9 @@ export default defineSchema({
         v.literal("Data Analytics"),
         v.literal("DevOps and Cloud Engineering"),
         v.literal("Cyber Security and IT Infrastructure"),
-        v.literal("AI, Machine Learning and Blockchain"),
+        v.literal("AI"),
+        v.literal("Machine Learning"),
+        v.literal("Blockchain"),
         v.literal("Quality Assurance and Testing")
       ),
       experienceLevel: v.union(
@@ -301,6 +305,9 @@ export default defineSchema({
     platformFee: v.number(), // Percentage (e.g., 10)
     currency: v.string(), // "usd"
     fundUpfrontMonths: v.optional(v.number()), // Months to release immediately after funding (1..duration)
+
+    // Team budget: role → monthly amount in cents per person (for role-based payment split)
+    teamBudgetBreakdown: v.optional(v.record(v.string(), v.number())),
 
     // Flutterwave
     flutterwaveTransactionId: v.optional(v.string()),

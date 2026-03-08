@@ -90,7 +90,9 @@ export default function ForFreelancersPage() {
     { icon: Database, title: "Data Analytics", color: "primary" },
     { icon: Cloud, title: "DevOps & Cloud Engineering", color: "primary" },
     { icon: Shield, title: "Cybersecurity & IT Infrastructure", color: "primary" },
-    { icon: Brain, title: "AI, Machine Learning & Blockchain", color: "primary" },
+    { icon: Brain, title: "AI", color: "primary" },
+    { icon: Brain, title: "Machine Learning", color: "primary" },
+    { icon: Brain, title: "Blockchain", color: "primary" },
     { icon: CheckCircle2, title: "Quality Assurance & Testing", color: "primary" },
   ];
 

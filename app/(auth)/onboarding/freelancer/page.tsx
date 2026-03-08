@@ -26,9 +26,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { Logo } from "@/components/ui/logo";
 import { toast } from "sonner";
 import {
-  PLATFORM_CATEGORIES,
+  PLATFORM_ROLES,
   PROGRAMMING_LANGUAGES,
-  getSkillsForCategory,
+  getSkillsForRole,
 } from "@/lib/platform-skills";
 
 const EXPERIENCE_LEVELS = [
@@ -46,6 +46,7 @@ const LEGACY_TECH_FIELD_TO_CATEGORY: Record<string, string> = {
   technical_writing: "qa_testing",
   marketing: "software_development",
   other: "software_development",
+  ai_ml_blockchain: "machine_learning", // Legacy: map to Machine Learning
 };
 
 export default function FreelancerOnboardingPage() {
@@ -72,7 +73,7 @@ export default function FreelancerOnboardingPage() {
       // Widen to string so we can compare legacy techField values with platform category ids
       const rawTech: string = user.profile.techField ?? "";
       const techField =
-        rawTech && PLATFORM_CATEGORIES.some((c) => c.id === rawTech)
+        rawTech && PLATFORM_ROLES.some((r) => r.id === rawTech)
           ? rawTech
           : LEGACY_TECH_FIELD_TO_CATEGORY[rawTech] ?? rawTech;
       setFormData({
@@ -86,7 +87,7 @@ export default function FreelancerOnboardingPage() {
     }
   }, [user]);
 
-  const categorySkills = formData.techField ? getSkillsForCategory(formData.techField) : [];
+  const roleSkills = formData.techField ? getSkillsForRole(formData.techField) : [];
 
   const handleAddSkill = () => {
     if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
@@ -220,7 +221,7 @@ export default function FreelancerOnboardingPage() {
 
                 <div className="space-y-3">
                   <Label htmlFor="techField" className="text-sm font-medium">
-                    Tech Category
+                    What role do you work in?
                   </Label>
                   <Select
                     value={formData.techField}
@@ -235,12 +236,12 @@ export default function FreelancerOnboardingPage() {
                     disabled={isLoading}
                   >
                     <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select your tech category" />
+                      <SelectValue placeholder="Select your role (e.g. Software Developer)" />
                     </SelectTrigger>
                     <SelectContent>
-                      {PLATFORM_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.label}
+                      {PLATFORM_ROLES.map((role) => (
+                        <SelectItem key={role.id} value={role.id}>
+                          {role.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -311,14 +312,14 @@ export default function FreelancerOnboardingPage() {
                 </div>
                 <div className="space-y-3">
                   <Label htmlFor="skills" className="text-sm font-medium">
-                    Tech Skills
+                    Skills for your role
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Skills for your category (used for verification):
+                    Select the skills you have. Used for matching and verification.
                   </p>
-                  {formData.techField && categorySkills.length > 0 && (
+                  {formData.techField && roleSkills.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {categorySkills.map((skill) => (
+                      {roleSkills.map((skill) => (
                         <Button
                           key={skill}
                           type="button"

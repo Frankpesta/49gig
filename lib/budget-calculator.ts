@@ -6,6 +6,7 @@ export type ExperienceLevel = "junior" | "mid" | "senior" | "expert";
 export type ProjectType = "one_time" | "ongoing" | "not_sure";
 export type HireType = "single" | "team";
 export type TeamSize = "2-3" | "4-6" | "7+" | "not_sure";
+export type RoleType = "full_time" | "part_time";
 
 export type BaseRatesForCategory = Record<
   ExperienceLevel,
@@ -18,6 +19,18 @@ const FALLBACK_HOURLY: BaseRatesForCategory = {
   mid: 55,
   senior: 90,
   expert: 140,
+};
+
+/** Hours per month based on role type (ongoing projects) */
+export const HOURS_PER_MONTH: Record<RoleType, number> = {
+  full_time: 160, // 40 hrs/week
+  part_time: 80,  // 20 hrs/week
+};
+
+/** Hours per day for one-time projects */
+export const HOURS_PER_DAY: Record<RoleType, number> = {
+  full_time: 8,
+  part_time: 4,
 };
 
 function getRates(
@@ -67,6 +80,22 @@ export interface BudgetCalculationParams {
   talentCategory?: string;
   /** Base hourly rates per category – from platform pricing config */
   baseRatesByCategory?: Record<string, BaseRatesForCategory>;
+  /** Part-time (20 hrs/week) or full-time (40 hrs/week) – affects ongoing projects */
+  roleType?: RoleType;
+  /** Selected categories/skills – used for team to distribute roles and apply category-specific rates */
+  skillsRequired?: string[];
+}
+
+/** Per-role breakdown for team projects */
+export interface TeamMemberBreakdown {
+  role: string;
+  roleDisplayName: string;
+  category: string;
+  count: number;
+  hourlyRate: number;
+  hoursPerMonth: number;
+  monthlyPerPerson: number;
+  monthlyTotal: number;
 }
 
 interface BudgetResult {
@@ -79,8 +108,80 @@ interface BudgetResult {
     totalHours?: number;
     totalDays?: number;
     monthlyRate?: number;
+    /** Per-role breakdown for team projects */
+    teamMembers?: TeamMemberBreakdown[];
   };
   currency: string;
+}
+
+/** Human-readable role names */
+const ROLE_DISPLAY_NAMES: Record<string, string> = {
+  backend_dev: "Backend Developer",
+  frontend_dev: "Frontend Developer",
+  mobile_dev: "Mobile Developer",
+  ui_designer: "UI/UX Designer",
+  ux_designer: "UX Designer",
+  cloud_engineer: "Cloud Engineer",
+  devops: "DevOps Engineer",
+  data_scientist: "Data Scientist",
+  data_analyst: "Data Analyst",
+  data_engineer: "Data Engineer",
+  ai_engineer: "AI Engineer",
+  blockchain_dev: "Blockchain Developer",
+  qa: "QA Engineer",
+  technical_writer: "Technical Writer",
+};
+
+/** Map talent category to default role(s) for team composition */
+const CATEGORY_TO_ROLES: Record<string, string[]> = {
+  "Software Development": ["backend_dev", "frontend_dev"],
+  "UI/UX and Product Design": ["ui_designer"],
+  "Data Analytics": ["data_analyst"],
+  "DevOps and Cloud Engineering": ["cloud_engineer"],
+  "Cyber Security and IT Infrastructure": ["backend_dev"],
+  "AI": ["ai_engineer"],
+  "Machine Learning": ["data_scientist"],
+  "Blockchain": ["blockchain_dev"],
+  "Quality Assurance and Testing": ["qa"],
+};
+
+/**
+ * Get team composition from selected categories and team size.
+ * Distributes roles across categories with category-specific rates.
+ */
+function getTeamCompositionFromCategories(
+  categories: string[],
+  teamSize: TeamSize
+): Array<{ role: string; category: string; count: number }> {
+  const targetSize = teamSize === "2-3" ? 3 : teamSize === "4-6" ? 5 : 7;
+  const uniqueCategories = [...new Set(categories)].filter(
+    (c) => CATEGORY_TO_ROLES[c]
+  );
+
+  if (uniqueCategories.length === 0) {
+    return [{ role: "backend_dev", category: "Software Development", count: Math.min(targetSize, 2) }];
+  }
+
+  const result: Array<{ role: string; category: string; count: number }> = [];
+
+  if (uniqueCategories.length >= targetSize) {
+    for (let i = 0; i < targetSize; i++) {
+      const cat = uniqueCategories[i];
+      const roles = CATEGORY_TO_ROLES[cat] || ["backend_dev"];
+      result.push({ role: roles[0], category: cat, count: 1 });
+    }
+  } else {
+    for (let i = 0; i < uniqueCategories.length; i++) {
+      const baseCount = Math.floor(targetSize / uniqueCategories.length);
+      const extra = i < targetSize % uniqueCategories.length ? 1 : 0;
+      const count = baseCount + extra;
+      const cat = uniqueCategories[i];
+      const roles = CATEGORY_TO_ROLES[cat] || ["backend_dev"];
+      result.push({ role: roles[0], category: cat, count });
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -192,6 +293,8 @@ export function calculateProjectBudget(
     timelineFlexible,
     talentCategory,
     baseRatesByCategory,
+    roleType = "full_time",
+    skillsRequired = [],
   } = params;
 
   const rates = getRates(baseRatesByCategory, talentCategory);
@@ -206,17 +309,42 @@ export function calculateProjectBudget(
   const projectTypeMultiplier = PROJECT_TYPE_MULTIPLIERS[projectType];
   const complexity = determineComplexity(durationDays, hireType, teamSize);
 
+  const hoursPerMonth = HOURS_PER_MONTH[roleType];
+  const hoursPerDay = HOURS_PER_DAY[roleType];
+
   if (hireType === "team" && teamSize) {
-    // Team pricing
-    const teamMultiplier = getTeamSizeMultiplier(teamSize);
-    const baseMonthlyRate = baseDailyRate * 20; // 20 working days per month
-    const monthlyRate = baseMonthlyRate * teamMultiplier;
-    
-    // For ongoing projects, use monthly rate
+    // Team pricing with category-specific rates and per-role breakdown
+    const categories = skillsRequired.length > 0
+      ? skillsRequired
+      : [talentCategory || "Software Development"];
+    const composition = getTeamCompositionFromCategories(categories, teamSize);
+
+    const teamMembers: TeamMemberBreakdown[] = composition.map(({ role, category, count }) => {
+      const catRates = getRates(baseRatesByCategory, category);
+      const hourlyRate = catRates[experienceLevel];
+      const monthlyPerPerson = hourlyRate * hoursPerMonth;
+      const monthlyTotal = monthlyPerPerson * count;
+      return {
+        role,
+        roleDisplayName: ROLE_DISPLAY_NAMES[role] || role.replace(/_/g, " "),
+        category,
+        count,
+        hourlyRate,
+        hoursPerMonth,
+        monthlyPerPerson,
+        monthlyTotal,
+      };
+    });
+
+    const totalMonthlyBeforeMultipliers = teamMembers.reduce(
+      (sum, m) => sum + m.monthlyTotal,
+      0
+    );
+
     if (projectType === "ongoing") {
       const months = Math.max(1, Math.ceil(durationDays / 30));
       const estimatedBudget = Math.round(
-        monthlyRate *
+        totalMonthlyBeforeMultipliers *
           months *
           timelineMultiplier *
           projectTypeMultiplier
@@ -225,29 +353,32 @@ export function calculateProjectBudget(
       return {
         estimatedBudget,
         breakdown: {
-          baseRate: baseMonthlyRate,
+          baseRate: baseHourlyRate,
           timelineMultiplier,
           projectTypeMultiplier,
-          teamMultiplier,
-          monthlyRate,
+          teamMembers,
+          monthlyRate: totalMonthlyBeforeMultipliers,
         },
         currency: "usd",
       };
     }
 
-    // For one-time projects, calculate based on days
-    const dailyRate = baseDailyRate * teamMultiplier;
+    // One-time team: use days × hours per day
+    const totalDailyRate = teamMembers.reduce(
+      (sum, m) => sum + m.hourlyRate * hoursPerDay * m.count,
+      0
+    );
     const estimatedBudget = Math.round(
-      dailyRate * durationDays * timelineMultiplier * projectTypeMultiplier
+      totalDailyRate * durationDays * timelineMultiplier * projectTypeMultiplier
     );
 
     return {
       estimatedBudget,
       breakdown: {
-        baseRate: baseDailyRate,
+        baseRate: baseHourlyRate,
         timelineMultiplier,
         projectTypeMultiplier,
-        teamMultiplier,
+        teamMembers,
         totalDays: durationDays,
       },
       currency: "usd",
@@ -256,10 +387,7 @@ export function calculateProjectBudget(
 
   // Single talent pricing (baseHourlyRate, baseDailyRate already set above)
   if (projectType === "ongoing") {
-    // Ongoing: hourly or monthly
-    const hoursPerDay = 8;
-    const daysPerMonth = 20; // Working days
-    const hoursPerMonth = hoursPerDay * daysPerMonth;
+    // Ongoing: hourly or monthly – roleType affects hours (part-time 80, full-time 160)
     const monthlyRate = baseHourlyRate * hoursPerMonth;
     const months = Math.max(1, Math.ceil(durationDays / 30));
     
@@ -280,19 +408,15 @@ export function calculateProjectBudget(
     };
   }
 
-  // One-time: milestone-based
-  // For simple projects, use a more conservative hour estimate
+  // One-time: milestone-based – roleType affects hours per day (part-time 4, full-time 8)
   let estimatedHours: number;
   
   if (complexity === "simple") {
-    // Simple projects: 4-6 hours/day (less intensive)
-    estimatedHours = Math.max(8, Math.ceil(durationDays * 5));
+    estimatedHours = Math.max(8, Math.ceil(durationDays * (hoursPerDay * 0.6)));
   } else if (complexity === "moderate") {
-    // Moderate: 6-7 hours/day
-    estimatedHours = Math.max(16, Math.ceil(durationDays * 6.5));
+    estimatedHours = Math.max(16, Math.ceil(durationDays * (hoursPerDay * 0.8)));
   } else {
-    // Complex: 8 hours/day (full-time)
-    estimatedHours = Math.max(24, durationDays * 8);
+    estimatedHours = Math.max(24, durationDays * hoursPerDay);
   }
 
   let estimatedBudget = Math.round(
@@ -328,4 +452,32 @@ export function formatBudget(budget: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(budget);
+}
+
+/**
+ * Compute role → monthlyPerPersonCents for team projects.
+ * Used to store in project and split payments by role (not equally).
+ */
+export function computeTeamBudgetBreakdown(
+  teamMembers: TeamMemberBreakdown[],
+  totalAmount: number,
+  platformFeePercent: number,
+  durationMonths: number
+): Record<string, number> {
+  if (teamMembers.length === 0) return {};
+
+  const totalMonthly = teamMembers.reduce((sum, m) => sum + m.monthlyTotal, 0);
+  if (totalMonthly <= 0) return {};
+
+  const netPercent = 100 - platformFeePercent;
+  const monthlyNet = (totalAmount * netPercent) / 100 / durationMonths;
+
+  const result: Record<string, number> = {};
+  for (const m of teamMembers) {
+    const roleShare = m.monthlyTotal / totalMonthly;
+    const roleMonthlyCents = Math.round(roleShare * monthlyNet * 100);
+    const perPersonCents = Math.floor(roleMonthlyCents / m.count);
+    result[m.role] = perPersonCents;
+  }
+  return result;
 }

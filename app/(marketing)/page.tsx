@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
-import { TypingEffect } from "@/components/ui/typing-effect";
+import { FlipWords } from "@/components/ui/flip-words";
 import {
   CheckCircle2,
   Users,
@@ -80,9 +80,21 @@ export default function Home() {
     },
     {
       icon: Brain,
-      title: "AI, Machine Learning & Blockchain",
-      description: "AI/ML engineers and blockchain developers",
+      title: "AI",
+      description: "AI engineers building LLMs, chatbots, and intelligent applications",
       image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80",
+    },
+    {
+      icon: Brain,
+      title: "Machine Learning",
+      description: "ML engineers for models, data science, and predictive systems",
+      image: "https://images.unsplash.com/photo-1555949963-aa79dcee981c?w=800&q=80",
+    },
+    {
+      icon: Brain,
+      title: "Blockchain",
+      description: "Blockchain developers for Web3, smart contracts, and DeFi",
+      image: "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=800&q=80",
     },
     {
       icon: CheckCircle2,
@@ -159,10 +171,9 @@ export default function Home() {
               <h1 className="text-5xl font-semibold tracking-tight text-primary sm:text-6xl lg:text-7xl dark:text-white">
                 Hire world-class African talent,{" "}
                 <span className="inline-flex align-middle text-secondary dark:text-amber-300">
-                  <TypingEffect
+                  <FlipWords
                     words={["faster", "smarter", "confidently", "securely"]}
-                    className="min-w-[10ch]"
-                    cursorClassName="h-7 sm:h-8 lg:h-9"
+                    duration={4500}
                   />
                 </span>
               </h1>
