@@ -82,6 +82,7 @@ const SKILL_TO_ROLE: Record<string, string[]> = {
   // AI
   "NLP": ["ai_engineer"],
   "Prompt Engineering": ["ai_engineer"],
+  "AI Automation": ["ai_engineer"],
   "LangChain": ["ai_engineer"],
   "LLMs": ["ai_engineer"],
   "RAG": ["ai_engineer"],

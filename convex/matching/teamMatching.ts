@@ -67,6 +67,7 @@ const SKILL_TO_ROLE: Record<string, string[]> = {
   "NumPy": ["data_scientist"],
   "NLP": ["ai_engineer"],
   "Prompt Engineering": ["ai_engineer"],
+  "AI Automation": ["ai_engineer"],
   "LangChain": ["ai_engineer"],
   "TensorFlow": ["data_scientist"],
   "PyTorch": ["data_scientist"],

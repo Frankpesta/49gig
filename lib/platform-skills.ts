@@ -167,6 +167,7 @@ export const SKILLS_BY_CATEGORY: Record<PlatformCategoryId, readonly string[]> =
     "Python",
     "NLP",
     "Prompt Engineering",
+    "AI Automation",
     "LangChain",
     "LLMs",
     "RAG",
