@@ -38,6 +38,7 @@ import type * as disputes_actions from "../disputes/actions.js";
 import type * as disputes_mutations from "../disputes/mutations.js";
 import type * as disputes_queries from "../disputes/queries.js";
 import type * as email_send from "../email/send.js";
+import type * as http from "../http.js";
 import type * as matching_actions from "../matching/actions.js";
 import type * as matching_mutations from "../matching/mutations.js";
 import type * as matching_queries from "../matching/queries.js";
@@ -124,6 +125,7 @@ declare const fullApi: ApiFromModules<{
   "disputes/mutations": typeof disputes_mutations;
   "disputes/queries": typeof disputes_queries;
   "email/send": typeof email_send;
+  http: typeof http;
   "matching/actions": typeof matching_actions;
   "matching/mutations": typeof matching_mutations;
   "matching/queries": typeof matching_queries;

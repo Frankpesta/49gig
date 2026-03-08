@@ -27,17 +27,38 @@ print(secrets.token_hex(32))
 a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
 ```
 
-### 2. Configure Webhook in Flutterwave Dashboard
+### 2. Set Environment Variable in Convex
+
+**Required before configuring Flutterwave.** Set the secret hash in Convex:
+
+1. Go to your [Convex Dashboard](https://dashboard.convex.dev)
+2. Select your project
+3. Navigate to **Settings** → **Environment Variables**
+4. Add:
+   - **Name:** `FLUTTERWAVE_WEBHOOK_SECRET`
+   - **Value:** (paste the secret hash from Step 1)
+5. Click **Save**
+6. Redeploy if needed: `npx convex deploy`
+
+> **Note:** Convex also accepts `FLW_SECRET_HASH` as an alternative name.
+
+### 3. Get Your Convex HTTP URL
+
+1. In Convex Dashboard, go to **Settings** → **URLs**
+2. Find your **HTTP Actions URL** (e.g. `https://your-deployment-123.convex.site`)
+3. Your webhook path is: `https://<your-http-url>/flutterwave-webhook`
+   - Example: `https://happy-animal-123.convex.site/flutterwave-webhook`
+
+### 4. Configure Webhook in Flutterwave Dashboard
 
 1. Log into your [Flutterwave Dashboard](https://dashboard.flutterwave.com)
 2. Navigate to **Settings** → **Webhooks** (or **Developers** → **Webhooks**)
 3. Click **"Add Webhook"** or **"New Webhook"**
 4. Fill in the webhook details:
-   - **Webhook URL:** `https://your-domain.com/api/webhooks/flutterwave`
-     - Replace `your-domain.com` with your actual domain
-     - Example: `https://49gig.com/api/webhooks/flutterwave`
-   - **Secret Hash:** Paste the secret hash you generated in Step 1
-     - ⚠️ **Important:** This must be the exact same secret you'll use in Step 3
+   - **Webhook URL:** `https://<your-deployment>.convex.site/flutterwave-webhook`
+     - Use the URL from Step 3 (your Convex HTTP Actions URL + `/flutterwave-webhook`)
+   - **Secret Hash:** Paste the **exact same** secret hash from Step 1
+     - ⚠️ **Critical:** Must match `FLUTTERWAVE_WEBHOOK_SECRET` in Convex
    - **Status:** Enable the webhook
 5. Select events to listen for:
    - ✅ `charge.completed` - Payment completed
@@ -46,35 +67,24 @@ a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
    - ✅ `refund.completed` - Refund completed
 6. Click **"Save"** or **"Create Webhook"**
 
-### 3. Set Environment Variable
+### 5. Deploy Convex
 
-Set the **same secret hash** as an environment variable in your application:
+Ensure your Convex functions (including the HTTP action) are deployed:
 
-**For Local Development (.env.local):**
 ```bash
-FLUTTERWAVE_WEBHOOK_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2
+npx convex deploy
 ```
 
-**For Convex Dashboard:**
-1. Go to your Convex Dashboard
-2. Navigate to Settings → Environment Variables
-3. Add:
-   - **Name:** `FLUTTERWAVE_WEBHOOK_SECRET`
-   - **Value:** `a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2`
+---
 
-**For Production (Vercel/Other hosting):**
-- Add the environment variable in your hosting platform's settings
-- Use the same secret hash value
+## Alternative: Next.js API Route
 
-### 4. Verify Webhook Configuration
+If you prefer to use the Next.js route instead of the Convex HTTP endpoint:
 
-Your webhook handler (`app/api/webhooks/flutterwave/route.ts`) will:
+- **Webhook URL:** `https://your-domain.com/api/webhooks/flutterwave`
+- **Environment variable:** Set `FLUTTERWAVE_WEBHOOK_SECRET` in Vercel (or your hosting) env vars
 
-1. Receive webhook requests from Flutterwave
-2. Extract the `verif-hash` header (Flutterwave's signature)
-3. Compute HMAC SHA512 hash using your `FLUTTERWAVE_WEBHOOK_SECRET`
-4. Compare the computed hash with `verif-hash` header
-5. Only process webhooks with matching signatures
+The Next.js route proxies to Convex. The Convex HTTP endpoint is recommended for reliability (no proxy, env vars in one place, direct processing).
 
 ## Security Best Practices
 
@@ -100,20 +110,23 @@ Your webhook handler (`app/api/webhooks/flutterwave/route.ts`) will:
 
 ### Local Testing
 
-For local development, use a tool like [ngrok](https://ngrok.com/) to expose your local server:
+**Option A – Convex HTTP (recommended):**  
+Your Convex HTTP endpoint is already public. Use your deployment’s HTTP URL:
 
 ```bash
-# Install ngrok
+# Get your HTTP URL from Convex Dashboard → Settings → URLs
+# Then use: https://<deployment>.convex.site/flutterwave-webhook
+```
+
+**Option B – Next.js with ngrok:**  
+If using the Next.js route for local testing:
+
+```bash
 npm install -g ngrok
-
-# Start your Next.js dev server
 npm run dev
-
-# In another terminal, expose port 3000
+# In another terminal:
 ngrok http 3000
-
-# Use the ngrok URL in Flutterwave dashboard:
-# https://abc123.ngrok.io/api/webhooks/flutterwave
+# Use: https://abc123.ngrok.io/api/webhooks/flutterwave
 ```
 
 ### Testing in Flutterwave Dashboard
@@ -124,15 +137,15 @@ ngrok http 3000
 
 ## Troubleshooting
 
-### "Invalid signature" errors
+### "Invalid signature" or "Unauthorized" errors
 
-**Cause:** The secret hash in your environment doesn't match the one in Flutterwave dashboard.
+**Cause:** The secret hash doesn't match between Convex and Flutterwave.
 
 **Solution:**
-1. Verify `FLUTTERWAVE_WEBHOOK_SECRET` in your environment
-2. Verify the secret hash in Flutterwave dashboard
-3. Ensure there are no extra spaces or characters
-4. Restart your application/server after changing environment variables
+1. Convex Dashboard → Settings → Environment Variables: verify `FLUTTERWAVE_WEBHOOK_SECRET`
+2. Flutterwave Dashboard → Webhooks: verify the **Secret Hash** matches exactly
+3. No extra spaces, newlines, or characters
+4. After changing Convex env vars, run `npx convex deploy`
 
 ### Webhooks not received
 
@@ -146,10 +159,10 @@ ngrok http 3000
 ### Webhook received but not processed
 
 **Check:**
-1. Application logs for errors
-2. Convex action `handleFlutterwaveWebhook` is working
-3. Network connectivity between your server and Convex
-4. Check webhook payload structure matches expected format
+1. Convex Dashboard → Logs for errors from the HTTP action or `handleFlutterwaveWebhook`
+2. Webhook payload structure (supports `event`/`data`, `type`/`data`, or direct `status`/`tx_ref`)
+3. Payment exists in DB for the given `tx_ref` (charge.completed)
+4. Response returned within 60 seconds (Flutterwave retries on timeout)
 
 ## Additional Resources
 

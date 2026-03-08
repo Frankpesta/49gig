@@ -118,7 +118,7 @@ export default function DashboardPage() {
     return active.slice(0, 4).map((p: any) => ({
       name: p.matchedFreelancerName ?? "Freelancer",
       task: p.intakeForm?.title ?? (isClient ? "Working on hire" : "Working on project"),
-      status: p.status === "completed" ? "completed" : "in_progress",
+      status: (p.status === "completed" ? "completed" : "in_progress") as "in_progress" | "completed" | "pending",
     }));
   }, [projects, isClient]);
 
