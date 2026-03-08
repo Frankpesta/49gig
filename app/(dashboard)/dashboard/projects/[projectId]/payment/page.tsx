@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, ExternalLink, Info } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
 
 export default function PaymentPage() {
@@ -234,9 +234,26 @@ export default function PaymentPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Fund upfront (optional)</Label>
-              <p className="text-xs text-muted-foreground">
-                How many months to release to the freelancer immediately after payment. Leave at 0 to release monthly with your approval only.
+              <Label>Salary Deposit</Label>
+              <p className="text-sm text-muted-foreground">
+                Choose how many months of salary you would like to deposit to begin this hire.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                The deposited amount will be held securely in escrow by 49GIG. Funds will not be released immediately.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                At the end of each completed month:
+              </p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
+                <li>You will review the freelancer&apos;s work.</li>
+                <li>If you are satisfied, you will approve the month.</li>
+                <li>Once approved, the payment for that month will be released to the freelancer.</li>
+              </ul>
+              <p className="text-sm text-muted-foreground">
+                Your approval confirms that the freelancer has completed the expected work for that month.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                If no action is taken within the approval period, the payment may be automatically released according to platform policy.
               </p>
               <Select
                 value={String(fundUpfrontMonths)}
@@ -260,15 +277,12 @@ export default function PaymentPage() {
                 <p className="text-sm text-muted-foreground">
                   {upfrontAmount.toFixed(2)} {project.currency.toUpperCase()} will be released to the freelancer immediately. The remaining {(totalAmount - upfrontAmount).toFixed(2)} stays in escrow.
                 </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  All funds stay in escrow. Release to the freelancer monthly after approving each month&apos;s work.
-                </p>
-              )}
+              ) : null}
             </div>
-            <div className="rounded-lg border border-border bg-muted/50 p-4">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 flex gap-3">
+              <Info className="h-5 w-5 shrink-0 text-primary mt-0.5" />
               <p className="text-sm text-muted-foreground">
-                All payments are securely held in escrow and released monthly to the freelancer only after your approval of the completed work for that month, even when you fund multiple months upfront. This ensures transparency, accountability, and protection for both parties throughout the engagement.
+                Note: Depositing multiple months does not release all payments at once. Funds remain in escrow and are released monthly after approval.
               </p>
             </div>
           </CardContent>
