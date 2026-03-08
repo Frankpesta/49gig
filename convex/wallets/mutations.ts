@@ -59,7 +59,7 @@ export const creditWallet = internalMutation({
       wallet = (await ctx.db.get(walletId))!;
     }
 
-    const newBalance = wallet.balanceCents + args.amountCents;
+    const newBalance = (wallet.balanceCents ?? 0) + args.amountCents;
     const now = Date.now();
 
     await ctx.db.patch(wallet._id, {
