@@ -726,12 +726,14 @@ export default defineSchema({
     approvedBy: v.optional(v.id("users")),
     approvedAt: v.optional(v.number()),
     disputeId: v.optional(v.id("disputes")),
+    autoReleaseAt: v.optional(v.number()), // 48h after monthEndDate; auto-approve if client hasn't
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_project", ["projectId"])
     .index("by_project_month", ["projectId", "monthIndex"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_auto_release", ["autoReleaseAt"]),
 
   // Client ratings of freelancers (one per project)
   reviews: defineTable({

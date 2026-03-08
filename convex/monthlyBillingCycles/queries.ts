@@ -1,4 +1,4 @@
-import { query } from "../_generated/server";
+import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -61,5 +61,64 @@ export const getPendingCyclesForClient = query({
     }
 
     return allCycles.sort((a, b) => a.monthStartDate - b.monthStartDate);
+  },
+});
+
+/**
+ * Get all pending cycles with project/client info (internal - for reminder cron)
+ */
+export const getPendingCyclesForReminderInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const cycles = await ctx.db
+      .query("monthlyBillingCycles")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    const result: Array<{
+      cycleId: Doc<"monthlyBillingCycles">["_id"];
+      projectId: Doc<"projects">["_id"];
+      clientId: Doc<"users">["_id"];
+      projectName: string;
+      monthLabel: string;
+    }> = [];
+
+    for (const c of cycles) {
+      const project = await ctx.db.get(c.projectId);
+      if (!project) continue;
+      result.push({
+        cycleId: c._id,
+        projectId: c.projectId,
+        clientId: project.clientId,
+        projectName: project.intakeForm.title,
+        monthLabel: new Date(c.monthStartDate).toLocaleString("default", {
+          month: "short",
+          year: "numeric",
+        }),
+      });
+    }
+    return result;
+  },
+});
+
+const AUTO_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000; // 48 hours after month ends
+
+/**
+ * Get pending cycles ready for auto-release (autoReleaseAt <= now).
+ * For cycles without autoReleaseAt (legacy), use monthEndDate + 48h.
+ */
+export const getCyclesReadyForAutoReleaseInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const cycles = await ctx.db
+      .query("monthlyBillingCycles")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    return cycles.filter((c) => {
+      const releaseAt = c.autoReleaseAt ?? c.monthEndDate + AUTO_RELEASE_DELAY_MS;
+      return releaseAt <= now;
+    });
   },
 });

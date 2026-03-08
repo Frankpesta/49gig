@@ -742,6 +742,60 @@ export function ProjectCreatedEmail({
   );
 }
 
+export function UnfundedProjectReminderEmail({
+  name = "there",
+  projectName,
+  daysLeft,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { projectName: string; daysLeft: number }) {
+  return (
+    <EmailLayout
+      title="Complete your project funding"
+      preview="Your project is awaiting payment."
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi {name}, your project {projectName} is still awaiting funding.
+      </Text>
+      <Text style={textStyle}>
+        You have {daysLeft} {daysLeft === 1 ? "day" : "days"} left to complete payment before the project is automatically removed.
+      </Text>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>Complete payment</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function MonthlyCyclePendingReminderEmail({
+  name = "there",
+  projectName,
+  monthLabel,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { projectName: string; monthLabel: string }) {
+  return (
+    <EmailLayout
+      title="Monthly payment approval pending"
+      preview="Review and approve this month's work."
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi {name}, the {monthLabel} payment for {projectName} is awaiting your approval.
+      </Text>
+      <Text style={textStyle}>
+        Please review the freelancer&apos;s work and approve the payment to release funds.
+      </Text>
+      <EmailButton href={`${appUrl}/dashboard/monthly-approvals`}>Review & approve</EmailButton>
+    </EmailLayout>
+  );
+}
+
 export function MilestoneCreatedEmail({
   name = "there",
   projectName,

@@ -464,3 +464,25 @@ export const getUnfundedProjectsOlderThanInternal = internalQuery({
       .map((p) => p._id);
   },
 });
+
+/**
+ * Get unfunded projects for reminder (created within a time window).
+ * E.g. createdBetween: [now - 8 days, now - 7 days] for 7-day reminder.
+ */
+export const getUnfundedProjectsForReminderInternal = internalQuery({
+  args: {
+    createdAfter: v.number(),
+    createdBefore: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_created", (q) =>
+        q.gte("createdAt", args.createdAfter).lt("createdAt", args.createdBefore)
+      )
+      .collect();
+    return projects.filter(
+      (p) => p.status === "draft" || p.status === "pending_funding"
+    );
+  },
+});

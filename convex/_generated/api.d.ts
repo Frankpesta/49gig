@@ -29,8 +29,10 @@ import type * as contracts_content from "../contracts/content.js";
 import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_queries from "../contracts/queries.js";
 import type * as cron_milestones from "../cron/milestones.js";
+import type * as cron_monthlyCycles from "../cron/monthlyCycles.js";
 import type * as cron_projects from "../cron/projects.js";
 import type * as cron_sessions from "../cron/sessions.js";
+import type * as crons from "../crons.js";
 import type * as dashboard_queries from "../dashboard/queries.js";
 import type * as disputes_actions from "../disputes/actions.js";
 import type * as disputes_mutations from "../disputes/mutations.js";
@@ -54,6 +56,7 @@ import type * as platformSettings_mutations from "../platformSettings/mutations.
 import type * as platformSettings_queries from "../platformSettings/queries.js";
 import type * as pricing_mutations from "../pricing/mutations.js";
 import type * as pricing_queries from "../pricing/queries.js";
+import type * as projects_actions from "../projects/actions.js";
 import type * as projects_mutations from "../projects/mutations.js";
 import type * as projects_queries from "../projects/queries.js";
 import type * as resume_actions from "../resume/actions.js";
@@ -112,8 +115,10 @@ declare const fullApi: ApiFromModules<{
   "contracts/mutations": typeof contracts_mutations;
   "contracts/queries": typeof contracts_queries;
   "cron/milestones": typeof cron_milestones;
+  "cron/monthlyCycles": typeof cron_monthlyCycles;
   "cron/projects": typeof cron_projects;
   "cron/sessions": typeof cron_sessions;
+  crons: typeof crons;
   "dashboard/queries": typeof dashboard_queries;
   "disputes/actions": typeof disputes_actions;
   "disputes/mutations": typeof disputes_mutations;
@@ -137,6 +142,7 @@ declare const fullApi: ApiFromModules<{
   "platformSettings/queries": typeof platformSettings_queries;
   "pricing/mutations": typeof pricing_mutations;
   "pricing/queries": typeof pricing_queries;
+  "projects/actions": typeof projects_actions;
   "projects/mutations": typeof projects_mutations;
   "projects/queries": typeof projects_queries;
   "resume/actions": typeof resume_actions;

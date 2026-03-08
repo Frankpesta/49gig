@@ -6,6 +6,7 @@ import type { FunctionReference } from "convex/server";
 
 const api = require("../_generated/api") as {
   api: {
+    auth: { actions: { sendWelcomeEmail: unknown } };
     notifications: { actions: { sendSystemNotification: unknown } };
   };
 };
@@ -312,6 +313,15 @@ export const createOrUpdateUser = mutation({
       message: "Your account is ready. Complete your setup to get started.",
       type: "account",
       data: { userId },
+    });
+
+    // Send welcome email on OAuth signup
+    const sendWelcomeEmail =
+      api.api.auth.actions.sendWelcomeEmail as unknown as FunctionReference<"action">;
+    await ctx.scheduler.runAfter(0, sendWelcomeEmail, {
+      email: args.email,
+      name: args.name,
+      role: args.role,
     });
 
     return userId;

@@ -204,6 +204,20 @@ export const createProject = mutation({
       data: { projectId },
     });
 
+    // Send project created email to client
+    await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendProjectCreatedEmail, {
+      projectId,
+      clientEmail: user.email,
+      clientName: user.name,
+      projectName: args.intakeForm.title,
+    });
+
+    // Notify admins
+    await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendProjectCreatedAdminEmail, {
+      projectName: args.intakeForm.title,
+      projectId,
+    });
+
     return projectId;
   },
 });
@@ -1029,6 +1043,11 @@ export const acceptSelectedMatchInternal = internalMutation({
 
     // Generate contract PDF (with pending signatures); email sent when each party signs
     await ctx.scheduler.runAfter(0, internalAny.contracts.actions.regenerateContractPdfAndSend, {
+      projectId: args.projectId,
+    });
+
+    // Send match success emails to client and freelancer(s)
+    await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendMatchSuccessEmails, {
       projectId: args.projectId,
     });
   },
