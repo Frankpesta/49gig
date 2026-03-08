@@ -514,6 +514,16 @@ export default function ProjectDetailPage() {
               <CardContent>
                 {monthlyCycles && monthlyCycles.length > 0 ? (
                 <div className="space-y-4">
+                  {(() => {
+                    const approvedCount = monthlyCycles.filter((c: { status: string }) => c.status === "approved").length;
+                    const totalCount = monthlyCycles.length;
+                    return (
+                      <p className="text-sm text-muted-foreground">
+                        {approvedCount} of {totalCount} month{totalCount !== 1 ? "s" : ""} released
+                        {isClient && project?.fundUpfrontMonths ? ` (${project.fundUpfrontMonths} upfront)` : ""}
+                      </p>
+                    );
+                  })()}
                   {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; amountCents: number; currency: string; status: string }) => {
                     const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", { month: "long", year: "numeric" });
                     const isPending = cycle.status === "pending";

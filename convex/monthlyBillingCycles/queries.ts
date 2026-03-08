@@ -18,7 +18,9 @@ export const getCyclesByProjectId = query({
     const isClient = project.clientId === (user as Doc<"users">)._id;
     const isFreelancer =
       project.matchedFreelancerId === (user as Doc<"users">)._id ||
-      (project.matchedFreelancerIds?.includes((user as Doc<"users">)._id) ?? false);
+      (project.matchedFreelancerIds?.includes((user as Doc<"users">)._id) ?? false) ||
+      project.selectedFreelancerId === (user as Doc<"users">)._id ||
+      (project.selectedFreelancerIds?.includes((user as Doc<"users">)._id) ?? false);
 
     if (!isClient && !isFreelancer && (user as Doc<"users">).role !== "admin") {
       return [];

@@ -1041,6 +1041,11 @@ export const acceptSelectedMatchInternal = internalMutation({
       projectId: args.projectId,
     });
 
+    // Process upfront release for existing cycles (when cycles were created at contract signing before payment)
+    await ctx.scheduler.runAfter(2000, internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal, {
+      projectId: args.projectId,
+    });
+
     // Generate contract PDF (with pending signatures); email sent when each party signs
     await ctx.scheduler.runAfter(0, internalAny.contracts.actions.regenerateContractPdfAndSend, {
       projectId: args.projectId,
