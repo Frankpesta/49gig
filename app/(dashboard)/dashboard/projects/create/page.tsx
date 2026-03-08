@@ -29,12 +29,17 @@ import { DatePicker } from "@/components/ui/date-picker";
 import {
   calculateProjectBudget,
   formatBudget,
+  computeTeamBudgetBreakdown,
   type ExperienceLevel,
   type ProjectType,
   type HireType,
   type TeamSize,
 } from "@/lib/budget-calculator";
-import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
+import {
+  PLATFORM_ROLES,
+  getSkillsForRole,
+  getCategoryLabelForRole,
+} from "@/lib/platform-skills";
 import { toast } from "sonner";
 
 const PROJECT_DURATIONS = [
@@ -83,11 +88,10 @@ function roleTypeToProjectType(_roleType: RoleType): ProjectType {
   return "ongoing";
 }
 
-// Map selected skills to talentCategory for schema (primary = first selected)
-function skillsToTalentCategory(skills: string[]): (typeof TALENT_CATEGORY_LABELS)[number] {
-  const first = skills[0];
-  if (first && TALENT_CATEGORY_LABELS.includes(first as any)) return first as (typeof TALENT_CATEGORY_LABELS)[number];
-  return "Software Development";
+// Primary category from first selected role (for schema)
+function getPrimaryCategory(selectedRoles: string[]): string {
+  if (selectedRoles.length === 0) return "Software Development";
+  return getCategoryLabelForRole(selectedRoles[0]);
 }
 
 // Parse "YYYY-MM-DD" as local date (avoids calendar off-by-one from UTC)
@@ -114,20 +118,18 @@ export default function CreateProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
+  // Form state: roles first, then skills per role
   const [formData, setFormData] = useState({
-    // Section 1: Hire Type
     hireType: "single" as HireType,
     teamSize: undefined as TeamSize | undefined,
-    // Section 2: Project Requirements (per image)
     title: "",
-    skillsRequired: [] as string[],
+    selectedRoles: [] as string[], // Role ids (e.g. software_development)
+    roleSkills: {} as Record<string, string[]>, // roleId -> selected skills
     roleType: "full_time" as RoleType,
     description: "",
     projectDuration: "3" as ProjectDuration,
     experienceLevel: "mid" as ExperienceLevel,
     startDate: "",
-    // Notes
     specialRequirements: "",
     fundUpfrontMonths: 0,
   });
@@ -156,12 +158,14 @@ export default function CreateProjectPage() {
     }
 
     try {
+      if (formData.selectedRoles.length === 0) return null;
+
       const startDate = parseLocalDateString(formData.startDate);
       if (!startDate || isNaN(startDate.getTime())) {
         return null;
       }
 
-      const talentCategory = skillsToTalentCategory(formData.skillsRequired);
+      const categoriesForBudget = formData.selectedRoles.map((r) => getCategoryLabelForRole(r));
       const calc = calculateProjectBudget({
         hireType: formData.hireType,
         teamSize: formData.teamSize,
@@ -169,8 +173,10 @@ export default function CreateProjectPage() {
         projectType,
         startDate,
         endDate: derivedEndDate,
-        talentCategory,
+        talentCategory: getPrimaryCategory(formData.selectedRoles),
         baseRatesByCategory: pricingConfig ?? undefined,
+        roleType: formData.roleType,
+        skillsRequired: categoriesForBudget,
       });
       const discount = DURATION_DISCOUNT[formData.projectDuration];
       const discountedBudget = Math.round(calc.estimatedBudget * discount);
@@ -185,18 +191,42 @@ export default function CreateProjectPage() {
     derivedEndDate,
     formData.experienceLevel,
     formData.roleType,
-    formData.skillsRequired,
+    formData.selectedRoles,
     pricingConfig,
   ]);
 
-  const toggleSkill = (skill: string) => {
+  const toggleRole = (roleId: string) => {
+    const isSingle = formData.hireType === "single";
+    const alreadySelected = formData.selectedRoles.includes(roleId);
+    if (alreadySelected) {
+      const newRoles = formData.selectedRoles.filter((r) => r !== roleId);
+      const newRoleSkills = { ...formData.roleSkills };
+      delete newRoleSkills[roleId];
+      setFormData({ ...formData, selectedRoles: newRoles, roleSkills: newRoleSkills });
+    } else {
+      if (isSingle && formData.selectedRoles.length >= 1) {
+        const prevRole = formData.selectedRoles[0];
+        const newRoleSkills = { ...formData.roleSkills };
+        delete newRoleSkills[prevRole];
+        setFormData({ ...formData, selectedRoles: [roleId], roleSkills: newRoleSkills });
+      } else {
+        setFormData({ ...formData, selectedRoles: [...formData.selectedRoles, roleId] });
+      }
+    }
+  };
+
+  const toggleRoleSkill = (roleId: string, skill: string) => {
+    const current = formData.roleSkills[roleId] ?? [];
+    const updated = current.includes(skill)
+      ? current.filter((s) => s !== skill)
+      : [...current, skill];
     setFormData({
       ...formData,
-      skillsRequired: formData.skillsRequired.includes(skill)
-        ? formData.skillsRequired.filter((s) => s !== skill)
-        : [...formData.skillsRequired, skill],
+      roleSkills: { ...formData.roleSkills, [roleId]: updated },
     });
   };
+
+  const allRequiredSkills = Object.values(formData.roleSkills).flat();
 
   const handleNext = () => {
     setError(null);
@@ -214,11 +244,18 @@ export default function CreateProjectPage() {
     } else if (step === 2) {
       // Validate Section 2: Project Requirements
       if (!formData.title.trim()) {
-        setError("Role title is required");
+        setError("Project title is required");
         return;
       }
-      if (!formData.skillsRequired.length) {
-        setError("Please select at least one skill");
+      if (formData.selectedRoles.length === 0) {
+        setError("Please select at least one role");
+        return;
+      }
+      const hasSkillsForAllRoles = formData.selectedRoles.every(
+        (r) => (formData.roleSkills[r]?.length ?? 0) > 0
+      );
+      if (!hasSkillsForAllRoles) {
+        setError("Please select at least one skill for each role");
         return;
       }
       if (!formData.description.trim()) {
@@ -274,8 +311,22 @@ export default function CreateProjectPage() {
       const totalAmount = budgetCalculation.estimatedBudget;
       const platformFee = platformFeePct ?? 25;
 
+      const durationMonths = formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10);
+      const teamBudgetBreakdown =
+        formData.hireType === "team" &&
+        budgetCalculation.breakdown?.teamMembers &&
+        budgetCalculation.breakdown.teamMembers.length > 0
+          ? computeTeamBudgetBreakdown(
+              budgetCalculation.breakdown.teamMembers,
+              totalAmount,
+              platformFee,
+              durationMonths
+            )
+          : undefined;
+
       const projectId = await createProject({
         fundUpfrontMonths: formData.fundUpfrontMonths,
+        teamBudgetBreakdown,
         intakeForm: {
           hireType: formData.hireType,
           teamSize: formData.teamSize,
@@ -284,9 +335,9 @@ export default function CreateProjectPage() {
           startDate: startDate.getTime(),
           endDate: endDate.getTime(),
           projectType,
-          talentCategory: skillsToTalentCategory(formData.skillsRequired),
+          talentCategory: getPrimaryCategory(formData.selectedRoles) as any,
           experienceLevel: formData.experienceLevel,
-          requiredSkills: formData.skillsRequired,
+          requiredSkills: allRequiredSkills,
           budget: totalAmount,
           specialRequirements: formData.specialRequirements || undefined,
           roleTitle: formData.title.trim() || undefined,
@@ -296,7 +347,7 @@ export default function CreateProjectPage() {
             formData.projectDuration === "12+"
               ? "1 year +"
               : `${formData.projectDuration} months`,
-          category: skillsToTalentCategory(formData.skillsRequired),
+          category: getPrimaryCategory(formData.selectedRoles),
           estimatedBudget: totalAmount,
         },
         totalAmount,
@@ -403,13 +454,16 @@ export default function CreateProjectPage() {
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <button
                     type="button"
-                    onClick={() =>
-                      setFormData({
-                        ...formData,
-                        hireType: "single",
-                        teamSize: undefined,
-                      })
-                    }
+                    onClick={() => {
+                      const isSwitchingToSingle = formData.hireType !== "single";
+                      const newData = { ...formData, hireType: "single" as HireType, teamSize: undefined as TeamSize | undefined };
+                      if (isSwitchingToSingle && formData.selectedRoles.length > 1) {
+                        const keepRole = formData.selectedRoles[0];
+                        newData.selectedRoles = [keepRole];
+                        newData.roleSkills = formData.roleSkills[keepRole] ? { [keepRole]: formData.roleSkills[keepRole] } : {};
+                      }
+                      setFormData(newData);
+                    }}
                     className={`flex items-center gap-4 rounded-xl border-2 p-4 text-left transition-all ${
                       formData.hireType === "single"
                         ? "border-primary bg-primary/10 shadow-sm"
@@ -470,8 +524,8 @@ export default function CreateProjectPage() {
           {step === 2 && (
             <div className="space-y-8">
               <div>
-                <Label htmlFor="title" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Role Title (s)</Label>
-                <p className="mt-1 text-sm text-muted-foreground">For hiring talent or a team (e.g. Senior React Developer, Full-stack Engineer).</p>
+                <Label htmlFor="title" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Project title</Label>
+                <p className="mt-1 text-sm text-muted-foreground">e.g. Build a modern e-commerce website, Mobile app for inventory management</p>
                 <Input
                   id="title"
                   placeholder="e.g., Build a modern e-commerce website, Mobile app for inventory management"
@@ -482,25 +536,66 @@ export default function CreateProjectPage() {
               </div>
 
               <div>
-                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Skills required</Label>
-                <p className="mt-1 text-sm text-muted-foreground">Select all that apply.</p>
+                <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Roles needed</Label>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formData.hireType === "single"
+                    ? "Select the role you need (e.g. Software Developer)."
+                    : "Select the roles for your team. Then choose specific skills for each."}
+                </p>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {TALENT_CATEGORY_LABELS.map((skill) => (
-                    <button
-                      key={skill}
-                      type="button"
-                      onClick={() => toggleSkill(skill)}
-                      className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
-                        formData.skillsRequired.includes(skill)
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border/60 bg-muted/30 hover:border-primary/40"
-                      }`}
-                    >
-                      {skill}
-                    </button>
-                  ))}
+                  {PLATFORM_ROLES.map((role) => {
+                    const isSelected = formData.selectedRoles.includes(role.id);
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        onClick={() => toggleRole(role.id)}
+                        className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
+                          isSelected
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border/60 bg-muted/30 hover:border-primary/40"
+                        }`}
+                      >
+                        {role.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+
+              {formData.selectedRoles.length > 0 && (
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Skills per role</Label>
+                  <p className="text-sm text-muted-foreground">Select the specific skills you need for each role.</p>
+                  {formData.selectedRoles.map((roleId) => {
+                    const role = PLATFORM_ROLES.find((r) => r.id === roleId);
+                    if (!role) return null;
+                    const skills = getSkillsForRole(roleId);
+                    const selectedSkills = formData.roleSkills[roleId] ?? [];
+                    return (
+                      <div key={roleId} className="rounded-xl border border-border/60 bg-muted/10 p-4 space-y-2">
+                        <p className="font-medium text-foreground">{role.label}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {skills.map((skill) => (
+                            <button
+                              key={skill}
+                              type="button"
+                              onClick={() => toggleRoleSkill(roleId, skill)}
+                              className={`rounded-lg border-2 px-3 py-1.5 text-sm transition-all ${
+                                selectedSkills.includes(skill)
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border/60 bg-background hover:border-primary/40"
+                              }`}
+                            >
+                              {skill}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div>
                 <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Role type</Label>
@@ -598,8 +693,14 @@ export default function CreateProjectPage() {
                 />
               </div>
 
-              {/* Budget Preview */}
-              {budgetCalculation && (
+              {/* Budget Preview - only shown when roles are selected (price depends on categories) */}
+              {formData.selectedRoles.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5">
+                  <p className="text-sm text-muted-foreground">
+                    Select roles above to see the estimated price. Base rates vary by role.
+                  </p>
+                </div>
+              ) : budgetCalculation ? (
                 <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated total</span>
@@ -607,13 +708,33 @@ export default function CreateProjectPage() {
                       {formatBudget(budgetCalculation.estimatedBudget)}
                     </span>
                   </div>
+                  {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Monthly breakdown per role</p>
+                      <div className="space-y-2 rounded-lg border border-border/40 bg-background/50 p-3">
+                        {budgetCalculation.breakdown.teamMembers.map((m) => (
+                          <div key={`${m.role}-${m.category}`} className="flex justify-between text-sm">
+                            <span className="text-foreground">
+                              {m.count}× {m.roleDisplayName} ({m.category})
+                            </span>
+                            <span className="font-medium tabular-nums">
+                              {formatBudget(m.monthlyPerPerson)}/mo each
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {formData.roleType === "part_time" ? "Part-time (20 hrs/week) rates." : "Full-time (40 hrs/week) rates."}
+                      </p>
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     Total you pay for this hire. {formData.projectDuration === "3" && "3% discount applied for 3-month commitment."}
                     {formData.projectDuration === "6" && "5% discount applied for 6-month commitment."}
                     {formData.projectDuration === "12+" && "5% discount applied for 12+ month commitment."}
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -635,6 +756,31 @@ export default function CreateProjectPage() {
                         This is the total you pay for this hire.
                       </p>
                     </div>
+                    {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 && (
+                      <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-3">
+                        <div className="font-medium text-foreground">Monthly earnings per team member</div>
+                        <p className="text-xs text-muted-foreground">
+                          Each role uses category-specific rates. {formData.roleType === "part_time" ? "Part-time (20 hrs/week)." : "Full-time (40 hrs/week)."}
+                        </p>
+                        <div className="space-y-2">
+                          {budgetCalculation.breakdown.teamMembers.map((m) => (
+                            <div key={`${m.role}-${m.category}`} className="flex items-center justify-between rounded-lg border border-border/40 bg-background/50 px-4 py-3">
+                              <div>
+                                <span className="font-medium text-foreground">{m.roleDisplayName}</span>
+                                <span className="text-muted-foreground"> — {m.category}</span>
+                                <span className="ml-2 text-xs text-muted-foreground">({m.count} {m.count === 1 ? "person" : "people"})</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-semibold tabular-nums">{formatBudget(m.monthlyPerPerson)}/mo</div>
+                                <div className="text-xs text-muted-foreground">
+                                  ${m.hourlyRate}/hr × {m.hoursPerMonth} hrs
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-3">
                       <div className="font-medium text-foreground">Fund upfront (optional)</div>
                       <p className="text-xs text-muted-foreground">

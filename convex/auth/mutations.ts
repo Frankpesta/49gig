@@ -154,7 +154,9 @@ export const signup = mutation({
             v.literal("data_analytics"),
             v.literal("devops_cloud"),
             v.literal("cybersecurity_it"),
-            v.literal("ai_ml_blockchain"),
+            v.literal("ai"),
+            v.literal("machine_learning"),
+            v.literal("blockchain"),
             v.literal("qa_testing")
           )
         ),

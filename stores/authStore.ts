@@ -33,7 +33,9 @@ export interface User {
           | "data_analytics"
           | "devops_cloud"
           | "cybersecurity_it"
-          | "ai_ml_blockchain"
+          | "ai"
+          | "machine_learning"
+          | "blockchain"
           | "qa_testing";
     experienceLevel?: "junior" | "mid" | "senior" | "expert";
     languagesWritten?: string[];

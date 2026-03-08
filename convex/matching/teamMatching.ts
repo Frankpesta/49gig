@@ -13,7 +13,9 @@ export type TalentCategory =
   | "Data Analytics"
   | "DevOps and Cloud Engineering"
   | "Cyber Security and IT Infrastructure"
-  | "AI, Machine Learning and Blockchain"
+  | "AI"
+  | "Machine Learning"
+  | "Blockchain"
   | "Quality Assurance and Testing"
 
 export type ExperienceLevel = "junior" | "mid" | "senior" | "expert";
@@ -63,6 +65,15 @@ const SKILL_TO_ROLE: Record<string, string[]> = {
   "Machine Learning": ["data_scientist"],
   "Pandas": ["data_scientist", "data_analyst"],
   "NumPy": ["data_scientist"],
+  "NLP": ["ai_engineer"],
+  "Prompt Engineering": ["ai_engineer"],
+  "LangChain": ["ai_engineer"],
+  "TensorFlow": ["data_scientist"],
+  "PyTorch": ["data_scientist"],
+  "Blockchain": ["blockchain_dev"],
+  "Solidity": ["blockchain_dev"],
+  "Web3": ["blockchain_dev"],
+  "Smart Contracts": ["blockchain_dev"],
   "Technical Writing": ["technical_writer"],
 };
 
@@ -217,8 +228,12 @@ export function determineTeamComposition(params: {
       composition["devops"] = (composition["devops"] || 0) + remaining;
     } else if (category === "Cyber Security and IT Infrastructure") {
       composition["backend_dev"] = (composition["backend_dev"] || 0) + remaining;
-    } else if (category === "AI, Machine Learning and Blockchain") {
+    } else if (category === "AI") {
+      composition["ai_engineer"] = (composition["ai_engineer"] || 0) + remaining;
+    } else if (category === "Machine Learning") {
       composition["data_scientist"] = (composition["data_scientist"] || 0) + remaining;
+    } else if (category === "Blockchain") {
+      composition["blockchain_dev"] = (composition["blockchain_dev"] || 0) + remaining;
     } else if (category === "Quality Assurance and Testing") {
       composition["qa"] = (composition["qa"] || 0) + remaining;
     }

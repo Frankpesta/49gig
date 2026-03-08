@@ -43,6 +43,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  getRoleIdForSkill,
+  getRoleLabel,
+  getRoleLabelFromCategoryLabel,
+  isCategoryLabel,
+  isLegacyCategoryLabel,
+} from "@/lib/platform-skills";
 
 const STATUS_CONFIG: Record<
   string,
@@ -62,6 +69,57 @@ const STATUS_CONFIG: Record<
   cancelled: { label: "Cancelled", variant: "destructive", icon: XCircle },
   disputed: { label: "Disputed", variant: "destructive", icon: AlertCircle },
 };
+
+/** Format exact duration from start/end timestamps */
+function formatExactDuration(startMs: number, endMs: number): string {
+  const diffMs = endMs - startMs;
+  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
+  if (diffDays >= 365) {
+    const years = Math.floor(diffDays / 365);
+    return years === 1 ? "1 year" : `${years} years`;
+  }
+  if (diffDays >= 30) {
+    const months = Math.round(diffDays / 30);
+    return months === 1 ? "1 month" : `${months} months`;
+  }
+  return diffDays === 1 ? "1 day" : `${diffDays} days`;
+}
+
+/** Derive role labels from requiredSkills (skills map to roles; legacy may have category labels) */
+function getRoleLabelsFromProject(intakeForm: {
+  requiredSkills?: string[];
+  talentCategory?: string;
+  category?: string;
+}): string[] {
+  const skills = intakeForm.requiredSkills ?? [];
+  const roleLabels = new Set<string>();
+
+  for (const item of skills) {
+    const roleId = getRoleIdForSkill(item);
+    if (roleId) {
+      roleLabels.add(getRoleLabel(roleId));
+    } else if (isLegacyCategoryLabel(item)) {
+      roleLabels.add("AI Engineer");
+      roleLabels.add("Machine Learning Engineer");
+      roleLabels.add("Blockchain Developer");
+    } else if (isCategoryLabel(item)) {
+      roleLabels.add(getRoleLabelFromCategoryLabel(item));
+    }
+  }
+
+  if (roleLabels.size === 0 && (intakeForm.talentCategory || intakeForm.category)) {
+    const cat = intakeForm.talentCategory || intakeForm.category || "";
+    roleLabels.add(getRoleLabelFromCategoryLabel(cat));
+  }
+  return [...roleLabels];
+}
+
+/** Filter to only actual skills (exclude category labels) */
+function getActualSkills(requiredSkills: string[]): string[] {
+  return requiredSkills.filter(
+    (s) => !isCategoryLabel(s) && !isLegacyCategoryLabel(s)
+  );
+}
 
 // Helper function to validate Convex ID format
 function isValidConvexId(id: string | string[] | undefined): id is Id<"projects"> {
@@ -564,9 +622,22 @@ export default function ProjectDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <div className="text-sm font-medium">Category</div>
-                <div className="text-sm text-muted-foreground">
-                  {project.intakeForm.category}
+                <div className="text-sm font-medium">Roles</div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(() => {
+                    const roleLabels = getRoleLabelsFromProject(project.intakeForm);
+                    return roleLabels.length > 0 ? (
+                      roleLabels.map((role) => (
+                        <Badge key={role} variant="secondary" className="text-xs">
+                          {role}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        {project.intakeForm.category || project.intakeForm.talentCategory || "—"}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               <Separator />
@@ -583,26 +654,31 @@ export default function ProjectDetailPage() {
               </div>
               <Separator />
               <div>
-                <div className="text-sm font-medium">Timeline</div>
+                <div className="text-sm font-medium">Duration</div>
                 <div className="text-sm text-muted-foreground">
-                  {project.intakeForm.timeline}
+                  {project.intakeForm.startDate && project.intakeForm.endDate
+                    ? formatExactDuration(project.intakeForm.startDate, project.intakeForm.endDate)
+                    : project.intakeForm.timeline || "—"}
                 </div>
               </div>
-              {project.intakeForm.requiredSkills && project.intakeForm.requiredSkills.length > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <div className="text-sm font-medium mb-2">Required Skills</div>
-                    <div className="flex flex-wrap gap-1">
-                      {project.intakeForm.requiredSkills.map((skill: string) => (
-                        <Badge key={skill} variant="outline" className="text-xs">
-                          {skill}
-                        </Badge>
-                      ))}
+              {(() => {
+                const actualSkills = getActualSkills(project.intakeForm.requiredSkills ?? []);
+                return actualSkills.length > 0 ? (
+                  <>
+                    <Separator />
+                    <div>
+                      <div className="text-sm font-medium mb-2">Required Skills</div>
+                      <div className="flex flex-wrap gap-1">
+                        {actualSkills.map((skill: string) => (
+                          <Badge key={skill} variant="outline" className="text-xs">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
+                  </>
+                ) : null;
+              })()}
             </CardContent>
           </Card>
 

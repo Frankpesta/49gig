@@ -25,7 +25,9 @@ const DEFAULT_RATES: Record<string, { junior: number; mid: number; senior: numbe
   "Data Analytics": { junior: 28, mid: 50, senior: 85, expert: 130 },
   "DevOps and Cloud Engineering": { junior: 32, mid: 58, senior: 95, expert: 145 },
   "Cyber Security and IT Infrastructure": { junior: 35, mid: 60, senior: 100, expert: 155 },
-  "AI, Machine Learning and Blockchain": { junior: 38, mid: 65, senior: 110, expert: 170 },
+  "AI": { junior: 38, mid: 68, senior: 115, expert: 175 },
+  "Machine Learning": { junior: 36, mid: 65, senior: 110, expert: 170 },
+  "Blockchain": { junior: 35, mid: 62, senior: 105, expert: 165 },
   "Quality Assurance and Testing": { junior: 24, mid: 42, senior: 70, expert: 108 },
 };
 

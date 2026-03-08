@@ -58,15 +58,22 @@ export function TypingEffect({
       style={{
         width: `${longestWordLength + 1}ch`,
         minWidth: `${longestWordLength + 1}ch`,
-        contain: "layout",
+        flexShrink: 0,
+        contain: "layout style paint",
         overflow: "hidden",
         transform: "translateZ(0)",
         backfaceVisibility: "hidden",
       }}
     >
-      <span className="inline-block shrink-0 whitespace-nowrap align-baseline">{currentText}</span>
+      <span
+        className="inline-block shrink-0 whitespace-nowrap align-baseline"
+        style={{ minWidth: `${longestWordLength}ch` }}
+      >
+        {currentText}
+      </span>
       <span
         className={cn("inline-block shrink-0 align-baseline h-5 w-0.5 animate-caret-blink bg-current", cursorClassName)}
+        style={{ transform: "translateZ(0)" }}
       />
     </span>
   );

@@ -51,13 +51,46 @@ export const approveMonthlyCycle = mutation({
       throw new Error("Project has no matched freelancer(s)");
     }
 
-    const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
-    const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
+    // Compute share per freelancer: role-based from teamBudgetBreakdown, or equal split
+    const breakdown = project.teamBudgetBreakdown;
+    let shareCentsByFreelancer: number[];
+
+    if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
+      const acceptedMatches = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", cycle.projectId))
+        .collect();
+      const acceptedByFreelancer = new Map(
+        acceptedMatches
+          .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
+          .map((m) => [m.freelancerId, m])
+      );
+
+      const equalShare = Math.floor(cycle.amountCents / freelancerIds.length);
+      shareCentsByFreelancer = freelancerIds.map((fid) => {
+        const match = acceptedByFreelancer.get(fid);
+        const role = match?.teamRole;
+        const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
+        return Math.max(0, roleAmount);
+      });
+
+      const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
+      const remainder = cycle.amountCents - totalAllocated;
+      if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
+        shareCentsByFreelancer[0] += remainder;
+      }
+    } else {
+      const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
+      const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
+      shareCentsByFreelancer = freelancerIds.map((_, i) =>
+        amountPerFreelancerCents + (i === 0 ? remainder : 0)
+      );
+    }
 
     // Credit each freelancer's wallet (creates wallet if needed)
     for (let i = 0; i < freelancerIds.length; i++) {
       const fid = freelancerIds[i];
-      const shareCents = amountPerFreelancerCents + (i === 0 ? remainder : 0);
+      const shareCents = shareCentsByFreelancer[i] ?? 0;
       if (shareCents <= 0) continue;
 
       const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
@@ -77,7 +110,7 @@ export const approveMonthlyCycle = mutation({
     // Create payment record(s) for audit - one per freelancer
     for (let i = 0; i < freelancerIds.length; i++) {
       const fid = freelancerIds[i];
-      const shareCents = amountPerFreelancerCents + (i === 0 ? remainder : 0);
+      const shareCents = shareCentsByFreelancer[i] ?? 0;
       if (shareCents <= 0) continue;
 
       await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
@@ -248,17 +281,49 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
         ? [project.matchedFreelancerId]
         : project.matchedFreelancerIds ?? [];
 
+      const breakdown = project.teamBudgetBreakdown;
+      let shareCentsByFreelancer: number[];
+
+      if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
+        const acceptedMatches = await ctx.db
+          .query("matches")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+          .collect();
+        const acceptedByFreelancer = new Map(
+          acceptedMatches
+            .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
+            .map((m) => [m.freelancerId, m])
+        );
+
+        const equalShare = Math.floor(amountPerMonthCents / freelancerIds.length);
+        shareCentsByFreelancer = freelancerIds.map((fid) => {
+          const match = acceptedByFreelancer.get(fid);
+          const role = match?.teamRole;
+          const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
+          return Math.max(0, roleAmount);
+        });
+
+        const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
+        const remainder = amountPerMonthCents - totalAllocated;
+        if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
+          shareCentsByFreelancer[0] += remainder;
+        }
+      } else {
+        const amountPerFreelancerCents = Math.floor(amountPerMonthCents / freelancerIds.length);
+        const remainder = amountPerMonthCents - amountPerFreelancerCents * freelancerIds.length;
+        shareCentsByFreelancer = freelancerIds.map((_, i) =>
+          amountPerFreelancerCents + (i === 0 ? remainder : 0)
+        );
+      }
+
       for (let i = 0; i < cyclesToApprove; i++) {
         const cycleId = cycleIds[i];
         const cycle = await ctx.db.get(cycleId);
         if (!cycle || cycle.status !== "pending") continue;
 
-        const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
-        const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
-
         for (let j = 0; j < freelancerIds.length; j++) {
           const fid = freelancerIds[j];
-          const shareCents = amountPerFreelancerCents + (j === 0 ? remainder : 0);
+          const shareCents = shareCentsByFreelancer[j] ?? 0;
           if (shareCents <= 0) continue;
 
           const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {

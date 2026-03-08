@@ -26,7 +26,9 @@ const CODING_CATEGORIES = new Set([
 const PORTFOLIO_MCQ_CATEGORIES = new Set([
   "data_analytics",
   "devops_cloud",
-  "ai_ml_blockchain",
+  "ai",
+  "machine_learning",
+  "blockchain",
 ]);
 
 /** MCQ-only (no coding, no portfolio). */
