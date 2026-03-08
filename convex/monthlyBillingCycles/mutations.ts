@@ -38,7 +38,8 @@ async function creditWalletInline(
     wallet = (await ctx.db.get(walletId))!;
   }
 
-  const newBalance = wallet.balanceCents + args.amountCents;
+  const currentBalance = wallet.balanceCents ?? 0;
+  const newBalance = currentBalance + args.amountCents;
   const now = Date.now();
 
   await ctx.db.patch(wallet._id, {
@@ -330,13 +331,23 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
       createdAt: now,
     });
 
-    // Auto-approve upfront cycles if client selected fundUpfrontMonths
+    // Auto-approve upfront cycles ONLY when: 1) client selected fundUpfrontMonths, 2) payment received (escrowedAmount > 0), 3) freelancer has signed contract
     const fundUpfront = project.fundUpfrontMonths ?? 0;
-    if (fundUpfront > 0 && cycleIds.length > 0) {
-      const cyclesToApprove = Math.min(fundUpfront, cycleIds.length);
-      const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
+    const freelancerIds: Doc<"users">["_id"][] = (
+      project.matchedFreelancerId
         ? [project.matchedFreelancerId]
-        : project.matchedFreelancerIds ?? [];
+        : project.matchedFreelancerIds ?? project.selectedFreelancerId
+          ? [project.selectedFreelancerId]
+          : project.selectedFreelancerIds ?? []
+    ).filter((id): id is Doc<"users">["_id"] => id != null);
+    const signatures = project.freelancerContractSignatures ?? [];
+    const allFreelancersSigned =
+      freelancerIds.length > 0 &&
+      freelancerIds.every((fid) => signatures.some((s) => s.freelancerId === fid));
+    const hasPayment = (project.escrowedAmount ?? 0) > 0;
+
+    if (fundUpfront > 0 && cycleIds.length > 0 && allFreelancersSigned && hasPayment) {
+      const cyclesToApprove = Math.min(fundUpfront, cycleIds.length);
 
       const breakdown = project.teamBudgetBreakdown;
       let shareCentsByFreelancer: number[];
@@ -546,9 +557,9 @@ export const autoReleaseMonthlyCycleInternal = internalMutation({
 });
 
 /**
- * Internal: process upfront release for existing cycles when payment succeeds.
- * Called after acceptSelectedMatchInternal - handles the case where cycles were
- * created at contract signing (before payment) so fundUpfrontMonths wasn't applied.
+ * Internal: process upfront release for existing cycles.
+ * Only releases when freelancer has signed the contract.
+ * Called: 1) after payment (may skip if freelancer hasn't signed), 2) when contract becomes fully signed.
  */
 export const processUpfrontReleaseForProjectInternal = internalMutation({
   args: { projectId: v.id("projects") },
@@ -558,6 +569,24 @@ export const processUpfrontReleaseForProjectInternal = internalMutation({
 
     const fundUpfront = project.fundUpfrontMonths ?? 0;
     if (fundUpfront <= 0) return { released: 0 };
+
+    const freelancerIds: Doc<"users">["_id"][] = (
+      project.matchedFreelancerId
+        ? [project.matchedFreelancerId]
+        : project.matchedFreelancerIds ?? project.selectedFreelancerId
+          ? [project.selectedFreelancerId]
+          : project.selectedFreelancerIds ?? []
+    ).filter((id): id is Doc<"users">["_id"] => id != null);
+    if (freelancerIds.length === 0) return { released: 0 };
+
+    // Only release when freelancer has signed - upfront goes to wallet only after contract is signed
+    const signatures = project.freelancerContractSignatures ?? [];
+    const allFreelancersSigned =
+      freelancerIds.every((fid) => signatures.some((s) => s.freelancerId === fid));
+    if (!allFreelancersSigned) return { released: 0 };
+
+    const hasPayment = (project.escrowedAmount ?? 0) > 0;
+    if (!hasPayment) return { released: 0 };
 
     const cycles = await ctx.db
       .query("monthlyBillingCycles")
@@ -570,11 +599,6 @@ export const processUpfrontReleaseForProjectInternal = internalMutation({
       .slice(0, fundUpfront);
 
     if (toRelease.length === 0) return { released: 0 };
-
-    const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
-      ? [project.matchedFreelancerId]
-      : project.matchedFreelancerIds ?? [];
-    if (freelancerIds.length === 0) return { released: 0 };
 
     const amountPerMonthCents = toRelease[0]?.amountCents ?? 0;
     const breakdown = project.teamBudgetBreakdown;

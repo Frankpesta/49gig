@@ -155,6 +155,12 @@ export const signContract = mutation({
           apiModule.internal.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
           { projectId }
         );
+        // Process upfront release when freelancer signs - only credits wallet if payment was received
+        await ctx.scheduler.runAfter(
+          0,
+          apiModule.internal.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
+          { projectId }
+        );
       }
     }
 
