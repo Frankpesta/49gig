@@ -244,6 +244,7 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
       const monthStart = startMs + i * monthMs;
       const monthEnd = Math.min(monthStart + monthMs, endMs);
 
+      const AUTO_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000; // 48 hours after month ends
       const id = await ctx.db.insert("monthlyBillingCycles", {
         projectId: args.projectId,
         monthIndex: i + 1,
@@ -252,6 +253,7 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
         amountCents: amountPerMonthCents,
         currency: project.currency,
         status: "pending",
+        autoReleaseAt: monthEnd + AUTO_RELEASE_DELAY_MS,
         createdAt: now,
         updatedAt: now,
       });
@@ -368,5 +370,122 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
     }
 
     return cycleIds;
+  },
+});
+
+/**
+ * Internal: auto-release a single monthly cycle (no client approval).
+ * Called by cron when autoReleaseAt has passed.
+ */
+export const autoReleaseMonthlyCycleInternal = internalMutation({
+  args: { monthlyCycleId: v.id("monthlyBillingCycles") },
+  handler: async (ctx, args) => {
+    const cycle = await ctx.db.get(args.monthlyCycleId);
+    if (!cycle || cycle.status !== "pending") return { released: false };
+
+    const project = await ctx.db.get(cycle.projectId);
+    if (!project) return { released: false };
+
+    const now = Date.now();
+
+    const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? [];
+
+    if (freelancerIds.length === 0) return { released: false };
+
+    const breakdown = project.teamBudgetBreakdown;
+    let shareCentsByFreelancer: number[];
+
+    if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
+      const acceptedMatches = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", cycle.projectId))
+        .collect();
+      const acceptedByFreelancer = new Map(
+        acceptedMatches
+          .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
+          .map((m) => [m.freelancerId, m])
+      );
+
+      const equalShare = Math.floor(cycle.amountCents / freelancerIds.length);
+      shareCentsByFreelancer = freelancerIds.map((fid) => {
+        const match = acceptedByFreelancer.get(fid);
+        const role = match?.teamRole;
+        const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
+        return Math.max(0, roleAmount);
+      });
+
+      const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
+      const remainder = cycle.amountCents - totalAllocated;
+      if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
+        shareCentsByFreelancer[0] += remainder;
+      }
+    } else {
+      const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
+      const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
+      shareCentsByFreelancer = freelancerIds.map((_, i) =>
+        amountPerFreelancerCents + (i === 0 ? remainder : 0)
+      );
+    }
+
+    const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
+      month: "short",
+      year: "numeric",
+    });
+
+    for (let i = 0; i < freelancerIds.length; i++) {
+      const fid = freelancerIds[i];
+      const shareCents = shareCentsByFreelancer[i] ?? 0;
+      if (shareCents <= 0) continue;
+
+      await ctx.scheduler.runAfter(0, internalAny.wallets.mutations.creditWallet, {
+        userId: fid,
+        amountCents: shareCents,
+        currency: cycle.currency,
+        description: `Auto-release: ${project.intakeForm.title} - ${monthLabel}`,
+        projectId: cycle.projectId,
+        monthlyCycleId: args.monthlyCycleId,
+      });
+
+      await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
+        projectId: cycle.projectId,
+        monthlyCycleId: args.monthlyCycleId,
+        type: "monthly_release",
+        amount: shareCents / 100,
+        currency: cycle.currency,
+        platformFee: 0,
+        netAmount: shareCents / 100,
+        userId: fid,
+        status: "succeeded",
+      });
+    }
+
+    await ctx.db.patch(args.monthlyCycleId, {
+      status: "approved",
+      approvedAt: now,
+      updatedAt: now,
+    });
+
+    const totalReleased = cycle.amountCents;
+    await ctx.db.patch(cycle.projectId, {
+      escrowedAmount: Math.max(0, project.escrowedAmount - totalReleased / 100),
+      updatedAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: freelancerIds,
+      title: "Monthly payment auto-released",
+      message: `${monthLabel} payment for ${project.intakeForm.title} was automatically released. Funds have been added to your wallet.`,
+      type: "payment",
+      data: { projectId: cycle.projectId, monthlyCycleId: args.monthlyCycleId },
+    });
+
+    return { released: true };
   },
 });

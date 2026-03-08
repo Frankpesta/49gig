@@ -12,6 +12,7 @@ const api = require("../_generated/api") as {
         sendTwoFactorCodeEmail: unknown;
         sendVerificationEmail: unknown;
         sendPasswordResetEmail: unknown;
+        sendWelcomeEmail: unknown;
       };
     };
     notifications: { actions: { sendSystemNotification: unknown } };
@@ -29,6 +30,9 @@ const sendVerificationEmailRef = authActions[
 ] as unknown as FunctionReference<"action">;
 const sendPasswordResetEmailRef = authActions[
   "sendPasswordResetEmail"
+] as unknown as FunctionReference<"action">;
+const sendWelcomeEmailRef = authActions[
+  "sendWelcomeEmail"
 ] as unknown as FunctionReference<"action">;
 
 const SESSION_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -625,6 +629,13 @@ export const verifyEmail = mutation({
         email: user.email,
       },
       createdAt: Date.now(),
+    });
+
+    // Send welcome email after verification (email signup)
+    await ctx.scheduler.runAfter(0, sendWelcomeEmailRef, {
+      email: user.email,
+      name: user.name,
+      role: user.role === "client" || user.role === "freelancer" ? user.role : "client",
     });
 
     return { success: true };

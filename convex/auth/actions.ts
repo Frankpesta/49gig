@@ -5,7 +5,6 @@ import { v } from "convex/values";
 import React from "react";
 import { sendEmail } from "../email/send";
 import {
-  VerificationEmail,
   VerificationCodeEmail,
   PasswordResetEmail,
   WelcomeEmail,
@@ -49,51 +48,31 @@ export const oauthSignIn = action({
 });
 
 /**
- * Send email verification (6-digit code for manual signups)
+ * Send email verification (6-digit code only)
  */
 export const sendVerificationEmail = action({
   args: {
     userId: v.id("users"),
     email: v.string(),
     name: v.optional(v.string()),
-    code: v.optional(v.string()),
-    token: v.optional(v.string()),
-    verifyUrl: v.optional(v.string()),
+    code: v.string(),
   },
   handler: async (ctx, args) => {
     const appUrl = getAppUrl();
     const logoUrl = getLogoUrl(appUrl);
     const date = formatDate();
 
-    if (args.code) {
-      await sendEmail({
-        to: args.email,
-        subject: "Your 49GIG verification code",
-        react: React.createElement(VerificationCodeEmail, {
-          name: args.name || "there",
-          code: args.code,
-          appUrl,
-          logoUrl,
-          date,
-        }),
-      });
-    } else if (args.token) {
-      const verifyUrl =
-        args.verifyUrl || `${appUrl}/verify-email?token=${encodeURIComponent(args.token)}`;
-      await sendEmail({
-        to: args.email,
-        subject: "Verify your email",
-        react: React.createElement(VerificationEmail, {
-          name: args.name || "there",
-          verifyUrl,
-          appUrl,
-          logoUrl,
-          date,
-        }),
-      });
-    } else {
-      throw new Error("Either code or token must be provided");
-    }
+    await sendEmail({
+      to: args.email,
+      subject: "Your 49GIG verification code",
+      react: React.createElement(VerificationCodeEmail, {
+        name: args.name || "there",
+        code: args.code,
+        appUrl,
+        logoUrl,
+        date,
+      }),
+    });
 
     return { success: true };
   },

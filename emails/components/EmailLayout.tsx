@@ -39,10 +39,12 @@ const styles = {
   header: {
     padding: "24px 32px",
     backgroundColor: "#ffffff",
+    textAlign: "center" as const,
   },
   logo: {
-    display: "block",
-    height: "36px",
+    display: "inline-block",
+    height: "56px",
+    width: "auto",
   },
   content: {
     padding: "0 32px 24px",
