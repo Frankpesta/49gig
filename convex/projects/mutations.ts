@@ -997,13 +997,14 @@ export const acceptSelectedMatchInternal = internalMutation({
           updatedAt: now,
         });
         acceptedMatchIds.push(match._id);
-        await ctx.db.patch(args.projectId, {
-          matchedFreelancerId: selectedId,
-          status: "matched",
-          matchedAt: now,
-          updatedAt: now,
-        });
       }
+      // Always set matched and status to "matched" when client pre-selected - freelancer must be able to sign contract
+      await ctx.db.patch(args.projectId, {
+        matchedFreelancerId: selectedId,
+        status: "matched",
+        matchedAt: now,
+        updatedAt: now,
+      });
       const otherPending = allMatches.filter(
         (m) => m.status === "pending" && m.freelancerId !== selectedId
       );
