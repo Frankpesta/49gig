@@ -1042,7 +1042,7 @@ export const acceptSelectedMatchInternal = internalMutation({
     });
 
     // Process upfront release for existing cycles (when cycles were created at contract signing before payment)
-    await ctx.scheduler.runAfter(2000, internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal, {
+    await ctx.scheduler.runAfter(500, internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal, {
       projectId: args.projectId,
     });
 

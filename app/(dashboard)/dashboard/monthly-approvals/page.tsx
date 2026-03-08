@@ -26,7 +26,7 @@ export default function MonthlyApprovalsPage() {
     setApprovingId(cycleId);
     try {
       await approveCycle({ monthlyCycleId: cycleId });
-      toast.success("Month approved. Funds have been released to the freelancer's wallet.");
+      toast.success("Month approved. Funds have been released to the freelancer's wallet. They can withdraw to their bank.");
     } catch (err) {
       toast.error(getUserFriendlyError(err) || "Approval failed");
     } finally {
@@ -38,7 +38,7 @@ export default function MonthlyApprovalsPage() {
     return null;
   }
 
-  if (user.role !== "client") {
+  if (user.role !== "client" && user.role !== "admin") {
     return (
       <div className="space-y-6 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
@@ -72,8 +72,7 @@ export default function MonthlyApprovalsPage() {
         <CardHeader>
           <CardTitle>Pending Approvals</CardTitle>
           <CardDescription>
-            Review and approve each month's work. Funds are released to the freelancer's wallet upon
-            approval.
+            Review and approve each month&apos;s work. Funds are released to the freelancer&apos;s wallet; they withdraw to their bank when ready.
           </CardDescription>
         </CardHeader>
         <CardContent>

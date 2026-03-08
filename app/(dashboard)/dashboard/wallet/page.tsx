@@ -72,7 +72,7 @@ export default function WalletPage() {
       <div className="space-y-6 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
           title="Wallet"
-          description="In-platform balance for freelancers."
+          description="Freelancers receive payments here, then withdraw to their bank."
           icon={Wallet}
         />
         <Card>
@@ -80,7 +80,7 @@ export default function WalletPage() {
             <DashboardEmptyState
               icon={Wallet}
               title="Freelancers only"
-              description="Wallet is available only for freelancers. Monthly payments from approved projects are credited here."
+              description="Wallet is for freelancers. When clients approve monthly payments, funds are credited here. Freelancers then withdraw to their bank accounts."
               iconTone="muted"
             />
           </CardContent>
@@ -95,7 +95,7 @@ export default function WalletPage() {
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Wallet"
-        description="Your in-platform balance. Withdraw to your bank account anytime."
+        description="Approved payments are credited here. Withdraw to your bank account when ready."
         icon={Wallet}
       />
 
@@ -159,7 +159,7 @@ export default function WalletPage() {
             Withdraw Funds
           </CardTitle>
           <CardDescription>
-            Funds from approved monthly payments. Withdraw to your connected bank account.
+            Funds from approved monthly payments go to your wallet. Withdraw to your bank account when you're ready.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -224,7 +224,7 @@ export default function WalletPage() {
             <DashboardEmptyState
               icon={Wallet}
               title="No transactions yet"
-              description="When clients approve monthly payments, funds will appear here."
+              description="When clients approve monthly payments, funds are credited here. You can then withdraw to your bank."
               iconTone="muted"
               className="border-0 bg-transparent py-8 shadow-none"
             />
