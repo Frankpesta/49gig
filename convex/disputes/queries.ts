@@ -95,6 +95,25 @@ export const getDisputes = query({
 });
 
 /**
+ * Get open disputes (open or under_review) for a project.
+ */
+export const getOpenDisputesForProject = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("disputes")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "open"),
+          q.eq(q.field("status"), "under_review")
+        )
+      )
+      .collect();
+  },
+});
+
+/**
  * Internal: get dispute by ID without auth (for actions e.g. releaseDisputeFunds).
  */
 export const internalGetDispute = internalQuery({
