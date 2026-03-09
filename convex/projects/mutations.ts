@@ -390,6 +390,22 @@ export const updateProjectStatus = mutation({
       throw new Error("Only the client or admin can mark a project as completed");
     }
 
+    if (args.status === "completed") {
+      const openDispute = await ctx.db
+        .query("disputes")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "open"),
+            q.eq(q.field("status"), "under_review")
+          )
+        )
+        .first();
+      if (openDispute) {
+        throw new Error("Cannot complete project while a dispute is open. Resolve the dispute first.");
+      }
+    }
+
     const updates: any = {
       status: args.status,
       updatedAt: Date.now(),
@@ -405,6 +421,14 @@ export const updateProjectStatus = mutation({
     }
 
     await ctx.db.patch(args.projectId, updates);
+
+    if (args.status === "completed") {
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.monthlyBillingCycles.mutations.releaseAllPendingCyclesForProjectInternal,
+        { projectId: args.projectId }
+      );
+    }
 
     // Log audit
     await ctx.db.insert("auditLogs", {

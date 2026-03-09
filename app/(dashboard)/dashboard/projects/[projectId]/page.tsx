@@ -172,6 +172,12 @@ export default function ProjectDetailPage() {
     projectId ? { projectId } : "skip"
   );
 
+  const openDisputes = useQuery(
+    (api as any)["disputes/queries"].getOpenDisputesForProject,
+    projectId ? { projectId } : "skip"
+  );
+  const hasOpenDispute = (openDisputes?.length ?? 0) > 0;
+
   const existingReview = useQuery(
     (api as any)["reviews/queries"].getReviewByProject,
     projectId && user?._id ? { projectId, userId: user._id } : "skip"
@@ -395,8 +401,9 @@ export default function ProjectDetailPage() {
               <>
                 <Button
                   onClick={() => setShowCompleteDialog(true)}
-                  disabled={isCompleting}
+                  disabled={isCompleting || hasOpenDispute}
                   variant="default"
+                  title={hasOpenDispute ? "Resolve the dispute before completing" : undefined}
                 >
                   {isCompleting ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -405,17 +412,22 @@ export default function ProjectDetailPage() {
                   )}
                   Complete Project
                 </Button>
+                {hasOpenDispute && (
+                  <span className="text-xs text-muted-foreground self-center">
+                    Resolve the dispute first
+                  </span>
+                )}
                 <AlertDialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Complete project?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Marking this project as completed will close it. Make sure all work is done and payments have been released. You can still rate the freelancer after completion.
+                        Marking this project as completed will close it and release all remaining payments to the freelancer&apos;s wallet. Make sure all work is done. You can still rate the freelancer after completion.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel disabled={isCompleting}>Cancel</AlertDialogCancel>
-                      <Button onClick={handleCompleteProject} disabled={isCompleting}>
+                      <Button onClick={handleCompleteProject} disabled={isCompleting || hasOpenDispute}>
                         {isCompleting ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         ) : null}
