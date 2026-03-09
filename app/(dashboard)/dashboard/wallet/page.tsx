@@ -38,6 +38,8 @@ export default function WalletPage() {
   const walletStats = useQuery(api.wallets.queries.getWalletStats);
   const transactions = useQuery(api.wallets.queries.getMyWalletTransactions, { limit: 50 });
   const withdrawFromWallet = useAction(api.payments.actions.withdrawFromWallet);
+  const reconcileWallet = useAction(api.wallets.actions.reconcileWalletFromPayments);
+  const [isReconciling, setIsReconciling] = useState(false);
 
   const handleWithdraw = async () => {
     if (!user?._id) return;
@@ -60,6 +62,23 @@ export default function WalletPage() {
       toast.error(getUserFriendlyError(err) || "Withdrawal failed");
     } finally {
       setIsWithdrawing(false);
+    }
+  };
+
+  const handleReconcile = async () => {
+    if (!user?._id) return;
+    setIsReconciling(true);
+    try {
+      const result = await reconcileWallet({ userId: user._id });
+      if (result.reconciled) {
+        toast.success(`Wallet synced. $${result.creditedCents! / 100} credited.`);
+      } else {
+        toast.info(result.message ?? "Wallet already in sync");
+      }
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Reconciliation failed");
+    } finally {
+      setIsReconciling(false);
     }
   };
 
@@ -164,8 +183,21 @@ export default function WalletPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {walletStats != null && (
-            <div className="text-sm text-muted-foreground">
-              Available: <span className="font-semibold text-foreground">{formatDollars(walletStats?.availableCents ?? 0)}</span>
+            <div className="flex flex-col gap-2">
+              <div className="text-sm text-muted-foreground">
+                Available: <span className="font-semibold text-foreground">{formatDollars(walletStats?.availableCents ?? 0)}</span>
+              </div>
+              {walletStats?.needsReconciliation && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReconcile}
+                  disabled={isReconciling}
+                  className="w-fit"
+                >
+                  {isReconciling ? "Syncing..." : "Sync wallet from payment records"}
+                </Button>
+              )}
             </div>
           )}
 

@@ -155,9 +155,9 @@ export const signContract = mutation({
           apiModule.internal.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
           { projectId }
         );
-        // Process upfront release when freelancer signs - only credits wallet if payment was received
+        // Process upfront release when freelancer signs - run after cycles exist (500ms delay)
         await ctx.scheduler.runAfter(
-          0,
+          500,
           apiModule.internal.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
           { projectId }
         );

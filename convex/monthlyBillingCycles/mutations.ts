@@ -177,7 +177,8 @@ export const approveMonthlyCycle = mutation({
         currency: cycle.currency,
         platformFee: 0,
         netAmount: shareCents / 100,
-        userId: fid,
+        userId: project.clientId,
+        recipientId: fid,
         status: "succeeded",
       });
     }
@@ -415,7 +416,8 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
             currency: cycle.currency,
             platformFee: 0,
             netAmount: shareCents / 100,
-            userId: fid,
+            userId: project.clientId,
+            recipientId: fid,
             status: "succeeded",
           });
         }
@@ -663,7 +665,8 @@ export const processUpfrontReleaseForProjectInternal = internalMutation({
           currency: cycle.currency,
           platformFee: 0,
           netAmount: shareCents / 100,
-          userId: fid,
+          userId: project.clientId,
+          recipientId: fid,
           status: "succeeded",
         });
       }
