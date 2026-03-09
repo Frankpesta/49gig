@@ -98,11 +98,19 @@ export const getTransactions = query({
       const allPayments: any[] = [];
 
       // From projects (milestone_release, monthly_release, project payouts)
-      const userProjects = await ctx.db
+      const singleProjects = await ctx.db
         .query("projects")
         .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
         .collect();
-      const projectIds = userProjects.map((p) => p._id);
+      const allProjects = await ctx.db.query("projects").collect();
+      const teamProjectIds = allProjects
+        .filter((p) => p.matchedFreelancerIds?.includes(user._id))
+        .map((p) => p._id);
+      const projectIdsSet = new Set([
+        ...singleProjects.map((p) => p._id),
+        ...teamProjectIds,
+      ]);
+      const projectIds = Array.from(projectIdsSet);
 
       for (const projectId of projectIds) {
         const projectPayments = await ctx.db
@@ -115,13 +123,20 @@ export const getTransactions = query({
         allPayments.push(...filteredPayments);
       }
 
-      // Wallet payouts (no projectId, identified by recipientId)
-      const walletPayouts = await ctx.db
+      // Payments by recipientId (monthly_release, payout) - for payments that have recipientId set
+      const byRecipient = await ctx.db
         .query("payments")
         .withIndex("by_recipient", (q) => q.eq("recipientId", user._id))
-        .filter((q) => q.eq(q.field("type"), "payout"))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("type"), "monthly_release"),
+            q.eq(q.field("type"), "payout")
+          )
+        )
         .collect();
-      allPayments.push(...walletPayouts);
+      for (const p of byRecipient) {
+        if (!allPayments.some((a) => a._id === p._id)) allPayments.push(p);
+      }
 
       payments = allPayments;
     } else {

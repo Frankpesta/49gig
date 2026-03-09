@@ -1,6 +1,8 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+
+// Use require to avoid TS2589 when accessing api.payments.actions.handleFlutterwaveWebhook
+const { api } = require("./_generated/api");
 
 const http = httpRouter();
 
@@ -80,7 +82,6 @@ http.route({
     }
 
     try {
-      // @ts-expect-error TS2589 - v.any() in action args causes excessively deep type instantiation
       await ctx.runAction(api.payments.actions.handleFlutterwaveWebhook, {
         event: eventType,
         data: eventData,

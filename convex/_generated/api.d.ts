@@ -85,6 +85,7 @@ import type * as vetting_questions from "../vetting/questions.js";
 import type * as vetting_skillTestComplexity from "../vetting/skillTestComplexity.js";
 import type * as vetting_skillTestSession from "../vetting/skillTestSession.js";
 import type * as vetting_testSessions from "../vetting/testSessions.js";
+import type * as wallets_actions from "../wallets/actions.js";
 import type * as wallets_mutations from "../wallets/mutations.js";
 import type * as wallets_queries from "../wallets/queries.js";
 
@@ -172,6 +173,7 @@ declare const fullApi: ApiFromModules<{
   "vetting/skillTestComplexity": typeof vetting_skillTestComplexity;
   "vetting/skillTestSession": typeof vetting_skillTestSession;
   "vetting/testSessions": typeof vetting_testSessions;
+  "wallets/actions": typeof wallets_actions;
   "wallets/mutations": typeof wallets_mutations;
   "wallets/queries": typeof wallets_queries;
 }>;
