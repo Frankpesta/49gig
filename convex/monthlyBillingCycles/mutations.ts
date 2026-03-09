@@ -11,6 +11,20 @@ const api = apiModule as {
 };
 const internalAny: any = apiModule.internal;
 
+async function getCurrentUserInMutation(
+  ctx: MutationCtx,
+  userId?: Doc<"users">["_id"]
+): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId);
+    if (!user || (user as Doc<"users">).status !== "active") return null;
+    return user as Doc<"users">;
+  }
+  const user = await getCurrentUser(ctx);
+  if (!user || (user as Doc<"users">).status !== "active") return null;
+  return user as Doc<"users">;
+}
+
 /** Credit wallet inline (no scheduler) - ensures immediate balance update */
 async function creditWalletInline(
   ctx: MutationCtx,
@@ -224,18 +238,21 @@ export const approveMonthlyCycle = mutation({
  * Use when cycles are missing for an in_progress project.
  */
 export const ensureMonthlyCycles = mutation({
-  args: { projectId: v.id("projects") },
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || (user as Doc<"users">).status !== "active") {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
       throw new Error("Not authenticated");
     }
 
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Project not found");
 
-    const isClient = project.clientId === (user as Doc<"users">)._id;
-    const isAdmin = (user as Doc<"users">).role === "admin";
+    const isClient = project.clientId === user._id;
+    const isAdmin = user.role === "admin";
     if (!isClient && !isAdmin) {
       throw new Error("Only the project client or admin can create monthly cycles");
     }

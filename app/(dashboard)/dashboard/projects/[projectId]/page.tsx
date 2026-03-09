@@ -599,7 +599,7 @@ export default function ProjectDetailPage() {
                         if (!projectId) return;
                         setIsCreatingCycles(true);
                         try {
-                          await ensureMonthlyCycles({ projectId });
+                          await ensureMonthlyCycles({ projectId, userId: user._id });
                           toast.success("Monthly cycles created. The page will update shortly.");
                         } catch (e) {
                           toast.error(getUserFriendlyError(e) || "Failed to create cycles");

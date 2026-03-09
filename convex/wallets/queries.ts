@@ -3,6 +3,17 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 
+async function resolveUser(ctx: any, userId?: Doc<"users">["_id"]): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId);
+    if (!user || user.status !== "active") return null;
+    return user as Doc<"users">;
+  }
+  const user = await getCurrentUser(ctx);
+  if (!user || (user as Doc<"users">).status !== "active") return null;
+  return user as Doc<"users">;
+}
+
 /**
  * Internal: sum of monthly_release payments (succeeded) for a freelancer
  */
@@ -76,14 +87,14 @@ export const getWalletCreditsSumInternal = internalQuery({
  * Get wallet for current user (freelancer)
  */
 export const getMyWallet = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || (user as Doc<"users">).status !== "active") return null;
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await resolveUser(ctx, args.userId);
+    if (!user) return null;
 
     const wallet = await ctx.db
       .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", (user as Doc<"users">)._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
     return wallet;
@@ -120,14 +131,14 @@ export const getWalletByUserIdInternal = internalQuery({
  * Get wallet balance stats: available, pending (awaiting client approval), withdrawn
  */
 export const getWalletStats = query({
-  args: {},
-  handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || (user as Doc<"users">).status !== "active") return null;
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await resolveUser(ctx, args.userId);
+    if (!user) return null;
 
     const wallet = await ctx.db
       .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", (user as Doc<"users">)._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
     // Available: derive from walletTransactions (credits - debits); if 0 but payments exist (sync issue), fallback to sum of monthly_release payments
@@ -145,7 +156,7 @@ export const getWalletStats = query({
         .reduce((s, t) => s + t.amountCents, 0);
       availableCents = Math.max(0, credits - debits);
     }
-    const userId = (user as Doc<"users">)._id;
+    const userId = user._id;
     if (availableCents === 0) {
       const paymentsAsRecipient = await ctx.db
         .query("payments")
@@ -270,14 +281,15 @@ export const getWalletStats = query({
 export const getMyWalletTransactions = query({
   args: {
     limit: v.optional(v.number()),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || (user as Doc<"users">).status !== "active") return [];
+    const user = await resolveUser(ctx, args.userId);
+    if (!user) return [];
 
     const wallet = await ctx.db
       .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", (user as Doc<"users">)._id))
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
 
     if (!wallet) return [];
