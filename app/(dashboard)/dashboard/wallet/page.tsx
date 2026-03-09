@@ -34,9 +34,9 @@ export default function WalletPage() {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  const wallet = useQuery(api.wallets.queries.getMyWallet);
-  const walletStats = useQuery(api.wallets.queries.getWalletStats);
-  const transactions = useQuery(api.wallets.queries.getMyWalletTransactions, { limit: 50 });
+  const wallet = useQuery(api.wallets.queries.getMyWallet, user?._id ? { userId: user._id } : "skip");
+  const walletStats = useQuery(api.wallets.queries.getWalletStats, user?._id ? { userId: user._id } : "skip");
+  const transactions = useQuery(api.wallets.queries.getMyWalletTransactions, user?._id ? { limit: 50, userId: user._id } : "skip");
   const withdrawFromWallet = useAction(api.payments.actions.withdrawFromWallet);
   const reconcileWallet = useAction(api.wallets.actions.reconcileWalletFromPayments);
   const [isReconciling, setIsReconciling] = useState(false);
