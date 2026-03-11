@@ -323,9 +323,9 @@ export default function VerificationPage() {
           )}
 
           {/* Step Components */}
-          {status === "in_progress" && (
+          {(status === "in_progress" || status === "pending_review") && (
             <div className="space-y-6">
-              {currentStep === "english" && !stepsCompleted.includes("english") && (
+              {status === "in_progress" && currentStep === "english" && !stepsCompleted.includes("english") && (
                 <EnglishTest
                   onComplete={() => {
                     // Refresh verification status
@@ -333,11 +333,12 @@ export default function VerificationPage() {
                   }}
                 />
               )}
-              {currentStep === "skills" && !stepsCompleted.includes("skills") && user && (
+              {status === "in_progress" && currentStep === "skills" && !stepsCompleted.includes("skills") && user && (
                 <SkillTestPathFlow />
               )}
-              {/* Submit verification when both steps are done */}
-              {stepsCompleted.includes("english") &&
+              {/* Submit verification when both steps are done (only while in_progress) */}
+              {status === "in_progress" &&
+                stepsCompleted.includes("english") &&
                 stepsCompleted.includes("skills") &&
                 currentStep === "complete" && (
                   <Card>
@@ -382,7 +383,8 @@ export default function VerificationPage() {
                     </CardContent>
                   </Card>
                 )}
-              {vettingComplete && user?._id && !kycComplete && (status === "pending_review" || status === "approved") && (
+              {/* KYC document upload: show as soon as vetting (English + Skills) is complete */}
+              {vettingComplete && user?._id && !kycComplete && (
                 <KycStep userId={user._id} />
               )}
             </div>
