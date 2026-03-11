@@ -153,6 +153,7 @@ export default function CreateProjectPage() {
   const budgetCalculation = useMemo(() => {
     if (
       !formData.startDate ||
+      !formData.projectDuration ||
       !derivedEndDate ||
       !formData.experienceLevel
     ) {
@@ -164,6 +165,9 @@ export default function CreateProjectPage() {
 
       const startDate = parseLocalDateString(formData.startDate);
       if (!startDate || isNaN(startDate.getTime())) {
+        return null;
+      }
+      if (isNaN(derivedEndDate.getTime()) || derivedEndDate.getTime() < startDate.getTime()) {
         return null;
       }
 
@@ -181,16 +185,18 @@ export default function CreateProjectPage() {
         skillsRequired: categoriesForBudget,
         selectedSkillNames: allRequiredSkills,
       });
-      const discount = DURATION_DISCOUNT[formData.projectDuration];
+      const discount = DURATION_DISCOUNT[formData.projectDuration as ProjectDuration] ?? 1;
       const discountedBudget = Math.round(calc.estimatedBudget * discount);
+      if (!Number.isFinite(discountedBudget) || discountedBudget <= 0) return null;
       return { ...calc, estimatedBudget: discountedBudget };
-    } catch (err) {
+    } catch {
       return null;
     }
   }, [
     formData.hireType,
     formData.teamSize,
     formData.startDate,
+    formData.projectDuration,
     derivedEndDate,
     formData.experienceLevel,
     formData.roleType,
@@ -682,14 +688,18 @@ export default function CreateProjectPage() {
                   id="startDate"
                   date={formData.startDate ? parseLocalDateString(formData.startDate) ?? undefined : undefined}
                   onDateChange={(date) => {
-                    if (!date) {
-                      setFormData({ ...formData, startDate: "" });
+                    if (!date || isNaN(date.getTime())) {
+                      setFormData((prev) => ({ ...prev, startDate: "" }));
                       return;
                     }
                     const y = date.getFullYear();
-                    const m = String(date.getMonth() + 1).padStart(2, "0");
-                    const d = String(date.getDate()).padStart(2, "0");
-                    setFormData({ ...formData, startDate: `${y}-${m}-${d}` });
+                    const m = date.getMonth() + 1;
+                    const d = date.getDate();
+                    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return;
+                    const yyyy = String(y);
+                    const mm = String(m).padStart(2, "0");
+                    const dd = String(d).padStart(2, "0");
+                    setFormData((prev) => ({ ...prev, startDate: `${yyyy}-${mm}-${dd}` }));
                   }}
                   placeholder="Select start date"
                   minDate={new Date()}
