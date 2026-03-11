@@ -28,8 +28,8 @@ export default function OpportunitiesPage() {
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
-        title="How you get projects"
-        description="Clients choose talent from their matches. When you are selected, the project appears in Projects."
+        title="How you get hires"
+        description="Clients choose talent from their matches. When you are selected, the hire appears in Hires."
         icon={Briefcase}
       />
 
@@ -40,14 +40,14 @@ export default function OpportunitiesPage() {
             No need to accept opportunities
           </CardTitle>
           <CardDescription>
-            We match you to projects based on your profile and skills. Clients review matched talent and select who they want. Once a client selects you, the project appears under Projects and you can proceed to payment and work.
+            We match you to hires based on your profile and skills. Clients review matched talent and select who they want. Once a client selects you, the hire appears under Hires and you can proceed to payment and work.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Button asChild>
             <Link href="/dashboard/projects" className="inline-flex items-center gap-2">
               <FolderKanban className="h-4 w-4" />
-              View my projects
+              View my hires
             </Link>
           </Button>
         </CardContent>

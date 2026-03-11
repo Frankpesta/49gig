@@ -79,13 +79,14 @@ export default function DashboardLayout({
 
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
     const onResumeUpload = currentPath.startsWith("/resume-upload");
+    const onVerificationPage = currentPath.startsWith("/verification");
     const resumeStatus = resumeInfo?.resumeStatus;
     const hasUploaded =
       resumeStatus === "uploaded" ||
       resumeStatus === "processing" ||
       resumeStatus === "processed";
 
-    if (!hasUploaded && !onResumeUpload) {
+    if (!hasUploaded && !onResumeUpload && !onVerificationPage) {
       router.replace("/resume-upload");
     }
   }, [isAuthenticated, isInitializing, isVerified, resumeInfo, router, effectiveUser]);

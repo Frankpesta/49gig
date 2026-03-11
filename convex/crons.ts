@@ -40,4 +40,18 @@ crons.interval(
   internal["cron/sessions"].cleanupExpiredSessions
 );
 
+// Delete KYC documents from storage 12 months after approval
+crons.daily(
+  "delete old KYC documents",
+  { hourUTC: 3, minuteUTC: 0 },
+  internal["cron/kyc"].deleteKycDocumentsOlderThan12Months
+);
+
+// Payment follow-up: remind clients to fund next month, terminate after grace
+crons.daily(
+  "payment follow-up reminders and terminate",
+  { hourUTC: 9, minuteUTC: 0 },
+  internal["cron/paymentFollowUp"].sendPaymentFollowUpRemindersAndTerminate
+);
+
 export default crons;

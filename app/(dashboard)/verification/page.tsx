@@ -12,6 +12,7 @@ import { CheckCircle2, XCircle, Clock, AlertCircle, Loader2 } from "lucide-react
 import { useAuth } from "@/hooks/use-auth";
 import { EnglishTest } from "@/components/vetting/english-test";
 import { SkillTestPathFlow } from "@/components/vetting/skill-test-path-flow";
+import { KycStep } from "@/components/vetting/kyc-step";
 import { useRouter } from "next/navigation";
 
 const VERIFICATION_FAILED_KEY = "verification_failed_message";
@@ -100,13 +101,15 @@ export default function VerificationPage() {
     );
   }
 
-  const { verificationStatus: status, vettingResult } = verificationStatus;
+  const { verificationStatus: status, vettingResult, kycStatus } = verificationStatus;
   const stepsCompleted = vettingResult?.stepsCompleted || [];
   const currentStep = vettingResult?.currentStep || "english";
   const router = useRouter();
+  const vettingComplete = stepsCompleted.includes("english") && stepsCompleted.includes("skills");
+  const kycComplete = kycStatus === "approved";
 
-  // Fully verified freelancers should use dashboard, not verification page
-  if (status === "approved" && vettingResult?.status === "approved") {
+  // Fully verified (vetting + KYC) should use dashboard
+  if (status === "approved" && vettingResult?.status === "approved" && kycComplete) {
     router.replace("/dashboard");
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -133,9 +136,16 @@ export default function VerificationPage() {
       completed: stepsCompleted.includes("skills"),
       inProgress: currentStep === "skills" && !stepsCompleted.includes("skills"),
     },
+    {
+      id: "kyc",
+      name: "ID & Address Verification (KYC)",
+      description: "Upload government-issued ID (front & back) and a recent utility bill or similar (not older than 3 months)",
+      completed: kycComplete,
+      inProgress: vettingComplete && !kycComplete && (kycStatus === "not_submitted" || kycStatus === "pending_review" || kycStatus === "id_rejected" || kycStatus === "address_rejected"),
+    },
   ];
 
-  const progress = (stepsCompleted.length / steps.length) * 100;
+  const progress = Math.round((steps.filter((s) => s.completed).length / steps.length) * 100);
 
   const handleInitialize = async () => {
     try {
@@ -372,6 +382,9 @@ export default function VerificationPage() {
                     </CardContent>
                   </Card>
                 )}
+              {vettingComplete && user?._id && !kycComplete && (status === "pending_review" || status === "approved") && (
+                <KycStep userId={user._id} />
+              )}
             </div>
           )}
 

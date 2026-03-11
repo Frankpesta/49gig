@@ -615,7 +615,7 @@ export default function ProjectMatchesPage() {
             </CardDescription>
           </CardHeader>
           <Link href="/dashboard/projects">
-            <Button variant="outline">{isClient ? "Back to hires" : "Back to projects"}</Button>
+            <Button variant="outline">Back to hires</Button>
           </Link>
         </Card>
       </div>

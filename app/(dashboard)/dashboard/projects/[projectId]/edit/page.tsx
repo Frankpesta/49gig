@@ -9,13 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Card,
   CardContent,
   CardDescription,
@@ -198,7 +191,7 @@ export default function EditProjectPage() {
       experienceLevel: (intake.experienceLevel as ExperienceLevel) || "mid",
       startDate,
       specialRequirements: intake.specialRequirements || "",
-      fundUpfrontMonths: project.fundUpfrontMonths ?? 0,
+      fundUpfrontMonths: Math.max(1, project.fundUpfrontMonths ?? 1),
     });
   }, [project, formData]);
 
@@ -231,6 +224,7 @@ export default function EditProjectPage() {
         baseRatesByCategory: pricingConfig ?? undefined,
         roleType: formData.roleType,
         skillsRequired: categoriesForBudget,
+        selectedSkillNames: Object.values(formData.roleSkills).flat(),
       });
       const discount = DURATION_DISCOUNT[formData.projectDuration];
       return { ...calc, estimatedBudget: Math.round(calc.estimatedBudget * discount) };
@@ -268,7 +262,7 @@ export default function EditProjectPage() {
       await updateProject({
         projectId,
         userId: user._id,
-        fundUpfrontMonths: formData.fundUpfrontMonths,
+        fundUpfrontMonths: 0,
         totalAmount,
         platformFee,
         teamBudgetBreakdown,
@@ -549,43 +543,9 @@ export default function EditProjectPage() {
                 <span className="text-sm font-medium text-muted-foreground">Estimated total</span>
                 <span className="text-2xl font-bold">{formatBudget(budgetCalculation.estimatedBudget)}</span>
               </div>
-              <div className="space-y-2">
-                <Label>Salary Deposit</Label>
-                <p className="text-sm text-muted-foreground">
-                  Choose how many months of salary you would like to deposit to begin this hire.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  The deposited amount will be held securely in escrow by 49GIG. Funds will not be released immediately.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  At the end of each completed month: You will review the freelancer&apos;s work. If satisfied, you approve the month. Once approved, the payment for that month will be released to the freelancer.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Your approval confirms that the freelancer has completed the expected work for that month.
-                </p>
-                <Select
-                  value={String(formData.fundUpfrontMonths)}
-                  onValueChange={(v) => setFormData({ ...formData, fundUpfrontMonths: parseInt(v, 10) })}
-                >
-                  <SelectTrigger className="w-full mt-2">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">0 months — Release monthly with approval only</SelectItem>
-                    {Array.from({ length: durMonths }, (_, i) => i + 1).map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n} month{n > 1 ? "s" : ""} — {formatBudget((budgetCalculation.estimatedBudget / durMonths) * n)} released immediately
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 flex gap-3 mt-2">
-                  <Info className="h-5 w-5 shrink-0 text-primary mt-0.5" />
-                  <p className="text-sm text-muted-foreground">
-                    Note: Depositing multiple months does not release all payments at once. Funds remain in escrow and are released monthly after approval.
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                You can fund all months upfront or pay one month at a time. All funds are held in escrow by 49GIG and released to the freelancer monthly after you approve each month. If no action is taken within 0–72 hours, the monthly salary is automatically released.
+              </p>
             </div>
           ) : null}
 

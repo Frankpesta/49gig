@@ -82,8 +82,10 @@ export interface BudgetCalculationParams {
   baseRatesByCategory?: Record<string, BaseRatesForCategory>;
   /** Part-time (20 hrs/week) or full-time (40 hrs/week) – affects ongoing projects */
   roleType?: RoleType;
-  /** Selected categories/skills – used for team to distribute roles and apply category-specific rates */
+  /** Selected categories – used for team to distribute roles and apply category-specific rates */
   skillsRequired?: string[];
+  /** Selected skill names (e.g. React, Node.js) – used to infer Backend vs Frontend for Software Development */
+  selectedSkillNames?: string[];
 }
 
 /** Per-role breakdown for team projects */
@@ -145,13 +147,58 @@ const CATEGORY_TO_ROLES: Record<string, string[]> = {
   "Quality Assurance and Testing": ["qa"],
 };
 
+/** Skills that indicate frontend development (for Software Development category) */
+const FRONTEND_SKILLS = new Set([
+  "react", "next.js", "vue.js", "angular", "typescript", "javascript",
+  "html/css", "html", "css", "svelte", "nuxt",
+]);
+/** Skills that indicate backend development (for Software Development category) */
+const BACKEND_SKILLS = new Set([
+  "node.js", "node", "python", "java", "go", "rust", "php", "ruby", ".net", "c++", "c#",
+]);
+
+/**
+ * Infer backend_dev vs frontend_dev for Software Development from selected skills (and languages).
+ * Returns preferred role(s): one for single hire, or both for team when skills span both.
+ */
+function inferSoftwareDevRoles(
+  skillNames: string[],
+  teamSize: TeamSize
+): string[] {
+  const normalized = skillNames.map((s) => s.toLowerCase().trim());
+  const hasFrontend = normalized.some((s) =>
+    [...FRONTEND_SKILLS].some((f) => s.includes(f) || f.includes(s))
+  );
+  const hasBackend = normalized.some((s) =>
+    [...BACKEND_SKILLS].some((b) => s.includes(b) || b.includes(s))
+  );
+  if (hasFrontend && !hasBackend) return ["frontend_dev"];
+  if (hasBackend && !hasFrontend) return ["backend_dev"];
+  if (hasFrontend && hasBackend) {
+    const targetSize = teamSize === "2-3" ? 3 : teamSize === "4-6" ? 5 : 7;
+    return targetSize >= 2 ? ["backend_dev", "frontend_dev"] : ["frontend_dev"];
+  }
+  return ["backend_dev"];
+}
+
+/**
+ * For Software Development single hire: return display name (Backend Developer / Frontend Developer) from skills.
+ * Export for use in create project UI.
+ */
+export function getSoftwareDevRoleDisplayName(skillNames: string[]): string {
+  if (!skillNames.length) return "Software Developer";
+  const roles = inferSoftwareDevRoles(skillNames, "2-3");
+  return ROLE_DISPLAY_NAMES[roles[0]!] ?? "Software Developer";
+}
+
 /**
  * Get team composition from selected categories and team size.
- * Distributes roles across categories with category-specific rates.
+ * For Software Development, uses selectedSkillNames to choose backend_dev vs frontend_dev.
  */
 function getTeamCompositionFromCategories(
   categories: string[],
-  teamSize: TeamSize
+  teamSize: TeamSize,
+  selectedSkillNames?: string[]
 ): Array<{ role: string; category: string; count: number }> {
   const targetSize = teamSize === "2-3" ? 3 : teamSize === "4-6" ? 5 : 7;
   const uniqueCategories = [...new Set(categories)].filter(
@@ -159,7 +206,12 @@ function getTeamCompositionFromCategories(
   );
 
   if (uniqueCategories.length === 0) {
-    return [{ role: "backend_dev", category: "Software Development", count: Math.min(targetSize, 2) }];
+    const roles =
+      selectedSkillNames?.length && selectedSkillNames.length > 0
+        ? inferSoftwareDevRoles(selectedSkillNames, teamSize)
+        : ["backend_dev"];
+    const role = roles[0];
+    return [{ role, category: "Software Development", count: Math.min(targetSize, 2) }];
   }
 
   const result: Array<{ role: string; category: string; count: number }> = [];
@@ -167,8 +219,15 @@ function getTeamCompositionFromCategories(
   if (uniqueCategories.length >= targetSize) {
     for (let i = 0; i < targetSize; i++) {
       const cat = uniqueCategories[i];
-      const roles = CATEGORY_TO_ROLES[cat] || ["backend_dev"];
-      result.push({ role: roles[0], category: cat, count: 1 });
+      let role: string;
+      if (cat === "Software Development" && selectedSkillNames?.length) {
+        const inferred = inferSoftwareDevRoles(selectedSkillNames, teamSize);
+        role = inferred[i % inferred.length] ?? inferred[0];
+      } else {
+        const roles = CATEGORY_TO_ROLES[cat] || ["backend_dev"];
+        role = roles[0];
+      }
+      result.push({ role, category: cat, count: 1 });
     }
   } else {
     for (let i = 0; i < uniqueCategories.length; i++) {
@@ -176,8 +235,15 @@ function getTeamCompositionFromCategories(
       const extra = i < targetSize % uniqueCategories.length ? 1 : 0;
       const count = baseCount + extra;
       const cat = uniqueCategories[i];
-      const roles = CATEGORY_TO_ROLES[cat] || ["backend_dev"];
-      result.push({ role: roles[0], category: cat, count });
+      let role: string;
+      if (cat === "Software Development" && selectedSkillNames?.length) {
+        const inferred = inferSoftwareDevRoles(selectedSkillNames, teamSize);
+        role = count > 1 && inferred.length > 1 ? inferred[i % inferred.length]! : inferred[0]!;
+      } else {
+        const roles = CATEGORY_TO_ROLES[cat] || ["backend_dev"];
+        role = roles[0];
+      }
+      result.push({ role, category: cat, count });
     }
   }
 
@@ -295,6 +361,7 @@ export function calculateProjectBudget(
     baseRatesByCategory,
     roleType = "full_time",
     skillsRequired = [],
+    selectedSkillNames = [],
   } = params;
 
   const rates = getRates(baseRatesByCategory, talentCategory);
@@ -317,7 +384,7 @@ export function calculateProjectBudget(
     const categories = skillsRequired.length > 0
       ? skillsRequired
       : [talentCategory || "Software Development"];
-    const composition = getTeamCompositionFromCategories(categories, teamSize);
+    const composition = getTeamCompositionFromCategories(categories, teamSize, selectedSkillNames);
 
     const teamMembers: TeamMemberBreakdown[] = composition.map(({ role, category, count }) => {
       const catRates = getRates(baseRatesByCategory, category);

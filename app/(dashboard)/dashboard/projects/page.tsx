@@ -91,12 +91,12 @@ export default function ProjectsPage() {
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
-        title={isClient ? "Hired Talents" : "Projects"}
+        title={isClient ? "Hired Talents" : "Hires"}
         icon={FolderKanban}
         description={
           isClient
             ? "Manage your hires and track their progress."
-            : "View projects you are currently working on."
+            : "View your hires and track progress."
         }
         actions={
           isClient ? (
@@ -156,11 +156,11 @@ export default function ProjectsPage() {
         <DashboardEmptyState
           icon={FolderKanban}
           iconTone="muted"
-          title={isClient ? "No hires found" : "No projects found"}
+          title={isClient ? "No hires found" : "No hires yet"}
           description={
             isClient
               ? "Get started by hiring your first talent."
-              : "No projects matched to you yet."
+              : "When a client selects you, the hire will appear here."
           }
           action={
             isClient ? (

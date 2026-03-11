@@ -299,12 +299,13 @@ export const generateMatches = action({
     );
     const activeSet = new Set(activeProjectFreelancerIds || []);
 
-    // Filter to verified freelancers and exclude those with an active project (matched or in_progress)
+    // Filter to verified freelancers (vetting + KYC approved) and exclude those with an active project
     const verifiedFreelancers = (allUsers || []).filter(
       (u: any) =>
         u.role === "freelancer" &&
         u.status === "active" &&
         u.verificationStatus === "approved" &&
+        u.kycStatus === "approved" &&
         !activeSet.has(u._id)
     );
     
@@ -454,6 +455,7 @@ export const generateTeamMatches = action({
         u.role === "freelancer" &&
         u.status === "active" &&
         u.verificationStatus === "approved" &&
+        u.kycStatus === "approved" &&
         !activeSetTeam.has(u._id)
     );
 
@@ -617,6 +619,7 @@ export const generateMatchesForDraft = action({
         u.role === "freelancer" &&
         u.status === "active" &&
         u.verificationStatus === "approved" &&
+        u.kycStatus === "approved" &&
         !activeSetDraft.has(u._id)
     );
 

@@ -49,15 +49,14 @@ export default function PaymentPage() {
 
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [txRef, setTxRef] = useState<string | null>(null);
-  const [fundUpfrontMonths, setFundUpfrontMonths] = useState<number>(0);
+  const [monthsToFund, setMonthsToFund] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
 
-  // Sync salary deposit from project when it loads (client may have selected it on edit page)
   useEffect(() => {
-    if (project?.fundUpfrontMonths !== undefined) {
-      setFundUpfrontMonths(project.fundUpfrontMonths);
+    if (project?.fundUpfrontMonths != null && project.fundUpfrontMonths >= 1) {
+      setMonthsToFund(Math.max(1, Math.floor(project.fundUpfrontMonths)));
     }
   }, [project?.fundUpfrontMonths]);
 
@@ -101,15 +100,22 @@ export default function PaymentPage() {
       setIsLoading(true);
       setError(null);
 
+      const durMonths =
+        project.intakeForm?.projectDuration === "12+"
+          ? 12
+          : Math.max(1, parseInt(project.intakeForm?.projectDuration ?? "1", 10) || 1);
+      const perMonth = project.totalAmount / durMonths;
+      const amountToPay = perMonth * monthsToFund;
+
       await updateProject({
         projectId: projectId as any,
-        fundUpfrontMonths,
+        fundUpfrontMonths: monthsToFund,
         userId: user._id,
       });
 
       const result = await createPaymentIntent({
         projectId: projectId as any,
-        amount: project.totalAmount,
+        amount: amountToPay,
         currency: project.currency || "USD",
         userId: user._id,
       });
@@ -186,15 +192,12 @@ export default function PaymentPage() {
     );
   }
 
-  const totalAmount = project.totalAmount;
-  const durMonths = project.intakeForm?.projectDuration
-    ? project.intakeForm.projectDuration === "12+"
+  const durMonths =
+    project.intakeForm?.projectDuration === "12+"
       ? 12
-      : parseInt(project.intakeForm.projectDuration, 10) || 1
-    : 1;
-  const fundUpfrontOptions = Array.from({ length: durMonths }, (_, i) => i + 1);
-  const perMonth = totalAmount / durMonths;
-  const upfrontAmount = perMonth * fundUpfrontMonths;
+      : Math.max(1, parseInt(project.intakeForm?.projectDuration ?? "1", 10) || 1);
+  const perMonth = project.totalAmount / durMonths;
+  const amountToPay = perMonth * monthsToFund;
 
   return (
     <div className="space-y-6">
@@ -233,73 +236,36 @@ export default function PaymentPage() {
             <CardTitle>Payment Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Salary Deposit</span>
-              <span>
-                {fundUpfrontMonths === 0
-                  ? "0 months — Release monthly with your approval only"
-                  : `${fundUpfrontMonths} month${fundUpfrontMonths > 1 ? "s" : ""} — ${upfrontAmount.toFixed(2)} ${project.currency.toUpperCase()} released immediately`}
-              </span>
-            </div>
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total amount to pay</span>
-              <span>
-                {totalAmount.toFixed(2)} {project.currency.toUpperCase()}
-              </span>
-            </div>
-
             <div className="space-y-2">
-              <Label>Salary Deposit</Label>
+              <Label>Months to fund</Label>
               <p className="text-sm text-muted-foreground">
-                Choose how many months of salary you would like to deposit to begin this hire.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                The deposited amount will be held securely in escrow by 49GIG. Funds will not be released immediately.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                At the end of each completed month:
-              </p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 ml-2">
-                <li>You will review the freelancer&apos;s work.</li>
-                <li>If you are satisfied, you will approve the month.</li>
-                <li>Once approved, the payment for that month will be released to the freelancer.</li>
-              </ul>
-              <p className="text-sm text-muted-foreground">
-                Your approval confirms that the freelancer has completed the expected work for that month.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                If no action is taken within the approval period, the payment may be automatically released according to platform policy.
+                You can choose the total engagement duration and fund all months upfront, or pay one month at a time. All funds are securely held in escrow by 49GIG and released to the freelancer or team monthly as salary. You pay upfront and we hold in escrow.
               </p>
               <Select
-                value={String(fundUpfrontMonths)}
-                onValueChange={(v) => setFundUpfrontMonths(parseInt(v, 10))}
+                value={String(monthsToFund)}
+                onValueChange={(v) => setMonthsToFund(parseInt(v, 10))}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select months" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">
-                    0 months — Release monthly with your approval only
-                  </SelectItem>
-                  {fundUpfrontOptions.map((n) => (
+                  {Array.from({ length: durMonths }, (_, i) => i + 1).map((n) => (
                     <SelectItem key={n} value={String(n)}>
-                      {n} month{n > 1 ? "s" : ""} — {(perMonth * n).toFixed(2)} {project.currency.toUpperCase()} released immediately
+                      {n} month{n > 1 ? "s" : ""} — {(perMonth * n).toFixed(2)} {project.currency.toUpperCase()}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {fundUpfrontMonths > 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {upfrontAmount.toFixed(2)} {project.currency.toUpperCase()} will be released to the freelancer immediately. The remaining {(totalAmount - upfrontAmount).toFixed(2)} stays in escrow.
-                </p>
-              ) : null}
             </div>
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 flex gap-3">
-              <Info className="h-5 w-5 shrink-0 text-primary mt-0.5" />
-              <p className="text-sm text-muted-foreground">
-                Note: Depositing multiple months does not release all payments at once. Funds remain in escrow and are released monthly after approval.
-              </p>
+            <div className="flex justify-between text-lg font-bold">
+              <span>Amount to pay</span>
+              <span>
+                {amountToPay.toFixed(2)} {project.currency.toUpperCase()}
+              </span>
             </div>
+            <p className="text-sm text-muted-foreground">
+              Once payment is successful, the matched freelancer(s) will see their share in their pending balance in the wallet.
+            </p>
           </CardContent>
         </Card>
       </div>
