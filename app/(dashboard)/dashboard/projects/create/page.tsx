@@ -139,11 +139,12 @@ export default function CreateProjectPage() {
   const derivedEndDate = useMemo(() => {
     if (!formData.startDate || !formData.projectDuration) return null;
     const start = parseLocalDateString(formData.startDate);
-    if (!start) return null;
-    const days = DURATION_DAYS[formData.projectDuration];
+    if (!start || isNaN(start.getTime())) return null;
+    const days = DURATION_DAYS[formData.projectDuration as ProjectDuration];
+    if (days == null || days <= 0) return null;
     const end = new Date(start);
     end.setDate(end.getDate() + days);
-    return end;
+    return isNaN(end.getTime()) ? null : end;
   }, [formData.startDate, formData.projectDuration]);
 
   const projectType = roleTypeToProjectType(formData.roleType);
@@ -259,10 +260,6 @@ export default function CreateProjectPage() {
       );
       if (!hasSkillsForAllRoles) {
         setError("Please select at least one skill for each role");
-        return;
-      }
-      if (!formData.description.trim()) {
-        setError("Role requirements / job details are required");
         return;
       }
       if (!formData.startDate) {
@@ -625,7 +622,7 @@ export default function CreateProjectPage() {
               </div>
 
               <div>
-                <Label htmlFor="description" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Role Requirements / Job Details</Label>
+                <Label htmlFor="description" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Role Requirements / Job Details (optional)</Label>
                 <Textarea
                   id="description"
                   placeholder="Describe role requirements, responsibilities, and any constraints..."
@@ -707,6 +704,12 @@ export default function CreateProjectPage() {
                     Select roles above to see the estimated price. Base rates vary by role.
                   </p>
                 </div>
+              ) : !formData.startDate || !formData.projectDuration ? (
+                <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5">
+                  <p className="text-sm text-muted-foreground">
+                    Select a start date and duration above to see your estimated budget.
+                  </p>
+                </div>
               ) : budgetCalculation ? (
                 <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -741,7 +744,11 @@ export default function CreateProjectPage() {
                     {formData.projectDuration === "12+" && "5% discount applied for 12+ month commitment."}
                   </p>
                 </div>
-              ) : null}
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-200">
+                  Unable to calculate budget. Please ensure you have selected a valid start date and duration, then try again.
+                </div>
+              )}
             </div>
           )}
 
@@ -818,8 +825,8 @@ export default function CreateProjectPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                    Unable to calculate budget. Please check your project dates.
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-200">
+                    Unable to calculate budget. Please ensure you have selected a valid start date and duration, then try again.
                   </div>
                 )}
               </div>
