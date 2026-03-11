@@ -149,6 +149,9 @@ export default function CreateProjectPage() {
 
   const projectType = roleTypeToProjectType(formData.roleType);
 
+  // Must be declared before budgetCalculation useMemo to avoid TDZ ReferenceError
+  const allRequiredSkills = Object.values(formData.roleSkills).flat();
+
   // Calculate budget based on form data
   const budgetCalculation = useMemo(() => {
     if (
@@ -189,7 +192,8 @@ export default function CreateProjectPage() {
       const discountedBudget = Math.round(calc.estimatedBudget * discount);
       if (!Number.isFinite(discountedBudget) || discountedBudget <= 0) return null;
       return { ...calc, estimatedBudget: discountedBudget };
-    } catch {
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") console.error("[budgetCalculation]", err);
       return null;
     }
   }, [
@@ -235,8 +239,6 @@ export default function CreateProjectPage() {
       roleSkills: { ...formData.roleSkills, [roleId]: updated },
     });
   };
-
-  const allRequiredSkills = Object.values(formData.roleSkills).flat();
 
   const handleNext = () => {
     setError(null);
