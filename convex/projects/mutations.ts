@@ -1183,3 +1183,46 @@ export const updateProjectStatusInternal = internalMutation({
   },
 });
 
+/**
+ * Mark that we sent a "please fund next month" reminder (throttles repeat reminders).
+ */
+export const markPaymentReminderSentInternal = internalMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      paymentReminderSentAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+/**
+ * Cancel project for non-payment after grace period.
+ */
+export const cancelProjectForNonPaymentInternal = internalMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return;
+    if (project.status !== "in_progress") return;
+
+    const now = Date.now();
+    await ctx.db.patch(args.projectId, {
+      status: "cancelled",
+      updatedAt: now,
+      completedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "project_cancelled_non_payment",
+      actionType: "admin",
+      actorId: project.clientId,
+      actorRole: "system",
+      targetType: "project",
+      targetId: args.projectId,
+      details: { reason: "Client did not fund next month(s) within grace period" },
+      createdAt: now,
+    });
+  },
+});
+

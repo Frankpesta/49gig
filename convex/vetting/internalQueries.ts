@@ -104,7 +104,8 @@ export const getFreelancerVerificationStatusByUserId = internalQuery({
       .first();
     const isFullyVetted =
       user.verificationStatus === "approved" &&
-      (vettingResult?.status ?? null) === "approved";
+      (vettingResult?.status ?? null) === "approved" &&
+      user.kycStatus === "approved";
     return {
       isFullyVetted,
       verificationStatus: user.verificationStatus ?? null,

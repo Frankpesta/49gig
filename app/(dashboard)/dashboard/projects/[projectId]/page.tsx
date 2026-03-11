@@ -397,6 +397,14 @@ export default function ProjectDetailPage() {
                 </Link>
               </Button>
             )}
+            {(project.status === "in_progress" || project.status === "cancelled") && (
+              <Button variant={project.status === "cancelled" ? "default" : "outline"} asChild>
+                <Link href={`/dashboard/projects/${project._id}/add-payment`}>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  {project.status === "cancelled" ? "Reactivate by adding payment" : "Add payment"}
+                </Link>
+              </Button>
+            )}
             {project.status === "in_progress" && (
               <>
                 <Button
@@ -536,7 +544,7 @@ export default function ProjectDetailPage() {
                     return (
                       <p className="text-sm text-muted-foreground">
                         {approvedCount} of {totalCount} month{totalCount !== 1 ? "s" : ""} released
-                        {isClient && project?.fundUpfrontMonths ? ` (${project.fundUpfrontMonths} upfront)` : ""}
+                        {isClient && project?.fundUpfrontMonths ? ` (${project.fundUpfrontMonths} month${project.fundUpfrontMonths > 1 ? "s" : ""} funded)` : ""}
                       </p>
                     );
                   })()}

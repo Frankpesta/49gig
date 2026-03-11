@@ -24,6 +24,8 @@ interface PageHeroProps {
   rightContent?: ReactNode;
   imageSrc?: string;
   imageAlt?: string;
+  /** Set to true for external storage URLs (e.g. Convex) not in next.config images */
+  imageUnoptimized?: boolean;
   /** CTA buttons below description */
   actions?: ReactNode;
   className?: string;
@@ -37,6 +39,7 @@ export function PageHero({
   rightContent,
   imageSrc,
   imageAlt,
+  imageUnoptimized,
   actions,
   className,
 }: PageHeroProps) {
@@ -55,6 +58,7 @@ export function PageHero({
           className="object-cover"
           sizes="100vw"
           priority
+          unoptimized={imageUnoptimized}
         />
       ) : (
         <div className="absolute inset-0 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900" />

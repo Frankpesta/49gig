@@ -84,7 +84,7 @@ export function ProjectAnalyticsCard({
                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                 <Tooltip
                   contentStyle={{ borderRadius: 8, border: "1px solid var(--border)" }}
-                  formatter={(value: number | undefined) => [`${value ?? 0} ${isClient ? "hires" : "projects"}`, "Activity"]}
+                  formatter={(value: number | undefined) => [`${value ?? 0} hires`, "Activity"]}
                 />
                 <Bar
                   dataKey="count"
@@ -113,7 +113,7 @@ export function ProjectListCard({
   isClient?: boolean;
 }) {
   const displayProjects = (projects ?? []).slice(0, 5);
-  const title = isClient ? "Hires" : "Projects";
+  const title = "Hires";
 
   return (
     <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
@@ -136,7 +136,7 @@ export function ProjectListCard({
             ))}
           </div>
         ) : displayProjects.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">{isClient ? "No hires yet" : "No projects yet"}</p>
+          <p className="text-sm text-muted-foreground py-4">No hires yet</p>
         ) : (
           <ul className="space-y-2">
             {displayProjects.map((project, i) => {

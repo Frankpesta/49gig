@@ -153,6 +153,103 @@ export const createPaymentIntent = action({
 });
 
 /**
+ * Create a Flutterwave payment for adding funds (top-up) to an in-progress or cancelled project.
+ * Fee is taken from client payment before escrow (same as initial funding). Supports all Flutterwave currencies.
+ */
+export const createTopUpPaymentIntent = action({
+  args: {
+    projectId: v.id("projects"),
+    monthsToFund: v.number(), // Number of months to pay for (must be >= 1)
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args): Promise<{ paymentLink: string; paymentId: string; txRef: string }> => {
+    const user = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
+      userId: args.userId,
+    });
+    if (!user || user.role !== "client") {
+      throw new Error("Only clients can add payment for a project");
+    }
+
+    const project = await ctx.runQuery(internalAny.payments.queries.getProject, {
+      projectId: args.projectId,
+      userId: args.userId,
+    });
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    if (project.clientId !== user._id) {
+      throw new Error("Not authorized to pay for this project");
+    }
+    if (project.status !== "in_progress" && project.status !== "cancelled") {
+      throw new Error("Add payment is only available for active hires or ended hires you can reactivate");
+    }
+
+    const monthsToFund = Math.max(1, Math.floor(args.monthsToFund));
+    const durationMonths =
+      project.intakeForm?.projectDuration === "12+"
+        ? 12
+        : Math.max(1, parseInt(project.intakeForm?.projectDuration ?? "1", 10) || 1);
+    const perMonth = project.totalAmount / durationMonths;
+    const amount = perMonth * monthsToFund;
+    if (amount <= 0 || !Number.isFinite(amount)) {
+      throw new Error("Invalid amount for selected months");
+    }
+
+    const currency = (project.currency || "USD").toUpperCase();
+    const baseUrl =
+      process.env.FRONTEND_URL ||
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      "https://your-site.com";
+    const redirectUrl = `${baseUrl}/dashboard/projects/${args.projectId}/payment/callback?type=top_up`;
+    const txRef = `49gig-topup-${args.projectId}-${Date.now()}`;
+
+    const paymentData = await flutterwave.initializePayment({
+      tx_ref: txRef,
+      amount,
+      currency,
+      redirect_url: redirectUrl,
+      customer: { email: user.email, name: user.name },
+      customizations: {
+        title: "49GIG Add Payment",
+        description: `Add ${monthsToFund} month(s) for: ${project.intakeForm?.title ?? "Hire"}`,
+      },
+      meta: {
+        projectId: args.projectId,
+        userId: args.userId,
+        type: "top_up",
+        monthsToFund: String(monthsToFund),
+      },
+    });
+
+    const platformFee =
+      project.platformFee ??
+      (await ctx.runQuery(internalAny.platformSettings.queries.getPlatformFeePercentageInternal, {}));
+    const platformFeeAmount = (amount * platformFee) / 100;
+    const netAmount = amount - platformFeeAmount;
+
+    const paymentId = await ctx.runMutation(internalAny.payments.mutations.createPayment, {
+      projectId: args.projectId,
+      type: "top_up",
+      topUpMonths: monthsToFund,
+      amount,
+      currency: project.currency || "usd",
+      platformFee: platformFeeAmount,
+      netAmount,
+      flutterwaveTransactionId: txRef,
+      flutterwaveCustomerEmail: user.email,
+      userId: args.userId,
+      status: "pending",
+    });
+
+    return {
+      paymentLink: paymentData.data.link,
+      paymentId,
+      txRef,
+    };
+  },
+});
+
+/**
  * Verify a Flutterwave payment transaction
  * Called after user returns from Flutterwave payment page
  */

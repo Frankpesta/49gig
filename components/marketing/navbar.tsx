@@ -40,6 +40,7 @@ const navLinks: NavLink[] = [
     label: "Resources",
     href: "/use-cases",
     children: [
+      { label: "Blog", href: "/blog" },
       { label: "Use Cases", href: "/use-cases" },
       { label: "Contact Us", href: "/contact" },
     ],

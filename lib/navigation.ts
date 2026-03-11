@@ -23,6 +23,8 @@ import {
   Mail,
   Wallet,
   CalendarCheck,
+  BookOpen,
+  ShieldCheck,
 } from "lucide-react";
 import type { UserRole } from "@/stores/authStore";
 
@@ -38,6 +40,8 @@ export interface NavItem {
   section?: NavSection; // "menu" = main nav, "general" = settings/help
   /** Override title for client role (e.g. "Projects" → "Hires") */
   clientTitle?: string;
+  /** Override title for freelancer role (e.g. "Projects" → "Hires") */
+  freelancerTitle?: string;
 }
 
 export const navigationItems: NavItem[] = [
@@ -50,10 +54,11 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Projects / Hires Section (client sees "Hires", freelancer sees "Projects")
+  // Projects / Hires Section (client and freelancer see "Hires")
   {
     title: "Projects",
     clientTitle: "Hires",
+    freelancerTitle: "Hires",
     url: "/dashboard/projects",
     icon: FolderKanban,
     section: "menu",
@@ -62,6 +67,7 @@ export const navigationItems: NavItem[] = [
       {
         title: "All Projects",
         clientTitle: "Hired Talents",
+        freelancerTitle: "Hires",
         url: "/dashboard/projects",
         icon: FolderKanban,
       },
@@ -161,6 +167,24 @@ export const navigationItems: NavItem[] = [
     roles: ["admin", "moderator"],
   },
 
+  // Admin & Moderator: Blog
+  {
+    title: "Blog",
+    url: "/dashboard/blog",
+    icon: BookOpen,
+    section: "menu",
+    roles: ["admin", "moderator"],
+  },
+
+  // Admin & Moderator: KYC Review
+  {
+    title: "KYC Review",
+    url: "/dashboard/kyc-review",
+    icon: ShieldCheck,
+    section: "menu",
+    roles: ["admin", "moderator"],
+  },
+
   // Admin & Moderator: Contact Enquiries
   {
     title: "Enquiries",
@@ -239,6 +263,7 @@ export const navigationItems: NavItem[] = [
  */
 export function getNavItemTitle(item: NavItem, role: UserRole): string {
   if (role === "client" && item.clientTitle) return item.clientTitle;
+  if (role === "freelancer" && item.freelancerTitle) return item.freelancerTitle;
   return item.title;
 }
 

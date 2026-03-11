@@ -24,6 +24,7 @@ export default function PaymentCallbackPage() {
   const projectId = params.projectId as string;
   const txRef = searchParams.get("tx_ref") ?? searchParams.get("transaction_id");
   const status = searchParams.get("status");
+  const isTopUp = searchParams.get("type") === "top_up";
 
   const verifyPayment = useAction(
     (api as any)["payments/actions"].verifyPayment
@@ -37,6 +38,7 @@ export default function PaymentCallbackPage() {
 
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [verificationSuccess, setVerificationSuccess] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
 
   // Verify payment when component mounts
@@ -54,7 +56,7 @@ export default function PaymentCallbackPage() {
             txRef,
             projectId: projectId as any,
           });
-          // Verification successful - payment status query will update
+          setVerificationSuccess(true);
         } catch (err) {
           setVerificationError(
             getUserFriendlyError(err) || "Payment verification failed"
@@ -71,9 +73,10 @@ export default function PaymentCallbackPage() {
     }
   }, [txRef, status, user, projectId, verifyPayment, router]);
 
-  // Redirect after successful payment
+  // Redirect after successful payment (for initial fund, isFunded becomes true; for top-up, verificationSuccess)
   useEffect(() => {
-    if (paymentStatus?.isFunded && !isVerifying && !verificationError) {
+    const success = isTopUp ? verificationSuccess && !verificationError : paymentStatus?.isFunded && !isVerifying && !verificationError;
+    if (success) {
       const timer = setTimeout(() => {
         setRedirecting(true);
         router.push(`/dashboard/projects/${projectId}`);
@@ -81,14 +84,14 @@ export default function PaymentCallbackPage() {
 
       return () => clearTimeout(timer);
     }
-  }, [paymentStatus?.isFunded, isVerifying, verificationError, projectId, router]);
+  }, [isTopUp, verificationSuccess, paymentStatus?.isFunded, isVerifying, verificationError, projectId, router]);
 
   if (!user) {
     return null;
   }
 
   const isSuccessStatus = status === "successful" || status === "succeeded";
-  const isSuccess = isSuccessStatus && paymentStatus?.isFunded;
+  const isSuccess = isTopUp ? isSuccessStatus && verificationSuccess && !verificationError : isSuccessStatus && paymentStatus?.isFunded;
   const isCancelled = status === "cancelled";
   const isPending = isSuccessStatus && !paymentStatus?.isFunded && !verificationError;
 
@@ -103,7 +106,9 @@ export default function PaymentCallbackPage() {
               </div>
               <CardTitle className="text-2xl">Payment Successful!</CardTitle>
               <CardDescription>
-                Your hire has been funded and is ready for matching.
+                {isTopUp
+                  ? "Your payment was received. The hire has been updated."
+                  : "Your hire has been funded and is ready for matching."}
               </CardDescription>
             </>
           ) : isCancelled ? (
@@ -161,7 +166,7 @@ export default function PaymentCallbackPage() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => router.push(`/dashboard/projects/${projectId}/payment`)}
+                  onClick={() => router.push(isTopUp ? `/dashboard/projects/${projectId}/add-payment` : `/dashboard/projects/${projectId}/payment`)}
                   className="flex-1"
                 >
                   Try Again
@@ -188,7 +193,7 @@ export default function PaymentCallbackPage() {
                   Back to Hire
                 </Button>
                 <Button
-                  onClick={() => router.push(`/dashboard/projects/${projectId}/payment`)}
+                  onClick={() => router.push(isTopUp ? `/dashboard/projects/${projectId}/add-payment` : `/dashboard/projects/${projectId}/payment`)}
                   className="flex-1"
                 >
                   Try Again

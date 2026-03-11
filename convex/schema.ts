@@ -136,6 +136,18 @@ export default defineSchema({
     ),
     verificationCompletedAt: v.optional(v.number()),
 
+    // KYC (freelancers): required for matching; approved = can be matched
+    kycStatus: v.optional(
+      v.union(
+        v.literal("not_submitted"),
+        v.literal("pending_review"),
+        v.literal("approved"),
+        v.literal("id_rejected"),
+        v.literal("address_rejected")
+      )
+    ),
+    kycApprovedAt: v.optional(v.number()),
+
     // Flutterwave
     flutterwaveCustomerEmail: v.optional(v.string()), // Flutterwave uses email as customer identifier
     flutterwaveSubaccountId: v.optional(v.string()), // Freelancer's Flutterwave Subaccount ID
@@ -151,7 +163,44 @@ export default defineSchema({
     .index("by_role", ["role"])
     .index("by_status", ["status"])
     .index("by_verification_status", ["verificationStatus"])
-    .index("by_resume_status", ["resumeStatus"]),
+    .index("by_resume_status", ["resumeStatus"])
+    .index("by_kyc_status", ["kycStatus"]),
+
+  // KYC submissions: one per freelancer; resubmit overwrites documents
+  kycSubmissions: defineTable({
+    freelancerId: v.id("users"),
+    idType: v.union(
+      v.literal("nin"),
+      v.literal("international_passport"),
+      v.literal("other")
+    ),
+    idOtherLabel: v.optional(v.string()),
+    idFrontFileId: v.id("_storage"),
+    idBackFileId: v.id("_storage"),
+    addressDocFileId: v.id("_storage"),
+    addressDocType: v.union(
+      v.literal("utility_bill"),
+      v.literal("bank_statement"),
+      v.literal("tenancy_agreement")
+    ),
+    status: v.union(
+      v.literal("pending_review"),
+      v.literal("approved"),
+      v.literal("id_rejected"),
+      v.literal("address_rejected")
+    ),
+    idRejectionCount: v.number(),
+    addressRejectionCount: v.number(),
+    idRejectionReason: v.optional(v.string()),
+    addressRejectionReason: v.optional(v.string()),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    submittedAt: v.number(),
+    updatedAt: v.number(),
+    documentsDeletedAt: v.optional(v.number()), // Set when storage files are deleted after 12 months
+  })
+    .index("by_freelancer", ["freelancerId"])
+    .index("by_status", ["status"]),
 
   emailVerificationTokens: defineTable({
     userId: v.id("users"),
@@ -304,7 +353,12 @@ export default defineSchema({
     escrowedAmount: v.number(),
     platformFee: v.number(), // Percentage (e.g., 10)
     currency: v.string(), // "usd"
-    fundUpfrontMonths: v.optional(v.number()), // Months to release immediately after funding (1..duration)
+    fundUpfrontMonths: v.optional(v.number()), // Months funded with (initial or latest) payment; must be >= 1
+
+    // Tracking for follow-up payments: last month index that has been paid for (1-based)
+    lastFundedMonthIndex: v.optional(v.number()),
+    // When we last sent a "please pay for next month" reminder (timestamp)
+    paymentReminderSentAt: v.optional(v.number()),
 
     // Team budget: role → monthly amount in cents per person (for role-based payment split)
     teamBudgetBreakdown: v.optional(v.record(v.string(), v.number())),
@@ -862,12 +916,16 @@ export default defineSchema({
     // Type
     type: v.union(
       v.literal("pre_funding"),
+      v.literal("top_up"), // Follow-up payment for next month(s); fee before escrow
       v.literal("milestone_release"), // Legacy
       v.literal("monthly_release"), // New: approval → wallet
       v.literal("refund"),
       v.literal("platform_fee"),
       v.literal("payout") // Withdrawal from wallet to bank
     ),
+
+    // Top-up: number of months this payment funds (1-based)
+    topUpMonths: v.optional(v.number()),
 
     // Amount
     amount: v.number(),
@@ -1084,6 +1142,48 @@ export default defineSchema({
   })
     .index("by_prompt_key", ["promptKey"])
     .index("by_category_language_level", ["categoryId", "language", "experienceLevel"]),
+
+  // --- Blog (marketing) ---
+  blogPosts: defineTable({
+    title: v.string(),
+    slug: v.string(), // unique URL slug
+    excerpt: v.string(), // short summary for cards/SEO
+    content: v.string(), // TipTap JSON as string
+    bannerImageId: v.optional(v.id("_storage")),
+    authorId: v.id("users"),
+    status: v.union(v.literal("draft"), v.literal("published")),
+    publishedAt: v.optional(v.number()),
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_status", ["status"])
+    .index("by_published", ["status", "publishedAt"])
+    .index("by_author", ["authorId"])
+    .index("by_created", ["createdAt"]),
+
+  blogComments: defineTable({
+    postId: v.id("blogPosts"),
+    parentId: v.optional(v.id("blogComments")), // null = top-level
+    authorId: v.optional(v.id("users")), // null = anonymous
+    authorName: v.optional(v.string()), // for anonymous
+    authorEmail: v.optional(v.string()), // for anonymous (optional)
+    content: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_post", ["postId", "createdAt"])
+    .index("by_parent", ["parentId", "createdAt"]),
+
+  blogPostLikes: defineTable({
+    postId: v.id("blogPosts"),
+    userId: v.id("users"), // only logged-in users can like (tracked)
+    createdAt: v.number(),
+  })
+    .index("by_post", ["postId"])
+    .index("by_post_user", ["postId", "userId"]),
 
   // Active skill test session (path-based: coding+mcq, portfolio+mcq, or mcq-only)
   vettingSkillTestSessions: defineTable({

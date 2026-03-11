@@ -40,12 +40,14 @@ export const createPayment = internalMutation({
     projectId: v.optional(v.id("projects")),
     type: v.union(
       v.literal("pre_funding"),
+      v.literal("top_up"),
       v.literal("milestone_release"),
       v.literal("monthly_release"),
       v.literal("refund"),
       v.literal("platform_fee"),
       v.literal("payout")
     ),
+    topUpMonths: v.optional(v.number()),
     amount: v.number(),
     currency: v.string(),
     platformFee: v.optional(v.number()),
@@ -128,6 +130,7 @@ export const createPayment = internalMutation({
       flutterwaveTransferId: args.flutterwaveTransferId,
       flutterwaveCustomerEmail: args.flutterwaveCustomerEmail,
       flutterwaveSubaccountId: args.flutterwaveSubaccountId,
+      topUpMonths: args.topUpMonths,
       status: args.status || "pending",
       webhookReceived: false,
       createdAt: now,
@@ -293,12 +296,13 @@ export const handlePaymentSuccess = internalMutation({
       : null;
     const clientId = project?.clientId;
 
-    // Update project based on payment type
+    // Update project based on payment type (fee already taken; netAmount goes to escrow)
     if (payment.type === "pre_funding" && project && projectId) {
-      // Update project to funded status
+      const monthsFunded = Math.max(1, project.fundUpfrontMonths ?? 1);
       await ctx.db.patch(projectId, {
         status: "funded",
-        escrowedAmount: payment.amount,
+        escrowedAmount: payment.netAmount,
+        lastFundedMonthIndex: monthsFunded,
         updatedAt: now,
       });
 
@@ -312,13 +316,48 @@ export const handlePaymentSuccess = internalMutation({
         await ctx.db.insert("auditLogs", {
           action: "project_funded",
           actionType: "admin",
-          actorId: clientId, // Use project owner as actor for system events
+          actorId: clientId,
           actorRole: "system",
           targetType: "project",
           targetId: projectId,
           details: {
             paymentId: payment._id,
             amount: payment.amount,
+            netAmount: payment.netAmount,
+          },
+          createdAt: now,
+        });
+      }
+    }
+
+    if (payment.type === "top_up" && project && projectId) {
+      const monthsToAdd = Math.max(1, payment.topUpMonths ?? 1);
+      const newLastFunded = (project.lastFundedMonthIndex ?? 0) + monthsToAdd;
+      const newEscrow = (project.escrowedAmount ?? 0) + payment.netAmount;
+      const patch: Record<string, unknown> = {
+        escrowedAmount: newEscrow,
+        lastFundedMonthIndex: newLastFunded,
+        updatedAt: now,
+      };
+      if (project.status === "cancelled") {
+        patch.status = "in_progress";
+        patch.paymentReminderSentAt = undefined;
+      }
+      await ctx.db.patch(projectId, patch);
+
+      if (clientId) {
+        await ctx.db.insert("auditLogs", {
+          action: "project_top_up",
+          actionType: "admin",
+          actorId: clientId,
+          actorRole: "system",
+          targetType: "project",
+          targetId: projectId,
+          details: {
+            paymentId: payment._id,
+            monthsAdded: monthsToAdd,
+            netAmount: payment.netAmount,
+            reactivated: project.status === "cancelled",
           },
           createdAt: now,
         });
@@ -344,10 +383,20 @@ export const handlePaymentSuccess = internalMutation({
 
     if (project) {
       const amountLabel = `${payment.amount} ${payment.currency}`;
+      const title =
+        payment.type === "top_up" && project.status === "cancelled"
+          ? "Payment received — hire reactivated"
+          : "Payment received";
+      const message =
+        payment.type === "top_up"
+          ? project.status === "cancelled"
+            ? `We received ${amountLabel}. Your hire "${project.intakeForm.title}" has been reactivated.`
+            : `We received ${amountLabel} for the next month(s) of ${project.intakeForm.title}.`
+          : `We received ${amountLabel} for ${project.intakeForm.title}.`;
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
         userIds: [project.clientId],
-        title: "Payment received",
-        message: `We received ${amountLabel} for ${project.intakeForm.title}.`,
+        title,
+        message,
         type: "payment",
         data: { paymentId: payment._id, projectId },
       });

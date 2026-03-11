@@ -31,6 +31,7 @@ const footerSections = [
     key: "resources",
     title: "Resources",
     links: [
+      { label: "Blog", href: "/blog" },
       { label: "Help Center", href: "/contact" },
       { label: "Contact Us", href: "/contact" },
       { label: "About 49GIG", href: "/about" },

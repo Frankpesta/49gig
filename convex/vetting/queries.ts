@@ -46,10 +46,17 @@ export const getVerificationStatus = query({
       .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
       .first();
 
+    const kycSubmission = await ctx.db
+      .query("kycSubmissions")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .first();
+
     return {
       userId: user._id,
       verificationStatus: user.verificationStatus || "not_started",
       verificationCompletedAt: user.verificationCompletedAt,
+      kycStatus: user.kycStatus ?? "not_submitted",
+      kycApprovedAt: user.kycApprovedAt,
       vettingResult: vettingResult
         ? {
             status: vettingResult.status,
@@ -59,6 +66,15 @@ export const getVerificationStatus = query({
             englishProficiency: vettingResult.englishProficiency,
             skillAssessments: vettingResult.skillAssessments,
             fraudFlags: vettingResult.fraudFlags,
+          }
+        : null,
+      kycSubmission: kycSubmission
+        ? {
+            status: kycSubmission.status,
+            idType: kycSubmission.idType,
+            addressDocType: kycSubmission.addressDocType,
+            idRejectionCount: kycSubmission.idRejectionCount,
+            addressRejectionCount: kycSubmission.addressRejectionCount,
           }
         : null,
     };
@@ -241,6 +257,15 @@ export const isFreelancerVerified = query({
         verified: false,
         reason: "vetting_not_approved",
         status: vettingResult?.status || "not_found",
+      };
+    }
+
+    // KYC must also be approved for matching
+    if (targetUser.kycStatus !== "approved") {
+      return {
+        verified: false,
+        reason: "kyc_not_approved",
+        status: targetUser.kycStatus || "not_submitted",
       };
     }
 

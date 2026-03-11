@@ -486,3 +486,67 @@ export const getUnfundedProjectsForReminderInternal = internalQuery({
     );
   },
 });
+
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Get in-progress projects where paid duration is nearing or past and client needs to fund next month(s).
+ * Used by cron: send reminders and optionally terminate after grace period.
+ */
+export const getProjectsNeedingPaymentFollowUpInternal = internalQuery({
+  args: {
+    now: v.number(),
+    graceDays: v.number(),
+    reminderThrottleDays: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_status", (q) => q.eq("status", "in_progress"))
+      .collect();
+
+    const startDate = (p: Doc<"projects">) => p.intakeForm?.startDate ?? 0;
+    const result: Array<{
+      projectId: Doc<"projects">["_id"];
+      clientId: Doc<"users">["_id"];
+      title: string;
+      lastFundedMonthIndex: number;
+      currentMonthIndex: number;
+      endOfLastFundedMonthMs: number;
+      sendReminder: boolean;
+      shouldTerminate: boolean;
+    }> = [];
+
+    for (const p of projects) {
+      const lastFunded = p.lastFundedMonthIndex;
+      if (lastFunded == null || lastFunded < 1) continue;
+      const start = startDate(p);
+      if (!start || !Number.isFinite(start)) continue;
+
+      const elapsed = args.now - start;
+      const currentMonthIndex = Math.floor(elapsed / MONTH_MS) + 1;
+      if (currentMonthIndex <= lastFunded) continue;
+
+      const endOfLastFundedMonthMs = start + lastFunded * MONTH_MS;
+      const graceEndMs = endOfLastFundedMonthMs + args.graceDays * 24 * 60 * 60 * 1000;
+      const shouldTerminate = args.now >= graceEndMs;
+
+      const reminderThrottleMs = args.reminderThrottleDays * 24 * 60 * 60 * 1000;
+      const lastReminder = p.paymentReminderSentAt ?? 0;
+      const sendReminder = !shouldTerminate && (args.now - lastReminder >= reminderThrottleMs);
+
+      result.push({
+        projectId: p._id,
+        clientId: p.clientId,
+        title: p.intakeForm?.title ?? "Project",
+        lastFundedMonthIndex: lastFunded,
+        currentMonthIndex,
+        endOfLastFundedMonthMs,
+        sendReminder,
+        shouldTerminate,
+      });
+    }
+
+    return result;
+  },
+});
