@@ -48,6 +48,7 @@ import type * as kyc_actions from "../kyc/actions.js";
 import type * as kyc_mutations from "../kyc/mutations.js";
 import type * as kyc_queries from "../kyc/queries.js";
 import type * as matching_actions from "../matching/actions.js";
+import type * as matching_autoAssign from "../matching/autoAssign.js";
 import type * as matching_mutations from "../matching/mutations.js";
 import type * as matching_queries from "../matching/queries.js";
 import type * as matching_teamMatching from "../matching/teamMatching.js";
@@ -144,6 +145,7 @@ declare const fullApi: ApiFromModules<{
   "kyc/mutations": typeof kyc_mutations;
   "kyc/queries": typeof kyc_queries;
   "matching/actions": typeof matching_actions;
+  "matching/autoAssign": typeof matching_autoAssign;
   "matching/mutations": typeof matching_mutations;
   "matching/queries": typeof matching_queries;
   "matching/teamMatching": typeof matching_teamMatching;

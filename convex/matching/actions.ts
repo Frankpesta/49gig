@@ -321,6 +321,11 @@ export const generateMatches = action({
     );
 
     if (approvedFreelancers.length === 0) {
+      // No verified freelancers at all — queue the project for auto-assignment
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: true,
+      });
       return [];
     }
 
@@ -396,6 +401,20 @@ export const generateMatches = action({
       matchIds.push(matchId);
     }
 
+    // If we found matches now but project was previously awaiting, clear the flag
+    if (matchIds.length > 0) {
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: false,
+      });
+    } else {
+      // Freelancers exist but none scored well enough — still queue for retry
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: true,
+      });
+    }
+
     return matchIds;
   },
 });
@@ -460,6 +479,10 @@ export const generateTeamMatches = action({
     );
 
     if (verifiedFreelancers.length === 0) {
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: true,
+      });
       return [];
     }
 
@@ -569,6 +592,18 @@ export const generateTeamMatches = action({
       );
 
       matchIds.push(matchId);
+    }
+
+    if (matchIds.length > 0) {
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: false,
+      });
+    } else {
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: true,
+      });
     }
 
     return {

@@ -316,3 +316,24 @@ export const rejectMatch = mutation({
   },
 });
 
+/**
+ * Internal: mark a project as awaiting auto-assignment (or clear the flag).
+ * Called by generateMatches when no suitable freelancers are found.
+ */
+export const setProjectAwaitingMatch = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    awaiting: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return;
+    await ctx.db.patch(args.projectId, {
+      awaitingMatch: args.awaiting || undefined,
+      awaitingMatchSince: args.awaiting ? (project.awaitingMatchSince ?? now) : undefined,
+      updatedAt: now,
+    });
+  },
+});
+

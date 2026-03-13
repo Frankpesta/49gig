@@ -508,30 +508,25 @@ export default function ProjectDetailPage() {
                 {isClient && (
                   <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
                     <div className="font-medium text-foreground mb-2">Expected hours per engagement</div>
-                    <div className="grid gap-2 sm:grid-cols-2 text-muted-foreground">
-                      <div>
-                        <span className="font-medium text-foreground">Part-Time</span>
-                        <ul className="mt-0.5 list-disc list-inside space-y-0.5">
-                          <li>20 hours per week</li>
-                          <li>~80 hours per month</li>
-                        </ul>
-                      </div>
-                      <div>
-                        <span className="font-medium text-foreground">Full-Time</span>
-                        <ul className="mt-0.5 list-disc list-inside space-y-0.5">
-                          <li>40 hours per week</li>
-                          <li>~160 hours per month</li>
-                        </ul>
-                      </div>
+                    <div className="text-muted-foreground">
+                      {(project.intakeForm.roleType ?? "full_time") === "full_time" ? (
+                        <>
+                          <span className="font-medium text-foreground">Full-Time</span>
+                          <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+                            <li>40 hours per week</li>
+                            <li>~160 hours per month</li>
+                          </ul>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-medium text-foreground">Part-Time</span>
+                          <ul className="mt-0.5 list-disc list-inside space-y-0.5">
+                            <li>20 hours per week</li>
+                            <li>~80 hours per month</li>
+                          </ul>
+                        </>
+                      )}
                     </div>
-                    {project.intakeForm.roleType && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        This project: <span className="font-medium text-foreground">
-                          {project.intakeForm.roleType === "full_time" ? "Full-Time" : "Part-Time"}
-                        </span>
-                        {" "}({project.intakeForm.roleType === "full_time" ? "40 hrs/week, ~160 hrs/month" : "20 hrs/week, ~80 hrs/month"})
-                      </p>
-                    )}
                   </div>
                 )}
               </CardHeader>

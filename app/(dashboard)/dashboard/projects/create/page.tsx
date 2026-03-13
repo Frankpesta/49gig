@@ -40,6 +40,9 @@ import {
   PLATFORM_ROLES,
   getSkillsForRole,
   getCategoryLabelForRole,
+  SOFTWARE_DEV_FIELDS,
+  getSoftwareDevFieldSkills,
+  getSoftwareDevFieldLabel,
 } from "@/lib/platform-skills";
 import { toast } from "sonner";
 
@@ -126,6 +129,7 @@ export default function CreateProjectPage() {
     title: "",
     selectedRoles: [] as string[], // Role ids (e.g. software_development)
     roleSkills: {} as Record<string, string[]>, // roleId -> selected skills
+    softwareDevFields: [] as string[],           // selected sub-fields when software_dev is chosen
     roleType: "full_time" as RoleType,
     description: "",
     projectDuration: "3" as ProjectDuration,
@@ -216,17 +220,44 @@ export default function CreateProjectPage() {
       const newRoles = formData.selectedRoles.filter((r) => r !== roleId);
       const newRoleSkills = { ...formData.roleSkills };
       delete newRoleSkills[roleId];
-      setFormData({ ...formData, selectedRoles: newRoles, roleSkills: newRoleSkills });
+      setFormData({
+        ...formData,
+        selectedRoles: newRoles,
+        roleSkills: newRoleSkills,
+        softwareDevFields: roleId === "software_development" ? [] : formData.softwareDevFields,
+      });
     } else {
       if (isSingle && formData.selectedRoles.length >= 1) {
         const prevRole = formData.selectedRoles[0];
         const newRoleSkills = { ...formData.roleSkills };
         delete newRoleSkills[prevRole];
-        setFormData({ ...formData, selectedRoles: [roleId], roleSkills: newRoleSkills });
+        setFormData({
+          ...formData,
+          selectedRoles: [roleId],
+          roleSkills: newRoleSkills,
+          softwareDevFields: roleId === "software_development" ? formData.softwareDevFields : [],
+        });
       } else {
         setFormData({ ...formData, selectedRoles: [...formData.selectedRoles, roleId] });
       }
     }
+  };
+
+  const toggleSoftwareDevField = (fieldId: string) => {
+    const isSingle = formData.hireType === "single";
+    const alreadySelected = formData.softwareDevFields.includes(fieldId);
+    let newFields: string[];
+    if (alreadySelected) {
+      newFields = formData.softwareDevFields.filter((f) => f !== fieldId);
+    } else if (isSingle) {
+      // Single hire: only one sub-field at a time
+      newFields = [fieldId];
+    } else {
+      newFields = [...formData.softwareDevFields, fieldId];
+    }
+    // When sub-fields change, reset skills for software_development so stale skills are cleared
+    const newRoleSkills = { ...formData.roleSkills, software_development: [] };
+    setFormData({ ...formData, softwareDevFields: newFields, roleSkills: newRoleSkills });
   };
 
   const toggleRoleSkill = (roleId: string, skill: string) => {
@@ -261,6 +292,11 @@ export default function CreateProjectPage() {
       }
       if (formData.selectedRoles.length === 0) {
         setError("Please select at least one role");
+        return;
+      }
+      // Require at least one sub-field when Software Developer is selected
+      if (formData.selectedRoles.includes("software_development") && formData.softwareDevFields.length === 0) {
+        setError("Please select a specialisation for the Software Developer role (e.g. Backend, Frontend)");
         return;
       }
       const hasSkillsForAllRoles = formData.selectedRoles.every(
@@ -346,6 +382,7 @@ export default function CreateProjectPage() {
           talentCategory: getPrimaryCategory(formData.selectedRoles) as any,
           experienceLevel: formData.experienceLevel,
           requiredSkills: allRequiredSkills,
+          softwareDevFields: formData.softwareDevFields.length > 0 ? formData.softwareDevFields : undefined,
           budget: totalAmount,
           specialRequirements: formData.specialRequirements || undefined,
           roleTitle: formData.title.trim() || undefined,
@@ -571,6 +608,39 @@ export default function CreateProjectPage() {
                 </div>
               </div>
 
+              {/* Software Developer sub-field picker */}
+              {formData.selectedRoles.includes("software_development") && (
+                <div className="rounded-xl border border-border/60 bg-muted/10 p-4 space-y-3">
+                  <div>
+                    <p className="font-medium text-foreground">Software Developer — specialisation</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formData.hireType === "team"
+                        ? "Select one or more specialisations needed for your team."
+                        : "Select the type of developer you need."}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {SOFTWARE_DEV_FIELDS.map((field) => {
+                      const isSelected = formData.softwareDevFields.includes(field.id);
+                      return (
+                        <button
+                          key={field.id}
+                          type="button"
+                          onClick={() => toggleSoftwareDevField(field.id)}
+                          className={`rounded-lg border-2 px-3 py-1.5 text-sm font-medium transition-all ${
+                            isSelected
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border/60 bg-background hover:border-primary/40"
+                          }`}
+                        >
+                          {field.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {formData.selectedRoles.length > 0 && (
                 <div className="space-y-4">
                   <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Skills per role</Label>
@@ -578,12 +648,16 @@ export default function CreateProjectPage() {
                   {formData.selectedRoles.map((roleId) => {
                     const role = PLATFORM_ROLES.find((r) => r.id === roleId);
                     if (!role) return null;
-                    const skills = getSkillsForRole(roleId);
+                    // For software_dev: show skills from selected sub-fields; require sub-field first
+                    const isSoftwareDev = roleId === "software_development";
+                    if (isSoftwareDev && formData.softwareDevFields.length === 0) return null;
+                    const skills = isSoftwareDev
+                      ? getSoftwareDevFieldSkills(formData.softwareDevFields)
+                      : getSkillsForRole(roleId);
                     const selectedSkills = formData.roleSkills[roleId] ?? [];
-                    const displayLabel =
-                      roleId === "software_development" && selectedSkills.length > 0
-                        ? getSoftwareDevRoleDisplayName(selectedSkills)
-                        : role.label;
+                    const displayLabel = isSoftwareDev && formData.softwareDevFields.length > 0
+                      ? formData.softwareDevFields.map(getSoftwareDevFieldLabel).join(" / ")
+                      : role.label;
                     return (
                       <div key={roleId} className="rounded-xl border border-border/60 bg-muted/10 p-4 space-y-2">
                         <p className="font-medium text-foreground">{displayLabel}</p>
