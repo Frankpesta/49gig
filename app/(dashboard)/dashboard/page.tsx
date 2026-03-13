@@ -65,6 +65,11 @@ export default function DashboardPage() {
     user?._id ? { userId: user._id, limit: 10 } : "skip"
   );
 
+  const walletStats = useQuery(
+    api.wallets.queries.getWalletStats,
+    isFreelancer && user?._id ? { userId: user._id } : "skip"
+  );
+
   const freelancerReviews = useQuery(
     (api as any)["reviews/queries"].getReviewsForFreelancer,
     isFreelancer && user?._id
@@ -206,6 +211,24 @@ export default function DashboardPage() {
           variant: "default" as const,
           trend: dashboardMetrics?.metrics?.trends?.earnings,
           badge: "MTD",
+        },
+        {
+          title: "Pending Balance",
+          subtitle: "Awaiting approval",
+          value: walletStats === undefined ? "—" : formatCurrency((walletStats?.pendingCents ?? 0) / 100),
+          description: "From monthly cycles awaiting client approval",
+          icon: Wallet,
+          variant: "default" as const,
+          badge: "Pending",
+        },
+        {
+          title: "Approved Balance",
+          subtitle: "Available",
+          value: walletStats === undefined ? "—" : formatCurrency((walletStats?.availableCents ?? 0) / 100),
+          description: "In wallet, ready to withdraw",
+          icon: Wallet,
+          variant: "default" as const,
+          badge: "Ready",
         },
       ]
     : [
