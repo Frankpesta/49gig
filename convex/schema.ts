@@ -284,6 +284,8 @@ export default defineSchema({
         v.literal("expert")
       ),
       requiredSkills: v.optional(v.array(v.string())),
+      // Software Development sub-fields (e.g. backend_dev, frontend_dev, mobile_dev …)
+      softwareDevFields: v.optional(v.array(v.string())),
       // Section 4: Budget / Notes
       budget: v.number(), // Calculated budget
       specialRequirements: v.optional(v.string()),
@@ -367,6 +369,10 @@ export default defineSchema({
     flutterwaveTransactionId: v.optional(v.string()),
     flutterwaveCustomerEmail: v.optional(v.string()),
 
+    // Auto-assignment queue: true while the project is funded but has no matches yet
+    awaitingMatch: v.optional(v.boolean()),
+    awaitingMatchSince: v.optional(v.number()),
+
     // Audit
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -376,7 +382,8 @@ export default defineSchema({
     .index("by_client", ["clientId"])
     .index("by_freelancer", ["matchedFreelancerId"])
     .index("by_status", ["status"])
-    .index("by_created", ["createdAt"]),
+    .index("by_created", ["createdAt"])
+    .index("by_awaiting_match", ["awaitingMatch"]),
 
   milestones: defineTable({
     // Project

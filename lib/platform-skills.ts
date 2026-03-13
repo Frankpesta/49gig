@@ -62,6 +62,55 @@ export const TALENT_CATEGORY_LABELS = [
   "Quality Assurance and Testing",
 ] as const;
 
+/**
+ * Software Development sub-fields — shown when a client selects "Software Developer".
+ * Single hires choose one; team hires can pick multiple.
+ */
+export const SOFTWARE_DEV_FIELDS = [
+  { id: "backend_dev",    label: "Backend Developer" },
+  { id: "frontend_dev",  label: "Frontend Developer" },
+  { id: "fullstack_dev", label: "Full-Stack Developer" },
+  { id: "mobile_dev",    label: "Mobile Developer" },
+  { id: "game_dev",      label: "Game Developer" },
+  { id: "desktop_dev",   label: "Desktop / Windows Developer" },
+  { id: "embedded_dev",  label: "Embedded Systems Developer" },
+] as const;
+
+export type SoftwareDevFieldId = (typeof SOFTWARE_DEV_FIELDS)[number]["id"];
+
+/** Skills shown per software dev sub-field */
+export const SKILLS_BY_SOFTWARE_DEV_FIELD: Record<SoftwareDevFieldId, readonly string[]> = {
+  backend_dev:   ["Node.js", "Python", "Java", "Go", "PHP", "Ruby", "C#", "Rust", "TypeScript", "SQL", "REST APIs", "GraphQL"],
+  frontend_dev:  ["React", "Vue.js", "Angular", "JavaScript", "TypeScript", "HTML/CSS", "Next.js", "Tailwind CSS", "Svelte"],
+  fullstack_dev: ["React", "Node.js", "TypeScript", "JavaScript", "Python", "SQL", "Next.js", "Vue.js", "GraphQL", "REST APIs"],
+  mobile_dev:    ["Swift", "Kotlin", "React Native", "Flutter", "Java", "Dart", "Objective-C", "Expo"],
+  game_dev:      ["C++", "C#", "Unity", "Unreal Engine", "Python", "Lua", "JavaScript", "Godot"],
+  desktop_dev:   ["C#", "C++", "Java", "Electron", "Python", "Swift", "Kotlin", "Rust", ".NET", "WPF", "Qt"],
+  embedded_dev:  ["C", "C++", "Rust", "Assembly", "Python", "RTOS", "Firmware", "FPGA", "Arduino", "Embedded Linux"],
+};
+
+/**
+ * Return deduplicated skills for an array of selected software dev sub-field IDs.
+ * Falls back to the full software_development skill list when no sub-field is selected.
+ */
+export function getSoftwareDevFieldSkills(fieldIds: string[]): string[] {
+  if (fieldIds.length === 0) return [...SKILLS_BY_CATEGORY.software_development];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const id of fieldIds) {
+    const skills = SKILLS_BY_SOFTWARE_DEV_FIELD[id as SoftwareDevFieldId] ?? [];
+    for (const s of skills) {
+      if (!seen.has(s)) { seen.add(s); result.push(s); }
+    }
+  }
+  return result;
+}
+
+/** Get the human-readable label for a software dev sub-field id */
+export function getSoftwareDevFieldLabel(fieldId: string): string {
+  return SOFTWARE_DEV_FIELDS.find((f) => f.id === fieldId)?.label ?? fieldId.replace(/_/g, " ");
+}
+
 /** Skills (programming languages / tech) used for MCQ + coding verification. Must match convex/vetting/questions.ts SKILL_QUESTIONS. */
 export const SKILLS_FOR_MCQ_CODING = [
   "React",

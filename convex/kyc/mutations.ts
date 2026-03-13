@@ -131,6 +131,13 @@ export const approveKyc = mutation({
       name: freelancer?.name ?? "there",
     });
 
+    // Trigger auto-assignment: check if any funded projects are waiting for a freelancer
+    await ctx.scheduler.runAfter(
+      5000, // small delay so KYC state is fully committed
+      internalAny.matching.autoAssign.checkAndAutoAssignForFreelancer,
+      { freelancerId: args.freelancerId }
+    );
+
     return { success: true };
   },
 });

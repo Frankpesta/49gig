@@ -105,6 +105,7 @@ export const createProject = mutation({
         v.literal("expert")
       ),
       requiredSkills: v.optional(v.array(v.string())),
+      softwareDevFields: v.optional(v.array(v.string())),
       // Section 4: Budget / Notes
       budget: v.number(),
       specialRequirements: v.optional(v.string()),

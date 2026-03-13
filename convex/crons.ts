@@ -54,4 +54,11 @@ crons.daily(
   internal["cron/paymentFollowUp"].sendPaymentFollowUpRemindersAndTerminate
 );
 
+// Retry matching for funded projects that had no available freelancers when they were paid
+crons.interval(
+  "retry awaiting-match projects",
+  { hours: 4 },
+  internal.matching.autoAssign.retryAwaitingMatchProjects
+);
+
 export default crons;

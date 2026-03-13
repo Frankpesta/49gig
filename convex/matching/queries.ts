@@ -150,6 +150,31 @@ export const getFreelancerPublicProfile = query({
 });
 
 /**
+ * Get all funded projects that are currently in the awaiting-match queue.
+ * Used by the auto-assignment cron and KYC-approval trigger.
+ */
+export const getProjectsAwaitingMatch = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("projects")
+      .withIndex("by_awaiting_match", (q) => q.eq("awaitingMatch", true))
+      .filter((q) => q.eq(q.field("status"), "funded"))
+      .collect();
+  },
+});
+
+/**
+ * Get a single match record by its ID (internal use by auto-assign notifications).
+ */
+export const getMatchById = internalQuery({
+  args: { matchId: v.id("matches") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.matchId);
+  },
+});
+
+/**
  * Get a specific match
  */
 export const getMatch = internalQuery({
