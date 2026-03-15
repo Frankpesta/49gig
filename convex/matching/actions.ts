@@ -26,17 +26,28 @@ interface ScoringBreakdown {
 }
 
 /**
- * Check if a freelancer skill matches a required skill (exact or closely related).
- * Related: same base (e.g. React/React.js), one contains the other, or common aliases.
+ * Check if a freelancer skill matches a required skill.
+ * Strict matching to avoid false positives (e.g. Java/JavaScript, C/C#, Go/Google).
+ * Uses exact match, normalized variants, or whole-word containment only.
  */
 function skillMatches(required: string, freelancerSkill: string): boolean {
   const r = required.toLowerCase().trim();
   const f = freelancerSkill.toLowerCase().trim();
   if (r === f) return true;
-  if (f.includes(r) || r.includes(f)) return true;
-  // Normalize common variants: "React.js" -> "react", "Node" -> "node.js" etc.
-  const normalize = (s: string) => s.replace(/\s*[.\-]\s*js$/i, "").replace(/\s+/g, " ").trim();
+  // Normalize common variants: "React.js" -> "react", "Node" -> "node.js"
+  const normalize = (s: string) =>
+    s.replace(/\s*[.\-]\s*js$/i, "").replace(/\s+/g, " ").trim();
   if (normalize(r) === normalize(f)) return true;
+  // Whole-word containment only (avoids "Java" in "JavaScript", "C" in "C#", "Go" in "Google")
+  const isWordBoundary = (idx: number, len: number, str: string) => {
+    const beforeOk = idx === 0 || !/[\w]/.test(str[idx - 1]);
+    const afterOk = idx + len >= str.length || !/[\w]/.test(str[idx + len]);
+    return beforeOk && afterOk;
+  };
+  const idx = f.indexOf(r);
+  if (idx >= 0 && isWordBoundary(idx, r.length, f)) return true;
+  const idxR = r.indexOf(f);
+  if (idxR >= 0 && f.length >= 3 && isWordBoundary(idxR, f.length, r)) return true;
   return false;
 }
 
