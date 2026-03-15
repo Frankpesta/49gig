@@ -281,11 +281,21 @@ export function getRoleLabelFromCategoryLabel(categoryLabel: string): string {
   return role?.label ?? categoryLabel;
 }
 
+/** Get role id from category label (for fallback when skill doesn't map) */
+export function getRoleIdFromCategoryLabel(categoryLabel: string): string {
+  const role = PLATFORM_ROLES.find((r) => r.categoryLabel === categoryLabel);
+  return role?.id ?? "software_development";
+}
+
 /** Get role/category id for a skill (for inferring roles from skills when loading legacy data) */
 export function getRoleIdForSkill(skill: string): string | null {
   const skillLower = skill.toLowerCase().trim();
   for (const [catId, skills] of Object.entries(SKILLS_BY_CATEGORY)) {
     if (skills.some((s) => s.toLowerCase().trim() === skillLower)) return catId;
+  }
+  // Also check Software Dev sub-fields (e.g. REST APIs, GraphQL, Next.js)
+  for (const skills of Object.values(SKILLS_BY_SOFTWARE_DEV_FIELD)) {
+    if (skills.some((s) => s.toLowerCase().trim() === skillLower)) return "software_development";
   }
   return null;
 }

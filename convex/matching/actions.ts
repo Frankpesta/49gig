@@ -3,6 +3,7 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { Doc } from "../_generated/dataModel";
+import { getRoleLabel, getRoleIdForSkill, getRoleIdFromCategoryLabel } from "../../lib/platform-skills";
 
 /**
  * Matching Engine - Deterministic, Explainable Algorithm
@@ -726,13 +727,30 @@ export const generateMatchesForDraft = action({
       return { matchIds, isTeam: false, groupCount: 0 };
     }
 
-    // Team: top 5 per skill group (each requiredSkill is a group)
-    const skillGroups =
-      requiredSkills.length > 0
-        ? requiredSkills
-        : [intakeForm.talentCategory || "Software Development"];
+    // Team: group by role. Derive roleSkills from requiredSkills using skill-to-role mapping
+    // (no form changes; same pattern as Software Developer sub-fields → skills)
+    const roleSkills: Record<string, string[]> = {};
+    const fallbackRoleId = getRoleIdFromCategoryLabel(
+      intakeForm.talentCategory || "Software Development"
+    );
+    for (const skill of requiredSkills || []) {
+      const roleId = getRoleIdForSkill(skill) ?? fallbackRoleId;
+      if (!roleSkills[roleId]) roleSkills[roleId] = [];
+      roleSkills[roleId].push(skill);
+    }
+    const roleEntries = Object.entries(roleSkills).filter(([, skills]) => skills.length > 0);
 
-    for (const groupSkill of skillGroups) {
+    const groups =
+      roleEntries.length > 0
+        ? roleEntries.map(([roleId, skills]) => ({
+            roleLabel: getRoleLabel(roleId),
+            skills,
+          }))
+        : (requiredSkills.length > 0 ? requiredSkills : [intakeForm.talentCategory || "Software Development"]).map(
+            (s) => ({ roleLabel: s, skills: [s] })
+          );
+
+    for (const group of groups) {
       const groupScores: Array<{
         freelancer: Doc<"users">;
         score: number;
@@ -743,14 +761,14 @@ export const generateMatchesForDraft = action({
         const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
           freelancer,
-          [groupSkill],
+          group.skills,
           vettingScore
         );
         groupScores.push({ freelancer, score: overallScore, breakdown });
       }
 
       groupScores.sort((a, b) => b.score - a.score);
-      // Show freelancers who match this skill (skillOverlap > 0); take up to 5
+      // Show freelancers who match this role's skills (skillOverlap > 0); take up to 5
       const top5 = groupScores.filter((m) => m.breakdown.skillOverlap > 0).slice(0, 5);
 
       for (const match of top5) {
@@ -770,7 +788,7 @@ export const generateMatchesForDraft = action({
             scoringBreakdown: match.breakdown,
             explanation,
             expiresAt,
-            teamRole: groupSkill,
+            teamRole: group.roleLabel,
           }
         );
         matchIds.push(matchId);
@@ -780,7 +798,7 @@ export const generateMatchesForDraft = action({
     return {
       matchIds,
       isTeam: true,
-      groupCount: skillGroups.length,
+      groupCount: groups.length,
     };
   },
 });
