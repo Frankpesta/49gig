@@ -372,7 +372,7 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
-        {isClient && (
+        {(isClient || user?.role === "admin") && (
           <div className="flex gap-2">
             {needContractSignPrePayment && (
               <Button asChild>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,6 +11,15 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-heade
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
 import { DashboardStatusBadge } from "@/components/dashboard/dashboard-status-badge";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Plus,
   FolderKanban,
@@ -19,10 +29,15 @@ import {
   CheckCircle2,
   AlertCircle,
   XCircle,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams } from "next/navigation";
-import { Doc } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
+import { useState } from "react";
 
 const STATUS_CONFIG: Record<
   string,
@@ -58,9 +73,16 @@ const VALID_PROJECT_STATUSES = [
 
 export default function ProjectsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get("status");
-  
+  const [deleteId, setDeleteId] = useState<Id<"projects"> | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const deleteDraftProject = useMutation(
+    (api as any)["projects/mutations"].deleteDraftProject
+  );
+
   // Validate status filter - only use if it's a valid project status
   const statusFilter = statusParam && VALID_PROJECT_STATUSES.includes(statusParam as any)
     ? statusParam
@@ -81,6 +103,24 @@ export default function ProjectsPage() {
   }
 
   const isClient = user.role === "client";
+  const canDeleteDraft = (p: Doc<"projects">) =>
+    p.status === "draft" && (isClient ? p.clientId === user._id : user.role === "admin");
+
+  const handleDeleteDraft = async () => {
+    if (!deleteId || !user?._id) return;
+    setDeleteId(null);
+    setIsDeleting(true);
+    try {
+      await deleteDraftProject({ projectId: deleteId, userId: user._id });
+      toast.success("Hire deleted");
+      router.refresh();
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Failed to delete hire");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const mapStatusTone = (status: string) => {
     if (status === "completed" || status === "matched" || status === "funded") return "success";
     if (status === "cancelled" || status === "disputed") return "danger";
@@ -226,18 +266,49 @@ export default function ProjectsPage() {
                     </div>
                   )}
 
-                  <Button variant="outline" className="w-full rounded-xl" asChild>
-                    <Link href={`/dashboard/projects/${project._id}`}>
-                      View Details
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1 rounded-xl" asChild>
+                      <Link href={`/dashboard/projects/${project._id}`}>
+                        View Details
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                    {canDeleteDraft(project) && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl"
+                        onClick={() => setDeleteId(project._id)}
+                        title="Delete hire"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );
           })}
         </div>
       )}
+
+      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && !isDeleting && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this hire?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the hire and all associated data. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDeleteDraft} disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              {isDeleting ? "Deleting…" : "Delete"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
