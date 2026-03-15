@@ -158,7 +158,7 @@ export default function VerificationPage() {
 
   if (status === "not_started" || !vettingResult) {
     return (
-      <div className="container mx-auto max-w-4xl py-8">
+      <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-6 sm:py-8">
         <Card>
           <CardHeader>
             <CardTitle>Freelancer Verification</CardTitle>
@@ -169,18 +169,22 @@ export default function VerificationPage() {
           <CardContent className="space-y-6">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">Verification Requirements</h3>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-                  <span>English proficiency test (grammar, comprehension, writing) — minimum 50%</span>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  <span><strong>English proficiency</strong> — grammar, comprehension, and writing (minimum 50%)</span>
                 </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
-                  <span>Skill assessments for your chosen skills — minimum 50%</span>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  <span><strong>Skill assessments</strong> — tests for your chosen skills (minimum 50%)</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
+                  <span><strong>ID & address verification (KYC)</strong> — upload government ID (front & back) and a recent utility bill or similar (not older than 3 months)</span>
                 </li>
               </ul>
               <p className="text-sm text-muted-foreground">
-                You must score at least 50% in both to continue. Otherwise your account will be removed from the platform.
+                You must score at least 50% in English and skills to continue. KYC is reviewed within 2 business days. All three steps are required to be matched with projects.
               </p>
             </div>
             <Button onClick={handleInitialize} size="lg" className="w-full">
@@ -193,7 +197,7 @@ export default function VerificationPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-4xl py-8">
+    <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-6 sm:py-8">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -245,33 +249,33 @@ export default function VerificationPage() {
           {/* Steps */}
           <div className="space-y-4">
             {steps.map((step) => (
-              <Card key={step.id} className={step.inProgress ? "border-primary" : ""}>
-                <CardContent className="p-4">
+              <Card key={step.id} className={step.inProgress ? "border-primary ring-2 ring-primary/20" : ""}>
+                <CardContent className="p-4 sm:p-5">
                   <div className="flex items-start gap-4">
-                    <div className="shrink-0">
+                    <div className="shrink-0 mt-0.5">
                       {step.completed ? (
                         <CheckCircle2 className="h-6 w-6 text-green-500" />
                       ) : step.inProgress ? (
-                        <Clock className="h-6 w-6 text-primary animate-spin" />
+                        <Clock className="h-6 w-6 text-primary animate-pulse" />
                       ) : (
                         <AlertCircle className="h-6 w-6 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold">{step.name}</h3>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="font-semibold text-base">{step.name}</h3>
                         {step.completed && (
-                          <Badge variant="outline" className="bg-green-50">
+                          <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 shrink-0">
                             Completed
                           </Badge>
                         )}
                         {step.inProgress && (
-                          <Badge variant="outline" className="bg-primary/10">
+                          <Badge variant="outline" className="bg-primary/10 shrink-0">
                             In Progress
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                         {step.description}
                       </p>
                       {step.id === "english" &&
@@ -342,9 +346,9 @@ export default function VerificationPage() {
                 stepsCompleted.includes("skills") &&
                 currentStep === "complete" && (
                   <Card>
-                    <CardContent className="p-4">
+                    <CardContent className="p-4 sm:p-5">
                       <p className="text-sm text-muted-foreground mb-4">
-                        You have completed the English proficiency and skill assessments. Submit your verification for review.
+                        You have completed the English proficiency and skill assessments. Complete the ID & address verification (KYC) below if you haven&apos;t already, then submit for review.
                       </p>
                       <Button
                         onClick={async () => {

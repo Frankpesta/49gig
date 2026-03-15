@@ -342,8 +342,8 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
   if (phase === "grammar") {
     return (
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="px-4 sm:px-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Grammar Test</CardTitle>
               <CardDescription>Answer 20 grammar questions</CardDescription>
@@ -354,7 +354,7 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-4 sm:px-6">
           <ErrorHandler
             error={error}
             onRetry={handleRetry}
@@ -381,8 +381,8 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
             {grammarQuestions.map((question, index) => (
               <div key={question.id} className="space-y-3">
                 <div className="flex items-start gap-2">
-                  <span className="font-semibold">{index + 1}.</span>
-                  <p className="flex-1">{question.question}</p>
+                  <span className="font-semibold shrink-0">{index + 1}.</span>
+                  <p className="min-w-0 flex-1 text-sm sm:text-base leading-relaxed">{question.question}</p>
                 </div>
                 <RadioGroup
                   value={grammarAnswers[question.id]?.toString()}
@@ -392,20 +392,25 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
                       [question.id]: parseInt(value),
                     })
                   }
+                  className="space-y-2"
                 >
                   {question.options.map((option: string, optIndex: number) => (
-                    <div key={optIndex} className="flex items-center space-x-2">
+                    <label
+                      key={optIndex}
+                      htmlFor={`${question.id}_${optIndex}`}
+                      className={`flex min-h-[48px] cursor-pointer items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors sm:min-h-[44px] sm:gap-4 sm:px-4 sm:py-3 ${
+                        grammarAnswers[question.id] === optIndex
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
+                      }`}
+                    >
                       <RadioGroupItem
                         value={optIndex.toString()}
                         id={`${question.id}_${optIndex}`}
+                        className="shrink-0"
                       />
-                      <Label
-                        htmlFor={`${question.id}_${optIndex}`}
-                        className="cursor-pointer"
-                      >
-                        {option}
-                      </Label>
-                    </div>
+                      <span className="flex-1 text-sm sm:text-base">{option}</span>
+                    </label>
                   ))}
                 </RadioGroup>
               </div>
@@ -427,8 +432,8 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
   if (phase === "comprehension") {
     return (
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="px-4 sm:px-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Reading Comprehension</CardTitle>
               <CardDescription>Read the passage and answer questions</CardDescription>
@@ -439,7 +444,7 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-4 sm:px-6">
           {comprehensionPassage && (
             <>
               <div className="space-y-4">
@@ -469,20 +474,25 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
                           [question.id]: parseInt(value),
                         })
                       }
+                      className="space-y-2"
                     >
                       {question.options.map((option: string, optIndex: number) => (
-                        <div key={optIndex} className="flex items-center space-x-2">
+                        <label
+                          key={optIndex}
+                          htmlFor={`${question.id}_${optIndex}`}
+                          className={`flex min-h-[48px] cursor-pointer items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors sm:min-h-[44px] sm:gap-4 sm:px-4 sm:py-3 ${
+                            comprehensionAnswers[question.id] === optIndex
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
+                          }`}
+                        >
                           <RadioGroupItem
                             value={optIndex.toString()}
                             id={`${question.id}_${optIndex}`}
+                            className="shrink-0"
                           />
-                          <Label
-                            htmlFor={`${question.id}_${optIndex}`}
-                            className="cursor-pointer"
-                          >
-                            {option}
-                          </Label>
-                        </div>
+                          <span className="flex-1 text-sm sm:text-base">{option}</span>
+                        </label>
                       ))}
                     </RadioGroup>
                   </div>

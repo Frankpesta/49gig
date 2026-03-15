@@ -560,21 +560,26 @@ export function SkillTestPathFlow() {
                 );
                 return shuffledOptions.map((opt, displayIdx) => {
                   const originalIndex = originalIndices[displayIdx];
+                  const isSelected = mcqAnswers[current._id] === originalIndex;
                   return (
                     <label
                       key={displayIdx}
-                      className={`flex items-center gap-3 cursor-pointer p-3 rounded-lg border hover:bg-muted/50 min-w-0 ${mcqAnswers[current._id] === originalIndex ? "border-primary bg-primary/5" : ""}`}
+                      className={`flex min-h-[48px] cursor-pointer items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors min-w-0 sm:min-h-[44px] sm:gap-4 sm:px-4 sm:py-3 ${
+                        isSelected
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
+                      }`}
                     >
                       <input
                         type="radio"
                         name={current._id}
-                        checked={mcqAnswers[current._id] === originalIndex}
+                        checked={isSelected}
                         onChange={() =>
                           setMcqAnswers((prev) => ({ ...prev, [current._id]: originalIndex }))
                         }
-                        className="w-4 h-4 shrink-0"
+                        className="h-4 w-4 shrink-0"
                       />
-                      <span className="break-words min-w-0">{opt}</span>
+                      <span className="min-w-0 flex-1 break-words text-sm sm:text-base">{opt}</span>
                     </label>
                   );
                 });
