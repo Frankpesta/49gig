@@ -37,7 +37,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PLATFORM_CATEGORIES } from "@/lib/platform-skills";
+import { getRoleLabelsFromProject, PLATFORM_CATEGORIES } from "@/lib/platform-skills";
 
 const PAGE_SIZE = 5;
 const TIME_SLOTS = (() => {
@@ -420,8 +420,8 @@ export default function ProjectMatchesPage() {
     (m: EnrichedMatch) => m.status === "pending"
   );
 
-  // Group by teamRole for team projects
-  const matchesByRole = isTeam
+  // Group by teamRole for team projects; also get all expected roles for "no availability" display
+  const matchesByRoleMap = isTeam && project
     ? (() => {
         const map = new Map<string, EnrichedMatch[]>();
         for (const m of pendingMatches) {
@@ -429,8 +429,11 @@ export default function ProjectMatchesPage() {
           if (!map.has(role)) map.set(role, []);
           map.get(role)!.push(m as EnrichedMatch);
         }
-        return Array.from(map.entries());
+        return map;
       })()
+    : new Map<string, EnrichedMatch[]>();
+  const allRoleLabels = isTeam && project
+    ? getRoleLabelsFromProject(project.intakeForm)
     : [];
 
   const singleList = !isTeam ? pendingMatches.slice(0, singleVisibleCount) : [];
@@ -678,7 +681,7 @@ export default function ProjectMatchesPage() {
         </Card>
       )}
 
-      {!matchingRunning && pendingMatches.length === 0 && (
+      {!matchingRunning && pendingMatches.length === 0 && !(isTeam && allRoleLabels.length > 0) && (
         <Card className="rounded-xl border-border/60">
           <CardContent className="py-12 px-4 sm:px-8 text-center space-y-4">
             <p className="font-medium text-foreground text-base sm:text-lg">
@@ -723,26 +726,42 @@ export default function ProjectMatchesPage() {
         </div>
       )}
 
-      {isTeam && matchesByRole.length > 0 && (
+      {isTeam && allRoleLabels.length > 0 && (
         <div className="space-y-6 sm:space-y-8">
-          {matchesByRole.map(([role, roleMatches]) => (
-            <div key={role} className="space-y-4">
-              <h2 className="text-base font-semibold sm:text-lg">{role}</h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {(roleMatches as EnrichedMatch[]).slice(0, 5).map((m, i) => (
-                  <MatchCard
-                    key={m._id}
-                    match={m}
-                    rank={i + 1}
-                    isSelected={selectedTeamIds.has(m.freelancerId)}
-                    onSelect={() => handleSelectTeam(m.freelancerId)}
-                    onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
-                    isTeam
-                  />
-                ))}
+          {allRoleLabels.map((roleLabel) => {
+            const roleMatches = matchesByRoleMap.get(roleLabel) ?? [];
+            return (
+              <div key={roleLabel} className="space-y-4">
+                <h2 className="text-base font-semibold sm:text-lg">{roleLabel}</h2>
+                {roleMatches.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {roleMatches.slice(0, 5).map((m, i) => (
+                      <MatchCard
+                        key={m._id}
+                        match={m}
+                        rank={i + 1}
+                        isSelected={selectedTeamIds.has(m.freelancerId)}
+                        onSelect={() => handleSelectTeam(m.freelancerId)}
+                        onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
+                        isTeam
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="rounded-xl border-dashed border-border/60 bg-muted/20">
+                    <CardContent className="py-8 px-4 sm:px-6 text-center">
+                      <p className="font-medium text-muted-foreground">
+                        No available freelancers for this role right now.
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        We&apos;ll match you with qualified talent once it becomes available. You can proceed with your other selections or check back later.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           <Button
             onClick={handleConfirmTeamSelection}
             disabled={selectedTeamIds.size === 0}

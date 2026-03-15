@@ -311,3 +311,32 @@ export const LEGACY_AI_ML_BLOCKCHAIN = "AI, Machine Learning and Blockchain";
 export function isLegacyCategoryLabel(value: string): boolean {
   return value === LEGACY_AI_ML_BLOCKCHAIN;
 }
+
+/** Derive role labels from project intake form (for team matching UI) */
+export function getRoleLabelsFromProject(intakeForm: {
+  requiredSkills?: string[];
+  talentCategory?: string;
+  category?: string;
+}): string[] {
+  const skills = intakeForm.requiredSkills ?? [];
+  const roleLabels = new Set<string>();
+
+  for (const item of skills) {
+    const roleId = getRoleIdForSkill(item);
+    if (roleId) {
+      roleLabels.add(getRoleLabel(roleId));
+    } else if (isLegacyCategoryLabel(item)) {
+      roleLabels.add("AI Engineer");
+      roleLabels.add("Machine Learning Engineer");
+      roleLabels.add("Blockchain Developer");
+    } else if (isCategoryLabel(item)) {
+      roleLabels.add(getRoleLabelFromCategoryLabel(item));
+    }
+  }
+
+  if (roleLabels.size === 0 && (intakeForm.talentCategory || intakeForm.category)) {
+    const cat = intakeForm.talentCategory || intakeForm.category || "";
+    roleLabels.add(getRoleLabelFromCategoryLabel(cat));
+  }
+  return [...roleLabels];
+}

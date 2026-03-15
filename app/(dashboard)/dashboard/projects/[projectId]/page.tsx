@@ -25,6 +25,7 @@ import {
   FileSignature,
   LucideIcon,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
@@ -47,6 +48,7 @@ import {
   getRoleIdForSkill,
   getRoleLabel,
   getRoleLabelFromCategoryLabel,
+  getRoleLabelsFromProject,
   isCategoryLabel,
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
@@ -85,35 +87,6 @@ function formatExactDuration(startMs: number, endMs: number): string {
   return diffDays === 1 ? "1 day" : `${diffDays} days`;
 }
 
-/** Derive role labels from requiredSkills (skills map to roles; legacy may have category labels) */
-function getRoleLabelsFromProject(intakeForm: {
-  requiredSkills?: string[];
-  talentCategory?: string;
-  category?: string;
-}): string[] {
-  const skills = intakeForm.requiredSkills ?? [];
-  const roleLabels = new Set<string>();
-
-  for (const item of skills) {
-    const roleId = getRoleIdForSkill(item);
-    if (roleId) {
-      roleLabels.add(getRoleLabel(roleId));
-    } else if (isLegacyCategoryLabel(item)) {
-      roleLabels.add("AI Engineer");
-      roleLabels.add("Machine Learning Engineer");
-      roleLabels.add("Blockchain Developer");
-    } else if (isCategoryLabel(item)) {
-      roleLabels.add(getRoleLabelFromCategoryLabel(item));
-    }
-  }
-
-  if (roleLabels.size === 0 && (intakeForm.talentCategory || intakeForm.category)) {
-    const cat = intakeForm.talentCategory || intakeForm.category || "";
-    roleLabels.add(getRoleLabelFromCategoryLabel(cat));
-  }
-  return [...roleLabels];
-}
-
 /** Filter to only actual skills (exclude category labels) */
 function getActualSkills(requiredSkills: string[]): string[] {
   return requiredSkills.filter(
@@ -141,6 +114,8 @@ export default function ProjectDetailPage() {
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Validate the projectId from URL params
   const isValidId = isValidConvexId(projectIdParam);
@@ -187,6 +162,9 @@ export default function ProjectDetailPage() {
   );
   const updateProjectStatus = useMutation(
     (api as any)["projects/mutations"].updateProjectStatus
+  );
+  const deleteDraftProject = useMutation(
+    (api as any)["projects/mutations"].deleteDraftProject
   );
 
   // Prefill rating form when existing review loads
@@ -354,6 +332,21 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleDeleteDraft = async () => {
+    if (!projectId || !user?._id) return;
+    setShowDeleteDialog(false);
+    setIsDeleting(true);
+    try {
+      await deleteDraftProject({ projectId, userId: user._id });
+      toast.success("Hire deleted");
+      router.push("/dashboard/projects");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Failed to delete hire");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -447,12 +440,47 @@ export default function ProjectDetailPage() {
               </>
             )}
             {project.status === "draft" && (
-              <Button variant="outline" asChild>
-                <Link href={`/dashboard/projects/${project._id}/edit`}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Link>
-              </Button>
+              <>
+                <Button variant="outline" asChild>
+                  <Link href={`/dashboard/projects/${project._id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this hire?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete the hire and all associated data. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteDraft}
+                        disabled={isDeleting}
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="mr-2 h-4 w-4" />
+                        )}
+                        {isDeleting ? "Deleting…" : "Delete"}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
           </div>
         )}

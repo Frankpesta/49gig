@@ -479,6 +479,49 @@ export const updateProjectStatus = mutation({
 });
 
 /**
+ * Delete a draft project. Only the client who owns it can delete.
+ * Permanently removes the project and its matches/scheduled calls.
+ */
+export const deleteDraftProject = mutation({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.clientId !== user._id && user.role !== "admin") {
+      throw new Error("Not authorized to delete this project");
+    }
+    if (project.status !== "draft") {
+      throw new Error("Only draft projects can be deleted");
+    }
+
+    const matches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const m of matches) {
+      await ctx.db.delete(m._id);
+    }
+
+    const calls = await ctx.db
+      .query("scheduledCalls")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const c of calls) {
+      await ctx.db.delete(c._id);
+    }
+
+    await ctx.db.delete(args.projectId);
+    return args.projectId;
+  },
+});
+
+/**
  * Set selected freelancer for a single-hire project (pre-funding).
  * Only client who owns the project can set selection.
  */
