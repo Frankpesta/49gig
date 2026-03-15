@@ -287,6 +287,24 @@ export function getRoleIdFromCategoryLabel(categoryLabel: string): string {
   return role?.id ?? "software_development";
 }
 
+/** Legacy techField values that map to platform role ids */
+const TECHFIELD_TO_ROLE: Record<string, string> = {
+  development: "software_development",
+  design: "ui_ux_design",
+  data_science: "data_analytics",
+};
+
+/** Check if freelancer's techField aligns with a role (for matching) */
+export function freelancerMatchesRole(
+  techField: string | undefined,
+  roleId: string
+): boolean {
+  // If no techField set (legacy), allow - rely on skill match only
+  if (!techField) return true;
+  const normalized = TECHFIELD_TO_ROLE[techField] ?? techField;
+  return normalized === roleId;
+}
+
 /** Get role/category id for a skill (for inferring roles from skills when loading legacy data) */
 export function getRoleIdForSkill(skill: string): string | null {
   const skillLower = skill.toLowerCase().trim();

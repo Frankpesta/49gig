@@ -3,7 +3,12 @@ import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { Doc } from "../_generated/dataModel";
-import { getRoleLabel, getRoleIdForSkill, getRoleIdFromCategoryLabel } from "../../lib/platform-skills";
+import {
+  getRoleLabel,
+  getRoleIdForSkill,
+  getRoleIdFromCategoryLabel,
+  freelancerMatchesRole,
+} from "../../lib/platform-skills";
 
 /**
  * Matching Engine - Deterministic, Explainable Algorithm
@@ -754,11 +759,12 @@ export const generateMatchesForDraft = action({
     const groups =
       roleEntries.length > 0
         ? roleEntries.map(([roleId, skills]) => ({
+            roleId,
             roleLabel: getRoleLabel(roleId),
             skills,
           }))
         : (requiredSkills.length > 0 ? requiredSkills : [intakeForm.talentCategory || "Software Development"]).map(
-            (s) => ({ roleLabel: s, skills: [s] })
+            (s) => ({ roleId: getRoleIdForSkill(s) ?? "software_development", roleLabel: s, skills: [s] })
           );
 
     for (const group of groups) {
@@ -779,8 +785,14 @@ export const generateMatchesForDraft = action({
       }
 
       groupScores.sort((a, b) => b.score - a.score);
-      // Show freelancers who match this role's skills (skillOverlap > 0); take up to 5
-      const top5 = groupScores.filter((m) => m.breakdown.skillOverlap > 0).slice(0, 5);
+      // Only show freelancers who: (1) have matching skills AND (2) techField aligns with role
+      const top5 = groupScores
+        .filter(
+          (m) =>
+            m.breakdown.skillOverlap > 0 &&
+            freelancerMatchesRole(m.freelancer.profile?.techField, group.roleId)
+        )
+        .slice(0, 5);
 
       for (const match of top5) {
         const explanation = generateExplanation(
