@@ -106,16 +106,16 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
 
   return (
     <Card>
-      <CardContent className="p-4 space-y-6">
-        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-800 dark:text-amber-200">
+      <CardContent className="p-4 sm:p-6 space-y-6">
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 sm:p-4 text-sm text-amber-800 dark:text-amber-200">
           <p className="font-medium flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
+            <AlertCircle className="h-4 w-4 shrink-0" />
             Upload tips
           </p>
-          <ul className="mt-2 list-disc list-inside space-y-1 opacity-90">
+          <ul className="mt-2 list-disc list-inside space-y-1.5 opacity-90">
             <li>Use clear, readable images or PDFs (max 5MB per file).</li>
             <li>Address document must be from the last 3 months.</li>
-            <li>Review may take up to 2 business days.</li>
+            <li>Review typically takes up to 2 business days.</li>
           </ul>
         </div>
 
@@ -165,32 +165,42 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
                 )}
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label>ID front</Label>
-                  <div className="mt-1 flex items-center gap-2">
+                  <Label className="text-sm font-medium">ID front</Label>
+                  <label className={`mt-2 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50 ${uploading === "ID front" ? "pointer-events-none opacity-60" : ""}`}>
                     <Input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={(e) => handleFile(e, setIdFrontFileId, "ID front")}
                       disabled={!!uploading}
+                      className="sr-only"
                     />
-                    {idFrontFileId && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                  </div>
-                  {uploading === "ID front" && <p className="text-xs text-muted-foreground">Uploading…</p>}
+                    <FileUp className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {idFrontFileId ? "Replace file" : "Choose file"}
+                    </span>
+                    {idFrontFileId && <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />}
+                  </label>
+                  {uploading === "ID front" && <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>}
                 </div>
                 <div>
-                  <Label>ID back</Label>
-                  <div className="mt-1 flex items-center gap-2">
+                  <Label className="text-sm font-medium">ID back</Label>
+                  <label className={`mt-2 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50 ${uploading === "ID back" ? "pointer-events-none opacity-60" : ""}`}>
                     <Input
                       type="file"
                       accept="image/*,.pdf"
                       onChange={(e) => handleFile(e, setIdBackFileId, "ID back")}
                       disabled={!!uploading}
+                      className="sr-only"
                     />
-                    {idBackFileId && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                  </div>
-                  {uploading === "ID back" && <p className="text-xs text-muted-foreground">Uploading…</p>}
+                    <FileUp className="h-5 w-5 shrink-0 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">
+                      {idBackFileId ? "Replace file" : "Choose file"}
+                    </span>
+                    {idBackFileId && <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />}
+                  </label>
+                  {uploading === "ID back" && <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>}
                 </div>
               </div>
 
@@ -211,17 +221,23 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
               </div>
 
               <div>
-                <Label>Address document (utility bill, bank statement, or tenancy agreement — not older than 3 months)</Label>
-                <div className="mt-1 flex items-center gap-2">
+                <Label className="text-sm font-medium">Address document</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">Utility bill, bank statement, or tenancy agreement — not older than 3 months</p>
+                <label className={`mt-2 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50 ${uploading === "Address document" ? "pointer-events-none opacity-60" : ""}`}>
                   <Input
                     type="file"
                     accept="image/*,.pdf"
                     onChange={(e) => handleFile(e, setAddressFileId, "Address document")}
                     disabled={!!uploading}
+                    className="sr-only"
                   />
-                  {addressFileId && <CheckCircle2 className="h-5 w-5 text-green-600" />}
-                </div>
-                {uploading === "Address document" && <p className="text-xs text-muted-foreground">Uploading…</p>}
+                  <FileUp className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">
+                    {addressFileId ? "Replace file" : "Choose file"}
+                  </span>
+                  {addressFileId && <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />}
+                </label>
+                {uploading === "Address document" && <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>}
               </div>
             </div>
 

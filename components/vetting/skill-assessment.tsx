@@ -388,7 +388,11 @@ export function SkillAssessment({
                   {question.options.map((option: string, optIndex: number) => (
                     <label
                       key={optIndex}
-                      className="flex items-center space-x-2 cursor-pointer p-2 rounded hover:bg-muted"
+                      className={`flex min-h-[48px] cursor-pointer items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors sm:min-h-[44px] sm:gap-4 sm:px-4 sm:py-3 ${
+                        mcqAnswers[question.id] === optIndex
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-muted/30 hover:border-primary/50 hover:bg-muted/50"
+                      }`}
                     >
                       <input
                         type="radio"
@@ -401,9 +405,9 @@ export function SkillAssessment({
                             [question.id]: optIndex,
                           })
                         }
-                        className="w-4 h-4"
+                        className="h-4 w-4 shrink-0"
                       />
-                      <span>{option}</span>
+                      <span className="flex-1 text-sm sm:text-base">{option}</span>
                     </label>
                   ))}
                 </div>

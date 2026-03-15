@@ -191,6 +191,7 @@ export default function CreateProjectPage() {
         roleType: formData.roleType,
         skillsRequired: categoriesForBudget,
         selectedSkillNames: allRequiredSkills,
+        softwareDevFields: formData.softwareDevFields.length > 0 ? formData.softwareDevFields : undefined,
       });
       const discount = DURATION_DISCOUNT[formData.projectDuration as ProjectDuration] ?? 1;
       const discountedBudget = Math.round(calc.estimatedBudget * discount);
@@ -205,6 +206,7 @@ export default function CreateProjectPage() {
     formData.teamSize,
     formData.startDate,
     formData.projectDuration,
+    formData.softwareDevFields,
     derivedEndDate,
     formData.experienceLevel,
     formData.roleType,
