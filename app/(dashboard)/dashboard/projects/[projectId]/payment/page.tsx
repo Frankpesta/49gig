@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, CheckCircle2, XCircle, ExternalLink, Info } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { getDurationMonths } from "@/lib/project-duration";
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -100,10 +101,7 @@ export default function PaymentPage() {
       setIsLoading(true);
       setError(null);
 
-      const durMonths =
-        project.intakeForm?.projectDuration === "12+"
-          ? 12
-          : Math.max(1, parseInt(project.intakeForm?.projectDuration ?? "1", 10) || 1);
+      const durMonths = getDurationMonths(project.intakeForm?.projectDuration);
       const perMonth = project.totalAmount / durMonths;
       const amountToPay = perMonth * monthsToFund;
 
@@ -192,10 +190,7 @@ export default function PaymentPage() {
     );
   }
 
-  const durMonths =
-    project.intakeForm?.projectDuration === "12+"
-      ? 12
-      : Math.max(1, parseInt(project.intakeForm?.projectDuration ?? "1", 10) || 1);
+  const durMonths = getDurationMonths(project.intakeForm?.projectDuration);
   const perMonth = project.totalAmount / durMonths;
   const amountToPay = perMonth * monthsToFund;
 

@@ -659,6 +659,12 @@ export const generateMatchesForDraft = action({
     const intakeForm = project.intakeForm;
     const isTeam = intakeForm.hireType === "team";
     const requiredSkills = intakeForm.requiredSkills || [];
+    const requestedLevel = intakeForm.experienceLevel || "mid";
+    const LEVEL_ORDER = ["junior", "mid", "senior", "expert"] as const;
+    const levelIndex = (l: string) => {
+      const i = LEVEL_ORDER.indexOf(l as (typeof LEVEL_ORDER)[number]);
+      return i >= 0 ? i : 1;
+    };
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
     const activeProjectFreelancerIdsDraft = await ctx.runQuery(
       internal.projects.queries.getFreelancerIdsWithActiveProjects,
@@ -690,22 +696,33 @@ export const generateMatchesForDraft = action({
     );
 
     if (approvedFreelancers.length === 0) {
-      return { matchIds: [], isTeam: false, groupCount: 0 };
+      return { matchIds: [], isTeam: false, groupCount: 0, availability: null };
     }
+
+    // Filter by experience level: only match freelancers at the requested level
+    const levelFiltered = approvedFreelancers.filter((a) => {
+      const fl = a.freelancer.profile?.experienceLevel || "mid";
+      return fl === requestedLevel;
+    });
+    // For "hasHigherLevel" check: freelancers at higher level with matching skills
+    const higherLevelFreelancers = approvedFreelancers.filter((a) => {
+      const fl = a.freelancer.profile?.experienceLevel || "mid";
+      return levelIndex(fl) > levelIndex(requestedLevel);
+    });
 
     const now = Date.now();
     const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
     const matchIds: string[] = [];
 
     if (!isTeam) {
-      // Single: top 20, same scoring as generateMatches (shared scoreOneFreelancer)
+      // Single: top 20, filter by experience level
       const scores: Array<{
         freelancer: Doc<"users">;
         score: number;
         breakdown: ScoringBreakdown;
       }> = [];
 
-      for (const { freelancer, overallScore: vettingScore } of approvedFreelancers) {
+      for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
         const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
           freelancer,
@@ -716,7 +733,24 @@ export const generateMatchesForDraft = action({
       }
 
       scores.sort((a, b) => b.score - a.score);
-      const top20 = scores.slice(0, 20);
+      const top20 = scores.filter((m) => m.breakdown.skillOverlap > 0).slice(0, 20);
+
+      // Check if we have higher-level freelancers (for availability message when 0 matches)
+      let hasHigherLevelWithSkills = false;
+      if (top20.length === 0 && higherLevelFreelancers.length > 0) {
+        for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
+          const { breakdown } = await scoreOneFreelancer(
+            ctx,
+            freelancer,
+            requiredSkills,
+            vettingScore
+          );
+          if (breakdown.skillOverlap > 0) {
+            hasHigherLevelWithSkills = true;
+            break;
+          }
+        }
+      }
 
       for (const match of top20) {
         const explanation = generateExplanation(
@@ -740,7 +774,11 @@ export const generateMatchesForDraft = action({
         matchIds.push(matchId);
       }
 
-      return { matchIds, isTeam: false, groupCount: 0 };
+      const availability =
+        top20.length === 0
+          ? { atRequestedLevel: 0, hasHigherLevelWithSkills }
+          : null;
+      return { matchIds, isTeam: false, groupCount: 0, availability };
     }
 
     // Team: group by role. Derive roleSkills from requiredSkills using skill-to-role mapping
@@ -774,7 +812,7 @@ export const generateMatchesForDraft = action({
         breakdown: ScoringBreakdown;
       }> = [];
 
-      for (const { freelancer, overallScore: vettingScore } of approvedFreelancers) {
+      for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
         const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
           freelancer,
@@ -785,7 +823,7 @@ export const generateMatchesForDraft = action({
       }
 
       groupScores.sort((a, b) => b.score - a.score);
-      // Only show freelancers who: (1) have matching skills AND (2) techField aligns with role
+      // Only show freelancers who: (1) have matching skills, (2) techField aligns with role, (3) experience level matches
       const top5 = groupScores
         .filter(
           (m) =>
@@ -818,10 +856,39 @@ export const generateMatchesForDraft = action({
       }
     }
 
+    // For team: check if any role had 0 matches and we have higher-level freelancers
+    let hasHigherLevelWithSkills = false;
+    if (matchIds.length === 0 && higherLevelFreelancers.length > 0) {
+      for (const group of groups) {
+        for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
+          const { breakdown } = await scoreOneFreelancer(
+            ctx,
+            freelancer,
+            group.skills,
+            vettingScore
+          );
+          if (
+            breakdown.skillOverlap > 0 &&
+            freelancerMatchesRole(freelancer.profile?.techField, group.roleId)
+          ) {
+            hasHigherLevelWithSkills = true;
+            break;
+          }
+        }
+        if (hasHigherLevelWithSkills) break;
+      }
+    }
+
+    const availability =
+      matchIds.length === 0
+        ? { atRequestedLevel: 0, hasHigherLevelWithSkills }
+        : null;
+
     return {
       matchIds,
       isTeam: true,
       groupCount: groups.length,
+      availability,
     };
   },
 });

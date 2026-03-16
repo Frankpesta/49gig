@@ -39,6 +39,7 @@ import {
 } from "@/lib/platform-skills";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
+import { getDurationMonths } from "@/lib/project-duration";
 
 const PROJECT_DURATIONS = [
   { value: "3", label: "3 months" },
@@ -46,18 +47,39 @@ const PROJECT_DURATIONS = [
   { value: "12+", label: "1 year +" },
 ] as const;
 
-type ProjectDuration = (typeof PROJECT_DURATIONS)[number]["value"];
+/** Shown when client selects "1 year +" – exact engagement length */
+const ENGAGEMENT_YEAR_OPTIONS = [
+  { value: "12", label: "1 year" },
+  { value: "24", label: "2 years" },
+  { value: "36", label: "3 years" },
+  { value: "48", label: "4 years" },
+  { value: "60", label: "5 years" },
+] as const;
 
-const DURATION_DAYS: Record<ProjectDuration, number> = {
+type ProjectDuration =
+  | (typeof PROJECT_DURATIONS)[number]["value"]
+  | (typeof ENGAGEMENT_YEAR_OPTIONS)[number]["value"];
+
+const DURATION_DAYS: Record<string, number> = {
   "3": 90,
   "6": 180,
   "12+": 365,
+  "12": 365,
+  "24": 730,
+  "36": 1095,
+  "48": 1460,
+  "60": 1825,
 };
 
-const DURATION_DISCOUNT: Record<ProjectDuration, number> = {
+const DURATION_DISCOUNT: Record<string, number> = {
   "3": 0.97,
   "6": 0.95,
   "12+": 0.95,
+  "12": 0.95,
+  "24": 0.95,
+  "36": 0.95,
+  "48": 0.95,
+  "60": 0.95,
 };
 
 const EXPERIENCE_LEVELS = [
@@ -199,7 +221,7 @@ export default function EditProjectPage() {
     if (!formData?.startDate || !formData?.projectDuration) return null;
     const start = parseLocalDateString(formData.startDate);
     if (!start) return null;
-    const days = DURATION_DAYS[formData.projectDuration];
+    const days = DURATION_DAYS[formData.projectDuration] ?? 90;
     const end = new Date(start);
     end.setDate(end.getDate() + days);
     return end;
@@ -226,7 +248,7 @@ export default function EditProjectPage() {
         skillsRequired: categoriesForBudget,
         selectedSkillNames: Object.values(formData.roleSkills).flat(),
       });
-      const discount = DURATION_DISCOUNT[formData.projectDuration];
+      const discount = DURATION_DISCOUNT[formData.projectDuration] ?? 0.97;
       return { ...calc, estimatedBudget: Math.round(calc.estimatedBudget * discount) };
     } catch {
       return null;
@@ -236,6 +258,10 @@ export default function EditProjectPage() {
   const handleSubmit = async () => {
     if (!formData || !project || !user) return;
     setError(null);
+    if (formData.projectDuration === "12+") {
+      setError("Please select how long this engagement will last (1 year, 2 years, etc.)");
+      return;
+    }
     const startDate = parseLocalDateString(formData.startDate);
     if (!startDate || !derivedEndDate || !budgetCalculation) {
       setError("Please fill all required fields and check dates.");
@@ -246,7 +272,7 @@ export default function EditProjectPage() {
     try {
       const totalAmount = budgetCalculation.estimatedBudget;
       const platformFee = platformFeePct ?? 25;
-      const durationMonths = formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10);
+      const durationMonths = getDurationMonths(formData.projectDuration);
       const teamBudgetBreakdown =
         formData.hireType === "team" &&
         budgetCalculation.breakdown?.teamMembers &&
@@ -282,7 +308,10 @@ export default function EditProjectPage() {
           roleTitle: formData.title.trim() || undefined,
           projectDuration: formData.projectDuration,
           roleType: formData.roleType,
-          timeline: formData.projectDuration === "12+" ? "1 year +" : `${formData.projectDuration} months`,
+          timeline:
+            getDurationMonths(formData.projectDuration) >= 12
+              ? `${getDurationMonths(formData.projectDuration) / 12} year${getDurationMonths(formData.projectDuration) > 12 ? "s" : ""}`
+              : `${formData.projectDuration} months`,
           category: getPrimaryCategory(formData.selectedRoles),
           estimatedBudget: budgetCalculation.estimatedBudget,
         },
@@ -377,7 +406,7 @@ export default function EditProjectPage() {
     );
   }
 
-  const durMonths = formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10);
+  const durMonths = getDurationMonths(formData.projectDuration);
 
   return (
     <div className="space-y-6">
@@ -433,13 +462,38 @@ export default function EditProjectPage() {
                 <Button
                   key={d.value}
                   type="button"
-                  variant={formData.projectDuration === d.value ? "default" : "outline"}
+                  variant={
+                    formData.projectDuration === d.value ||
+                    (d.value === "12+" && ["12", "24", "36", "48", "60"].includes(formData.projectDuration))
+                      ? "default"
+                      : "outline"
+                  }
                   onClick={() => setFormData({ ...formData, projectDuration: d.value as ProjectDuration })}
                 >
                   {d.label}
                 </Button>
               ))}
             </div>
+            {(formData.projectDuration === "12+" || ["12", "24", "36", "48", "60"].includes(formData.projectDuration)) && (
+              <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                <Label className="text-sm font-medium text-foreground">How long will this engagement last?</Label>
+                <p className="mt-1 text-sm text-muted-foreground mb-3">
+                  Select the exact duration so we can calculate your budget and set up milestones correctly.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ENGAGEMENT_YEAR_OPTIONS.map((opt) => (
+                    <Button
+                      key={opt.value}
+                      type="button"
+                      variant={formData.projectDuration === opt.value ? "default" : "outline"}
+                      onClick={() => setFormData({ ...formData, projectDuration: opt.value as ProjectDuration })}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div>
             <Label>Experience level</Label>

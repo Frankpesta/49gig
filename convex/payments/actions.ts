@@ -185,10 +185,11 @@ export const createTopUpPaymentIntent = action({
     }
 
     const monthsToFund = Math.max(1, Math.floor(args.monthsToFund));
+    const raw = project.intakeForm?.projectDuration;
     const durationMonths =
-      project.intakeForm?.projectDuration === "12+"
-        ? 12
-        : Math.max(1, parseInt(project.intakeForm?.projectDuration ?? "1", 10) || 1);
+      !raw ? 3
+      : raw === "12+" ? 12
+      : Math.max(1, parseInt(raw, 10) || 1);
     const perMonth = project.totalAmount / durationMonths;
     const amount = perMonth * monthsToFund;
     if (amount <= 0 || !Number.isFinite(amount)) {

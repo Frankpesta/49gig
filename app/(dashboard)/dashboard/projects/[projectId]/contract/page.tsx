@@ -43,10 +43,10 @@ export default function ContractPage() {
             <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
             <h3 className="mb-2 text-lg font-semibold">Invalid Project</h3>
             <p className="mb-4 text-center text-sm text-muted-foreground">
-              This project could not be found.
+              This hire could not be found.
             </p>
             <Button asChild>
-              <Link href="/dashboard/projects">Back to Projects</Link>
+              <Link href="/dashboard/projects">Back to hires</Link>
             </Button>
           </CardContent>
         </Card>
@@ -69,12 +69,12 @@ export default function ContractPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
-            <h3 className="mb-2 text-lg font-semibold">Project not found</h3>
+            <h3 className="mb-2 text-lg font-semibold">Hire not found</h3>
             <p className="mb-4 text-center text-sm text-muted-foreground">
-              You don&apos;t have access to this project.
+              You don&apos;t have access to this hire.
             </p>
             <Button asChild>
-              <Link href="/dashboard/projects">Back to Projects</Link>
+              <Link href="/dashboard/projects">Back to hires</Link>
             </Button>
           </CardContent>
         </Card>

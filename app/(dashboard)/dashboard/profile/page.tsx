@@ -379,7 +379,7 @@ export default function ProfilePage() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      No feedback yet. Complete projects and clients will be able to rate you.
+                      No feedback yet. Complete hires and clients will be able to rate you.
                     </p>
                   )}
                 </CardContent>

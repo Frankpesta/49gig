@@ -20,57 +20,70 @@ interface EmailLayoutProps {
   children: ReactNode;
 }
 
+// Plus Jakarta Sans – matches app font (49GIG design system)
+const FONT_FAMILY =
+  '"Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
+
 const styles = {
   body: {
-    backgroundColor: "#f7f8fb",
-    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif",
+    backgroundColor: "#f4f5f7",
+    fontFamily: FONT_FAMILY,
     margin: 0,
     padding: 0,
   },
   container: {
-    maxWidth: "640px",
+    maxWidth: "600px",
     backgroundColor: "#ffffff",
-    margin: "40px auto",
-    padding: "0",
-    borderRadius: "16px",
-    border: "1px solid #e5e7eb",
+    margin: "32px auto",
+    padding: 0,
+    borderRadius: "12px",
+    boxShadow: "0 4px 24px rgba(7, 18, 43, 0.08)",
     overflow: "hidden",
   },
   header: {
-    padding: "24px 32px",
+    padding: "40px 32px 32px",
     backgroundColor: "#ffffff",
     textAlign: "center" as const,
   },
   logo: {
-    display: "inline-block",
-    height: "56px",
+    display: "block",
+    height: "96px",
     width: "auto",
+    margin: "0 auto",
+  },
+  logoLink: {
+    display: "block",
+    textAlign: "center" as const,
   },
   content: {
-    padding: "0 32px 24px",
+    padding: "0 40px 32px",
   },
   title: {
-    fontSize: "24px",
+    fontSize: "22px",
     fontWeight: 700,
-    color: "#111827",
-    margin: "0 0 8px",
-    lineHeight: "1.3",
+    color: "#07122B",
+    margin: "0 0 16px",
+    lineHeight: 1.35,
   },
   text: {
-    fontSize: "14px",
-    lineHeight: "1.6",
-    color: "#4b5563",
-    margin: "0 0 12px",
+    fontSize: "15px",
+    lineHeight: 1.65,
+    color: "#374151",
+    margin: "0 0 14px",
   },
   footer: {
-    padding: "16px 32px 24px",
-    backgroundColor: "#f9fafb",
-    fontSize: "12px",
+    padding: "24px 40px 32px",
+    backgroundColor: "#fafbfc",
+  },
+  footerText: {
+    fontSize: "13px",
+    lineHeight: 1.55,
     color: "#6b7280",
+    margin: "0 0 8px",
   },
   hr: {
     borderColor: "#e5e7eb",
-    margin: "0",
+    margin: 0,
   },
 };
 
@@ -84,12 +97,17 @@ export function EmailLayout({
 }: EmailLayoutProps) {
   return (
     <Html>
-      <Head />
+      <Head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </Head>
       <Preview>{preview}</Preview>
       <Body style={styles.body}>
         <Container style={styles.container}>
           <Section style={styles.header}>
-            <a href={appUrl}>
+            <a href={appUrl} style={styles.logoLink}>
               <Img src={logoUrl} alt="49GIG" style={styles.logo} />
             </a>
           </Section>
@@ -100,11 +118,11 @@ export function EmailLayout({
           </Section>
           <Hr style={styles.hr} />
           <Section style={styles.footer}>
-            <Text style={styles.text}>
+            <Text style={styles.footerText}>
               Sent on {date}. If you need help, reply to this email or contact
               support via your dashboard.
             </Text>
-            <Text style={styles.text}>49GIG, All rights reserved.</Text>
+            <Text style={styles.footerText}>© 49GIG. All rights reserved.</Text>
           </Section>
         </Container>
       </Body>

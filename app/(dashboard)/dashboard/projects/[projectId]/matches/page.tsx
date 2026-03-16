@@ -402,6 +402,10 @@ export default function ProjectMatchesPage() {
 
   const [matchingRunning, setMatchingRunning] = useState(false);
   const matchingAttemptedRef = useRef(false);
+  const [matchingAvailability, setMatchingAvailability] = useState<{
+    atRequestedLevel: number;
+    hasHigherLevelWithSkills: boolean;
+  } | null>(null);
   const [singleVisibleCount, setSingleVisibleCount] = useState(PAGE_SIZE);
   const [selectedSingleId, setSelectedSingleId] = useState<Id<"users"> | null>(
     null
@@ -440,9 +444,10 @@ export default function ProjectMatchesPage() {
   const hasMoreSingle =
     !isTeam && pendingMatches.length > singleVisibleCount;
 
-  // Reset "attempted" when project changes so a new project can trigger matching
+  // Reset "attempted" and availability when project changes so a new project can trigger matching
   useEffect(() => {
     matchingAttemptedRef.current = false;
+    setMatchingAvailability(null);
   }, [projectId]);
 
   // Run matching once when project is draft and no matches; do not retry on failure
@@ -462,7 +467,10 @@ export default function ProjectMatchesPage() {
     matchingAttemptedRef.current = true;
     setMatchingRunning(true);
     generateMatchesForDraft({ projectId })
-      .then(() => setMatchingRunning(false))
+      .then((result) => {
+        setMatchingRunning(false);
+        if (result?.availability) setMatchingAvailability(result.availability);
+      })
       .catch(() => {
         setMatchingRunning(false);
         toast.error("Matching failed. Try refreshing.");
@@ -684,15 +692,41 @@ export default function ProjectMatchesPage() {
       {!matchingRunning && pendingMatches.length === 0 && !(isTeam && allRoleLabels.length > 0) && (
         <Card className="rounded-xl border-border/60">
           <CardContent className="py-12 px-4 sm:px-8 text-center space-y-4">
-            <p className="font-medium text-foreground text-base sm:text-lg">
-              Thank you for submitting your hire request!
-            </p>
-            <div className="text-muted-foreground text-sm sm:text-base space-y-2 max-w-lg mx-auto">
-              <p>We&apos;re currently matching your role with the most qualified freelancers.</p>
-              <p>This may take a short moment as we ensure you get the best fit for your hire.</p>
-              <p>Matches usually appear within 24 hours.</p>
-              <p>You&apos;ll be notified as soon as we have suitable matches ready for review.</p>
-            </div>
+            {matchingAvailability ? (
+              <>
+                <p className="font-medium text-foreground text-base sm:text-lg">
+                  No freelancers at your selected experience level right now.
+                </p>
+                <div className="text-muted-foreground text-sm sm:text-base space-y-2 max-w-lg mx-auto">
+                  {matchingAvailability.hasHigherLevelWithSkills ? (
+                    <>
+                      <p>We match by the experience level you chose (Junior, Mid-Level, Senior, or Expert).</p>
+                      <p>We have higher-level talent available who match your skills. Consider editing your hire to select a different experience level—you may find great matches quickly.</p>
+                      <Link href={`/dashboard/projects/${projectId}/edit`}>
+                        <Button variant="outline" className="mt-2">Edit hire & change experience level</Button>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <p>We&apos;ll match you with qualified talent once it becomes available at your selected level.</p>
+                      <p>You&apos;ll be notified as soon as we have suitable matches ready for review.</p>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-foreground text-base sm:text-lg">
+                  Thank you for submitting your hire request!
+                </p>
+                <div className="text-muted-foreground text-sm sm:text-base space-y-2 max-w-lg mx-auto">
+                  <p>We&apos;re currently matching your role with the most qualified freelancers.</p>
+                  <p>This may take a short moment as we ensure you get the best fit for your hire.</p>
+                  <p>Matches usually appear within 24 hours.</p>
+                  <p>You&apos;ll be notified as soon as we have suitable matches ready for review.</p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -751,11 +785,18 @@ export default function ProjectMatchesPage() {
                   <Card className="rounded-xl border-dashed border-border/60 bg-muted/20">
                     <CardContent className="py-8 px-4 sm:px-6 text-center">
                       <p className="font-medium text-muted-foreground">
-                        No available freelancers for this role right now.
+                        No available freelancers for this role at your selected experience level.
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        We&apos;ll match you with qualified talent once it becomes available. You can proceed with your other selections or check back later.
+                        {matchingAvailability?.hasHigherLevelWithSkills
+                          ? "We have higher-level talent available. Consider editing your hire to select a different experience level."
+                          : "We'll match you with qualified talent once it becomes available. You can proceed with your other selections or check back later."}
                       </p>
+                      {matchingAvailability?.hasHigherLevelWithSkills && (
+                        <Link href={`/dashboard/projects/${projectId}/edit`}>
+                          <Button variant="outline" size="sm" className="mt-3">Edit hire</Button>
+                        </Link>
+                      )}
                     </CardContent>
                   </Card>
                 )}
