@@ -264,14 +264,14 @@ export default function ProjectDetailPage() {
   if (needContractSign && projectId && user._id) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
+          <Button variant="ghost" size="icon" className="shrink-0" asChild>
             <Link href="/dashboard/projects">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <h1 className="text-2xl font-heading font-bold">Sign the contract</h1>
+          <div className="min-w-0">
+            <h1 className="text-xl font-heading font-bold sm:text-2xl">Sign the contract</h1>
             <p className="text-sm text-muted-foreground">
               Read and sign the project agreement to continue. Your signature will be added and a copy sent to your email.
             </p>
@@ -351,18 +351,18 @@ export default function ProjectDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+          <Button variant="ghost" size="icon" className="shrink-0" asChild>
             <Link href="/dashboard/projects">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div className="space-y-1">
-            <h1 className="text-3xl font-heading font-bold">
+          <div className="min-w-0 space-y-1">
+            <h1 className="text-xl font-heading font-bold break-words sm:text-2xl md:text-3xl">
               {project.intakeForm.title}
             </h1>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant={statusConfig.variant}>
                 <StatusIcon className="mr-1 h-3 w-3" />
                 {statusConfig.label}
@@ -374,7 +374,7 @@ export default function ProjectDetailPage() {
           </div>
         </div>
         {(isClient || user?.role === "admin") && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 sm:shrink-0">
             {needContractSignPrePayment && (
               <Button asChild>
                 <Link href={`/dashboard/projects/${project._id}/contract`}>
