@@ -8,6 +8,7 @@ const apiModule = require("../_generated/api");
 const api = apiModule as {
   api: {
     notifications: { actions: { sendSystemNotification: unknown } };
+    matching: { actions: { generateMatchesForDraft: unknown } };
   };
 };
 const internalAny: any = apiModule.internal;
@@ -292,6 +293,22 @@ export const updateProject = mutation({
 
     await ctx.db.patch(args.projectId, updates);
 
+    // When intake form changes, delete existing matches and regenerate so client sees fresh matches
+    if (args.intakeForm) {
+      const existingMatches = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
+      for (const m of existingMatches) {
+        await ctx.db.delete(m._id);
+      }
+      const generateMatchesRef = api.api.matching.actions
+        .generateMatchesForDraft as unknown as FunctionReference<"action">;
+      await ctx.scheduler.runAfter(0, generateMatchesRef, {
+        projectId: args.projectId,
+      });
+    }
+
     // Log audit
     await ctx.db.insert("auditLogs", {
       action: "project_updated",
@@ -314,7 +331,9 @@ export const updateProject = mutation({
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [project.clientId],
       title: "Project updated",
-      message: `Project "${project.intakeForm.title}" was updated.`,
+      message: args.intakeForm
+        ? `Project "${project.intakeForm.title}" was updated. New matches are being generated.`
+        : `Project "${project.intakeForm.title}" was updated.`,
       type: "project",
       data: { projectId: args.projectId },
     });

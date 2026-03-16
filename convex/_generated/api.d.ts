@@ -42,6 +42,7 @@ import type * as dashboard_queries from "../dashboard/queries.js";
 import type * as disputes_actions from "../disputes/actions.js";
 import type * as disputes_mutations from "../disputes/mutations.js";
 import type * as disputes_queries from "../disputes/queries.js";
+import type * as email_actions from "../email/actions.js";
 import type * as email_send from "../email/send.js";
 import type * as http from "../http.js";
 import type * as kyc_actions from "../kyc/actions.js";
@@ -139,6 +140,7 @@ declare const fullApi: ApiFromModules<{
   "disputes/actions": typeof disputes_actions;
   "disputes/mutations": typeof disputes_mutations;
   "disputes/queries": typeof disputes_queries;
+  "email/actions": typeof email_actions;
   "email/send": typeof email_send;
   http: typeof http;
   "kyc/actions": typeof kyc_actions;

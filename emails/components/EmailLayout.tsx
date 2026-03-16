@@ -41,13 +41,13 @@ const styles = {
     overflow: "hidden",
   },
   header: {
-    padding: "40px 32px 32px",
+    padding: "24px 32px",
     backgroundColor: "#ffffff",
     textAlign: "center" as const,
   },
   logo: {
     display: "block",
-    height: "96px",
+    height: "150px",
     width: "auto",
     margin: "0 auto",
   },
