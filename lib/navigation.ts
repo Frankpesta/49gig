@@ -21,6 +21,7 @@ import {
   AlertCircle,
   DollarSign,
   Mail,
+  Send,
   Wallet,
   CalendarCheck,
   BookOpen,
@@ -190,6 +191,15 @@ export const navigationItems: NavItem[] = [
     title: "Enquiries",
     url: "/dashboard/enquiries",
     icon: Mail,
+    section: "menu",
+    roles: ["admin", "moderator"],
+  },
+
+  // Admin & Moderator: Send Email
+  {
+    title: "Send Email",
+    url: "/dashboard/send-email",
+    icon: Send,
     section: "menu",
     roles: ["admin", "moderator"],
   },

@@ -1353,3 +1353,32 @@ export function OneOnOneSessionScheduledEmail({
     </EmailLayout>
   );
 }
+
+/**
+ * Admin/moderator broadcast email - custom subject and body
+ */
+export function AdminBroadcastEmail({
+  subject,
+  body,
+  appUrl,
+  logoUrl,
+  date,
+}: {
+  subject: string;
+  body: string;
+  appUrl: string;
+  logoUrl: string;
+  date: string;
+}) {
+  return (
+    <EmailLayout
+      title={subject}
+      preview={body.slice(0, 100)}
+      appUrl={appUrl}
+      logoUrl={logoUrl}
+      date={date}
+    >
+      <Text style={{ ...textStyle, whiteSpace: "pre-wrap" }}>{body}</Text>
+    </EmailLayout>
+  );
+}

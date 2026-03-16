@@ -89,6 +89,16 @@ const DURATION_DISCOUNT: Record<string, number> = {
   "60": 0.95,
 };
 
+/** Format duration for display (e.g. "3 months", "2 years") */
+function formatDurationDisplay(projectDuration: string): string {
+  const months = getDurationMonths(projectDuration);
+  if (months >= 12) {
+    const years = months / 12;
+    return years === 1 ? "1 year" : `${years} years`;
+  }
+  return `${months} month${months > 1 ? "s" : ""}`;
+}
+
 const EXPERIENCE_LEVELS = [
   { value: "junior", label: "Junior (1–3 years)" },
   { value: "mid", label: "Mid-level (3–5 years)" },
@@ -858,6 +868,9 @@ export default function CreateProjectPage() {
                       {formatBudget(budgetCalculation.estimatedBudget)}
                     </span>
                   </div>
+                  <p className="text-sm text-muted-foreground">
+                    For {formatDurationDisplay(formData.projectDuration)} engagement
+                  </p>
                   {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 && (
                     <div className="mt-4 space-y-2">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Monthly breakdown per role</p>
@@ -881,7 +894,8 @@ export default function CreateProjectPage() {
                   <p className="text-xs text-muted-foreground">
                     Total you pay for this hire. {formData.projectDuration === "3" && "3% discount applied for 3-month commitment."}
                     {formData.projectDuration === "6" && "5% discount applied for 6-month commitment."}
-                    {["12", "24", "36", "48", "60"].includes(formData.projectDuration) && "5% discount applied for 12+ month commitment."}
+                    {["12", "24", "36", "48", "60"].includes(formData.projectDuration) &&
+                      `5% discount applied for ${formatDurationDisplay(formData.projectDuration)} commitment.`}
                   </p>
                 </div>
               ) : (
@@ -907,7 +921,7 @@ export default function CreateProjectPage() {
                         </span>
                       </div>
                       <p className="mt-2 text-sm text-muted-foreground">
-                        This is the total you pay for this hire.
+                        For {formatDurationDisplay(formData.projectDuration)} engagement. This is the total you pay for this hire.
                       </p>
                     </div>
                     {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 && (

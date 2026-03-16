@@ -226,3 +226,66 @@ export const getModeratorsAndAdminsInternal = internalQuery({
   },
 });
 
+/**
+ * Get emails for admin broadcast. Used by sendAdminBroadcastEmail action.
+ */
+export const getEmailsForAdminBroadcastInternal = internalQuery({
+  args: {
+    recipientType: v.union(
+      v.literal("all"),
+      v.literal("clients"),
+      v.literal("freelancers")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const users = await ctx.db.query("users").collect();
+    const active = users.filter((u) => u.status === "active" && u.email);
+    if (args.recipientType === "all") {
+      return active.map((u) => ({ email: u.email, name: u.name, role: u.role }));
+    }
+    if (args.recipientType === "clients") {
+      return active.filter((u) => u.role === "client").map((u) => ({ email: u.email, name: u.name, role: u.role }));
+    }
+    if (args.recipientType === "freelancers") {
+      return active.filter((u) => u.role === "freelancer").map((u) => ({ email: u.email, name: u.name, role: u.role }));
+    }
+    return [];
+  },
+});
+
+/**
+ * Get recipient counts for admin broadcast (admin/moderator only)
+ */
+export const getBroadcastRecipientCounts = query({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    let currentUser: Doc<"users"> | null = null;
+    if (args.userId) {
+      const u = await ctx.db.get(args.userId);
+      if (u && (u as Doc<"users">).status === "active") currentUser = u as Doc<"users">;
+    }
+    if (!currentUser) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (identity?.email) {
+        const u = await ctx.db
+          .query("users")
+          .withIndex("by_email", (q) => q.eq("email", identity.email!))
+          .first();
+        if (u && (u as Doc<"users">).status === "active") currentUser = u as Doc<"users">;
+      }
+    }
+    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "moderator")) {
+      return null;
+    }
+    const users = await ctx.db.query("users").collect();
+    const active = users.filter((u) => u.status === "active" && u.email);
+    return {
+      all: active.length,
+      clients: active.filter((u) => u.role === "client").length,
+      freelancers: active.filter((u) => u.role === "freelancer").length,
+    };
+  },
+});
+

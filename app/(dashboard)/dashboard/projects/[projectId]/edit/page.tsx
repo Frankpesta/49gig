@@ -82,6 +82,16 @@ const DURATION_DISCOUNT: Record<string, number> = {
   "60": 0.95,
 };
 
+/** Format duration for display (e.g. "3 months", "2 years") */
+function formatDurationDisplay(projectDuration: string): string {
+  const months = getDurationMonths(projectDuration);
+  if (months >= 12) {
+    const years = months / 12;
+    return years === 1 ? "1 year" : `${years} years`;
+  }
+  return `${months} month${months > 1 ? "s" : ""}`;
+}
+
 const EXPERIENCE_LEVELS = [
   { value: "junior", label: "Junior (1–3 years)" },
   { value: "mid", label: "Mid-level (3–5 years)" },
@@ -597,6 +607,9 @@ export default function EditProjectPage() {
                 <span className="text-sm font-medium text-muted-foreground">Estimated total</span>
                 <span className="text-2xl font-bold">{formatBudget(budgetCalculation.estimatedBudget)}</span>
               </div>
+              <p className="text-sm text-muted-foreground">
+                For {formatDurationDisplay(formData.projectDuration)} engagement.
+              </p>
               <p className="text-sm text-muted-foreground">
                 You can fund all months upfront or pay one month at a time. All funds are held in escrow by 49GIG and released to the freelancer monthly after you approve each month. If no action is taken within 0–72 hours, the monthly salary is automatically released.
               </p>
