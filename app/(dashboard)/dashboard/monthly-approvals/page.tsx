@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { CalendarCheck, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { getDurationMonths } from "@/lib/project-duration";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function MonthlyApprovalsPage() {
@@ -129,11 +130,7 @@ function MonthlyApprovalCard({
     month: "long",
     year: "numeric",
   });
-  const durMonths = project?.intakeForm?.projectDuration
-    ? project.intakeForm.projectDuration === "12+"
-      ? 12
-      : parseInt(project.intakeForm.projectDuration, 10) || 1
-    : 1;
+  const durMonths = getDurationMonths(project?.intakeForm?.projectDuration) || 1;
   const amountDollars = project
     ? (project.totalAmount / durMonths).toFixed(2)
     : (cycle.amountCents / 100).toFixed(2);

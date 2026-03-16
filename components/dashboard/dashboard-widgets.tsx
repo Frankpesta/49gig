@@ -69,7 +69,7 @@ export function ProjectAnalyticsCard({
   return (
     <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">{isClient ? "Hire Analytics" : "Project Analytics"}</CardTitle>
+        <CardTitle className="text-base font-semibold">Hire Analytics</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
@@ -258,7 +258,7 @@ export function ProjectProgressCard({
   return (
     <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Project Progress</CardTitle>
+        <CardTitle className="text-base font-semibold">Hire Progress</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (

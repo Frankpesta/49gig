@@ -87,13 +87,13 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Projects Stats */}
+        {/* Hires Stats */}
         <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden relative">
           <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Projects
+                Total Hires
               </CardTitle>
               <div className="relative">
                 <div className="absolute inset-0 bg-blue-500/10 rounded-full blur-xl group-hover:bg-blue-500/20 transition-colors duration-300" />
@@ -208,12 +208,12 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Projects Breakdown */}
+        {/* Hires Breakdown */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FolderKanban className="h-5 w-5" />
-              Projects Breakdown
+              Hires Breakdown
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

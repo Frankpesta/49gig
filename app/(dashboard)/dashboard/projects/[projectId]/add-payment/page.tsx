@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, DollarSign, ExternalLink } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { getDurationMonths } from "@/lib/project-duration";
 import Link from "next/link";
 
 export default function AddPaymentPage() {
@@ -95,10 +96,7 @@ export default function AddPaymentPage() {
     return null;
   }
 
-  const durMonths =
-    project.intakeForm?.projectDuration === "12+"
-      ? 12
-      : Math.max(1, parseInt(project.intakeForm?.projectDuration ?? "1", 10) || 1);
+  const durMonths = getDurationMonths(project.intakeForm?.projectDuration);
   const perMonth = project.totalAmount / durMonths;
   const amountToPay = perMonth * monthsToFund;
 

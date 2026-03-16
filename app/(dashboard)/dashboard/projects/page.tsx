@@ -177,7 +177,7 @@ export default function ProjectsPage() {
         </DashboardFilterBar>
       )}
 
-      {/* Projects List */}
+      {/* Hires List */}
       {projects === undefined ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (

@@ -174,7 +174,7 @@ export default function DashboardPage() {
     : isFreelancer
     ? [
         {
-          title: "Total Projects",
+          title: "Total Hires",
           subtitle: "All time",
           value: projects?.length ?? 0,
           description: "Increased from last month",
@@ -187,7 +187,7 @@ export default function DashboardPage() {
           title: "Completed",
           subtitle: "Delivered",
           value: projects?.filter((p: any) => p.status === "completed").length ?? 0,
-          description: "Projects finished",
+          description: "Hires finished",
           icon: Briefcase,
           variant: "default" as const,
           badge: "Done",
@@ -206,7 +206,7 @@ export default function DashboardPage() {
           title: "Earnings",
           subtitle: "This month",
           value: formatCurrency(dashboardMetrics?.metrics?.earnings ?? 0),
-          description: "From completed projects",
+          description: "From completed hires",
           icon: DollarSign,
           variant: "default" as const,
           trend: dashboardMetrics?.metrics?.trends?.earnings,
@@ -283,7 +283,7 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground mt-1">
             {isClient
               ? "Plan, prioritize, and manage your hires with ease."
-              : "Plan, prioritize, and accomplish your projects with ease."}
+              : "Plan, prioritize, and accomplish your hires with ease."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -298,7 +298,7 @@ export default function DashboardPage() {
           <Button asChild variant="outline" className="rounded-xl border-primary/50 text-primary hover:bg-primary/10 hover:border-secondary/50 hover:text-secondary-foreground">
             <Link href="/dashboard/projects">
               <Briefcase className="mr-2 h-4 w-4" />
-              {isClient ? "View Hires" : "View Projects"}
+              View Hires
             </Link>
           </Button>
         </div>
@@ -488,7 +488,7 @@ export default function DashboardPage() {
             </div>
           ) : recentActivity.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              No recent activity. Your activity will appear here as you get matches, messages, and project updates.
+              No recent activity. Your activity will appear here as you get matches, messages, and hire updates.
             </p>
           ) : (
             <ul className="space-y-3">

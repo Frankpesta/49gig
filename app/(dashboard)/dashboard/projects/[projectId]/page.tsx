@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { getDurationMonths } from "@/lib/project-duration";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -191,7 +192,7 @@ export default function ProjectDetailPage() {
               The project ID in the URL is not valid. Please check the URL and try again.
             </p>
             <Button asChild>
-              <Link href="/dashboard/projects">Back to Projects</Link>
+              <Link href="/dashboard/projects">Back to hires</Link>
             </Button>
           </CardContent>
         </Card>
@@ -222,12 +223,12 @@ export default function ProjectDetailPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
-            <h3 className="mb-2 text-lg font-semibold">Project not found</h3>
+            <h3 className="mb-2 text-lg font-semibold">Hire not found</h3>
             <p className="mb-4 text-center text-sm text-muted-foreground">
-              The project you're looking for doesn't exist or you don't have access to it.
+              The hire you're looking for doesn't exist or you don't have access to it.
             </p>
             <Button asChild>
-              <Link href="/dashboard/projects">Back to Projects</Link>
+              <Link href="/dashboard/projects">Back to hires</Link>
             </Button>
           </CardContent>
         </Card>
@@ -577,7 +578,7 @@ export default function ProjectDetailPage() {
                     const statusLabel = isClient
                       ? (cycle.status === "pending" ? "Awaiting your approval" : cycle.status === "approved" ? "Approved" : cycle.status === "disputed" ? "Disputed" : cycle.status)
                       : (cycle.status === "pending" ? "Awaiting client approval" : cycle.status === "approved" ? "Approved, funds released" : cycle.status === "disputed" ? "Disputed" : cycle.status);
-                    const durMonths = project?.intakeForm?.projectDuration ? (project.intakeForm.projectDuration === "12+" ? 12 : parseInt(project.intakeForm.projectDuration, 10) || 1) : monthlyCycles.length || 1;
+                    const durMonths = getDurationMonths(project?.intakeForm?.projectDuration) || monthlyCycles.length || 1;
                     const displayAmount = isClient ? (project ? project.totalAmount / durMonths : cycle.amountCents / 100) : cycle.amountCents / 100;
                     return (
                       <div key={cycle._id} className="flex items-center justify-between rounded-lg border p-4">

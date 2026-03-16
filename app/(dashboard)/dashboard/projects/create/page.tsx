@@ -45,6 +45,7 @@ import {
   getSoftwareDevFieldLabel,
 } from "@/lib/platform-skills";
 import { toast } from "sonner";
+import { getDurationMonths } from "@/lib/project-duration";
 
 const PROJECT_DURATIONS = [
   { value: "3", label: "3 months" },
@@ -52,19 +53,40 @@ const PROJECT_DURATIONS = [
   { value: "12+", label: "1 year +" },
 ] as const;
 
-export type ProjectDuration = (typeof PROJECT_DURATIONS)[number]["value"];
+/** Shown when client selects "1 year +" – exact engagement length */
+const ENGAGEMENT_YEAR_OPTIONS = [
+  { value: "12", label: "1 year" },
+  { value: "24", label: "2 years" },
+  { value: "36", label: "3 years" },
+  { value: "48", label: "4 years" },
+  { value: "60", label: "5 years" },
+] as const;
 
-const DURATION_DAYS: Record<ProjectDuration, number> = {
+export type ProjectDuration =
+  | (typeof PROJECT_DURATIONS)[number]["value"]
+  | (typeof ENGAGEMENT_YEAR_OPTIONS)[number]["value"];
+
+const DURATION_DAYS: Record<string, number> = {
   "3": 90,
   "6": 180,
   "12+": 365,
+  "12": 365,
+  "24": 730,
+  "36": 1095,
+  "48": 1460,
+  "60": 1825,
 };
 
 /** Duration discount: 3% for 3 months, 5% for 6+ months */
-const DURATION_DISCOUNT: Record<ProjectDuration, number> = {
+const DURATION_DISCOUNT: Record<string, number> = {
   "3": 0.97,
   "6": 0.95,
   "12+": 0.95,
+  "12": 0.95,
+  "24": 0.95,
+  "36": 0.95,
+  "48": 0.95,
+  "60": 0.95,
 };
 
 const EXPERIENCE_LEVELS = [
@@ -144,7 +166,7 @@ export default function CreateProjectPage() {
     if (!formData.startDate || !formData.projectDuration) return null;
     const start = parseLocalDateString(formData.startDate);
     if (!start || isNaN(start.getTime())) return null;
-    const days = DURATION_DAYS[formData.projectDuration as ProjectDuration];
+    const days = DURATION_DAYS[formData.projectDuration] ?? 90;
     if (days == null || days <= 0) return null;
     const end = new Date(start);
     end.setDate(end.getDate() + days);
@@ -316,6 +338,10 @@ export default function CreateProjectPage() {
         setError("Please select hire duration");
         return;
       }
+      if (formData.projectDuration === "12+") {
+        setError("Please select how long this engagement will last (1 year, 2 years, etc.)");
+        return;
+      }
       const startDate = parseLocalDateString(formData.startDate);
       if (!startDate || isNaN(startDate.getTime())) {
         setError("Invalid start date format");
@@ -357,7 +383,7 @@ export default function CreateProjectPage() {
       const totalAmount = budgetCalculation.estimatedBudget;
       const platformFee = platformFeePct ?? 25;
 
-      const durationMonths = formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10);
+      const durationMonths = getDurationMonths(formData.projectDuration);
       const teamBudgetBreakdown =
         formData.hireType === "team" &&
         budgetCalculation.breakdown?.teamMembers &&
@@ -393,7 +419,9 @@ export default function CreateProjectPage() {
           timeline:
             formData.projectDuration === "12+"
               ? "1 year +"
-              : `${formData.projectDuration} months`,
+              : getDurationMonths(formData.projectDuration) >= 12
+                ? `${getDurationMonths(formData.projectDuration) / 12} year${getDurationMonths(formData.projectDuration) > 12 ? "s" : ""}`
+                : `${formData.projectDuration} months`,
           category: getPrimaryCategory(formData.selectedRoles),
           estimatedBudget: totalAmount,
         },
@@ -729,7 +757,7 @@ export default function CreateProjectPage() {
                       type="button"
                       onClick={() => setFormData({ ...formData, projectDuration: d.value as ProjectDuration })}
                       className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
-                        formData.projectDuration === d.value
+                        formData.projectDuration === d.value || (d.value === "12+" && ["12", "24", "36", "48", "60"].includes(formData.projectDuration))
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border/60 bg-muted/30 hover:border-primary/50"
                       }`}
@@ -738,6 +766,30 @@ export default function CreateProjectPage() {
                     </button>
                   ))}
                 </div>
+                {(formData.projectDuration === "12+" || ["12", "24", "36", "48", "60"].includes(formData.projectDuration)) && (
+                  <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                    <Label className="text-sm font-medium text-foreground">How long will this engagement last?</Label>
+                    <p className="mt-1 text-sm text-muted-foreground mb-3">
+                      Select the exact duration so we can calculate your budget and set up milestones correctly.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {ENGAGEMENT_YEAR_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, projectDuration: opt.value as ProjectDuration })}
+                          className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all ${
+                            formData.projectDuration === opt.value
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border/60 bg-muted/30 hover:border-primary/50"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -829,7 +881,7 @@ export default function CreateProjectPage() {
                   <p className="text-xs text-muted-foreground">
                     Total you pay for this hire. {formData.projectDuration === "3" && "3% discount applied for 3-month commitment."}
                     {formData.projectDuration === "6" && "5% discount applied for 6-month commitment."}
-                    {formData.projectDuration === "12+" && "5% discount applied for 12+ month commitment."}
+                    {["12", "24", "36", "48", "60"].includes(formData.projectDuration) && "5% discount applied for 12+ month commitment."}
                   </p>
                 </div>
               ) : (
@@ -896,8 +948,8 @@ export default function CreateProjectPage() {
                           <SelectValue placeholder="Select months" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({ length: formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10) }, (_, i) => i + 1).map((n) => {
-                            const durMonths = formData.projectDuration === "12+" ? 12 : parseInt(formData.projectDuration || "3", 10);
+                          {Array.from({ length: getDurationMonths(formData.projectDuration) }, (_, i) => i + 1).map((n) => {
+                            const durMonths = getDurationMonths(formData.projectDuration);
                             const perMonth = budgetCalculation.estimatedBudget / durMonths;
                             return (
                               <SelectItem key={n} value={String(n)}>

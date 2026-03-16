@@ -255,7 +255,12 @@ export default defineSchema({
         v.union(
           v.literal("3"),
           v.literal("6"),
-          v.literal("12+")
+          v.literal("12+"),
+          v.literal("12"),
+          v.literal("24"),
+          v.literal("36"),
+          v.literal("48"),
+          v.literal("60")
         )
       ),
       roleType: v.optional(
