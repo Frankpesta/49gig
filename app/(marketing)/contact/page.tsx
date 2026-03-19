@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 
 export default function ContactPage() {
+  const analytics = useAnalytics();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -64,7 +65,7 @@ export default function ContactPage() {
         category: formData.category,
         message: formData.message.trim(),
       });
-      trackEvent("generate_lead", { category: formData.category });
+      analytics.trackEvent("generate_lead", { category: formData.category });
       setIsSubmitted(true);
       setFormData({ name: "", email: "", subject: "", category: "", message: "" });
       setTimeout(() => setIsSubmitted(false), 5000);
