@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAction } from "convex/react";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,6 +32,7 @@ import {
 } from "lucide-react";
 
 export default function ContactPage() {
+  const analytics = useAnalytics();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -63,6 +65,7 @@ export default function ContactPage() {
         category: formData.category,
         message: formData.message.trim(),
       });
+      analytics.trackEvent("generate_lead", { category: formData.category });
       setIsSubmitted(true);
       setFormData({ name: "", email: "", subject: "", category: "", message: "" });
       setTimeout(() => setIsSubmitted(false), 5000);

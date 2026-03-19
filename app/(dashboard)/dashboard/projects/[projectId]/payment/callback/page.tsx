@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
 
@@ -40,6 +41,8 @@ export default function PaymentCallbackPage() {
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [verificationSuccess, setVerificationSuccess] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const { trackEvent } = useAnalytics();
+  const hasTracked = useRef(false);
 
   // Verify payment when component mounts
   useEffect(() => {
@@ -77,6 +80,10 @@ export default function PaymentCallbackPage() {
   useEffect(() => {
     const success = isTopUp ? verificationSuccess && !verificationError : paymentStatus?.isFunded && !isVerifying && !verificationError;
     if (success) {
+      if (!hasTracked.current) {
+        hasTracked.current = true;
+        trackEvent(isTopUp ? "add_payment" : "purchase", { project_id: projectId, value: paymentStatus?.totalAmount });
+      }
       const timer = setTimeout(() => {
         setRedirecting(true);
         router.push(`/dashboard/projects/${projectId}`);
@@ -84,7 +91,7 @@ export default function PaymentCallbackPage() {
 
       return () => clearTimeout(timer);
     }
-  }, [isTopUp, verificationSuccess, paymentStatus?.isFunded, isVerifying, verificationError, projectId, router]);
+  }, [isTopUp, verificationSuccess, paymentStatus?.isFunded, paymentStatus?.totalAmount, isVerifying, verificationError, projectId, router, trackEvent]);
 
   if (!user) {
     return null;

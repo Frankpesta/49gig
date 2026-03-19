@@ -14,10 +14,12 @@ import { clientSignupFeatures } from "@/components/auth/auth-icons";
 import { CountrySelector } from "@/components/ui/country-selector";
 import { getCountryByCode } from "@/lib/countries";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function ClientSignupPage() {
   const router = useRouter();
+  const { trackEvent } = useAnalytics();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -87,6 +89,7 @@ export default function ClientSignupPage() {
       });
 
       if (result.success) {
+        trackEvent("sign_up", { method: "email", role: "client" });
         if (result.emailVerificationRequired) {
           if (result.sessionToken) {
             localStorage.setItem("sessionToken", result.sessionToken);

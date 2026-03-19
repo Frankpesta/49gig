@@ -20,6 +20,7 @@ import {
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { loginFeatures } from "@/components/auth/auth-icons";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
@@ -29,6 +30,7 @@ const authCardClass =
 
 function VerifyEmailContent() {
   const router = useRouter();
+  const { trackEvent } = useAnalytics();
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -82,9 +84,10 @@ function VerifyEmailContent() {
     try {
       const result = await verifyEmail({ code: verifyCode });
       if (result.success) {
-      setSuccess(true);
-      sessionStorage.removeItem("pending_verify_email");
-    }
+        trackEvent("sign_up", { method: "email", step: "verify_email" });
+        setSuccess(true);
+        sessionStorage.removeItem("pending_verify_email");
+      }
     } catch (err: unknown) {
       setError(getUserFriendlyError(err) || "Failed to verify email");
     } finally {

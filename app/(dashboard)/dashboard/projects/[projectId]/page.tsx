@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { getDurationMonths } from "@/lib/project-duration";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,6 +109,7 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { trackEvent } = useAnalytics();
   const projectIdParam = params.projectId;
   const [isOpeningChat, setIsOpeningChat] = useState(false);
   const [rating, setRating] = useState(0);
@@ -324,6 +326,7 @@ export default function ProjectDetailPage() {
         status: "completed",
         userId: user._id,
       });
+      trackEvent("complete_project", { project_id: projectId });
       toast.success("Project marked as completed");
       router.refresh();
     } catch (err) {
