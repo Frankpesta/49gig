@@ -367,7 +367,7 @@ export default defineSchema({
     escrowedAmount: v.number(),
     platformFee: v.number(), // Percentage (e.g., 10)
     currency: v.string(), // "usd"
-    fundUpfrontMonths: v.optional(v.number()), // Months funded with (initial or latest) payment; must be >= 1
+    fundUpfrontMonths: v.optional(v.number()), // Months paid for (held in escrow; released only at month end)
 
     // Tracking for follow-up payments: last month index that has been paid for (1-based)
     lastFundedMonthIndex: v.optional(v.number()),
