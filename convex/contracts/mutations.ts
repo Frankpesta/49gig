@@ -54,6 +54,8 @@ export const signContract = mutation({
   args: {
     projectId: v.string(),
     userId: v.optional(v.id("users")),
+    signedAtIp: v.optional(v.string()),
+    signedAtUserAgent: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const projectId = ctx.db.normalizeId("projects", args.projectId);
@@ -83,6 +85,8 @@ export const signContract = mutation({
       }
       await ctx.db.patch(projectId, {
         clientContractSignedAt: now,
+        clientContractSignedAtIp: args.signedAtIp,
+        clientContractSignedAtUserAgent: args.signedAtUserAgent,
         updatedAt: now,
       });
     } else {
@@ -93,7 +97,12 @@ export const signContract = mutation({
       await ctx.db.patch(projectId, {
         freelancerContractSignatures: [
           ...existing,
-          { freelancerId: user._id, signedAt: now },
+          {
+            freelancerId: user._id,
+            signedAt: now,
+            signedAtIp: args.signedAtIp,
+            signedAtUserAgent: args.signedAtUserAgent,
+          },
         ],
         updatedAt: now,
       });
@@ -106,7 +115,13 @@ export const signContract = mutation({
       actorRole: user.role,
       targetType: "project",
       targetId: projectId,
-      details: { role: isClient ? "client" : "freelancer" },
+      details: {
+        role: isClient ? "client" : "freelancer",
+        accountId: user._id,
+        timestamp: now,
+        ip: args.signedAtIp,
+        userAgent: args.signedAtUserAgent,
+      },
       createdAt: now,
     });
 

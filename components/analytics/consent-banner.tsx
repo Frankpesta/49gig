@@ -22,6 +22,15 @@ export function ConsentBanner({ onConsentChange }: ConsentBannerProps) {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!mounted || typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("accept_analytics") === "1") {
+      setStoredConsent("granted");
+      onConsentChange?.("granted");
+    }
+  }, [mounted, onConsentChange]);
+
   const stored = mounted ? getStoredConsent() : null;
 
   const handleChoice = (status: ConsentStatus) => {

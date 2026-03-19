@@ -41,6 +41,7 @@ export const initiateDispute = mutation({
   args: {
     projectId: v.string(), // Accept string (e.g. from URL); normalized in handler
     milestoneId: v.optional(v.string()),
+    monthlyCycleId: v.optional(v.string()),
     type: v.union(
       v.literal("milestone_quality"),
       v.literal("payment"),
@@ -79,7 +80,11 @@ export const initiateDispute = mutation({
     const milestoneIdRaw = args.milestoneId
       ? ctx.db.normalizeId("milestones", args.milestoneId)
       : undefined;
-    const milestoneId = milestoneIdRaw ?? undefined; // normalizeId returns null; schema expects undefined
+    const milestoneId = milestoneIdRaw ?? undefined;
+    const monthlyCycleIdRaw = args.monthlyCycleId
+      ? ctx.db.normalizeId("monthlyBillingCycles", args.monthlyCycleId)
+      : undefined;
+    const monthlyCycleId = monthlyCycleIdRaw ?? undefined;
 
     // Get project
     const project = await ctx.db.get(projectId);
@@ -89,7 +94,9 @@ export const initiateDispute = mutation({
 
     // Check authorization - must be client or freelancer on this project
     const isClient = project.clientId === user._id;
-    const isFreelancer = project.matchedFreelancerId === user._id;
+    const isFreelancer =
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds?.includes(user._id) ?? false);
 
     if (!isClient && !isFreelancer) {
       throw new Error("Unauthorized - must be project client or freelancer");
@@ -107,7 +114,14 @@ export const initiateDispute = mutation({
       )
       .collect();
 
-    if (milestoneId) {
+    if (monthlyCycleId) {
+      const cycleDispute = existingDisputes.find(
+        (d) => d.monthlyCycleId === monthlyCycleId
+      );
+      if (cycleDispute) {
+        throw new Error("Dispute already exists for this monthly payment");
+      }
+    } else if (milestoneId) {
       const milestoneDispute = existingDisputes.find(
         (d) => d.milestoneId === milestoneId
       );
@@ -115,8 +129,9 @@ export const initiateDispute = mutation({
         throw new Error("Dispute already exists for this milestone");
       }
     } else {
-      // Check for open project-level disputes
-      const projectDispute = existingDisputes.find((d) => !d.milestoneId);
+      const projectDispute = existingDisputes.find(
+        (d) => !d.milestoneId && !d.monthlyCycleId
+      );
       if (projectDispute) {
         throw new Error("An open dispute already exists for this project");
       }
@@ -124,13 +139,17 @@ export const initiateDispute = mutation({
 
     // Calculate locked amount
     let lockedAmount = 0;
-    if (milestoneId) {
+    if (monthlyCycleId) {
+      const cycle = await ctx.db.get(monthlyCycleId);
+      if (cycle && cycle.status === "pending") {
+        lockedAmount = cycle.amountCents / 100; // Convert cents to dollars for lockedAmount (stored as dollars)
+      }
+    } else if (milestoneId) {
       const milestone = await ctx.db.get(milestoneId);
       if (milestone) {
         lockedAmount = milestone.amount;
       }
     } else {
-      // Lock all remaining escrowed funds
       lockedAmount = project.escrowedAmount || 0;
     }
 
@@ -138,6 +157,7 @@ export const initiateDispute = mutation({
     const disputeId = await ctx.db.insert("disputes", {
       projectId,
       milestoneId,
+      monthlyCycleId,
       initiatorId: user._id,
       initiatorRole: user.role === "client" ? "client" : "freelancer",
       type: args.type,
@@ -149,6 +169,14 @@ export const initiateDispute = mutation({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
+
+    if (monthlyCycleId) {
+      await ctx.db.patch(monthlyCycleId, {
+        status: "disputed",
+        disputeId,
+        updatedAt: Date.now(),
+      });
+    }
 
     // Update project status to disputed
     await ctx.db.patch(projectId, {

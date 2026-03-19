@@ -13,12 +13,24 @@ interface GoogleAnalyticsProps {
 export function GoogleAnalytics({ consent }: GoogleAnalyticsProps) {
   const pathname = usePathname();
   const initialized = useRef(false);
+  const lastPathRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (consent !== "granted") return;
 
     const measurementId = getGaMeasurementId();
     if (!measurementId) return;
+
+    const sendPageView = () => {
+      if (typeof window === "undefined" || !window.gtag) return;
+      const url = window.location.href;
+      window.gtag("event", "page_view", {
+        page_path: pathname,
+        page_location: url,
+        page_title: document.title,
+      });
+      lastPathRef.current = pathname;
+    };
 
     const initGtag = () => {
       if (typeof window === "undefined") return;
@@ -30,7 +42,7 @@ export function GoogleAnalytics({ consent }: GoogleAnalyticsProps) {
       window.gtag = gtag as NonNullable<typeof window.gtag>;
       gtag("js", new Date());
 
-      const isDebug = typeof window !== "undefined" && window.location.search.includes("debug_mode=true");
+      const isDebug = window.location.search.includes("debug_mode=true");
       window.gtag("config", measurementId, {
         send_page_view: false,
         anonymize_ip: true,
@@ -39,6 +51,7 @@ export function GoogleAnalytics({ consent }: GoogleAnalyticsProps) {
       });
 
       initialized.current = true;
+      sendPageView();
     };
 
     if (!initialized.current) {
@@ -48,14 +61,14 @@ export function GoogleAnalytics({ consent }: GoogleAnalyticsProps) {
       script.onload = initGtag;
       document.head.appendChild(script);
     }
-  }, [consent]);
+  }, [consent, pathname]);
 
   useEffect(() => {
     if (consent !== "granted") return;
-
     const measurementId = getGaMeasurementId();
-    if (!measurementId || !window.gtag) return;
-
+    if (!measurementId || !window.gtag || !initialized.current) return;
+    if (lastPathRef.current === pathname) return;
+    lastPathRef.current = pathname;
     const url = typeof window !== "undefined" ? window.location.href : "";
     window.gtag("event", "page_view", {
       page_path: pathname,
