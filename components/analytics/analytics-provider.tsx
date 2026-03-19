@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ConsentBanner } from "./consent-banner";
-import { GoogleAnalytics } from "./google-analytics";
-import { getStoredConsent } from "@/lib/analytics";
+import { GoogleTagManager } from "./google-tag-manager";
+import { getStoredConsent, pushConsentUpdate } from "@/lib/analytics";
 
-const hasGaId = !!(process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID);
+const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
 
 export function AnalyticsProvider() {
   const [consent, setConsent] = useState<"granted" | "denied" | null>(null);
@@ -16,13 +16,23 @@ export function AnalyticsProvider() {
 
   const handleConsentChange = useCallback((status: "granted" | "denied" | null) => {
     setConsent(status);
+    if (status !== null) {
+      pushConsentUpdate(status === "granted");
+    }
   }, []);
 
-  if (!hasGaId) return null;
+  // Sync consent_update when we have stored consent on load (e.g. returning user)
+  useEffect(() => {
+    if (consent && gtmId) {
+      pushConsentUpdate(consent === "granted");
+    }
+  }, [consent, gtmId]);
+
+  if (!gtmId) return <ConsentBanner onConsentChange={handleConsentChange} />;
 
   return (
     <>
-      <GoogleAnalytics consent={consent} />
+      <GoogleTagManager consent={consent} gtmId={gtmId} />
       <ConsentBanner onConsentChange={handleConsentChange} />
     </>
   );

@@ -1,9 +1,28 @@
 /**
- * Google Analytics 4 - Consent-first implementation
- * No tracking occurs until user explicitly consents.
+ * Google Tag Manager - Consent Mode v2 implementation
+ * GTM loads with default consent denied; tags fire only after consent_update.
+ * GTM manages GA4, Meta Pixel, Google Ads, etc. from the GTM dashboard.
  */
 
 export const CONSENT_STORAGE_KEY = "ga_consent";
+
+/**
+ * Conversion events we push to dataLayer. Use these in GTM triggers.
+ * GA4 / Meta mapping:
+ * - sign_up → CompleteRegistration
+ * - purchase, add_payment → Purchase
+ * - generate_lead → Lead
+ * - begin_checkout → InitiateCheckout
+ * - sign_contract → AddPaymentInfo (or custom)
+ */
+export const CONVERSION_EVENTS = {
+  SIGN_UP: "sign_up",
+  PURCHASE: "purchase",
+  ADD_PAYMENT: "add_payment",
+  GENERATE_LEAD: "generate_lead",
+  BEGIN_CHECKOUT: "begin_checkout",
+  SIGN_CONTRACT: "sign_contract",
+} as const;
 
 export type ConsentStatus = "granted" | "denied" | null;
 
@@ -33,25 +52,39 @@ export function setStoredConsent(status: ConsentStatus): void {
   }
 }
 
-/** GA4 Measurement ID - set via NEXT_PUBLIC_GA_MEASUREMENT_ID */
-export function getGaMeasurementId(): string | null {
+/** GTM Container ID - set via NEXT_PUBLIC_GTM_ID */
+export function getGtmId(): string | null {
   if (typeof window === "undefined") return null;
-  return process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || null;
+  return process.env.NEXT_PUBLIC_GTM_ID || null;
 }
 
-/** Check if GA is configured and consented */
+/** Check if tracking is configured and consented */
 export function canTrack(): boolean {
-  return getStoredConsent() === "granted" && !!getGaMeasurementId();
+  return getStoredConsent() === "granted" && !!getGtmId();
 }
 
-/** Declare gtag on window for TypeScript */
+/**
+ * Push Google Consent Mode v2 consent_update to dataLayer.
+ * Call when user accepts analytics. Uses gtag format for GTM compatibility.
+ */
+export function pushConsentUpdate(granted: boolean): void {
+  if (typeof window === "undefined") return;
+  window.dataLayer = window.dataLayer || [];
+  const value = granted ? "granted" : "denied";
+  (window.dataLayer as object[]).push([
+    "consent",
+    "update",
+    {
+      ad_storage: value,
+      ad_user_data: value,
+      ad_personalization: value,
+      analytics_storage: value,
+    },
+  ]);
+}
+
 declare global {
   interface Window {
-    gtag?: (
-      command: "config" | "event" | "js",
-      targetId: string,
-      config?: Record<string, unknown>
-    ) => void;
     dataLayer?: unknown[];
   }
 }

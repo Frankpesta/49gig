@@ -5,6 +5,7 @@ import { ConvexClientProvider } from "@/lib/convex-provider";
 import { QueryProvider } from "@/lib/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
+import { GtmHeadScript } from "@/components/analytics/gtm-head-script";
 import { Toaster } from "sonner";
 
 // Plus Jakarta Sans - Lively, modern, vibrant dashboard font (reference design)
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body
         className={`${plusJakarta.variable} font-sans antialiased bg-background text-foreground`}
       >
+        <GtmHeadScript />
         <ThemeProvider
           attribute="class"
           defaultTheme="light"
