@@ -3,6 +3,19 @@ import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 
 /**
+ * Get all payments for a project (internal - for dispute resolution).
+ */
+export const getPaymentsByProjectInternal = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("payments")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+  },
+});
+
+/**
  * Get payment by project ID
  * Internal query
  */

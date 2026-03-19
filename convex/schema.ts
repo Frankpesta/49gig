@@ -351,8 +351,15 @@ export default defineSchema({
     contractGeneratedAt: v.optional(v.number()),
     contractSignedAt: v.optional(v.number()),
     clientContractSignedAt: v.optional(v.number()),
+    clientContractSignedAtIp: v.optional(v.string()),
+    clientContractSignedAtUserAgent: v.optional(v.string()),
     freelancerContractSignatures: v.optional(
-      v.array(v.object({ freelancerId: v.id("users"), signedAt: v.number() }))
+      v.array(v.object({
+        freelancerId: v.id("users"),
+        signedAt: v.number(),
+        signedAtIp: v.optional(v.string()),
+        signedAtUserAgent: v.optional(v.string()),
+      }))
     ),
 
     // Payment
@@ -836,8 +843,10 @@ export default defineSchema({
     // Project
     projectId: v.id("projects"),
 
-    // Milestone (if milestone-specific)
+    // Milestone (legacy - deprecated; use monthlyCycleId for monthly payments)
     milestoneId: v.optional(v.id("milestones")),
+    // Monthly billing cycle (for monthly payment disputes)
+    monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
 
     // Initiator
     initiatorId: v.id("users"),

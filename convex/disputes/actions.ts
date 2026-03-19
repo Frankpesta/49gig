@@ -34,30 +34,39 @@ export const attemptAutomatedResolution = action({
       throw new Error("Project not found");
     }
 
-    // Automated resolution rules
-    // Rule 1: If milestone_quality dispute and milestone is overdue by >7 days, favor client
-    if (dispute.type === "milestone_quality" && dispute.milestoneId) {
-      const milestone = await ctx.runQuery(
-        (api as any)["projects/queries"].getMilestoneById,
-        { milestoneId: dispute.milestoneId }
-      );
-
-      if (milestone && milestone.dueDate) {
-        const daysOverdue =
-          (Date.now() - milestone.dueDate) / (1000 * 60 * 60 * 24);
-        if (daysOverdue > 7) {
-          // Auto-resolve in client's favor
-          await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
-            disputeId: args.disputeId,
-            decision: "client_favor",
-            notes: `Automated resolution: Milestone overdue by ${Math.round(daysOverdue)} days`,
-          });
-
-          return {
-            canAutoResolve: true,
-            resolved: true,
-            decision: "client_favor",
-          };
+    // Rule 1: Work/deliverable quality dispute - if monthly cycle is overdue by >7 days, favor client
+    if (dispute.type === "milestone_quality") {
+      if (dispute.monthlyCycleId) {
+        const cycle = await ctx.runQuery(
+          (api as any)["monthlyBillingCycles/queries"].getCycleById,
+          { monthlyCycleId: dispute.monthlyCycleId }
+        );
+        if (cycle?.monthEndDate) {
+          const daysOverdue = (Date.now() - cycle.monthEndDate) / (1000 * 60 * 60 * 24);
+          if (daysOverdue > 7) {
+            await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
+              disputeId: args.disputeId,
+              decision: "client_favor",
+              notes: `Automated resolution: Monthly period overdue by ${Math.round(daysOverdue)} days`,
+            });
+            return { canAutoResolve: true, resolved: true, decision: "client_favor" };
+          }
+        }
+      } else if (dispute.milestoneId) {
+        const milestone = await ctx.runQuery(
+          (api as any)["projects/queries"].getMilestoneById,
+          { milestoneId: dispute.milestoneId }
+        );
+        if (milestone?.dueDate) {
+          const daysOverdue = (Date.now() - milestone.dueDate) / (1000 * 60 * 60 * 24);
+          if (daysOverdue > 7) {
+            await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
+              disputeId: args.disputeId,
+              decision: "client_favor",
+              notes: `Automated resolution: Milestone overdue by ${Math.round(daysOverdue)} days`,
+            });
+            return { canAutoResolve: true, resolved: true, decision: "client_favor" };
+          }
         }
       }
     }
@@ -98,31 +107,37 @@ export const attemptAutomatedResolution = action({
       }
     }
 
-    // Rule 3: If payment dispute and payment was successful, favor freelancer
-    if (dispute.type === "payment" && dispute.milestoneId) {
-      const payments = await ctx.runQuery(
-        (api as any)["payments/queries"].getPaymentByProject,
-        { projectId: dispute.projectId }
-      );
-
-      // Check if milestone payment was successful
-      const milestonePayment = payments?.find(
-        (p: any) => p.milestoneId === dispute.milestoneId && p.status === "succeeded"
-      );
-
-      if (milestonePayment) {
-        // Auto-resolve in freelancer's favor
-        await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
-          disputeId: args.disputeId,
-          decision: "freelancer_favor",
-          notes: "Automated resolution: Payment was successful",
-        });
-
-        return {
-          canAutoResolve: true,
-          resolved: true,
-          decision: "freelancer_favor",
-        };
+    // Rule 3: Payment dispute - if monthly cycle was already approved/released, favor freelancer
+    if (dispute.type === "payment") {
+      if (dispute.monthlyCycleId) {
+        const cycle = await ctx.runQuery(
+          (api as any)["monthlyBillingCycles/queries"].getCycleById,
+          { monthlyCycleId: dispute.monthlyCycleId }
+        );
+        if (cycle?.status === "approved") {
+          await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
+            disputeId: args.disputeId,
+            decision: "freelancer_favor",
+            notes: "Automated resolution: Monthly payment was already released",
+          });
+          return { canAutoResolve: true, resolved: true, decision: "freelancer_favor" };
+        }
+      } else if (dispute.milestoneId) {
+        const payments = await ctx.runQuery(
+          internal.payments.queries.getPaymentsByProjectInternal,
+          { projectId: dispute.projectId }
+        );
+        const milestonePayment = payments?.find(
+          (p: any) => p.milestoneId === dispute.milestoneId && p.status === "succeeded"
+        );
+        if (milestonePayment) {
+          await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
+            disputeId: args.disputeId,
+            decision: "freelancer_favor",
+            notes: "Automated resolution: Payment was successful",
+          });
+          return { canAutoResolve: true, resolved: true, decision: "freelancer_favor" };
+        }
       }
     }
 
@@ -136,7 +151,8 @@ export const attemptAutomatedResolution = action({
 
 /**
  * Release funds based on dispute resolution
- * Called after dispute is resolved
+ * Called after dispute is resolved.
+ * Uses monthly payment model: credits freelancer wallet(s) and reduces escrow.
  */
 export const releaseDisputeFunds = action({
   args: {
@@ -151,7 +167,6 @@ export const releaseDisputeFunds = action({
       throw new Error("Dispute not resolved");
     }
 
-    // Get project
     const project = await ctx.runQuery(
       (api as any)["projects/queries"].getProject,
       { projectId: dispute.projectId }
@@ -166,11 +181,9 @@ export const releaseDisputeFunds = action({
       internal.payments.queries.getPaymentByProject,
       { projectId: dispute.projectId }
     );
-    const currency = basePayment?.currency || "usd";
+    const currency = (basePayment?.currency || project.currency || "usd").toLowerCase();
 
-    // Handle fund release based on decision
     if (decision === "client_favor") {
-      // Refund to client
       await ctx.runAction(api.payments.actions.refundPaymentIntent, {
         projectId: dispute.projectId,
         amount: dispute.lockedAmount,
@@ -181,23 +194,24 @@ export const releaseDisputeFunds = action({
         {
           projectId: dispute.projectId,
           status: "cancelled",
-          escrowedAmount: 0, // Release all funds
+          escrowedAmount: 0,
         }
       );
     } else if (decision === "freelancer_favor") {
-      // Release to freelancer
-      if (project.matchedFreelancerId) {
-        await ctx.runAction(api.payments.actions.createPayoutTransfer, {
+      const amount = resolutionAmount ?? dispute.lockedAmount;
+      const amountCents = Math.round(amount * 100);
+      await ctx.runMutation(
+        internal.monthlyBillingCycles.mutations.releaseDisputeFundsToWalletInternal,
+        {
           projectId: dispute.projectId,
-          freelancerId: project.matchedFreelancerId,
-          milestoneId: dispute.milestoneId,
-          amount: resolutionAmount || dispute.lockedAmount,
+          disputeId: args.disputeId,
+          amountCents,
           currency,
-        });
-      }
+          monthlyCycleId: dispute.monthlyCycleId,
+        }
+      );
     } else if (decision === "partial") {
-      // Split funds
-      if (resolutionAmount) {
+      if (resolutionAmount != null) {
         const clientRefund = dispute.lockedAmount - resolutionAmount;
         if (clientRefund > 0) {
           await ctx.runAction(api.payments.actions.refundPaymentIntent, {
@@ -206,20 +220,20 @@ export const releaseDisputeFunds = action({
             reason: "dispute_partial_refund",
           });
         }
-        if (resolutionAmount > 0 && project.matchedFreelancerId) {
-          await ctx.runAction(api.payments.actions.createPayoutTransfer, {
-            projectId: dispute.projectId,
-            freelancerId: project.matchedFreelancerId,
-            milestoneId: dispute.milestoneId,
-            amount: resolutionAmount,
-            currency,
-          });
+        if (resolutionAmount > 0) {
+          const amountCents = Math.round(resolutionAmount * 100);
+          await ctx.runMutation(
+            internal.monthlyBillingCycles.mutations.releaseDisputeFundsToWalletInternal,
+            {
+              projectId: dispute.projectId,
+              disputeId: args.disputeId,
+              amountCents,
+              currency,
+              monthlyCycleId: dispute.monthlyCycleId,
+            }
+          );
         }
       }
-    } else if (decision === "replacement") {
-      // Hold funds for new freelancer
-      // Project will be re-matched
-      // Funds remain in escrow
     }
 
     return { success: true };

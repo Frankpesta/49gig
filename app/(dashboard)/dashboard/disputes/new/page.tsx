@@ -32,6 +32,7 @@ export default function NewDisputePage() {
 
   const [formData, setFormData] = useState({
     projectId: projectId || "",
+    monthlyCycleId: "" as string,
     type: "" as
       | "milestone_quality"
       | "payment"
@@ -62,6 +63,15 @@ export default function NewDisputePage() {
       : "skip"
   );
 
+  const monthlyCycles = useQuery(
+    (api as any)["monthlyBillingCycles/queries"].getCyclesByProjectId,
+    formData.projectId ? { projectId: formData.projectId as any } : "skip"
+  );
+
+  const pendingCycles = (monthlyCycles ?? []).filter(
+    (c: { status: string }) => c.status === "pending"
+  );
+
   const initiateDispute = useMutation(api.disputes.mutations.initiateDispute);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,6 +100,7 @@ export default function NewDisputePage() {
 
       const disputeId = await initiateDispute({
         projectId: formData.projectId as any,
+        monthlyCycleId: formData.monthlyCycleId || undefined,
         type: formData.type as any,
         reason: formData.reason,
         description: formData.description,
@@ -172,7 +183,7 @@ export default function NewDisputePage() {
                 <Select
                   value={formData.projectId}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, projectId: value })
+                    setFormData({ ...formData, projectId: value, monthlyCycleId: "" })
                   }
                   required
                   disabled={!!projectId}
@@ -196,6 +207,33 @@ export default function NewDisputePage() {
               )}
             </div>
 
+            {formData.projectId && pendingCycles.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="monthlyCycle">Monthly Payment (optional)</Label>
+                <Select
+                  value={formData.monthlyCycleId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, monthlyCycleId: value })
+                  }
+                >
+                  <SelectTrigger id="monthlyCycle">
+                    <SelectValue placeholder="Select a monthly payment to dispute (or leave blank for project-level)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Project-level dispute</SelectItem>
+                    {pendingCycles.map((c: { _id: string; monthIndex: number; monthStartDate: number; amountCents: number }) => (
+                      <SelectItem key={c._id} value={c._id}>
+                        Month {c.monthIndex} ({new Date(c.monthStartDate).toLocaleString("default", { month: "short", year: "numeric" })}) – ${(c.amountCents / 100).toFixed(2)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select a specific monthly payment to dispute, or leave blank to dispute the entire project.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="type">Dispute Type *</Label>
               <Select
@@ -210,7 +248,7 @@ export default function NewDisputePage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="milestone_quality">
-                    Deliverable Quality
+                    Work / Deliverable Quality
                   </SelectItem>
                   <SelectItem value="payment">Payment</SelectItem>
                   <SelectItem value="communication">Communication</SelectItem>

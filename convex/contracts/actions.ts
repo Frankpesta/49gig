@@ -295,17 +295,18 @@ async function generateFullContractPdf({
   freelancers,
   clientSignedAt,
   freelancerSignatures,
+  copyFor,
 }: {
   project: Doc<"projects">;
   client: Doc<"users">;
   freelancers: Doc<"users">[];
   clientSignedAt?: number;
   freelancerSignatures?: { freelancerId: Id<"users">; signedAt: number }[];
+  copyFor?: { name: string; role: string };
 }) {
   const pdfDoc = await PDFDocument.create();
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  // Signature names use italic font (handwritten-style); custom script font can be added via fontkit
   const signatureFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
 
   const pageWidth = 612;
@@ -320,6 +321,17 @@ async function generateFullContractPdf({
 
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
   let y = pageHeight - margin;
+
+  if (copyFor) {
+    page.drawText(`Copy for: ${sanitizeForPdf(copyFor.name)} (${copyFor.role})`, {
+      x: margin,
+      y,
+      size: 10,
+      font: bold,
+      color: rgb(0.2, 0.2, 0.2),
+    });
+    y -= lineHeight * 2;
+  }
 
   const ensureSpace = (need: number) => {
     if (y < margin + need) {
@@ -554,11 +566,12 @@ export const generateAndSendContract = action({
 /**
  * Internal: Regenerate contract PDF with current signatures and send to all parties.
  * Called after client or freelancer signs.
+ * Sends personalized copies (client name on client copy, freelancer names on freelancer copies)
+ * and an admin copy for record-keeping with all parties listed.
  */
 export const regenerateContractPdfAndSend = internalAction({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    // Type instantiation depth limit with internal API - use require to avoid deep resolution
     const apiModule = require("../_generated/api");
     const parties = await ctx.runQuery(
       apiModule.internal.contracts.queries.getProjectContractParties,
@@ -567,60 +580,115 @@ export const regenerateContractPdfAndSend = internalAction({
     if (!parties) return { status: "parties_not_found" };
 
     const { project, client, freelancers } = parties;
-    const pdfBytes = await generateFullContractPdf({
+    const basePdfParams = {
       project,
       client,
       freelancers,
       clientSignedAt: project.clientContractSignedAt,
       freelancerSignatures: project.freelancerContractSignatures,
-    });
+    };
 
-    const pdfArrayBuffer = pdfBytes.buffer.slice(
-      pdfBytes.byteOffset,
-      pdfBytes.byteOffset + pdfBytes.byteLength
+    const clientPdfBytes = await generateFullContractPdf({
+      ...basePdfParams,
+      copyFor: { name: client.name || "Client", role: "Client" },
+    });
+    const clientArrayBuffer = clientPdfBytes.buffer.slice(
+      clientPdfBytes.byteOffset,
+      clientPdfBytes.byteOffset + clientPdfBytes.byteLength
     ) as ArrayBuffer;
-    const storageId = await ctx.storage.store(
-      new Blob([pdfArrayBuffer], { type: "application/pdf" })
+    const clientStorageId = await ctx.storage.store(
+      new Blob([clientArrayBuffer], { type: "application/pdf" })
     );
 
     await ctx.runMutation(
       apiModule.internal.contracts.mutations.updateContractFile,
-      {
-        projectId: args.projectId,
-        contractFileId: storageId,
-      }
+      { projectId: args.projectId, contractFileId: clientStorageId }
     );
 
-    const contractUrl = await ctx.storage.getUrl(storageId);
     const appUrl = getAppUrl();
     const logoUrl = getLogoUrl(appUrl);
     const date = formatDate();
-    const attachment = {
-      filename: `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}.pdf`,
-      content: Buffer.from(pdfBytes).toString("base64"),
+    const baseFilename = `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}`;
+
+    const clientAttachment = {
+      filename: `${baseFilename}-Client-${(client.name || "Client").replace(/\s+/g, "-")}.pdf`,
+      content: Buffer.from(clientPdfBytes).toString("base64"),
       contentType: "application/pdf",
     };
 
-    const allRecipients = [
-      { email: client.email, name: client.name || "there" },
-      ...freelancers.map((f: Doc<"users">) => ({ email: f.email, name: f.name || "there" })),
-    ];
-    for (const recipient of allRecipients) {
+    await sendEmail({
+      to: client.email,
+      subject: `Contract ready / signed – ${project.intakeForm.title}`,
+      react: React.createElement(ContractReadyEmail, {
+        name: client.name || "there",
+        projectName: project.intakeForm.title,
+        contractUrl: (await ctx.storage.getUrl(clientStorageId)) || `${appUrl}/dashboard/projects/${args.projectId}`,
+        appUrl,
+        logoUrl,
+        date,
+      }),
+      attachments: [clientAttachment],
+    });
+
+    for (const f of freelancers as Doc<"users">[]) {
+      const freelancerPdfBytes = await generateFullContractPdf({
+        ...basePdfParams,
+        copyFor: { name: f.name || "Freelancer", role: "Freelancer" },
+      });
+      const freelancerAttachment = {
+        filename: `${baseFilename}-Freelancer-${(f.name || "Freelancer").replace(/\s+/g, "-")}.pdf`,
+        content: Buffer.from(freelancerPdfBytes).toString("base64"),
+        contentType: "application/pdf",
+      };
       await sendEmail({
-        to: recipient.email,
+        to: f.email,
         subject: `Contract ready / signed – ${project.intakeForm.title}`,
         react: React.createElement(ContractReadyEmail, {
-          name: recipient.name,
+          name: f.name || "there",
           projectName: project.intakeForm.title,
-          contractUrl: contractUrl || `${appUrl}/dashboard/projects/${args.projectId}`,
+          contractUrl: (await ctx.storage.getUrl(clientStorageId)) || `${appUrl}/dashboard/projects/${args.projectId}`,
           appUrl,
           logoUrl,
           date,
         }),
-        attachments: [attachment],
+        attachments: [freelancerAttachment],
       });
     }
 
-    return { status: "sent", contractFileId: storageId };
+    const admins = await ctx.runQuery(
+      apiModule.internal.users.queries.getModeratorsAndAdminsInternal,
+      {}
+    );
+    if (admins && admins.length > 0) {
+      const adminPdfBytes = await generateFullContractPdf({
+        ...basePdfParams,
+        copyFor: { name: "49GIG Admin", role: "Record (all parties listed in email)" },
+      });
+      const adminAttachment = {
+        filename: `${baseFilename}-Admin-Record.pdf`,
+        content: Buffer.from(adminPdfBytes).toString("base64"),
+        contentType: "application/pdf",
+      };
+      const partiesList = [
+        `Client: ${client.name || "Client"} (${client.email})`,
+        ...freelancers.map((f: Doc<"users">) => `Freelancer: ${f.name || "Freelancer"} (${f.email})`),
+      ].join("\n");
+      await sendEmail({
+        to: admins.map((a: { email: string }) => a.email),
+        subject: `[49GIG] Contract signed – ${project.intakeForm.title}`,
+        react: React.createElement(
+          "div",
+          { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
+          React.createElement("h2", { style: { marginBottom: "16px" } }, "Contract Signed – Admin Record"),
+          React.createElement("p", null, `Project: ${project.intakeForm.title}`),
+          React.createElement("p", { style: { marginTop: "12px", fontWeight: 600 } }, "Parties:"),
+          React.createElement("pre", { style: { whiteSpace: "pre-wrap", fontSize: "13px", margin: "8px 0" } }, partiesList),
+          React.createElement("p", { style: { marginTop: "16px", fontSize: "13px", color: "#6b7280" } }, "A signed copy is attached for your records.")
+        ),
+        attachments: [adminAttachment],
+      });
+    }
+
+    return { status: "sent", contractFileId: clientStorageId };
   },
 });

@@ -576,6 +576,110 @@ export const autoReleaseMonthlyCycleInternal = internalMutation({
 });
 
 /**
+ * Internal: Release dispute funds to freelancer wallet(s).
+ * Used when dispute is resolved in freelancer's favor (monthly payment model).
+ * Credits wallet(s) and reduces project escrow - same flow as monthly approval.
+ */
+export const releaseDisputeFundsToWalletInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    disputeId: v.id("disputes"),
+    amountCents: v.number(),
+    currency: v.string(),
+    monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return { released: false };
+
+    const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? [];
+
+    if (freelancerIds.length === 0) return { released: false };
+
+    const breakdown = project.teamBudgetBreakdown;
+    let shareCentsByFreelancer: number[];
+
+    if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
+      const acceptedMatches = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
+      const acceptedByFreelancer = new Map(
+        acceptedMatches
+          .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
+          .map((m) => [m.freelancerId, m])
+      );
+      const equalShare = Math.floor(args.amountCents / freelancerIds.length);
+      shareCentsByFreelancer = freelancerIds.map((fid) => {
+        const match = acceptedByFreelancer.get(fid);
+        const role = match?.teamRole;
+        const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
+        return Math.max(0, roleAmount);
+      });
+      const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
+      const remainder = args.amountCents - totalAllocated;
+      if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
+        shareCentsByFreelancer[0] += remainder;
+      }
+    } else {
+      const amountPerFreelancerCents = Math.floor(args.amountCents / freelancerIds.length);
+      const remainder = args.amountCents - amountPerFreelancerCents * freelancerIds.length;
+      shareCentsByFreelancer = freelancerIds.map((_, i) =>
+        amountPerFreelancerCents + (i === 0 ? remainder : 0)
+      );
+    }
+
+    const now = Date.now();
+    const desc = `Dispute resolution: ${project.intakeForm.title}`;
+
+    for (let i = 0; i < freelancerIds.length; i++) {
+      const fid = freelancerIds[i];
+      const shareCents = shareCentsByFreelancer[i] ?? 0;
+      if (shareCents <= 0) continue;
+
+      await creditWalletInline(ctx, {
+        userId: fid,
+        amountCents: shareCents,
+        currency: args.currency,
+        description: desc,
+        projectId: args.projectId,
+        monthlyCycleId: args.monthlyCycleId,
+      });
+
+      await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
+        projectId: args.projectId,
+        monthlyCycleId: args.monthlyCycleId,
+        type: "monthly_release",
+        amount: shareCents / 100,
+        currency: args.currency,
+        platformFee: 0,
+        netAmount: shareCents / 100,
+        userId: fid,
+        recipientId: fid,
+        status: "succeeded",
+      });
+    }
+
+    await ctx.db.patch(args.projectId, {
+      escrowedAmount: Math.max(0, (project.escrowedAmount ?? 0) - args.amountCents / 100),
+      updatedAt: now,
+    });
+
+    if (args.monthlyCycleId) {
+      await ctx.db.patch(args.monthlyCycleId, {
+        status: "approved",
+        approvedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return { released: true };
+  },
+});
+
+/**
  * Internal: process upfront release for existing cycles.
  * Only releases when freelancer has signed the contract.
  * Called: 1) after payment (may skip if freelancer hasn't signed), 2) when contract becomes fully signed.

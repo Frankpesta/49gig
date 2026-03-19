@@ -4,6 +4,16 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 
 /**
+ * Get a single monthly cycle by ID (for dispute resolution).
+ */
+export const getCycleById = query({
+  args: { monthlyCycleId: v.id("monthlyBillingCycles") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.monthlyCycleId);
+  },
+});
+
+/**
  * Get monthly cycles for a project by project ID
  */
 export const getCyclesByProjectId = query({

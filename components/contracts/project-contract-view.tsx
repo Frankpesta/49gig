@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileSignature } from "lucide-react";
 import { toast } from "sonner";
@@ -20,6 +22,7 @@ interface ProjectContractViewProps {
 export function ProjectContractView({ projectId, userId }: ProjectContractViewProps) {
   const router = useRouter();
   const { trackEvent } = useAnalytics();
+  const [agreed, setAgreed] = useState(false);
   const contractData = useQuery(api.contracts.queries.getContractForProject, {
     projectId,
     userId,
@@ -44,8 +47,26 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
   }
 
   const handleSign = async () => {
+    if (!agreed) {
+      toast.error("Please confirm you have read and agree to the agreement before signing.");
+      return;
+    }
     try {
-      const result = await signContract({ projectId, userId });
+      let signedAtIp: string | undefined;
+      try {
+        const res = await fetch("https://api.ipify.org?format=json");
+        const data = await res.json();
+        signedAtIp = data.ip;
+      } catch {
+        // Ignore IP fetch failure
+      }
+      const signedAtUserAgent = typeof navigator !== "undefined" ? navigator.userAgent : undefined;
+      const result = await signContract({
+        projectId,
+        userId,
+        signedAtIp,
+        signedAtUserAgent,
+      });
       if ((result as { alreadySigned?: boolean }).alreadySigned) {
         toast.info("You have already signed this contract.");
         return;
@@ -86,12 +107,23 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
           {contractData.filledBody}
         </div>
         {!contractData.hasSigned ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <Checkbox
+                checked={agreed}
+                onCheckedChange={(v) => setAgreed(v === true)}
+                className="mt-0.5 shrink-0"
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                I have read, understood, and agree to the 49GIG {contractData.role === "client" ? "Client" : "Freelancer"} Agreement.
+              </span>
+            </label>
             <p className="text-sm text-muted-foreground">
-              By clicking below, you agree to the terms above. Your name will be added as your signature and a copy will be sent to your email.
+              By signing below, your name will be added as your signature and a copy will be sent to your email.
             </p>
             <Button
               onClick={handleSign}
+              disabled={!agreed}
               className="font-semibold text-base px-8 py-6"
               style={{ fontFamily: "'Georgia', 'Times New Roman', serif", fontStyle: "italic" }}
             >

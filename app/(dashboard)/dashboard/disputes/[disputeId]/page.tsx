@@ -151,17 +151,17 @@ export default function DisputeDetailPage() {
                 <label className="text-sm font-medium text-muted-foreground">Initiator</label>
                 <p className="mt-1 capitalize">{dispute.initiatorRole}</p>
               </div>
-              {dispute.milestoneId && (
+              {(dispute.monthlyCycleId || dispute.milestoneId) && (
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
-                    Milestone
+                    {dispute.monthlyCycleId ? "Monthly Payment" : "Milestone"}
                   </label>
                   <p className="mt-1">
                     <Link
-                      href={`/dashboard/projects/${dispute.projectId}?milestone=${dispute.milestoneId}`}
+                      href={`/dashboard/projects/${dispute.projectId}${dispute.monthlyCycleId ? "?cycle=" + dispute.monthlyCycleId : "?milestone=" + dispute.milestoneId}`}
                       className="text-primary hover:underline"
                     >
-                      View Milestone
+                      {dispute.monthlyCycleId ? "View Monthly Payment" : "View Milestone"}
                     </Link>
                   </p>
                 </div>
