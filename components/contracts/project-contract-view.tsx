@@ -10,6 +10,7 @@ import { FileSignature } from "lucide-react";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 interface ProjectContractViewProps {
   projectId: string;
@@ -18,6 +19,7 @@ interface ProjectContractViewProps {
 
 export function ProjectContractView({ projectId, userId }: ProjectContractViewProps) {
   const router = useRouter();
+  const { trackEvent } = useAnalytics();
   const contractData = useQuery(api.contracts.queries.getContractForProject, {
     projectId,
     userId,
@@ -48,6 +50,7 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
         toast.info("You have already signed this contract.");
         return;
       }
+      trackEvent("sign_contract", { project_id: projectId, role: contractData.role });
       toast.success("Contract signed. A copy has been sent to your email and the freelancer(s).");
       if (contractData.role === "client") {
         router.push(`/dashboard/projects/${projectId}/payment`);

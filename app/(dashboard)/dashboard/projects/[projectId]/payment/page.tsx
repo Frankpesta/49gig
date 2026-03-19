@@ -24,11 +24,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { Loader2, CheckCircle2, XCircle, ExternalLink, Info } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { getDurationMonths } from "@/lib/project-duration";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 export default function PaymentPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
+  const { trackEvent } = useAnalytics();
   const projectId = params.projectId as string;
 
   const createPaymentIntent = useAction(
@@ -110,6 +112,8 @@ export default function PaymentPage() {
         fundUpfrontMonths: monthsToFund,
         userId: user._id,
       });
+
+      trackEvent("begin_checkout", { project_id: projectId, value: amountToPay, currency: project.currency || "USD" });
 
       const result = await createPaymentIntent({
         projectId: projectId as any,

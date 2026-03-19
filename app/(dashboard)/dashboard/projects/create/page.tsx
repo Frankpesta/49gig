@@ -46,6 +46,7 @@ import {
 } from "@/lib/platform-skills";
 import { toast } from "sonner";
 import { getDurationMonths } from "@/lib/project-duration";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 const PROJECT_DURATIONS = [
   { value: "3", label: "3 months" },
@@ -145,6 +146,7 @@ export default function CreateProjectPage() {
   const createProject = useMutation(
     (api as any)["projects/mutations"].createProject
   );
+  const { trackEvent } = useAnalytics();
   const platformFeePct = useQuery(
     (api as any)["platformSettings/queries"].getPlatformFeePercentage
   );
@@ -442,6 +444,7 @@ export default function CreateProjectPage() {
       });
 
       toast.success("Hire created! Select your freelancer to continue.");
+      trackEvent("create_project", { project_id: projectId, hire_type: formData.hireType });
       router.push(`/dashboard/projects/${projectId}/matches`);
     } catch (err: any) {
       setError(getUserFriendlyError(err) || "Failed to create hire");
@@ -861,43 +864,84 @@ export default function CreateProjectPage() {
                   </p>
                 </div>
               ) : budgetCalculation ? (
-                <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Estimated total</span>
-                    <span className="text-xl font-bold text-primary tabular-nums">
-                      {formatBudget(budgetCalculation.estimatedBudget)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    For {formatDurationDisplay(formData.projectDuration)} engagement
-                  </p>
-                  {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Monthly breakdown per role</p>
-                      <div className="space-y-2 rounded-lg border border-border/40 bg-background/50 p-3">
-                        {budgetCalculation.breakdown.teamMembers.map((m) => (
-                          <div key={`${m.role}-${m.category}`} className="flex justify-between text-sm">
-                            <span className="text-foreground">
-                              {m.count}× {m.roleDisplayName} ({m.category})
-                            </span>
-                            <span className="font-medium tabular-nums">
-                              {formatBudget(m.monthlyPerPerson)}/mo each
+                (() => {
+                  const platformFee = platformFeePct ?? 25;
+                  const netPercent = 100 - platformFee;
+                  const durMonths = getDurationMonths(formData.projectDuration);
+                  const totalNet = (budgetCalculation.estimatedBudget * netPercent) / 100;
+                  const monthlyFreelancerSalary = totalNet / durMonths;
+                  return (
+                    <div className="rounded-xl border border-primary/20 bg-gradient-to-b from-primary/5 to-transparent shadow-sm overflow-hidden">
+                      {/* Header */}
+                      <div className="p-5 pb-4">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estimated total</span>
+                          <span className="text-2xl font-bold text-primary tabular-nums">
+                            {formatBudget(budgetCalculation.estimatedBudget)}
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                            {formatDurationDisplay(formData.projectDuration)} engagement
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Freelancer salary section */}
+                      <div className="border-t border-border/60 bg-background/50 px-5 py-4">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                          {formData.hireType === "team" ? "What each freelancer receives" : "Freelancer monthly salary"}
+                        </p>
+                        {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 ? (
+                          <div className="space-y-3">
+                            {budgetCalculation.breakdown.teamMembers.map((m) => {
+                              const netPerPerson = (m.monthlyPerPerson * netPercent) / 100;
+                              return (
+                                <div
+                                  key={`${m.role}-${m.category}`}
+                                  className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3"
+                                >
+                                  <div>
+                                    <span className="font-medium text-foreground">{m.roleDisplayName}</span>
+                                    <span className="text-muted-foreground"> — {m.category}</span>
+                                    {m.count > 1 && (
+                                      <span className="ml-1.5 text-xs text-muted-foreground">×{m.count}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="font-semibold tabular-nums text-foreground">{formatBudget(netPerPerson)}</span>
+                                    <span className="text-xs text-muted-foreground">/mo</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            <p className="text-xs text-muted-foreground pt-1">
+                              {formData.roleType === "part_time" ? "Part-time (20 hrs/week)." : "Full-time (40 hrs/week)."} After platform fee.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3">
+                            <span className="text-sm text-muted-foreground">Net monthly salary</span>
+                            <span className="text-lg font-semibold tabular-nums text-foreground">
+                              {formatBudget(monthlyFreelancerSalary)}
+                              <span className="text-sm font-normal text-muted-foreground">/mo</span>
                             </span>
                           </div>
-                        ))}
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formData.roleType === "part_time" ? "Part-time (20 hrs/week) rates." : "Full-time (40 hrs/week) rates."}
-                      </p>
+
+                      {/* Footer note */}
+                      <div className="px-5 py-3 bg-muted/20 border-t border-border/40">
+                        <p className="text-xs text-muted-foreground">
+                          Total you pay. {formData.projectDuration === "3" && "3% discount for 3-month commitment."}
+                          {formData.projectDuration === "6" && "5% discount for 6-month commitment."}
+                          {["12", "24", "36", "48", "60"].includes(formData.projectDuration) &&
+                            `5% discount for ${formatDurationDisplay(formData.projectDuration)} commitment.`}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Total you pay for this hire. {formData.projectDuration === "3" && "3% discount applied for 3-month commitment."}
-                    {formData.projectDuration === "6" && "5% discount applied for 6-month commitment."}
-                    {["12", "24", "36", "48", "60"].includes(formData.projectDuration) &&
-                      `5% discount applied for ${formatDurationDisplay(formData.projectDuration)} commitment.`}
-                  </p>
-                </div>
+                  );
+                })()
               ) : (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-200">
                   Unable to calculate budget. Please ensure you have selected a valid start date and duration, then try again.

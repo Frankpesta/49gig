@@ -6,6 +6,7 @@ import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useSessionRotation } from "@/hooks/use-session";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +23,7 @@ function OAuthCallbackContent() {
   const [isLoading, setIsLoading] = useState(true);
   const handleCallback = useAction((api as any)["auth/oauth"].handleGoogleCallback);
   const { setRefreshToken } = useSessionRotation();
+  const { trackEvent } = useAnalytics();
 
   useEffect(() => {
     const code = searchParams.get("code");
@@ -48,6 +50,7 @@ function OAuthCallbackContent() {
         });
 
         if (result.success) {
+          trackEvent(result.isNewUser ? "sign_up" : "login", { method: "google" });
           // If role selection is needed, redirect to role selection page
           if (result.needsRoleSelection && result.oauthData) {
             // Store OAuth data in sessionStorage for role selection page

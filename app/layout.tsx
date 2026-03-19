@@ -4,6 +4,7 @@ import "./globals.css";
 import { ConvexClientProvider } from "@/lib/convex-provider";
 import { QueryProvider } from "@/lib/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { Toaster } from "sonner";
 
 // Plus Jakarta Sans - Lively, modern, vibrant dashboard font (reference design)
@@ -39,6 +40,7 @@ export default function RootLayout({
           <QueryProvider>
             <ConvexClientProvider>
               {children}
+              <AnalyticsProvider />
               <Toaster richColors position="top-right" />
             </ConvexClientProvider>
           </QueryProvider>

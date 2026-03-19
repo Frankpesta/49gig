@@ -40,6 +40,7 @@ import {
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
 import { getDurationMonths } from "@/lib/project-duration";
+import { useAnalytics } from "@/hooks/use-analytics";
 
 const PROJECT_DURATIONS = [
   { value: "3", label: "3 months" },
@@ -141,6 +142,7 @@ export default function EditProjectPage() {
   const router = useRouter();
   const params = useParams();
   const { user } = useAuth();
+  const { trackEvent } = useAnalytics();
   const projectId = params.projectId as Id<"projects">;
 
   const project = useQuery(
@@ -326,6 +328,7 @@ export default function EditProjectPage() {
           estimatedBudget: budgetCalculation.estimatedBudget,
         },
       });
+      trackEvent("edit_project", { project_id: projectId });
       toast.success("Hire updated.");
       router.push(`/dashboard/projects/${projectId}`);
     } catch (err) {

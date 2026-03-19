@@ -11,12 +11,14 @@ import { api } from "@/convex/_generated/api";
 import { useSessionRotation } from "@/hooks/use-session";
 import { useOAuth } from "@/hooks/use-oauth";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { loginFeatures } from "@/components/auth/auth-icons";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { trackEvent } = useAnalytics();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -44,6 +46,7 @@ export default function LoginPage() {
         });
 
         if (result.success && result.refreshToken) {
+          trackEvent("login", { method: "two_factor" });
           setRefreshToken(result.refreshToken);
           if (result.sessionToken) {
             localStorage.setItem("sessionToken", result.sessionToken);
@@ -78,6 +81,7 @@ export default function LoginPage() {
       }
 
       if (result.success && result.refreshToken) {
+        trackEvent("login", { method: "email" });
         setRefreshToken(result.refreshToken);
         if (result.sessionToken) {
           localStorage.setItem("sessionToken", result.sessionToken);

@@ -36,6 +36,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getRoleLabelsFromProject, PLATFORM_CATEGORIES } from "@/lib/platform-skills";
 
@@ -367,6 +368,7 @@ export default function ProjectMatchesPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { trackEvent } = useAnalytics();
   const projectId = isValidConvexId(params.projectId)
     ? (params.projectId as Id<"projects">)
     : null;
@@ -526,6 +528,7 @@ export default function ProjectMatchesPage() {
           userId: user._id,
         });
       }
+      trackEvent("accept_match", { project_id: projectId, freelancer_count: isTeam ? selectedTeamIds.size : 1 });
       router.push(`/dashboard/projects/${projectId}/contract`);
     } catch (e) {
       toast.error(getUserFriendlyError(e) || "Failed to save selection");
@@ -539,6 +542,7 @@ export default function ProjectMatchesPage() {
     setSelectedFreelancer,
     setSelectedFreelancers,
     router,
+    trackEvent,
   ]);
 
   const handleScheduleSession = useCallback(() => {
@@ -577,6 +581,7 @@ export default function ProjectMatchesPage() {
         title: `49GIG: ${project?.intakeForm?.title ?? "Session"}`,
         userId: user._id,
       });
+      trackEvent("schedule_session", { project_id: projectId, freelancer_count: freelancerIds.length });
       setScheduleDialogOpen(false);
       toast.success("Session scheduled. Check your email for the Meet link.");
       if (isTeam) {
@@ -592,6 +597,7 @@ export default function ProjectMatchesPage() {
           userId: user._id,
         });
       }
+      trackEvent("accept_match", { project_id: projectId, freelancer_count: freelancerIds.length });
       router.push(`/dashboard/projects/${projectId}/contract`);
     } catch (e) {
       toast.error(getUserFriendlyError(e) || "Failed to schedule");
@@ -611,6 +617,7 @@ export default function ProjectMatchesPage() {
     setSelectedFreelancer,
     setSelectedFreelancers,
     router,
+    trackEvent,
   ]);
 
   if (!user) return null;

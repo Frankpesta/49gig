@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHero } from "@/components/marketing/page-hero";
+import { CookiePreferences } from "@/components/analytics/cookie-preferences";
 import { Card, CardContent } from "@/components/ui/card";
 import { Cookie } from "lucide-react";
 
@@ -107,6 +108,10 @@ export default function CookiePolicyPage() {
             <p className="mt-3 text-muted-foreground">
               By continuing to use 49GIG, you agree to the use of cookies as described in this policy unless you disable them through your browser or cookie settings.
             </p>
+          </div>
+
+          <div className="mt-6">
+            <CookiePreferences />
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

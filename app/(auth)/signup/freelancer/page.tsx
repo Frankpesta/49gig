@@ -23,6 +23,7 @@ import {
   getSkillsForCategory,
 } from "@/lib/platform-skills";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { Eye, EyeOff } from "lucide-react";
 
 const EXPERIENCE_LEVELS = [
@@ -34,6 +35,7 @@ const EXPERIENCE_LEVELS = [
 
 export default function FreelancerSignupPage() {
   const router = useRouter();
+  const { trackEvent } = useAnalytics();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -136,7 +138,7 @@ export default function FreelancerSignupPage() {
       });
 
       if (result.success) {
-        // Track pending resume upload for freelancers
+        trackEvent("sign_up", { method: "email", role: "freelancer" });
         localStorage.setItem("pending_resume_upload", "freelancer");
         if (result.sessionToken) {
           localStorage.setItem("sessionToken", result.sessionToken);

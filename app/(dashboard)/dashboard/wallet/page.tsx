@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { Doc } from "@/convex/_generated/dataModel";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -31,6 +32,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function WalletPage() {
   const { user } = useAuth();
+  const { trackEvent } = useAnalytics();
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
@@ -56,6 +58,7 @@ export default function WalletPage() {
     setIsWithdrawing(true);
     try {
       await withdrawFromWallet({ amountCents, userId: user._id });
+      trackEvent("withdraw", { value: amountCents / 100, currency: "USD" });
       toast.success("Withdrawal initiated. Funds will be transferred to your bank account.");
       setWithdrawAmount("");
     } catch (err) {
