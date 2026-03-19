@@ -89,6 +89,16 @@ MILESTONE_AUTO_RELEASE_HOURS=48
 MATCH_EXPIRATION_DAYS=7
 ```
 
+### Sitemap & SEO (Vercel)
+
+For production, set in Vercel → Project → Settings → Environment Variables:
+
+```bash
+NEXT_PUBLIC_BASE_URL=https://49gig.com
+```
+
+This ensures the sitemap and robots.txt use `https://49gig.com` instead of the Vercel preview URL. Without it, production uses `https://49gig.com` by default; preview deployments use the preview URL.
+
 ## Getting Started
 
 1. Copy this file to `.env.local`
