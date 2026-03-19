@@ -26,6 +26,14 @@ NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 
 Users can change their choice anytime at [/legal/cookie-policy](/legal/cookie-policy).
 
+## Verifying Analytics
+
+1. **Accept the consent banner** on your site (tracking only runs after consent).
+2. **GA4 Realtime report**: In [analytics.google.com](https://analytics.google.com) → Reports → Realtime. You should see yourself as an active user within ~30 seconds.
+3. **DebugView**: Add `?debug_mode=true` to your URL (e.g. `https://49gig.com?debug_mode=true`). In GA4 → Admin → DebugView, you’ll see events as they fire.
+4. **Browser DevTools**: Open Network tab, filter by `google-analytics.com` or `googletagmanager.com`. After consent, you should see requests when you navigate or trigger events.
+5. **Chrome extension**: Use [Google Analytics Debugger](https://chrome.google.com/webstore/detail/google-analytics-debugger) to log events in the console.
+
 ## Custom Events
 
 ```tsx

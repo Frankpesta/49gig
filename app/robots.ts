@@ -1,8 +1,10 @@
 import type { MetadataRoute } from "next";
 
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "https://49gig.com";
+const baseUrl =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  (process.env.VERCEL_ENV === "production" ? "https://49gig.com" : null) ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+  "https://49gig.com";
 
 export default function robots(): MetadataRoute.Robots {
   return {

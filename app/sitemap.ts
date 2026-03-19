@@ -2,9 +2,11 @@ import type { MetadataRoute } from "next";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "https://49gig.com";
+const baseUrl =
+  process.env.NEXT_PUBLIC_BASE_URL ||
+  (process.env.VERCEL_ENV === "production" ? "https://49gig.com" : null) ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+  "https://49gig.com";
 
 const staticRoutes: MetadataRoute.Sitemap = [
   { url: baseUrl, lastModified: new Date(), changeFrequency: "weekly", priority: 1 },

@@ -30,10 +30,12 @@ export function GoogleAnalytics({ consent }: GoogleAnalyticsProps) {
       window.gtag = gtag as NonNullable<typeof window.gtag>;
       gtag("js", new Date());
 
+      const isDebug = typeof window !== "undefined" && window.location.search.includes("debug_mode=true");
       window.gtag("config", measurementId, {
         send_page_view: false,
         anonymize_ip: true,
         cookie_flags: "SameSite=None;Secure",
+        ...(isDebug && { debug_mode: true }),
       });
 
       initialized.current = true;
