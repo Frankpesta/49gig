@@ -82,7 +82,11 @@ export default function PaymentCallbackPage() {
     if (success) {
       if (!hasTracked.current) {
         hasTracked.current = true;
-        trackEvent(isTopUp ? "add_payment" : "purchase", { project_id: projectId, value: paymentStatus?.totalAmount });
+        trackEvent(isTopUp ? "add_payment" : "purchase", {
+          project_id: projectId,
+          value: paymentStatus?.totalAmount,
+          currency: "USD",
+        });
       }
       const timer = setTimeout(() => {
         setRedirecting(true);

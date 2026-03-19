@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useAnalytics } from "@/hooks/use-analytics";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
 export default function PaymentSuccessPage() {
@@ -22,6 +23,8 @@ export default function PaymentSuccessPage() {
   const { user } = useAuth();
   const projectId = params.projectId as string;
   const paymentIntent = searchParams.get("payment_intent");
+  const { trackEvent } = useAnalytics();
+  const hasTracked = useRef(false);
 
   const paymentStatus = useQuery(
     (api as any)["payments/queries"].getPaymentStatus,
@@ -34,6 +37,14 @@ export default function PaymentSuccessPage() {
 
   useEffect(() => {
     if (paymentStatus?.isFunded) {
+      if (!hasTracked.current) {
+        hasTracked.current = true;
+        trackEvent("purchase", {
+          project_id: projectId,
+          value: paymentStatus?.totalAmount,
+          currency: "USD",
+        });
+      }
       // Wait a moment to show success message, then redirect
       const timer = setTimeout(() => {
         setRedirecting(true);
@@ -42,7 +53,7 @@ export default function PaymentSuccessPage() {
 
       return () => clearTimeout(timer);
     }
-  }, [paymentStatus, projectId, router]);
+  }, [paymentStatus, projectId, router, trackEvent]);
 
   if (!user) {
     return null;
