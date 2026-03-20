@@ -2,10 +2,51 @@
  * Budget calculation based on experience level, timeline, and project type
  */
 
+import {
+  type TeamSlotIntake,
+  compositionFromTeamSlots,
+} from "./team-slots";
+
 export type ExperienceLevel = "junior" | "mid" | "senior" | "expert";
 export type ProjectType = "one_time" | "ongoing" | "not_sure";
 export type HireType = "single" | "team";
 export type TeamSize = "2-3" | "4-6" | "7+" | "not_sure";
+
+/** Team hires: min/max freelancers the client can specify */
+export const MIN_TEAM_MEMBER_COUNT = 2;
+export const MAX_TEAM_MEMBER_COUNT = 25;
+
+/** Map legacy bucket to a representative headcount (for old projects). */
+export function legacyTeamSizeToCount(teamSize: TeamSize | undefined): number {
+  switch (teamSize) {
+    case "2-3":
+      return 3;
+    case "4-6":
+      return 5;
+    case "7+":
+      return 7;
+    case "not_sure":
+      return 5;
+    default:
+      return 3;
+  }
+}
+
+/** Resolved headcount for pricing / matching: prefers teamMemberCount, else legacy teamSize. */
+export function resolveTargetTeamSize(
+  teamMemberCount: number | undefined,
+  teamSize: TeamSize | undefined
+): number {
+  if (teamMemberCount != null && Number.isFinite(teamMemberCount)) {
+    const n = Math.floor(teamMemberCount);
+    return Math.min(
+      MAX_TEAM_MEMBER_COUNT,
+      Math.max(MIN_TEAM_MEMBER_COUNT, n)
+    );
+  }
+  if (teamSize) return legacyTeamSizeToCount(teamSize);
+  return MIN_TEAM_MEMBER_COUNT;
+}
 export type RoleType = "full_time" | "part_time";
 
 export type BaseRatesForCategory = Record<
@@ -70,6 +111,9 @@ const PROJECT_TYPE_MULTIPLIERS: Record<ProjectType, number> = {
 
 export interface BudgetCalculationParams {
   hireType: HireType;
+  /** Exact freelancer count for team hires (preferred). */
+  teamMemberCount?: number;
+  /** @deprecated Legacy; used if teamMemberCount is missing */
   teamSize?: TeamSize;
   experienceLevel: ExperienceLevel;
   projectType: ProjectType;
@@ -88,6 +132,8 @@ export interface BudgetCalculationParams {
   selectedSkillNames?: string[];
   /** Selected software dev sub-fields (e.g. backend_dev, frontend_dev, mobile_dev) – overrides skill inference */
   softwareDevFields?: string[];
+  /** Per-freelancer seats (team hires). When set, composition is derived exactly from slots. */
+  teamSlots?: TeamSlotIntake[];
 }
 
 /** Per-role breakdown for team projects */
@@ -169,7 +215,7 @@ const BACKEND_SKILLS = new Set([
  */
 function inferSoftwareDevRoles(
   skillNames: string[],
-  teamSize: TeamSize
+  targetTeamSize: number
 ): string[] {
   const normalized = skillNames.map((s) => s.toLowerCase().trim());
   const hasFrontend = normalized.some((s) =>
@@ -181,8 +227,7 @@ function inferSoftwareDevRoles(
   if (hasFrontend && !hasBackend) return ["frontend_dev"];
   if (hasBackend && !hasFrontend) return ["backend_dev"];
   if (hasFrontend && hasBackend) {
-    const targetSize = teamSize === "2-3" ? 3 : teamSize === "4-6" ? 5 : 7;
-    return targetSize >= 2 ? ["backend_dev", "frontend_dev"] : ["frontend_dev"];
+    return targetTeamSize >= 2 ? ["backend_dev", "frontend_dev"] : ["frontend_dev"];
   }
   return ["backend_dev"];
 }
@@ -193,7 +238,7 @@ function inferSoftwareDevRoles(
  */
 export function getSoftwareDevRoleDisplayName(skillNames: string[]): string {
   if (!skillNames.length) return "Software Developer";
-  const roles = inferSoftwareDevRoles(skillNames, "2-3");
+  const roles = inferSoftwareDevRoles(skillNames, 3);
   return ROLE_DISPLAY_NAMES[roles[0]!] ?? "Software Developer";
 }
 
@@ -203,13 +248,13 @@ export function getSoftwareDevRoleDisplayName(skillNames: string[]): string {
 function getSoftwareDevRolesForComposition(
   softwareDevFields: string[] | undefined,
   selectedSkillNames: string[] | undefined,
-  teamSize: TeamSize
+  targetTeamSize: number
 ): string[] {
   if (softwareDevFields && softwareDevFields.length > 0) {
     return softwareDevFields.filter((id) => ROLE_DISPLAY_NAMES[id] || id.replace(/_/g, " "));
   }
   if (selectedSkillNames?.length) {
-    return inferSoftwareDevRoles(selectedSkillNames, teamSize);
+    return inferSoftwareDevRoles(selectedSkillNames, targetTeamSize);
   }
   return ["backend_dev"];
 }
@@ -220,17 +265,24 @@ function getSoftwareDevRolesForComposition(
  */
 function getTeamCompositionFromCategories(
   categories: string[],
-  teamSize: TeamSize,
+  targetTeamSize: number,
   selectedSkillNames?: string[],
   softwareDevFields?: string[]
 ): Array<{ role: string; category: string; count: number }> {
-  const targetSize = teamSize === "2-3" ? 3 : teamSize === "4-6" ? 5 : 7;
+  const targetSize = Math.max(
+    MIN_TEAM_MEMBER_COUNT,
+    Math.min(MAX_TEAM_MEMBER_COUNT, Math.floor(targetTeamSize))
+  );
   const uniqueCategories = [...new Set(categories)].filter(
     (c) => CATEGORY_TO_ROLES[c]
   );
 
   const getSoftwareDevRoles = () =>
-    getSoftwareDevRolesForComposition(softwareDevFields, selectedSkillNames, teamSize);
+    getSoftwareDevRolesForComposition(
+      softwareDevFields,
+      selectedSkillNames,
+      targetSize
+    );
 
   if (uniqueCategories.length === 0) {
     const roles = getSoftwareDevRoles();
@@ -375,6 +427,7 @@ export function calculateProjectBudget(
 ): BudgetResult {
   const {
     hireType,
+    teamMemberCount,
     teamSize,
     experienceLevel,
     projectType,
@@ -387,7 +440,10 @@ export function calculateProjectBudget(
     skillsRequired = [],
     selectedSkillNames = [],
     softwareDevFields,
+    teamSlots,
   } = params;
+
+  const targetTeamSize = resolveTargetTeamSize(teamMemberCount, teamSize);
 
   const rates = getRates(baseRatesByCategory, talentCategory);
   const baseHourlyRate = rates[experienceLevel];
@@ -404,17 +460,19 @@ export function calculateProjectBudget(
   const hoursPerMonth = HOURS_PER_MONTH[roleType];
   const hoursPerDay = HOURS_PER_DAY[roleType];
 
-  if (hireType === "team" && teamSize) {
-    // Team pricing with category-specific rates and per-role breakdown
-    const categories = skillsRequired.length > 0
-      ? skillsRequired
-      : [talentCategory || "Software Development"];
-    const composition = getTeamCompositionFromCategories(
-      categories,
-      teamSize,
-      selectedSkillNames,
-      softwareDevFields
-    );
+  if (hireType === "team") {
+    // Team pricing: exact composition from per-seat slots when provided
+    const composition =
+      teamSlots && teamSlots.length > 0
+        ? compositionFromTeamSlots(teamSlots)
+        : getTeamCompositionFromCategories(
+            skillsRequired.length > 0
+              ? skillsRequired
+              : [talentCategory || "Software Development"],
+            targetTeamSize,
+            selectedSkillNames,
+            softwareDevFields
+          );
 
     const teamMembers: TeamMemberBreakdown[] = composition.map(({ role, category, count }) => {
       const catRates = getRates(baseRatesByCategory, category);

@@ -54,6 +54,7 @@ export const createProject = mutation({
     intakeForm: v.object({
       // Section 1: Hire Type
       hireType: v.union(v.literal("single"), v.literal("team")),
+      teamMemberCount: v.optional(v.number()),
       teamSize: v.optional(
         v.union(
           v.literal("2-3"),
@@ -112,6 +113,15 @@ export const createProject = mutation({
       ),
       requiredSkills: v.optional(v.array(v.string())),
       softwareDevFields: v.optional(v.array(v.string())),
+      teamSlots: v.optional(
+        v.array(
+          v.object({
+            roleId: v.string(),
+            softwareDevFieldId: v.optional(v.string()),
+            skills: v.array(v.string()),
+          })
+        )
+      ),
       // Section 4: Budget / Notes
       budget: v.number(),
       specialRequirements: v.optional(v.string()),
@@ -161,6 +171,34 @@ export const createProject = mutation({
     // Only clients can create projects
     if (user.role !== "client") {
       throw new Error("Only clients can create projects");
+    }
+
+    if (args.intakeForm.hireType === "team") {
+      const n = args.intakeForm.teamMemberCount;
+      if (n == null || !Number.isFinite(n) || n < 2 || n > 25) {
+        throw new Error("Team hire requires a team size between 2 and 25 freelancers.");
+      }
+      const slots = args.intakeForm.teamSlots;
+      if (!slots || slots.length !== n) {
+        throw new Error(
+          "Team hire requires a filled seat for each freelancer (roles and skills)."
+        );
+      }
+      for (let i = 0; i < slots.length; i++) {
+        const s = slots[i];
+        if (!s.roleId?.trim()) {
+          throw new Error(`Seat ${i + 1}: choose a role.`);
+        }
+        if (
+          s.roleId === "software_development" &&
+          !s.softwareDevFieldId?.trim()
+        ) {
+          throw new Error(`Seat ${i + 1}: choose a software specialisation.`);
+        }
+        if (!s.skills?.length) {
+          throw new Error(`Seat ${i + 1}: select at least one skill.`);
+        }
+      }
     }
 
     const now = Date.now();

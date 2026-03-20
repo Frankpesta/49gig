@@ -232,6 +232,9 @@ export default defineSchema({
     intakeForm: v.object({
       // Section 1: Hire Type
       hireType: v.union(v.literal("single"), v.literal("team")),
+      /** Exact number of freelancers (team hires). Role selection is capped at this count. */
+      teamMemberCount: v.optional(v.number()),
+      /** @deprecated Legacy bucket; prefer teamMemberCount. Kept for existing projects. */
       teamSize: v.optional(
         v.union(
           v.literal("2-3"),
@@ -291,6 +294,16 @@ export default defineSchema({
       requiredSkills: v.optional(v.array(v.string())),
       // Software Development sub-fields (e.g. backend_dev, frontend_dev, mobile_dev …)
       softwareDevFields: v.optional(v.array(v.string())),
+      /** One entry per freelancer for team hires (role + optional dev specialisation + skills). */
+      teamSlots: v.optional(
+        v.array(
+          v.object({
+            roleId: v.string(),
+            softwareDevFieldId: v.optional(v.string()),
+            skills: v.array(v.string()),
+          })
+        )
+      ),
       // Section 4: Budget / Notes
       budget: v.number(), // Calculated budget
       specialRequirements: v.optional(v.string()),
