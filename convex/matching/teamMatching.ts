@@ -151,30 +151,35 @@ function inferProjectType(
  * Determine team composition based on project requirements
  */
 export function determineTeamComposition(params: {
-  teamSize: TeamSize;
+  teamMemberCount?: number;
+  teamSize?: TeamSize;
   description: string;
   skills: string[];
   category: TalentCategory;
   experienceLevel: ExperienceLevel;
 }): Record<string, number> {
-  const { teamSize, description, skills, category } = params;
-  
+  const { teamMemberCount, teamSize, description, skills, category } = params;
+
   let targetSize: number;
-  switch (teamSize) {
-    case "2-3":
-      targetSize = 3;
-      break;
-    case "4-6":
-      targetSize = 5;
-      break;
-    case "7+":
-      targetSize = 7;
-      break;
-    case "not_sure":
-      targetSize = skills.length > 5 ? 5 : 3;
-      break;
-    default:
-      targetSize = 3;
+  if (teamMemberCount != null && Number.isFinite(teamMemberCount)) {
+    const n = Math.floor(teamMemberCount);
+    targetSize = Math.min(25, Math.max(2, n));
+  } else if (teamSize === "not_sure") {
+    targetSize = skills.length > 5 ? 5 : 3;
+  } else {
+    switch (teamSize) {
+      case "2-3":
+        targetSize = 3;
+        break;
+      case "4-6":
+        targetSize = 5;
+        break;
+      case "7+":
+        targetSize = 7;
+        break;
+      default:
+        targetSize = 3;
+    }
   }
   
   const projectType = inferProjectType(description, skills, category);

@@ -24,6 +24,9 @@ import {
   calculateProjectBudget,
   formatBudget,
   computeTeamBudgetBreakdown,
+  MIN_TEAM_MEMBER_COUNT,
+  MAX_TEAM_MEMBER_COUNT,
+  resolveTargetTeamSize,
   type ExperienceLevel,
   type ProjectType,
   type HireType,
@@ -34,9 +37,19 @@ import {
   getSkillsForRole,
   getCategoryLabelForRole,
   getRoleIdForSkill,
+  getRoleIdFromCategoryLabel,
   isCategoryLabel,
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
+import {
+  type TeamSlotIntake,
+  emptyTeamSlot,
+  allSkillsFromTeamSlots,
+  primaryCategoryFromTeamSlots,
+  softwareDevFieldsFromTeamSlots,
+  uniqueCategoriesFromTeamSlots,
+} from "@/lib/team-slots";
+import { TeamSlotsEditor } from "@/components/hire/team-slots-editor";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
 import { getDurationMonths } from "@/lib/project-duration";
@@ -99,13 +112,6 @@ const EXPERIENCE_LEVELS = [
   { value: "senior", label: "Senior (5+ years)" },
 ] as const;
 
-const TEAM_SIZES = [
-  { value: "2-3", label: "2–3" },
-  { value: "4-6", label: "4–6" },
-  { value: "7+", label: "7+" },
-  { value: "not_sure", label: "Not sure" },
-] as const;
-
 const ROLE_TYPES = [
   { value: "full_time", label: "Full time" },
   { value: "part_time", label: "Part time" },
@@ -120,6 +126,16 @@ function roleTypeToProjectType(_: RoleType): ProjectType {
 function getPrimaryCategory(selectedRoles: string[]): string {
   if (selectedRoles.length === 0) return "Software Development";
   return getCategoryLabelForRole(selectedRoles[0]);
+}
+
+function resizeTeamSlots(
+  prev: TeamSlotIntake[] | undefined,
+  n: number
+): TeamSlotIntake[] {
+  const slots = [...(prev ?? [])];
+  while (slots.length < n) slots.push(emptyTeamSlot());
+  if (slots.length > n) slots.length = n;
+  return slots;
 }
 
 function parseLocalDateString(value: string): Date | null {
@@ -161,7 +177,7 @@ export default function EditProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
     hireType: HireType;
-    teamSize?: TeamSize;
+    teamMemberCount?: number;
     title: string;
     selectedRoles: string[];
     roleSkills: Record<string, string[]>;
@@ -172,6 +188,7 @@ export default function EditProjectPage() {
     startDate: string;
     specialRequirements: string;
     fundUpfrontMonths: number;
+    teamSlots: TeamSlotIntake[];
   } | null>(null);
 
   useEffect(() => {
@@ -213,9 +230,54 @@ export default function EditProjectPage() {
       }
     }
 
+    const hireType = (intake.hireType as HireType) || "single";
+    const teamMemberCountResolved =
+      hireType === "team"
+        ? resolveTargetTeamSize(
+            intake.teamMemberCount,
+            intake.teamSize as TeamSize | undefined
+          )
+        : undefined;
+
+    let teamSlots: TeamSlotIntake[] =
+      (intake as { teamSlots?: TeamSlotIntake[] }).teamSlots ?? [];
+
+    if (hireType === "team" && teamMemberCountResolved != null) {
+      teamSlots = resizeTeamSlots(teamSlots, teamMemberCountResolved);
+      const needsMigrate = teamSlots.every((s) => !s.roleId);
+      if (needsMigrate) {
+        const primaryRole = getRoleIdFromCategoryLabel(
+          String(intake.talentCategory ?? "Software Development")
+        );
+        const sfields = (intake as { softwareDevFields?: string[] })
+          .softwareDevFields;
+        const rolesCycle =
+          selectedRoles.length > 0 ? selectedRoles : [primaryRole];
+        for (let i = 0; i < teamSlots.length; i++) {
+          const r = rolesCycle[i % rolesCycle.length] ?? primaryRole;
+          const rs = roleSkills[r];
+          teamSlots[i] = {
+            roleId: r,
+            softwareDevFieldId:
+              r === "software_development"
+                ? sfields?.[0] ?? "fullstack_dev"
+                : undefined,
+            skills:
+              rs && rs.length > 0
+                ? [...rs]
+                : i === 0
+                  ? [...rawSkills]
+                  : [...(teamSlots[0]?.skills ?? [])],
+          };
+        }
+      }
+    } else {
+      teamSlots = [];
+    }
+
     setFormData({
-      hireType: (intake.hireType as HireType) || "single",
-      teamSize: intake.teamSize as TeamSize | undefined,
+      hireType,
+      teamMemberCount: teamMemberCountResolved,
       title: intake.title || "",
       selectedRoles,
       roleSkills,
@@ -226,6 +288,7 @@ export default function EditProjectPage() {
       startDate,
       specialRequirements: intake.specialRequirements || "",
       fundUpfrontMonths: Math.max(1, project.fundUpfrontMonths ?? 1),
+      teamSlots,
     });
   }, [project, formData]);
 
@@ -242,24 +305,63 @@ export default function EditProjectPage() {
   const projectType = formData ? roleTypeToProjectType(formData.roleType) : "ongoing";
 
   const budgetCalculation = useMemo(() => {
-    if (!formData?.selectedRoles?.length || !formData?.startDate || !derivedEndDate || !formData?.experienceLevel) return null;
+    if (!formData?.startDate || !derivedEndDate || !formData?.experienceLevel) return null;
     try {
       const startDate = parseLocalDateString(formData.startDate);
       if (!startDate || isNaN(startDate.getTime())) return null;
-      const categoriesForBudget = formData.selectedRoles.map((r) => getCategoryLabelForRole(r));
-      const calc = calculateProjectBudget({
-        hireType: formData.hireType,
-        teamSize: formData.teamSize,
-        experienceLevel: formData.experienceLevel,
-        projectType,
-        startDate,
-        endDate: derivedEndDate,
-        talentCategory: getPrimaryCategory(formData.selectedRoles),
-        baseRatesByCategory: pricingConfig ?? undefined,
-        roleType: formData.roleType,
-        skillsRequired: categoriesForBudget,
-        selectedSkillNames: Object.values(formData.roleSkills).flat(),
-      });
+
+      let calc;
+      if (formData.hireType === "team") {
+        const slots = formData.teamSlots;
+        const complete = slots.every(
+          (s) =>
+            s.roleId &&
+            (s.roleId !== "software_development" || s.softwareDevFieldId) &&
+            s.skills.length > 0
+        );
+        if (
+          !slots.length ||
+          slots.length !== formData.teamMemberCount ||
+          !complete
+        ) {
+          return null;
+        }
+        const categoriesForBudget = uniqueCategoriesFromTeamSlots(slots);
+        calc = calculateProjectBudget({
+          hireType: "team",
+          teamMemberCount: formData.teamMemberCount,
+          teamSlots: slots,
+          experienceLevel: formData.experienceLevel,
+          projectType,
+          startDate,
+          endDate: derivedEndDate,
+          talentCategory: primaryCategoryFromTeamSlots(slots),
+          baseRatesByCategory: pricingConfig ?? undefined,
+          roleType: formData.roleType,
+          skillsRequired:
+            categoriesForBudget.length > 0
+              ? categoriesForBudget
+              : ["Software Development"],
+          selectedSkillNames: allSkillsFromTeamSlots(slots),
+        });
+      } else {
+        if (!formData.selectedRoles.length) return null;
+        const categoriesForBudget = formData.selectedRoles.map((r) =>
+          getCategoryLabelForRole(r)
+        );
+        calc = calculateProjectBudget({
+          hireType: "single",
+          experienceLevel: formData.experienceLevel,
+          projectType,
+          startDate,
+          endDate: derivedEndDate,
+          talentCategory: getPrimaryCategory(formData.selectedRoles),
+          baseRatesByCategory: pricingConfig ?? undefined,
+          roleType: formData.roleType,
+          skillsRequired: categoriesForBudget,
+          selectedSkillNames: Object.values(formData.roleSkills).flat(),
+        });
+      }
       const discount = DURATION_DISCOUNT[formData.projectDuration] ?? 0.97;
       return { ...calc, estimatedBudget: Math.round(calc.estimatedBudget * discount) };
     } catch {
@@ -273,6 +375,29 @@ export default function EditProjectPage() {
     if (formData.projectDuration === "12+") {
       setError("Please select how long this engagement will last (1 year, 2 years, etc.)");
       return;
+    }
+    if (formData.hireType === "team") {
+      const n = formData.teamMemberCount;
+      if (n == null || n < MIN_TEAM_MEMBER_COUNT || n > MAX_TEAM_MEMBER_COUNT) {
+        setError(
+          `Team size must be between ${MIN_TEAM_MEMBER_COUNT} and ${MAX_TEAM_MEMBER_COUNT} freelancers.`
+        );
+        return;
+      }
+      if (formData.teamSlots.length !== n) {
+        setError("Each freelancer needs a filled seat.");
+        return;
+      }
+      const incomplete = formData.teamSlots.findIndex(
+        (s) =>
+          !s.roleId ||
+          (s.roleId === "software_development" && !s.softwareDevFieldId) ||
+          s.skills.length === 0
+      );
+      if (incomplete !== -1) {
+        setError(`Complete seat ${incomplete + 1} before saving.`);
+        return;
+      }
     }
     const startDate = parseLocalDateString(formData.startDate);
     if (!startDate || !derivedEndDate || !budgetCalculation) {
@@ -306,15 +431,30 @@ export default function EditProjectPage() {
         teamBudgetBreakdown,
         intakeForm: {
           hireType: formData.hireType,
-          teamSize: formData.teamSize,
+          teamMemberCount:
+            formData.hireType === "team" ? formData.teamMemberCount : undefined,
+          teamSlots:
+            formData.hireType === "team" ? formData.teamSlots : undefined,
           title: formData.title,
           description: formData.description,
           startDate: startDate.getTime(),
           endDate: derivedEndDate.getTime(),
           projectType,
-          talentCategory: getPrimaryCategory(formData.selectedRoles) as any,
+          talentCategory: (formData.hireType === "team"
+            ? primaryCategoryFromTeamSlots(formData.teamSlots)
+            : getPrimaryCategory(formData.selectedRoles)) as any,
           experienceLevel: formData.experienceLevel,
-          requiredSkills: Object.values(formData.roleSkills).flat(),
+          requiredSkills:
+            formData.hireType === "team"
+              ? allSkillsFromTeamSlots(formData.teamSlots)
+              : Object.values(formData.roleSkills).flat(),
+          softwareDevFields:
+            formData.hireType === "team"
+              ? (() => {
+                  const u = softwareDevFieldsFromTeamSlots(formData.teamSlots);
+                  return u.length > 0 ? u : undefined;
+                })()
+              : undefined,
           budget: budgetCalculation.estimatedBudget,
           specialRequirements: formData.specialRequirements || undefined,
           roleTitle: formData.title.trim() || undefined,
@@ -324,7 +464,10 @@ export default function EditProjectPage() {
             getDurationMonths(formData.projectDuration) >= 12
               ? `${getDurationMonths(formData.projectDuration) / 12} year${getDurationMonths(formData.projectDuration) > 12 ? "s" : ""}`
               : `${formData.projectDuration} months`,
-          category: getPrimaryCategory(formData.selectedRoles),
+          category:
+            formData.hireType === "team"
+              ? primaryCategoryFromTeamSlots(formData.teamSlots)
+              : getPrimaryCategory(formData.selectedRoles),
           estimatedBudget: budgetCalculation.estimatedBudget,
         },
       });
@@ -523,53 +666,107 @@ export default function EditProjectPage() {
               ))}
             </div>
           </div>
-          <div>
-            <Label>Roles needed</Label>
-            <p className="text-xs text-muted-foreground mt-1">
-              {formData.hireType === "single" ? "Select the role you need." : "Select roles for your team, then choose skills for each."}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PLATFORM_ROLES.map((role) => (
-                <Button
-                  key={role.id}
-                  type="button"
-                  variant={formData.selectedRoles.includes(role.id) ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => toggleRole(role.id)}
-                >
-                  {role.label}
-                </Button>
-              ))}
+          {formData.hireType === "team" && (
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-2">
+              <Label htmlFor="edit-team-member-count">Team size</Label>
+              <p className="text-xs text-muted-foreground">
+                Number of seats (one role configuration per freelancer). Changing this adds or removes seats.
+              </p>
+              <Input
+                id="edit-team-member-count"
+                type="number"
+                inputMode="numeric"
+                min={MIN_TEAM_MEMBER_COUNT}
+                max={MAX_TEAM_MEMBER_COUNT}
+                value={formData.teamMemberCount ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    setFormData({ ...formData, teamMemberCount: undefined });
+                    return;
+                  }
+                  const parsed = parseInt(raw, 10);
+                  if (!Number.isFinite(parsed)) return;
+                  const n = Math.min(
+                    MAX_TEAM_MEMBER_COUNT,
+                    Math.max(MIN_TEAM_MEMBER_COUNT, parsed)
+                  );
+                  setFormData((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          teamMemberCount: n,
+                          teamSlots: resizeTeamSlots(prev.teamSlots, n),
+                        }
+                      : prev
+                  );
+                }}
+                className="max-w-[120px]"
+              />
             </div>
-          </div>
-          {formData.selectedRoles.length > 0 && (
-            <div className="space-y-4">
-              <Label>Skills per role</Label>
-              {formData.selectedRoles.map((roleId) => {
-                const role = PLATFORM_ROLES.find((r) => r.id === roleId);
-                if (!role) return null;
-                const skills = getSkillsForRole(roleId);
-                const selectedSkills = formData.roleSkills[roleId] ?? [];
-                return (
-                  <div key={roleId} className="rounded-lg border border-border/60 bg-muted/10 p-4 space-y-2">
-                    <p className="font-medium text-sm">{role.label}</p>
-                    <div className="flex flex-wrap gap-2">
-                      {skills.map((skill) => (
-                        <Button
-                          key={skill}
-                          type="button"
-                          variant={selectedSkills.includes(skill) ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleRoleSkill(roleId, skill)}
-                        >
-                          {skill}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+          )}
+          {formData.hireType === "team" ? (
+            <TeamSlotsEditor
+              slots={formData.teamSlots}
+              onSlotsChange={(teamSlots) => setFormData({ ...formData, teamSlots })}
+            />
+          ) : (
+            <>
+              <div>
+                <Label>Role needed</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Select the role you need.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {PLATFORM_ROLES.map((role) => {
+                    const isSelected = formData.selectedRoles.includes(role.id);
+                    return (
+                      <Button
+                        key={role.id}
+                        type="button"
+                        variant={isSelected ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleRole(role.id)}
+                      >
+                        {role.label}
+                      </Button>
+                    );
+                  })}
+                </div>
+              </div>
+              {formData.selectedRoles.length > 0 && (
+                <div className="space-y-4">
+                  <Label>Skills</Label>
+                  {formData.selectedRoles.map((roleId) => {
+                    const role = PLATFORM_ROLES.find((r) => r.id === roleId);
+                    if (!role) return null;
+                    const skills = getSkillsForRole(roleId);
+                    const selectedSkills = formData.roleSkills[roleId] ?? [];
+                    return (
+                      <div
+                        key={roleId}
+                        className="rounded-lg border border-border/60 bg-muted/10 p-4 space-y-2"
+                      >
+                        <p className="font-medium text-sm">{role.label}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {skills.map((skill) => (
+                            <Button
+                              key={skill}
+                              type="button"
+                              variant={selectedSkills.includes(skill) ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => toggleRoleSkill(roleId, skill)}
+                            >
+                              {skill}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
           <div>
             <Label>Start date</Label>
@@ -598,10 +795,14 @@ export default function EditProjectPage() {
             />
           </div>
 
-          {!formData?.selectedRoles?.length ? (
+          {(formData.hireType === "team"
+            ? !formData.teamSlots.some((s) => s.roleId)
+            : !formData.selectedRoles.length) ? (
             <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5">
               <p className="text-sm text-muted-foreground">
-                Select roles above to see the estimated price. Base rates vary by role.
+                {formData.hireType === "team"
+                  ? "Fill at least one seat above to preview pricing."
+                  : "Select a role above to see the estimated price."}
               </p>
             </div>
           ) : budgetCalculation ? (
@@ -625,8 +826,18 @@ export default function EditProjectPage() {
               disabled={
                 isSubmitting ||
                 !budgetCalculation ||
-                formData.selectedRoles.length === 0 ||
-                formData.selectedRoles.some((r) => (formData.roleSkills[r]?.length ?? 0) === 0)
+                (formData.hireType === "team"
+                  ? !formData.teamSlots.every(
+                      (s) =>
+                        s.roleId &&
+                        (s.roleId !== "software_development" ||
+                          s.softwareDevFieldId) &&
+                        s.skills.length > 0
+                    )
+                  : formData.selectedRoles.length === 0 ||
+                    formData.selectedRoles.some(
+                      (r) => (formData.roleSkills[r]?.length ?? 0) === 0
+                    ))
               }
             >
               {isSubmitting ? "Saving..." : "Save changes"}

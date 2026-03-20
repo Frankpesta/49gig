@@ -471,7 +471,9 @@ export const generateTeamMatches = action({
 
     // Determine team composition
     const teamComposition = determineTeamComposition({
-      teamSize: intakeForm.teamSize || "not_sure",
+      teamSlots: intakeForm.teamSlots,
+      teamMemberCount: intakeForm.teamMemberCount,
+      teamSize: intakeForm.teamSize,
       description: intakeForm.description,
       skills: intakeForm.requiredSkills || [],
       category: intakeForm.talentCategory as any,

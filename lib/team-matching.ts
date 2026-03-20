@@ -6,6 +6,14 @@
  */
 
 import type { Doc } from "../convex/_generated/dataModel";
+import {
+  legacyTeamSizeToCount,
+  resolveTargetTeamSize,
+} from "./budget-calculator";
+import {
+  type TeamSlotIntake,
+  teamSlotRoleCountsForMatching,
+} from "./team-slots";
 
 export type TeamSize = "2-3" | "4-6" | "7+" | "not_sure";
 export type TalentCategory =
@@ -179,32 +187,32 @@ function inferProjectType(
  * Determine team composition based on project requirements
  */
 export function determineTeamComposition(params: {
-  teamSize: TeamSize;
+  /** Per-seat roles (preferred for team hires). */
+  teamSlots?: TeamSlotIntake[];
+  /** Exact freelancer count when set (preferred). */
+  teamMemberCount?: number;
+  /** @deprecated Legacy bucket */
+  teamSize?: TeamSize;
   description: string;
   skills: string[];
   category: TalentCategory;
   experienceLevel: ExperienceLevel;
 }): Record<string, number> {
-  const { teamSize, description, skills, category } = params;
-  
-  // Get target team size
+  const { teamSlots, teamMemberCount, teamSize, description, skills, category } =
+    params;
+
+  if (teamSlots && teamSlots.length > 0) {
+    const counts = teamSlotRoleCountsForMatching(teamSlots);
+    if (Object.keys(counts).length > 0) return counts;
+  }
+
   let targetSize: number;
-  switch (teamSize) {
-    case "2-3":
-      targetSize = 3; // Use upper bound
-      break;
-    case "4-6":
-      targetSize = 5; // Use middle
-      break;
-    case "7+":
-      targetSize = 7; // Use minimum
-      break;
-    case "not_sure":
-      // Infer from project complexity
-      targetSize = skills.length > 5 ? 5 : 3;
-      break;
-    default:
-      targetSize = 3;
+  if (teamMemberCount != null && Number.isFinite(teamMemberCount)) {
+    targetSize = resolveTargetTeamSize(teamMemberCount, teamSize);
+  } else if (teamSize === "not_sure") {
+    targetSize = skills.length > 5 ? 5 : 3;
+  } else {
+    targetSize = legacyTeamSizeToCount(teamSize);
   }
   
   // Infer project type
