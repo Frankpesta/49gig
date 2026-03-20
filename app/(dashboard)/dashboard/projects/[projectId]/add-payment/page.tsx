@@ -123,7 +123,7 @@ export default function AddPaymentPage() {
             {project.intakeForm?.title}
           </CardTitle>
           <CardDescription>
-            Platform fee is deducted before escrow. Freelancer(s) receive salary to their wallet each month after you approve.
+            Funds are held in escrow and released to your hire(s) each month after you approve completed work.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

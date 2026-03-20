@@ -33,11 +33,9 @@ export function ConsentBanner({ onConsentChange }: ConsentBannerProps) {
 
   const stored = mounted ? getStoredConsent() : null;
 
-  const handleChoice = (status: ConsentStatus) => {
-    if (status) {
-      setStoredConsent(status);
-      onConsentChange?.(status);
-    }
+  const handleChoice = (status: Exclude<ConsentStatus, null>) => {
+    setStoredConsent(status);
+    onConsentChange?.(status);
   };
 
   if (!mounted || stored !== null) {
@@ -58,29 +56,30 @@ export function ConsentBanner({ onConsentChange }: ConsentBannerProps) {
                 <Cookie className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-foreground">
-                  We value your privacy
-                </h3>
+                <h3 className="font-semibold text-foreground">We value your privacy</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  We use analytics to improve 49GIG and understand how you use our
-                  platform. No tracking runs until you consent. You can change
-                  your mind anytime in{" "}
-                  <Link
-                    href="/legal/cookie-policy"
-                    className="underline hover:text-foreground"
-                  >
+                  We use cookies that are required for the site to work, and—with your choice—analytics
+                  to improve 49GIG. Pick{" "}
+                  <span className="font-medium text-foreground">Allow all</span> or{" "}
+                  <span className="font-medium text-foreground">Necessary ones</span>
+                  . You can update this anytime in{" "}
+                  <Link href="/legal/cookie-policy" className="underline hover:text-foreground">
                     Cookie settings
                   </Link>
                   .
                 </p>
                 {showDetails && (
                   <div className="mt-3 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-                    <p className="font-medium text-foreground">What we track when you accept:</p>
+                    <p className="font-medium text-foreground">If you allow all, we may use:</p>
                     <ul className="mt-1 list-inside list-disc space-y-0.5">
                       <li>Page views and navigation</li>
                       <li>Sign-ups, logins, and key actions</li>
-                      <li>Aggregated usage patterns (no personal data sold)</li>
+                      <li>Aggregated usage (we don&apos;t sell personal data)</li>
                     </ul>
+                    <p className="mt-2">
+                      <span className="font-medium text-foreground">Necessary ones</span> keeps only
+                      cookies needed for security, sign-in, and core features—optional analytics stay off.
+                    </p>
                   </div>
                 )}
                 <button
@@ -96,19 +95,11 @@ export function ConsentBanner({ onConsentChange }: ConsentBannerProps) {
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                onClick={() => handleChoice("granted")}
-                className="font-medium"
-              >
-                Accept analytics
+              <Button size="sm" onClick={() => handleChoice("granted")} className="font-medium">
+                Allow all
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleChoice("denied")}
-              >
-                Reject
+              <Button size="sm" variant="outline" onClick={() => handleChoice("denied")}>
+                Necessary ones
               </Button>
             </div>
           </div>

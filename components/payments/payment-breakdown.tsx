@@ -109,20 +109,6 @@ export function PaymentBreakdownDisplay({
             </div>
           </div>
         )}
-
-        {/* Platform Fee Info */}
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-          <div className="flex items-start gap-2 text-xs">
-            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-            <div className="space-y-1 min-w-0">
-              <div className="font-semibold">What the service fee covers</div>
-              <div className="text-muted-foreground">
-                A service fee is included in the amount you pay.
-                It covers vetting, escrow, contracts, replacements, and support.
-              </div>
-            </div>
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
