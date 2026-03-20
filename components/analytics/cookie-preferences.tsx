@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { getStoredConsent, setStoredConsent } from "@/lib/analytics";
+import { getStoredConsent, setStoredConsent, pushConsentUpdate } from "@/lib/analytics";
 
 export function CookiePreferences() {
   const [consent, setConsent] = useState<"granted" | "denied" | null>(null);
@@ -13,15 +13,17 @@ export function CookiePreferences() {
     setConsent(getStoredConsent());
   }, []);
 
-  const handleAccept = () => {
+  const handleAllowAll = () => {
     setStoredConsent("granted");
     setConsent("granted");
+    pushConsentUpdate(true);
     window.location.reload();
   };
 
-  const handleReject = () => {
+  const handleNecessaryOnes = () => {
     setStoredConsent("denied");
     setConsent("denied");
+    pushConsentUpdate(false);
     window.location.reload();
   };
 
@@ -29,20 +31,20 @@ export function CookiePreferences() {
 
   return (
     <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-      <h3 className="font-medium text-foreground">Analytics consent</h3>
+      <h3 className="font-medium text-foreground">Cookie preferences</h3>
       <p className="mt-1 text-sm text-muted-foreground">
         {consent === "granted"
-          ? "You have accepted analytics. We use this to improve 49GIG."
+          ? "You chose Allow all—analytics and related tags may run to help us improve 49GIG."
           : consent === "denied"
-            ? "You have rejected analytics. No tracking is active."
-            : "You have not yet made a choice. Use the banner or the buttons below."}
+            ? "You chose Necessary ones—we use essential cookies only; optional analytics stay off."
+            : "Choose Allow all (analytics included) or Necessary ones (essential cookies only). You can also use the banner on any page."}
       </p>
-      <div className="mt-3 flex gap-2">
-        <Button size="sm" variant={consent === "granted" ? "default" : "outline"} onClick={handleAccept}>
-          Accept analytics
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" variant={consent === "granted" ? "default" : "outline"} onClick={handleAllowAll}>
+          Allow all
         </Button>
-        <Button size="sm" variant={consent === "denied" ? "default" : "outline"} onClick={handleReject}>
-          Reject analytics
+        <Button size="sm" variant={consent === "denied" ? "default" : "outline"} onClick={handleNecessaryOnes}>
+          Necessary ones
         </Button>
       </div>
     </div>

@@ -33,7 +33,7 @@ const TYPE_LABELS: Record<string, string> = {
   pre_funding: "Project Funding",
   milestone_release: "Milestone Release",
   refund: "Refund",
-  platform_fee: "Platform Fee",
+  platform_fee: "Included services",
   payout: "Payout",
 };
 

@@ -1023,11 +1023,9 @@ export default function CreateProjectPage() {
                 </div>
               ) : budgetCalculation ? (
                 (() => {
-                  const platformFee = platformFeePct ?? 25;
-                  const netPercent = 100 - platformFee;
                   const durMonths = getDurationMonths(formData.projectDuration);
-                  const totalNet = (budgetCalculation.estimatedBudget * netPercent) / 100;
-                  const monthlyFreelancerSalary = totalNet / durMonths;
+                  const estimatedMonthlyTotal =
+                    durMonths > 0 ? budgetCalculation.estimatedBudget / durMonths : 0;
                   return (
                     <div className="rounded-xl border border-primary/20 bg-gradient-to-b from-primary/5 to-transparent shadow-sm overflow-hidden">
                       {/* Header */}
@@ -1045,16 +1043,16 @@ export default function CreateProjectPage() {
                         </div>
                       </div>
 
-                      {/* Freelancer salary section */}
+                      {/* Monthly breakdown */}
                       <div className="border-t border-border/60 bg-background/50 px-5 py-4">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                          {formData.hireType === "team" ? "What each freelancer receives" : "Freelancer monthly salary"}
+                          {formData.hireType === "team"
+                            ? "Estimated monthly by role"
+                            : "Estimated monthly"}
                         </p>
                         {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 ? (
                           <div className="space-y-3">
-                            {budgetCalculation.breakdown.teamMembers.map((m) => {
-                              const netPerPerson = (m.monthlyPerPerson * netPercent) / 100;
-                              return (
+                            {budgetCalculation.breakdown.teamMembers.map((m) => (
                                 <div
                                   key={`${m.role}-${m.category}`}
                                   className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3"
@@ -1067,21 +1065,20 @@ export default function CreateProjectPage() {
                                     )}
                                   </div>
                                   <div className="text-right">
-                                    <span className="font-semibold tabular-nums text-foreground">{formatBudget(netPerPerson)}</span>
+                                    <span className="font-semibold tabular-nums text-foreground">{formatBudget(m.monthlyPerPerson)}</span>
                                     <span className="text-xs text-muted-foreground">/mo</span>
                                   </div>
                                 </div>
-                              );
-                            })}
+                            ))}
                             <p className="text-xs text-muted-foreground pt-1">
-                              {formData.roleType === "part_time" ? "Part-time (20 hrs/week)." : "Full-time (40 hrs/week)."} After platform fee.
+                              {formData.roleType === "part_time" ? "Part-time (20 hrs/week)." : "Full-time (40 hrs/week)."}
                             </p>
                           </div>
                         ) : (
                           <div className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3">
-                            <span className="text-sm text-muted-foreground">Net monthly salary</span>
+                            <span className="text-sm text-muted-foreground">Average per month</span>
                             <span className="text-lg font-semibold tabular-nums text-foreground">
-                              {formatBudget(monthlyFreelancerSalary)}
+                              {formatBudget(estimatedMonthlyTotal)}
                               <span className="text-sm font-normal text-muted-foreground">/mo</span>
                             </span>
                           </div>

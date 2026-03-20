@@ -314,7 +314,7 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
     });
   }
 
-  const summary = `${formatCurrency(breakdown.totalAmount)} total (service fee included)`;
+  const summary = `${formatCurrency(breakdown.totalAmount)} total`;
 
   return { summary, details };
 }

@@ -1,6 +1,6 @@
 # Google Tag Manager Setup — 49GIG
 
-49GIG uses Google Tag Manager (GTM) with **Google Consent Mode v2**. GTM loads immediately with default consent denied; tags fire only after the user accepts analytics. This keeps the consent banner functional while respecting privacy.
+49GIG uses Google Tag Manager (GTM) with **Google Consent Mode v2**. GTM loads with default consent denied; after the user chooses **Allow all** or **Necessary ones**, `consent_update` sets analytics/ad signals to granted or denied accordingly.
 
 ---
 
@@ -23,7 +23,7 @@ Restart the dev server. The GTM snippet with Consent Mode v2 is automatically in
 **Implementation details:**
 - `consent_default` is pushed with all four v2 parameters denied (`ad_storage`, `ad_user_data`, `ad_personalization`, `analytics_storage`)
 - `wait_for_update: 500` gives the consent banner time to run
-- When the user accepts, `consent_update` is pushed with all granted
+- When the user chooses **Allow all**, `consent_update` is pushed with all granted
 - GTM loads immediately; tags inside GTM respect consent and fire only when granted
 
 ---
@@ -222,7 +222,7 @@ Users can change their choice at [/legal/cookie-policy](/legal/cookie-policy).
 1. **Build**: Run `npm run build` — no errors.
 2. **GTM loads**: Open DevTools → Network, filter by `gtm.js` — request to `googletagmanager.com` appears.
 3. **Consent default**: In Console, `window.dataLayer` should show `['consent','default',{...}]` with all denied.
-4. **Accept flow**: Click "Accept analytics" → `dataLayer` should show `['consent','update',{...}]` with all granted.
+4. **Consent**: "Allow all" → `consent_update` all granted; "Necessary ones" → same keys with denied.
 5. **Page view**: After consent, navigate → `dataLayer` should show `{event:'page_view',page_path:'/...'}`.
 6. **GTM Preview**: Use GTM → Preview, enter your URL with `?accept_analytics=1` — verify tags fire.
 7. **GA4 Realtime**: After consent, events appear in GA4 → Reports → Realtime.

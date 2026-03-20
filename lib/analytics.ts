@@ -24,6 +24,10 @@ export const CONVERSION_EVENTS = {
   SIGN_CONTRACT: "sign_contract",
 } as const;
 
+/**
+ * - `granted` — "Allow all" (analytics + advertising consent mode signals on).
+ * - `denied` — "Necessary ones" (non-essential / analytics storage off until user allows all).
+ */
 export type ConsentStatus = "granted" | "denied" | null;
 
 /** Get stored consent from localStorage (client-side only) */
@@ -65,7 +69,7 @@ export function canTrack(): boolean {
 
 /**
  * Push Google Consent Mode v2 consent_update to dataLayer.
- * Call when user accepts analytics. Uses gtag format for GTM compatibility.
+ * @param granted - `true` after "Allow all"; `false` after "Necessary ones".
  */
 export function pushConsentUpdate(granted: boolean): void {
   if (typeof window === "undefined") return;
