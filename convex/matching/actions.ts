@@ -9,6 +9,7 @@ import {
   getRoleIdFromCategoryLabel,
   freelancerMatchesRole,
   humanizeTeamRoleKey,
+  getRoleLabelsFromProject,
 } from "../../lib/platform-skills";
 
 function projectAllowsPostFundMatchGeneration(project: Doc<"projects">): boolean {
@@ -733,6 +734,20 @@ export const generateMatchesForDraft = action({
     );
 
     if (approvedFreelancers.length === 0) {
+      if (isTeam) {
+        const roleLabels = getRoleLabelsFromProject(intakeForm);
+        await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+          projectId: args.projectId,
+          awaiting: true,
+          rolesAwaitingMatch:
+            roleLabels.length > 0 ? roleLabels : undefined,
+        });
+      } else {
+        await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+          projectId: args.projectId,
+          awaiting: true,
+        });
+      }
       return { matchIds: [], isTeam: false, groupCount: 0, availability: null };
     }
 
@@ -815,6 +830,18 @@ export const generateMatchesForDraft = action({
         top20.length === 0
           ? { atRequestedLevel: 0, hasHigherLevelWithSkills }
           : null;
+      if (matchIds.length === 0) {
+        await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+          projectId: args.projectId,
+          awaiting: true,
+        });
+      } else {
+        await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+          projectId: args.projectId,
+          awaiting: false,
+          clearRolesAwaitingMatch: true,
+        });
+      }
       return { matchIds, isTeam: false, groupCount: 0, availability };
     }
 
@@ -842,7 +869,10 @@ export const generateMatchesForDraft = action({
             (s) => ({ roleId: getRoleIdForSkill(s) ?? "software_development", roleLabel: s, skills: [s] })
           );
 
+    const rolesMissing: string[] = [];
+
     for (const group of groups) {
+      const matchCountBeforeGroup = matchIds.length;
       const groupScores: Array<{
         freelancer: Doc<"users">;
         score: number;
@@ -891,6 +921,9 @@ export const generateMatchesForDraft = action({
         );
         matchIds.push(matchId);
       }
+      if (matchIds.length === matchCountBeforeGroup) {
+        rolesMissing.push(group.roleLabel);
+      }
     }
 
     // For team: check if any role had 0 matches and we have higher-level freelancers
@@ -920,6 +953,20 @@ export const generateMatchesForDraft = action({
       matchIds.length === 0
         ? { atRequestedLevel: 0, hasHigherLevelWithSkills }
         : null;
+
+    if (rolesMissing.length > 0) {
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: true,
+        rolesAwaitingMatch: rolesMissing,
+      });
+    } else {
+      await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
+        projectId: args.projectId,
+        awaiting: false,
+        clearRolesAwaitingMatch: true,
+      });
+    }
 
     return {
       matchIds,

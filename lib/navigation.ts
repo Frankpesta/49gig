@@ -159,13 +159,13 @@ export const navigationItems: NavItem[] = [
     roles: ["admin", "moderator"],
   },
 
-  // Admin & Moderator: Base rates by tech stack
+  // Admin: Base rates by tech stack (moderators cannot change rates)
   {
     title: "Pricing",
     url: "/dashboard/pricing",
     icon: DollarSign,
     section: "menu",
-    roles: ["admin", "moderator"],
+    roles: ["admin"],
   },
 
   // Admin & Moderator: Blog

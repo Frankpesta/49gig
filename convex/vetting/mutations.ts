@@ -805,6 +805,165 @@ export const rejectVerification = mutation({
   },
 });
 
+/**
+ * Admin only: waive verification and skill tests for a freelancer by writing a passing
+ * vetting record, closing open skill sessions, and optionally approving KYC for matching.
+ */
+export const adminOverrideFreelancerVerificationAndTests = mutation({
+  args: {
+    freelancerId: v.id("users"),
+    adminUserId: v.optional(v.id("users")),
+    reason: v.optional(v.string()),
+    /** When true, sets kycStatus to approved (needed for matching alongside vetting). */
+    approveKyc: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInMutation(ctx, args.adminUserId);
+    if (!admin) {
+      throw new Error("Not authenticated");
+    }
+    if (admin.role !== "admin") {
+      throw new Error("Only admins can override verification and tests");
+    }
+
+    const freelancer = await ctx.db.get(args.freelancerId);
+    if (!freelancer || freelancer.role !== "freelancer") {
+      throw new Error("Freelancer not found");
+    }
+
+    const now = Date.now();
+    const reviewNotes = args.reason?.trim()
+      ? `Admin override: ${args.reason.trim()}`
+      : "Admin override: verification and skill tests waived";
+
+    const sessions = await ctx.db
+      .query("vettingSkillTestSessions")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+      .collect();
+
+    for (const s of sessions) {
+      if (s.status !== "completed") {
+        await ctx.db.patch(s._id, {
+          status: "completed",
+          completedAt: now,
+          mcqScore: s.mcqScore ?? 85,
+          portfolioScore: s.portfolioScore ?? 85,
+          updatedAt: now,
+        });
+      }
+    }
+
+    const syntheticEnglish = {
+      grammarScore: 85,
+      comprehensionScore: 85,
+      writtenResponseScore: 85,
+      overallScore: 85,
+      completedAt: now,
+    };
+    const syntheticSkills = [
+      {
+        skillId: "admin_verification_override",
+        skillName: "Admin verification override",
+        assessmentType: "mcq" as const,
+        score: 85,
+        completedAt: now,
+        details: {
+          waivedByAdmin: true,
+          adminId: admin._id,
+          at: now,
+        },
+      },
+    ];
+
+    let vettingDoc = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+      .first();
+
+    if (!vettingDoc) {
+      const vettingResultId = await ctx.db.insert("vettingResults", {
+        freelancerId: args.freelancerId,
+        englishProficiency: syntheticEnglish,
+        skillAssessments: syntheticSkills,
+        overallScore: 85,
+        status: "approved",
+        currentStep: "complete",
+        stepsCompleted: ["english", "skills"],
+        reviewedBy: admin._id,
+        reviewedAt: now,
+        reviewNotes,
+        fraudFlags: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+      vettingDoc = await ctx.db.get(vettingResultId);
+    } else {
+      await ctx.db.patch(vettingDoc._id, {
+        englishProficiency: syntheticEnglish,
+        skillAssessments: syntheticSkills,
+        overallScore: 85,
+        status: "approved",
+        currentStep: "complete",
+        stepsCompleted: ["english", "skills"],
+        reviewedBy: admin._id,
+        reviewedAt: now,
+        reviewNotes,
+        fraudFlags: [],
+        updatedAt: now,
+      });
+      vettingDoc = await ctx.db.get(vettingDoc._id);
+    }
+
+    if (!vettingDoc) {
+      throw new Error("Failed to update verification record");
+    }
+
+    const userPatch: Record<string, unknown> = {
+      verificationStatus: "approved",
+      verificationCompletedAt: now,
+      updatedAt: now,
+    };
+    if (args.approveKyc === true) {
+      userPatch.kycStatus = "approved";
+      userPatch.kycApprovedAt = now;
+    }
+    await ctx.db.patch(args.freelancerId, userPatch);
+
+    await ctx.db.insert("auditLogs", {
+      action: "admin_verification_override",
+      actionType: "admin",
+      actorId: admin._id,
+      actorRole: admin.role,
+      targetType: "vettingResult",
+      targetId: vettingDoc._id,
+      details: {
+        freelancerId: args.freelancerId,
+        reason: args.reason,
+        approveKyc: args.approveKyc === true,
+      },
+      createdAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.freelancerId],
+      title: "Verification updated",
+      message:
+        args.approveKyc === true
+          ? "Your verification and identity checks have been approved by the platform team. You can use the full freelancer experience."
+          : "Your verification has been approved by the platform team. Complete any remaining identity (KYC) steps if prompted.",
+      type: "verification",
+      data: { vettingResultId: vettingDoc._id },
+    });
+
+    return { success: true };
+  },
+});
+
 const SKILL_TEST_PASS_THRESHOLD = 60;
 const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes for auto-submit after time up
 

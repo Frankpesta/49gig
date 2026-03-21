@@ -496,17 +496,29 @@ export default function ProjectDetailPage() {
       </div>
 
       {matchingInProgressForClient && (
-        <Card className="rounded-xl border-amber-500/40 bg-amber-500/5">
+        <Card
+          className={
+            project.status === "draft"
+              ? "rounded-xl border-amber-500/50 bg-amber-500/5 shadow-md shadow-amber-500/10 ring-1 ring-amber-500/25"
+              : "rounded-xl border-amber-500/40 bg-amber-500/5"
+          }
+        >
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="h-4 w-4 text-amber-600" />
+              {project.status === "draft" ? (
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-600" aria-hidden />
+              ) : (
+                <Clock className="h-4 w-4 text-amber-600" aria-hidden />
+              )}
               Matching in progress
             </CardTitle>
             <CardDescription>
               {project.status === "matching" && (project.pendingTeamMemberSlots ?? 0) > 0
                 ? `We’re still confirming ${project.pendingTeamMemberSlots} more team member(s). You’ll get an email when there are people to review.`
                 : project.awaitingMatch
-                  ? "We’re finding the right freelancer(s) for this hire. You’ll get an email when matches are ready to review."
+                  ? project.status === "draft"
+                    ? "We’re actively matching your hire to vetted talent. You’ll get an email when there are people to review—check the matches page anytime for updates."
+                    : "We’re finding the right freelancer(s) for this hire. You’ll get an email when matches are ready to review."
                   : "Some roles are still being staffed. We’ll email you when there’s an update."}
             </CardDescription>
           </CardHeader>
