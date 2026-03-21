@@ -27,11 +27,9 @@ export default function PaymentCallbackPage() {
   const status = searchParams.get("status");
   const isTopUp = searchParams.get("type") === "top_up";
 
-  const verifyPayment = useAction(
-    (api as any)["payments/actions"].verifyPayment
-  );
+  const verifyPayment = useAction(api.payments.actions.verifyPayment);
   const paymentStatus = useQuery(
-    (api as any)["payments/queries"].getPaymentStatus,
+    api.payments.queries.getPaymentStatus,
     user?._id && projectId
       ? { projectId: projectId as any, userId: user._id }
       : "skip"
@@ -76,35 +74,82 @@ export default function PaymentCallbackPage() {
     }
   }, [txRef, status, user, projectId, verifyPayment, router]);
 
-  // Redirect after successful payment (for initial fund, isFunded becomes true; for top-up, verificationSuccess)
-  useEffect(() => {
-    const success = isTopUp ? verificationSuccess && !verificationError : paymentStatus?.isFunded && !isVerifying && !verificationError;
-    if (success) {
-      if (!hasTracked.current) {
-        hasTracked.current = true;
-        trackEvent(isTopUp ? "add_payment" : "purchase", {
-          project_id: projectId,
-          value: paymentStatus?.totalAmount,
-          currency: "USD",
-        });
-      }
-      const timer = setTimeout(() => {
-        setRedirecting(true);
-        router.push(`/dashboard/projects/${projectId}`);
-      }, 3000);
+  const initialFundComplete =
+    verificationSuccess ||
+    paymentStatus?.isPreFundingPaymentSucceeded ||
+    !!paymentStatus?.isProjectPastFunding;
+  const topUpComplete =
+    verificationSuccess || !!paymentStatus?.isLatestTopUpSucceeded;
 
-      return () => clearTimeout(timer);
+  // Redirect after successful payment (webhook may confirm before verify returns; do not block on isVerifying)
+  useEffect(() => {
+    const success = isTopUp
+      ? topUpComplete && !verificationError
+      : initialFundComplete && !verificationError;
+    if (!success) return;
+    const backendConfirmed = isTopUp
+      ? paymentStatus?.isLatestTopUpSucceeded
+      : paymentStatus?.isPreFundingPaymentSucceeded ||
+        paymentStatus?.isProjectPastFunding;
+    if (isVerifying && !verificationSuccess && !backendConfirmed) return;
+
+    if (!hasTracked.current) {
+      hasTracked.current = true;
+      trackEvent(isTopUp ? "add_payment" : "purchase", {
+        project_id: projectId,
+        value: paymentStatus?.totalAmount,
+        currency: (paymentStatus?.currency || "USD").toUpperCase(),
+      });
     }
-  }, [isTopUp, verificationSuccess, paymentStatus?.isFunded, paymentStatus?.totalAmount, isVerifying, verificationError, projectId, router, trackEvent]);
+    const timer = setTimeout(() => {
+      setRedirecting(true);
+      router.push(`/dashboard/projects/${projectId}`);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [
+    isTopUp,
+    initialFundComplete,
+    topUpComplete,
+    paymentStatus?.totalAmount,
+    paymentStatus?.currency,
+    isVerifying,
+    verificationSuccess,
+    paymentStatus?.isLatestTopUpSucceeded,
+    paymentStatus?.isPreFundingPaymentSucceeded,
+    paymentStatus?.isProjectPastFunding,
+    verificationError,
+    projectId,
+    router,
+    trackEvent,
+  ]);
 
   if (!user) {
     return null;
   }
 
   const isSuccessStatus = status === "successful" || status === "succeeded";
-  const isSuccess = isTopUp ? isSuccessStatus && verificationSuccess && !verificationError : isSuccessStatus && paymentStatus?.isFunded;
+  const isSuccess = isTopUp
+    ? isSuccessStatus &&
+      (verificationSuccess || paymentStatus?.isLatestTopUpSucceeded) &&
+      !verificationError
+    : isSuccessStatus &&
+      (verificationSuccess ||
+        paymentStatus?.isPreFundingPaymentSucceeded ||
+        paymentStatus?.isProjectPastFunding) &&
+      !verificationError;
   const isCancelled = status === "cancelled";
-  const isPending = isSuccessStatus && !paymentStatus?.isFunded && !verificationError;
+  const waitingOnBackend = isTopUp
+    ? !verificationSuccess && !paymentStatus?.isLatestTopUpSucceeded
+    : !verificationSuccess &&
+      !paymentStatus?.isPreFundingPaymentSucceeded &&
+      !paymentStatus?.isProjectPastFunding;
+
+  const isPending =
+    isSuccessStatus &&
+    !isSuccess &&
+    !verificationError &&
+    (isVerifying || waitingOnBackend);
 
   return (
     <div className="flex min-h-[400px] items-center justify-center">

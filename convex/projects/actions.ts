@@ -10,6 +10,8 @@ import {
   OpportunityMatchFreelancerEmail,
   UnfundedProjectReminderEmail,
   MonthlyCyclePendingReminderEmail,
+  AdminNewProjectEmail,
+  AdminMatchConfirmedEmail,
 } from "../../emails/templates";
 
 const internalAny: any = require("../_generated/api").internal;
@@ -81,29 +83,20 @@ export const sendProjectCreatedAdminEmail = internalAction({
     if (!admins || admins.length === 0) return { success: true };
 
     const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
     const dashboardUrl = `${appUrl}/dashboard/projects/${args.projectId}`;
 
     await sendEmail({
       to: admins.map((a: { email: string }) => a.email),
       subject: `[49GIG] New project created: ${args.projectName}`,
-      react: React.createElement(
-        "div",
-        { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-        React.createElement("h2", { style: { marginBottom: "16px" } }, "New Project Created"),
-        React.createElement("p", null, `Project: ${args.projectName}`),
-        React.createElement("a", {
-          href: dashboardUrl,
-          style: {
-            display: "inline-block",
-            marginTop: "24px",
-            padding: "12px 24px",
-            backgroundColor: "#2563eb",
-            color: "white",
-            textDecoration: "none",
-            borderRadius: "8px",
-          },
-        }, "View in Dashboard")
-      ),
+      react: React.createElement(AdminNewProjectEmail, {
+        projectName: args.projectName,
+        dashboardUrl,
+        appUrl,
+        logoUrl,
+        date,
+      }),
     });
 
     return { success: true };
@@ -173,26 +166,15 @@ export const sendMatchSuccessEmails = internalAction({
       await sendEmail({
         to: admins.map((a: { email: string }) => a.email),
         subject: `[49GIG] Match confirmed: ${projectName}`,
-        react: React.createElement(
-          "div",
-          { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-          React.createElement("h2", { style: { marginBottom: "16px" } }, "Match Confirmed"),
-          React.createElement("p", null, `Project: ${projectName}`),
-          React.createElement("p", null, `Client: ${client.name || client.email}`),
-          React.createElement("p", null, `Freelancers: ${freelancerNameStr}`),
-          React.createElement("a", {
-            href: `${appUrl}/dashboard/projects/${args.projectId}`,
-            style: {
-              display: "inline-block",
-              marginTop: "24px",
-              padding: "12px 24px",
-              backgroundColor: "#2563eb",
-              color: "white",
-              textDecoration: "none",
-              borderRadius: "8px",
-            },
-          }, "View in Dashboard")
-        ),
+        react: React.createElement(AdminMatchConfirmedEmail, {
+          projectName,
+          clientLabel: client.name || client.email || "Client",
+          freelancersLabel: freelancerNameStr,
+          dashboardUrl: `${appUrl}/dashboard/projects/${args.projectId}`,
+          appUrl,
+          logoUrl,
+          date,
+        }),
       });
     }
 

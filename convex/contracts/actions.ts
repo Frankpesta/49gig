@@ -7,7 +7,10 @@ import { internal } from "../_generated/api";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { FunctionReference } from "convex/server";
 import { sendEmail } from "../email/send";
-import { ContractReadyEmail } from "../../emails/templates";
+import {
+  ContractReadyEmail,
+  AdminContractRecordEmail,
+} from "../../emails/templates";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   CLIENT_AGREEMENT_SECTIONS,
@@ -49,6 +52,32 @@ function formatDate() {
 
 function formatCurrency(amount: number, currency: string) {
   return `${currency.toUpperCase()} ${amount.toFixed(2)}`;
+}
+
+function isValidEmail(e: string | undefined | null): e is string {
+  return typeof e === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
+}
+
+async function sendResendEmail(
+  label: string,
+  fn: () => ReturnType<typeof sendEmail>,
+): Promise<void> {
+  try {
+    const result = await fn();
+    if (
+      result &&
+      typeof result === "object" &&
+      "status" in result &&
+      (result as { status: string }).status === "skipped"
+    ) {
+      console.warn(
+        `[contracts] ${label}: email skipped — set RESEND_API_KEY and RESEND_FROM_EMAIL in Convex`,
+      );
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[contracts] ${label} failed:`, msg);
+  }
 }
 
 /** WinAnsi encoding cannot handle newlines or certain Unicode (e.g. ⸻ U+2E3B); sanitize before drawing. */
@@ -797,35 +826,59 @@ export const generateAndSendContract = action({
       contentType: "application/pdf",
     };
 
-    const sendToClient = sendEmail({
-      to: client.email,
-      subject: `Contract ready for ${project.intakeForm.title}`,
-      react: React.createElement(ContractReadyEmail, {
-        name: client.name || "there",
-        projectName: project.intakeForm.title,
-        contractUrl: contractUrl || `${appUrl}/dashboard/projects/${project._id}`,
-        appUrl,
-        logoUrl,
-        date,
-      }),
-      attachments: [attachment],
-    });
+    const emailTasks: Promise<void>[] = [];
+    const contractLink =
+      contractUrl || `${appUrl}/dashboard/projects/${project._id}`;
 
-    const sendToFreelancer = sendEmail({
-      to: freelancer.email,
-      subject: `Contract ready for ${project.intakeForm.title}`,
-      react: React.createElement(ContractReadyEmail, {
-        name: freelancer.name || "there",
-        projectName: project.intakeForm.title,
-        contractUrl: contractUrl || `${appUrl}/dashboard/projects/${project._id}`,
-        appUrl,
-        logoUrl,
-        date,
-      }),
-      attachments: [attachment],
-    });
+    if (isValidEmail(client.email)) {
+      emailTasks.push(
+        sendResendEmail("contract email (match flow, client)", () =>
+          sendEmail({
+            to: client.email.trim(),
+            subject: `Contract ready for ${project.intakeForm.title}`,
+            react: React.createElement(ContractReadyEmail, {
+              name: client.name || "there",
+              projectName: project.intakeForm.title,
+              contractUrl: contractLink,
+              appUrl,
+              logoUrl,
+              date,
+            }),
+            attachments: [attachment],
+          }),
+        ),
+      );
+    } else {
+      console.warn(
+        "[contracts] skip match-flow client email: invalid or missing email",
+      );
+    }
 
-    await Promise.all([sendToClient, sendToFreelancer]);
+    if (isValidEmail(freelancer.email)) {
+      emailTasks.push(
+        sendResendEmail("contract email (match flow, freelancer)", () =>
+          sendEmail({
+            to: freelancer.email.trim(),
+            subject: `Contract ready for ${project.intakeForm.title}`,
+            react: React.createElement(ContractReadyEmail, {
+              name: freelancer.name || "there",
+              projectName: project.intakeForm.title,
+              contractUrl: contractLink,
+              appUrl,
+              logoUrl,
+              date,
+            }),
+            attachments: [attachment],
+          }),
+        ),
+      );
+    } else {
+      console.warn(
+        "[contracts] skip match-flow freelancer email: invalid or missing email",
+      );
+    }
+
+    await Promise.all(emailTasks);
 
     return { status: "sent", contractFileId: storageId };
   },
@@ -890,27 +943,45 @@ export const regenerateContractPdfAndSend = internalAction({
     const baseFilename = `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}`;
 
     if (sendEmails) {
+      const contractUrl =
+        (await ctx.storage.getUrl(clientStorageId)) ||
+        `${appUrl}/dashboard/projects/${args.projectId}`;
+
       const clientAttachment = {
         filename: `${baseFilename}-Client-${(client.name || "Client").replace(/\s+/g, "-")}.pdf`,
         content: Buffer.from(clientPdfBytes).toString("base64"),
         contentType: "application/pdf",
       };
 
-      await sendEmail({
-        to: client.email,
-        subject: `Contract ready / signed – ${project.intakeForm.title}`,
-        react: React.createElement(ContractReadyEmail, {
-          name: client.name || "there",
-          projectName: project.intakeForm.title,
-          contractUrl: (await ctx.storage.getUrl(clientStorageId)) || `${appUrl}/dashboard/projects/${args.projectId}`,
-          appUrl,
-          logoUrl,
-          date,
-        }),
-        attachments: [clientAttachment],
-      });
+      if (isValidEmail(client.email)) {
+        await sendResendEmail("contract email (client)", () =>
+          sendEmail({
+            to: client.email.trim(),
+            subject: `Contract ready / signed – ${project.intakeForm.title}`,
+            react: React.createElement(ContractReadyEmail, {
+              name: client.name || "there",
+              projectName: project.intakeForm.title,
+              contractUrl,
+              appUrl,
+              logoUrl,
+              date,
+            }),
+            attachments: [clientAttachment],
+          }),
+        );
+      } else {
+        console.warn(
+          "[contracts] skip client contract email: invalid or missing client email",
+        );
+      }
 
       for (const f of freelancers as Doc<"users">[]) {
+        if (!isValidEmail(f.email)) {
+          console.warn(
+            `[contracts] skip freelancer contract email: invalid email for ${f._id}`,
+          );
+          continue;
+        }
         const freelancerPdfBytes = await generateFullContractPdf({
           ...basePdfParams,
           copyFor: { name: f.name || "Freelancer", role: "Freelancer" },
@@ -920,53 +991,70 @@ export const regenerateContractPdfAndSend = internalAction({
           content: Buffer.from(freelancerPdfBytes).toString("base64"),
           contentType: "application/pdf",
         };
-        await sendEmail({
-          to: f.email,
-          subject: `Contract ready / signed – ${project.intakeForm.title}`,
-          react: React.createElement(ContractReadyEmail, {
-            name: f.name || "there",
-            projectName: project.intakeForm.title,
-            contractUrl: (await ctx.storage.getUrl(clientStorageId)) || `${appUrl}/dashboard/projects/${args.projectId}`,
-            appUrl,
-            logoUrl,
-            date,
+        await sendResendEmail(`contract email (freelancer ${f._id})`, () =>
+          sendEmail({
+            to: f.email!.trim(),
+            subject: `Contract ready / signed – ${project.intakeForm.title}`,
+            react: React.createElement(ContractReadyEmail, {
+              name: f.name || "there",
+              projectName: project.intakeForm.title,
+              contractUrl,
+              appUrl,
+              logoUrl,
+              date,
+            }),
+            attachments: [freelancerAttachment],
           }),
-          attachments: [freelancerAttachment],
-        });
+        );
       }
 
       const admins = await ctx.runQuery(
         apiModule.internal.users.queries.getModeratorsAndAdminsInternal,
-        {}
+        {},
       );
-      if (admins && admins.length > 0) {
+      const adminEmails =
+        admins?.filter((a: { email?: string }) => isValidEmail(a.email)).map(
+          (a: { email: string }) => a.email.trim(),
+        ) ?? [];
+      if (adminEmails.length > 0) {
         const adminPdfBytes = await generateFullContractPdf({
           ...basePdfParams,
-          copyFor: { name: "49GIG Admin", role: "Record (all parties listed in email)" },
+          copyFor: {
+            name: "49GIG Admin",
+            role: "Record (all parties listed in email)",
+          },
         });
         const adminAttachment = {
           filename: `${baseFilename}-Admin-Record.pdf`,
           content: Buffer.from(adminPdfBytes).toString("base64"),
           contentType: "application/pdf",
         };
-        const partiesList = [
-          `Client: ${client.name || "Client"} (${client.email})`,
-          ...freelancers.map((f: Doc<"users">) => `Freelancer: ${f.name || "Freelancer"} (${f.email})`),
-        ].join("\n");
-        await sendEmail({
-          to: admins.map((a: { email: string }) => a.email),
-          subject: `[49GIG] Contract signed – ${project.intakeForm.title}`,
-          react: React.createElement(
-            "div",
-            { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-            React.createElement("h2", { style: { marginBottom: "16px" } }, "Contract Signed – Admin Record"),
-            React.createElement("p", null, `Project: ${project.intakeForm.title}`),
-            React.createElement("p", { style: { marginTop: "12px", fontWeight: 600 } }, "Parties:"),
-            React.createElement("pre", { style: { whiteSpace: "pre-wrap", fontSize: "13px", margin: "8px 0" } }, partiesList),
-            React.createElement("p", { style: { marginTop: "16px", fontSize: "13px", color: "#6b7280" } }, "A signed copy is attached for your records.")
-          ),
-          attachments: [adminAttachment],
-        });
+        const partyRows: { label: string; value: string }[] = [
+          {
+            label: "Client",
+            value: `${client.name || "Client"} (${client.email || "no email"})`,
+          },
+          ...(freelancers as Doc<"users">[]).map((f) => ({
+            label: "Freelancer",
+            value: `${f.name || "Freelancer"} (${f.email || "no email"})`,
+          })),
+        ];
+        const dashboardUrl = `${appUrl}/dashboard/projects/${args.projectId}`;
+        await sendResendEmail("contract email (admins)", () =>
+          sendEmail({
+            to: adminEmails,
+            subject: `[49GIG] Contract signed – ${project.intakeForm.title}`,
+            react: React.createElement(AdminContractRecordEmail, {
+              projectName: project.intakeForm.title,
+              partyRows,
+              dashboardUrl,
+              appUrl,
+              logoUrl,
+              date,
+            }),
+            attachments: [adminAttachment],
+          }),
+        );
       }
     }
 

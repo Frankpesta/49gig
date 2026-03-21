@@ -964,6 +964,98 @@ export function ContractReadyEmail({
   );
 }
 
+export function AdminNewProjectEmail({
+  projectName,
+  dashboardUrl,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { projectName: string; dashboardUrl: string }) {
+  return (
+    <EmailLayout
+      preview={`New project: ${projectName}`}
+      heroLabel="Admin"
+      heroTitle="New project created."
+      heroSubtitle="A client created a new hire on the platform."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Project <strong>{projectName}</strong> was just created. Open the dashboard to review details and activity.
+      </Text>
+      <EmailButton href={dashboardUrl}>Open in dashboard</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function AdminMatchConfirmedEmail({
+  projectName,
+  clientLabel,
+  freelancersLabel,
+  dashboardUrl,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & {
+  projectName: string;
+  clientLabel: string;
+  freelancersLabel: string;
+  dashboardUrl: string;
+}) {
+  return (
+    <EmailLayout
+      preview={`Match confirmed: ${projectName}`}
+      heroLabel="Admin"
+      heroTitle="Match confirmed."
+      heroSubtitle="A client and talent are now paired on a funded hire."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <InfoBlock
+        rows={[
+          { label: "Project", value: projectName },
+          { label: "Client", value: clientLabel },
+          { label: "Talent", value: freelancersLabel },
+        ]}
+      />
+      <EmailButton href={dashboardUrl}>View hire</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function AdminContractRecordEmail({
+  projectName,
+  partyRows,
+  dashboardUrl,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & {
+  projectName: string;
+  partyRows: Array<{ label: string; value: string }>;
+  dashboardUrl: string;
+}) {
+  return (
+    <EmailLayout
+      preview={`Contract record: ${projectName}`}
+      heroLabel="Admin"
+      heroTitle="Contract PDF — record copy."
+      heroSubtitle="A signed agreement PDF is attached. Parties are listed below."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hire <strong>{projectName}</strong> — keep this email for your records.
+      </Text>
+      <InfoBlock rows={partyRows} />
+      <EmailButton href={dashboardUrl}>Open hire in dashboard</EmailButton>
+    </EmailLayout>
+  );
+}
+
 export function ProjectCreatedEmail({
   name = "there",
   projectName,

@@ -33,18 +33,14 @@ export default function PaymentPage() {
   const { trackEvent } = useAnalytics();
   const projectId = params.projectId as string;
 
-  const createPaymentIntent = useAction(
-    (api as any)["payments/actions"].createPaymentIntent
-  );
-  const updateProject = useMutation(
-    (api as any)["projects/mutations"].updateProject
-  );
+  const createPaymentIntent = useAction(api.payments.actions.createPaymentIntent);
+  const updateProject = useMutation(api.projects.mutations.updateProject);
   const project = useQuery(
-    (api as any)["projects/queries"].getProject,
+    api.projects.queries.getProject,
     user?._id ? { projectId: projectId as any, userId: user._id } : "skip"
   );
   const paymentStatus = useQuery(
-    (api as any)["payments/queries"].getPaymentStatus,
+    api.payments.queries.getPaymentStatus,
     user?._id && projectId
       ? { projectId: projectId as any, userId: user._id }
       : "skip"
@@ -72,7 +68,10 @@ export default function PaymentPage() {
 
   useEffect(() => {
     if (!project || !paymentStatus) return;
-    if (paymentStatus.isFunded) {
+    if (
+      paymentStatus.isPreFundingPaymentSucceeded ||
+      paymentStatus.isProjectPastFunding
+    ) {
       router.push(`/dashboard/projects/${projectId}`);
       return;
     }
