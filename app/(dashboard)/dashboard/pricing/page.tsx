@@ -154,13 +154,13 @@ export default function PricingPage() {
     return <DashboardEmptyState icon={DollarSign} title="Please log in." iconTone="muted" />;
   }
 
-  if (user.role !== "admin" && user.role !== "moderator") {
+  if (user.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={DollarSign}
         iconTone="muted"
         title="Access restricted"
-        description="Only admins and moderators can manage pricing."
+        description="Only admins can manage base rates and platform fee."
       />
     );
   }
@@ -171,11 +171,11 @@ export default function PricingPage() {
     <div className="space-y-8 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Pricing & Platform Settings"
-        description="Manage base rates and platform fee. Changes apply to new hires only."
+        description="Admins manage base rates and platform fee here. Changes apply to new hires only."
         icon={DollarSign}
       />
 
-      {/* Platform Fee (Admin only) */}
+      {/* Platform Fee */}
       <Card className="overflow-hidden">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">

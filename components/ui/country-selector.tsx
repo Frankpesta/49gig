@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { countries, type Country } from "@/lib/countries";
+import { countriesAlphabetical, type Country } from "@/lib/countries";
 
 interface CountrySelectorProps {
   value?: string;
@@ -24,7 +24,7 @@ export function CountrySelector({
   className,
 }: CountrySelectorProps) {
   const selectedCountry = value
-    ? countries.find((c) => c.code === value)
+    ? countriesAlphabetical.find((c) => c.code === value)
     : undefined;
 
   return (
@@ -40,7 +40,7 @@ export function CountrySelector({
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {countries.map((country: Country) => (
+        {countriesAlphabetical.map((country: Country) => (
           <SelectItem key={country.code} value={country.code}>
             <span className="flex items-center gap-2">
               <span className="text-lg">{country.flag}</span>

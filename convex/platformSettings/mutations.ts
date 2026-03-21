@@ -18,7 +18,7 @@ export const setPlatformFeePercentage = mutation({
     if (!user) {
       throw new Error("Not authenticated");
     }
-    if (user.role !== "admin" && user.role !== "moderator") {
+    if (user.role !== "admin") {
       throw new Error("Only admins can update platform fee");
     }
 

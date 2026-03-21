@@ -71,6 +71,16 @@ const VALID_PROJECT_STATUSES = [
   "disputed",
 ] as const;
 
+/** Status chips shown in the hire filter bar (active lifecycle only; rare/terminal states use &quot;All&quot;). */
+const HIRE_FILTER_STATUSES = [
+  "draft",
+  "pending_funding",
+  "matching",
+  "matched",
+  "in_progress",
+  "completed",
+] as const satisfies readonly (typeof VALID_PROJECT_STATUSES)[number][];
+
 export default function ProjectsPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -179,25 +189,29 @@ export default function ProjectsPage() {
           >
             <Link href="/dashboard/projects?matching_in_progress=1">Matching in progress</Link>
           </Button>
-          {Object.entries(STATUS_CONFIG).map(([status, config]) => (
-            <Button
-              key={status}
-              variant={statusFilter === status ? "default" : "outline"}
-              size="sm"
-              asChild
-              className="rounded-lg"
-            >
-              <Link
-                href={
-                  matchingInProgressFilter
-                    ? `/dashboard/projects?status=${status}&matching_in_progress=1`
-                    : `/dashboard/projects?status=${status}`
-                }
+          {HIRE_FILTER_STATUSES.map((status) => {
+            const config = STATUS_CONFIG[status];
+            if (!config) return null;
+            return (
+              <Button
+                key={status}
+                variant={statusFilter === status ? "default" : "outline"}
+                size="sm"
+                asChild
+                className="rounded-lg"
               >
-                {config.label}
-              </Link>
-            </Button>
-          ))}
+                <Link
+                  href={
+                    matchingInProgressFilter
+                      ? `/dashboard/projects?status=${status}&matching_in_progress=1`
+                      : `/dashboard/projects?status=${status}`
+                  }
+                >
+                  {config.label}
+                </Link>
+              </Button>
+            );
+          })}
         </DashboardFilterBar>
       )}
 

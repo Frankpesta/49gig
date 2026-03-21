@@ -80,7 +80,8 @@ const s = {
   // ── Header
   header: {
     backgroundColor: tokens.black,
-    padding: "24px 40px",
+    padding: "28px 40px",
+    textAlign: "center" as const,
   },
   logoNum: {
     fontFamily: serif,
@@ -211,11 +212,28 @@ export function EmailLayout({
 
             {/* ── Logo Header */}
             <Section style={s.header}>
-              <Link href={appUrl} style={{ textDecoration: "none" }}>
+              <Link
+                href={appUrl}
+                style={{
+                  textDecoration: "none",
+                  display: "block",
+                  textAlign: "center",
+                }}
+              >
                 {logoUrl ? (
-                  <Img src={logoUrl} alt="49GIG" height="36" style={{ display: "block" }} />
+                  <Img
+                    src={logoUrl}
+                    alt="49GIG"
+                    width="220"
+                    height="72"
+                    style={{
+                      display: "block",
+                      margin: "0 auto",
+                      maxWidth: "280px",
+                    }}
+                  />
                 ) : (
-                  <Text style={{ margin: 0, lineHeight: "1" }}>
+                  <Text style={{ margin: 0, lineHeight: "1", textAlign: "center" }}>
                     <span style={s.logoNum}>49</span>
                     <span style={s.logoWord}>GIG</span>
                   </Text>

@@ -29,7 +29,7 @@ async function getCurrentUserInMutation(
 }
 
 /**
- * Set base hourly rates per talent category. Admin or moderator only.
+ * Set base hourly rates per talent category. Admin only.
  * Pass the full ratesByCategory map (e.g. from getPricingConfig).
  */
 export const setPricingBaseRates = mutation({
@@ -42,8 +42,8 @@ export const setPricingBaseRates = mutation({
     if (!user) {
       throw new Error("Not authenticated");
     }
-    if (user.role !== "admin" && user.role !== "moderator") {
-      throw new Error("Only admins and moderators can update pricing");
+    if (user.role !== "admin") {
+      throw new Error("Only admins can update base rates");
     }
 
     const now = Date.now();

@@ -177,9 +177,13 @@ export default function Home() {
                   />
                 </span>
               </h1>
-              <p className="mt-8 max-w-2xl text-lg leading-relaxed text-muted-foreground sm:text-xl">
-                Connect with the top 3% of vetted professionals across engineering, design, and growth. Build exceptional teams with confidence.
-              </p>
+              <div className="mt-8 max-w-2xl space-y-4 text-lg leading-relaxed text-muted-foreground sm:text-xl">
+                <p>
+                  Connect with the top 3% vetted African tech professionals across Software Engineering,
+                  DevOps, Cloud, Data, and Product Design.
+                </p>
+                <p>Build reliable and exceptional teams with confidence.</p>
+              </div>
             </div>
 
             <div className="mt-10 flex flex-nowrap gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">

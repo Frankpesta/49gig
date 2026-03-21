@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -46,7 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Users, Shield, Ban, CheckCircle2, Search, AlertCircle } from "lucide-react";
+import { Loader2, Users, Shield, ShieldCheck, CheckCircle2, Search, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -68,6 +71,10 @@ export default function UsersPage() {
     title: "",
     message: "",
   });
+  const [verificationOverrideOpen, setVerificationOverrideOpen] = useState(false);
+  const [verificationOverrideReason, setVerificationOverrideReason] = useState("");
+  const [verificationOverrideApproveKyc, setVerificationOverrideApproveKyc] = useState(true);
+  const [verificationOverrideLoading, setVerificationOverrideLoading] = useState(false);
 
   const users = useQuery(
     api.users.queries.getAllUsersAdmin,
@@ -82,6 +89,9 @@ export default function UsersPage() {
 
   const updateUserRole = useMutation(api.users.mutations.updateUserRole);
   const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
+  const adminOverrideVerification = useMutation(
+    api.vetting.mutations.adminOverrideFreelancerVerificationAndTests
+  );
 
   useEffect(() => {
     setCurrentPage(1);
@@ -147,6 +157,33 @@ export default function UsersPage() {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleAdminVerificationOverride = async () => {
+    if (!user?._id || !selectedUser || selectedUser.role !== "freelancer") return;
+    setVerificationOverrideLoading(true);
+    try {
+      await adminOverrideVerification({
+        freelancerId: selectedUser._id,
+        adminUserId: user._id,
+        reason: verificationOverrideReason.trim() || undefined,
+        approveKyc: verificationOverrideApproveKyc,
+      });
+      toast.success("Verification and tests overridden for this freelancer.");
+      setVerificationOverrideOpen(false);
+      setVerificationOverrideReason("");
+      setVerificationOverrideApproveKyc(true);
+      setSelectedUser(null);
+    } catch (error) {
+      const errorMessage = getUserFriendlyError(error) || "Override failed";
+      setErrorDialog({
+        open: true,
+        title: "Override failed",
+        message: errorMessage,
+      });
+    } finally {
+      setVerificationOverrideLoading(false);
     }
   };
 
@@ -382,6 +419,33 @@ export default function UsersPage() {
                                     </p>
                                   )}
                                 </div>
+
+                                {user.role === "admin" && selectedUser.role === "freelancer" && (
+                                  <>
+                                    <Separator />
+                                    <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                                      <div className="flex items-center gap-2 text-sm font-medium">
+                                        <ShieldCheck className="h-4 w-4 text-amber-600" />
+                                        Admin: override verification &amp; tests
+                                      </div>
+                                      <p className="text-xs text-muted-foreground leading-relaxed">
+                                        Waives English and skill verification requirements, closes any in-progress
+                                        skill sessions, and marks vetting as approved. Use when you have verified
+                                        this person outside the platform.
+                                      </p>
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-amber-600/50 text-amber-900 hover:bg-amber-500/10 dark:text-amber-100"
+                                        onClick={() => setVerificationOverrideOpen(true)}
+                                        disabled={isUpdating}
+                                      >
+                                        Override verification &amp; tests…
+                                      </Button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             )}
                             <DialogFooter>
@@ -411,6 +475,85 @@ export default function UsersPage() {
           />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={verificationOverrideOpen}
+        onOpenChange={(open) => {
+          setVerificationOverrideOpen(open);
+          if (!open) {
+            setVerificationOverrideReason("");
+            setVerificationOverrideApproveKyc(true);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Override verification &amp; tests?</DialogTitle>
+            <DialogDescription>
+              This immediately approves vetting and skill tests for{" "}
+              <span className="font-medium text-foreground">{selectedUser?.name ?? "this freelancer"}</span>.
+              It is recorded in audit logs.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-start gap-3 space-y-0">
+              <Checkbox
+                id="approve-kyc-override"
+                checked={verificationOverrideApproveKyc}
+                onCheckedChange={(c) => setVerificationOverrideApproveKyc(c === true)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <label
+                  htmlFor="approve-kyc-override"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Also approve KYC
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Required for matching if identity checks are normally mandatory. Uncheck if only tests should be
+                  waived.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="override-reason">Notes (optional)</Label>
+              <Textarea
+                id="override-reason"
+                placeholder="e.g. Vetted via partner program, manual interview completed…"
+                value={verificationOverrideReason}
+                onChange={(e) => setVerificationOverrideReason(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setVerificationOverrideOpen(false)}
+              disabled={verificationOverrideLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => void handleAdminVerificationOverride()}
+              disabled={verificationOverrideLoading}
+            >
+              {verificationOverrideLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Applying…
+                </>
+              ) : (
+                "Confirm override"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Error Dialog */}
       <AlertDialog open={errorDialog.open} onOpenChange={(open) => setErrorDialog({ ...errorDialog, open })}>

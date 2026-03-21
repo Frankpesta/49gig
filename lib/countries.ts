@@ -98,6 +98,11 @@ export const countries: Country[] = [
   { code: "AD", name: "Andorra", flag: "🇦🇩", phoneCode: "+376" },
 ];
 
+/** Country list sorted A–Z by name (for selects). */
+export const countriesAlphabetical: Country[] = [...countries].sort((a, b) =>
+  a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+);
+
 export function getCountryByCode(code: string): Country | undefined {
   return countries.find((c) => c.code === code);
 }
