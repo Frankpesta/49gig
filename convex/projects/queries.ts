@@ -56,6 +56,8 @@ export const getProjects = query({
         v.literal("disputed")
       )
     ),
+    /** Client filter: hires where matching is still in progress (queue or partial team). */
+    matchingInProgress: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -128,6 +130,16 @@ export const getProjects = query({
           .order("desc")
           .collect();
       }
+    }
+
+    if (args.matchingInProgress && user.role === "client") {
+      projects = projects.filter(
+        (p) =>
+          p.clientId === user._id &&
+          (p.awaitingMatch === true ||
+            (p.pendingTeamMemberSlots != null && p.pendingTeamMemberSlots > 0) ||
+            (p.rolesAwaitingMatch != null && p.rolesAwaitingMatch.length > 0))
+      );
     }
 
     // Enrich with client/freelancer info

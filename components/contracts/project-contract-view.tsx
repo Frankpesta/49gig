@@ -72,7 +72,16 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
         return;
       }
       trackEvent("sign_contract", { project_id: projectId, role: contractData.role });
-      toast.success("Contract signed. A copy has been sent to your email and the freelancer(s).");
+      const emailed = (result as { emailedParties?: boolean }).emailedParties === true;
+      if (emailed) {
+        toast.success(
+          "Contract fully signed. A final PDF has been emailed to you, the freelancer(s), and 49GIG."
+        );
+      } else {
+        toast.success(
+          "Signature saved. The contract PDF in your dashboard is updated. You’ll receive an email with the final signed copy once everyone has signed."
+        );
+      }
       if (contractData.role === "client") {
         router.push(`/dashboard/projects/${projectId}/payment`);
       }

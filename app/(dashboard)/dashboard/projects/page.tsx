@@ -76,6 +76,7 @@ export default function ProjectsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusParam = searchParams.get("status");
+  const matchingInProgressParam = searchParams.get("matching_in_progress");
   const [deleteId, setDeleteId] = useState<Id<"projects"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -88,15 +89,24 @@ export default function ProjectsPage() {
     ? statusParam
     : undefined;
 
+  const matchingInProgressFilter =
+    matchingInProgressParam === "1" || matchingInProgressParam === "true";
+
   const projects = useQuery(
     (api as any)["projects/queries"].getProjects,
     user?._id
       ? {
           ...(statusFilter ? { status: statusFilter } : {}),
+          ...(matchingInProgressFilter ? { matchingInProgress: true } : {}),
           userId: user._id,
         }
       : "skip"
   );
+
+  const hireMatchingInProgress = (p: Doc<"projects">) =>
+    p.awaitingMatch === true ||
+    (p.pendingTeamMemberSlots != null && p.pendingTeamMemberSlots > 0) ||
+    (p.rolesAwaitingMatch != null && p.rolesAwaitingMatch.length > 0);
 
   if (!user) {
     return null;
@@ -154,12 +164,20 @@ export default function ProjectsPage() {
       {isClient && (
         <DashboardFilterBar>
           <Button
-            variant={!statusFilter ? "default" : "outline"}
+            variant={!statusFilter && !matchingInProgressFilter ? "default" : "outline"}
             size="sm"
             asChild
             className="rounded-lg"
           >
             <Link href="/dashboard/projects">All</Link>
+          </Button>
+          <Button
+            variant={matchingInProgressFilter ? "default" : "outline"}
+            size="sm"
+            asChild
+            className="rounded-lg"
+          >
+            <Link href="/dashboard/projects?matching_in_progress=1">Matching in progress</Link>
           </Button>
           {Object.entries(STATUS_CONFIG).map(([status, config]) => (
             <Button
@@ -169,7 +187,13 @@ export default function ProjectsPage() {
               asChild
               className="rounded-lg"
             >
-              <Link href={`/dashboard/projects?status=${status}`}>
+              <Link
+                href={
+                  matchingInProgressFilter
+                    ? `/dashboard/projects?status=${status}&matching_in_progress=1`
+                    : `/dashboard/projects?status=${status}`
+                }
+              >
                 {config.label}
               </Link>
             </Button>
@@ -222,13 +246,23 @@ export default function ProjectsPage() {
             return (
               <Card key={project._id} className="rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
                 <CardHeader>
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between gap-2">
                     <CardTitle className="line-clamp-2">{project.intakeForm.title}</CardTitle>
-                    <DashboardStatusBadge
-                      label={statusConfig.label}
-                      tone={mapStatusTone(project.status)}
-                      icon={<StatusIcon className="h-3 w-3" />}
-                    />
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <DashboardStatusBadge
+                        label={statusConfig.label}
+                        tone={mapStatusTone(project.status)}
+                        icon={<StatusIcon className="h-3 w-3" />}
+                      />
+                      {hireMatchingInProgress(project) && (
+                        <DashboardStatusBadge
+                          label="Matching in progress"
+                          tone="warning"
+                          icon={<Clock className="h-3 w-3" />}
+                          className="text-[10px]"
+                        />
+                      )}
+                    </div>
                   </div>
                   <CardDescription className="line-clamp-2">
                     {project.intakeForm.description}

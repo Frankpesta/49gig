@@ -159,7 +159,20 @@ export const getProjectsAwaitingMatch = internalQuery({
     return await ctx.db
       .query("projects")
       .withIndex("by_awaiting_match", (q) => q.eq("awaitingMatch", true))
-      .filter((q) => q.eq(q.field("status"), "funded"))
+      .filter((q) =>
+        q.or(q.eq(q.field("status"), "funded"), q.eq(q.field("status"), "matching"))
+      )
+      .collect();
+  },
+});
+
+/** Internal: all match rows for a project (post-fund team refill). */
+export const listProjectMatchesInternal = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
   },
 });

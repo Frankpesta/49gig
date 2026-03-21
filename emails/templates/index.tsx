@@ -1,68 +1,296 @@
-import { Text, Section } from "@react-email/components";
+import { Text, Section, Row, Column, Hr } from "@react-email/components";
 import { EmailLayout } from "../components/EmailLayout";
 import { EmailButton } from "../components/EmailButton";
 import { EmailList } from "../components/EmailList";
+import { tokens } from "../components/EmailLayout";
+import { textStyle, mutedTextStyle, sectionLabelStyle } from "../components/styles";
 
-const textStyle = {
-  fontSize: "14px",
-  lineHeight: "1.6",
-  color: "#4b5563",
-  margin: "0 0 12px",
-};
+const sans = '"Plus Jakarta Sans", "Helvetica Neue", Helvetica, Arial, sans-serif';
 
+// ─── Shared base props ────────────────────────────────────────────────────────
 interface BaseEmailProps {
   name?: string;
   appUrl: string;
-  logoUrl: string;
+  logoUrl?: string;
   date: string;
 }
 
-export function WelcomeEmail({
+// ─── Benefit card helper (used in welcome emails) ─────────────────────────────
+function BenefitCard({
+  icon,
+  title,
+  description,
+}: {
+  icon: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div
+      style={{
+        backgroundColor: tokens.cardBg,
+        border: `1px solid ${tokens.border}`,
+        borderRadius: "10px",
+        padding: "16px 18px",
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: sans,
+          fontSize: "20px",
+          margin: "0 0 8px",
+          lineHeight: "1",
+        }}
+      >
+        {icon}
+      </Text>
+      <Text
+        style={{
+          fontFamily: sans,
+          fontSize: "13px",
+          fontWeight: "700",
+          color: tokens.textPrimary,
+          margin: "0 0 5px",
+        }}
+      >
+        {title}
+      </Text>
+      <Text
+        style={{
+          fontFamily: sans,
+          fontSize: "12px",
+          color: tokens.textMuted,
+          lineHeight: "1.65",
+          margin: "0",
+        }}
+      >
+        {description}
+      </Text>
+    </div>
+  );
+}
+
+// ─── Info row helper (used in session, security alert, etc.) ──────────────────
+function InfoBlock({
+  rows,
+}: {
+  rows: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <Section
+      style={{
+        backgroundColor: tokens.cardBg,
+        border: `1px solid ${tokens.border}`,
+        borderRadius: "10px",
+        padding: "18px 20px",
+        marginBottom: "20px",
+      }}
+    >
+      {rows.map((r, i) => (
+        <Row key={i} style={{ marginBottom: i < rows.length - 1 ? "10px" : "0" }}>
+          <Column style={{ width: "110px", verticalAlign: "top" }}>
+            <Text
+              style={{
+                fontFamily: sans,
+                fontSize: "11px",
+                fontWeight: "700",
+                letterSpacing: "1.5px",
+                textTransform: "uppercase" as const,
+                color: tokens.textMuted,
+                margin: "0",
+              }}
+            >
+              {r.label}
+            </Text>
+          </Column>
+          <Column style={{ verticalAlign: "top" }}>
+            <Text
+              style={{
+                fontFamily: sans,
+                fontSize: "13.5px",
+                color: tokens.textPrimary,
+                margin: "0",
+                fontWeight: "600",
+              }}
+            >
+              {r.value}
+            </Text>
+          </Column>
+        </Row>
+      ))}
+    </Section>
+  );
+}
+
+// ─── OTP / code display helper ────────────────────────────────────────────────
+function CodeBlock({ code }: { code: string }) {
+  return (
+    <Section
+      style={{
+        backgroundColor: tokens.navy,
+        borderRadius: "12px",
+        padding: "24px 28px",
+        textAlign: "center" as const,
+        margin: "4px 0 20px",
+        borderBottom: `3px solid ${tokens.gold}`,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: sans,
+          fontSize: "10px",
+          fontWeight: "700",
+          letterSpacing: "3px",
+          textTransform: "uppercase" as const,
+          color: tokens.gold,
+          margin: "0 0 12px",
+        }}
+      >
+        Your code
+      </Text>
+      <Text
+        style={{
+          fontFamily: '"Courier New", Courier, monospace',
+          fontSize: "34px",
+          fontWeight: "700",
+          letterSpacing: "10px",
+          color: tokens.white,
+          margin: "0",
+          lineHeight: "1",
+        }}
+      >
+        {code}
+      </Text>
+    </Section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTH & ACCOUNT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function WelcomeClientEmail({
   name = "there",
-  role,
   appUrl,
   logoUrl,
   date,
-}: BaseEmailProps & { role: "client" | "freelancer" }) {
-  const isClient = role === "client";
+  dashboardUrl,
+}: BaseEmailProps & { dashboardUrl?: string }) {
   return (
     <EmailLayout
-      title={`Welcome to 49GIG, ${name}`}
-      preview="Meet your dedicated talent platform."
-      appUrl={appUrl}
+      preview={`Welcome to 49GIG, ${name} — your next great hire starts here.`}
+      heroLabel="Welcome Aboard"
+      heroTitle="Your next great hire starts here."
+      heroAccent="here."
+      heroSubtitle="You've joined a platform purpose-built to connect you with Africa's most talented professionals — fast, confidently, and without compromise."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        I am the CEO of 49GIG. We built this platform to connect world class
-        African talent with teams that value quality and speed. I am excited to
-        have you here.
+        Welcome to 49GIG, <strong>{name}</strong>.
       </Text>
-      {isClient ? (
-        <>
-          <Text style={textStyle}>
-            As a client, you can post projects, review vetted profiles, and hire
-            quickly. Our team will help you find the right match fast.
-          </Text>
-          <EmailButton href={`${appUrl}/dashboard/projects/create`}>
-            Post your first project
-          </EmailButton>
-        </>
-      ) : (
-        <>
-          <Text style={textStyle}>
-            As a freelancer, you will showcase your skills, complete
-            verification, and get matched with high quality projects.
-          </Text>
-          <EmailButton href={`${appUrl}/resume-upload`}>
-            Upload your resume
-          </EmailButton>
-        </>
-      )}
-      <Text style={{ ...textStyle, marginTop: "16px" }}>
-        Thank you for trusting 49GIG. We are here if you need anything.
+      <Text style={{ ...textStyle, marginBottom: "28px" }}>
+        We're glad to have you. 49GIG exists to make hiring exceptional African talent the easiest decision you ever make. Whether you need a specialist for a short-term project or a long-term partner, you'll find the right fit here.
       </Text>
-      <Text style={{ ...textStyle, fontWeight: 600 }}>- The 49GIG CEO</Text>
+
+      <Text style={sectionLabelStyle}>What you get as a client</Text>
+
+      <Row style={{ marginBottom: "10px" }}>
+        <Column style={{ width: "50%", paddingRight: "6px" }}>
+          <BenefitCard icon="🎯" title="Vetted Talent Only" description="Every freelancer is reviewed for skill and professionalism before they're visible to you." />
+        </Column>
+        <Column style={{ width: "50%", paddingLeft: "6px" }}>
+          <BenefitCard icon="⚡" title="Fast Matching" description="Browse profiles and connect with the right professional quickly — no back-and-forth." />
+        </Column>
+      </Row>
+      <Row style={{ marginBottom: "10px" }}>
+        <Column style={{ width: "50%", paddingRight: "6px" }}>
+          <BenefitCard icon="🔒" title="Secure Payments" description="Funds are held in escrow until work is delivered to your satisfaction." />
+        </Column>
+        <Column style={{ width: "50%", paddingLeft: "6px" }}>
+          <BenefitCard icon="📋" title="Clear Milestones" description="Structure every engagement with defined deliverables and milestone-based releases." />
+        </Column>
+      </Row>
+      <Row style={{ marginBottom: "28px" }}>
+        <Column style={{ width: "50%", paddingRight: "6px" }}>
+          <BenefitCard icon="💬" title="Built-in Messaging" description="Communicate directly with hired talent inside the platform — all in one place." />
+        </Column>
+        <Column style={{ width: "50%", paddingLeft: "6px" }}>
+          <BenefitCard icon="⭐" title="Reputation System" description="Verified ratings give you the full picture before you decide — hire with confidence." />
+        </Column>
+      </Row>
+
+      <EmailButton href={dashboardUrl ?? `${appUrl}/dashboard`} message="Your dashboard is ready. Explore verified freelancers across dozens of categories and find your next collaborator today.">
+        Explore Talent
+      </EmailButton>
+
+      <Text style={mutedTextStyle}>
+        If you ever need help navigating the platform, our support team is always a message away — right from your dashboard.
+      </Text>
+    </EmailLayout>
+  );
+}
+
+export function WelcomeFreelancerEmail({
+  name = "there",
+  appUrl,
+  logoUrl,
+  date,
+  profileUrl,
+}: BaseEmailProps & { profileUrl?: string }) {
+  return (
+    <EmailLayout
+      preview={`Welcome to 49GIG, ${name} — your skills deserve a global stage.`}
+      heroLabel="Welcome to the Network"
+      heroTitle="Your skills deserve a global stage."
+      heroAccent="global stage."
+      heroSubtitle="49GIG connects Africa's top freelance talent with clients who value quality, speed, and professionalism. You're exactly where you should be."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Welcome, <strong>{name}</strong>.
+      </Text>
+      <Text style={{ ...textStyle, marginBottom: "28px" }}>
+        You've joined a growing community of Africa's most skilled independent professionals. 49GIG was built to give talented people like you real access to quality clients, fair pay, and the freedom to work on your terms.
+      </Text>
+
+      <Text style={sectionLabelStyle}>What you get as a freelancer</Text>
+
+      <Row style={{ marginBottom: "10px" }}>
+        <Column style={{ width: "50%", paddingRight: "6px" }}>
+          <BenefitCard icon="🌍" title="Quality Clients" description="Get discovered by serious clients — local and international — looking for your exact skill set." />
+        </Column>
+        <Column style={{ width: "50%", paddingLeft: "6px" }}>
+          <BenefitCard icon="💰" title="Guaranteed Payments" description="Client funds are secured before work begins. You deliver, you get paid — every time." />
+        </Column>
+      </Row>
+      <Row style={{ marginBottom: "10px" }}>
+        <Column style={{ width: "50%", paddingRight: "6px" }}>
+          <BenefitCard icon="🏆" title="Build Your Reputation" description="Earn verified reviews that build credibility and attract better clients over time." />
+        </Column>
+        <Column style={{ width: "50%", paddingLeft: "6px" }}>
+          <BenefitCard icon="📁" title="Professional Profile" description="Showcase your portfolio, skills, and past work in a profile designed to convert visits into contracts." />
+        </Column>
+      </Row>
+      <Row style={{ marginBottom: "28px" }}>
+        <Column style={{ width: "50%", paddingRight: "6px" }}>
+          <BenefitCard icon="🤝" title="Structured Engagements" description="Clear milestones and scoped deliverables mean fewer surprises for both sides." />
+        </Column>
+        <Column style={{ width: "50%", paddingLeft: "6px" }}>
+          <BenefitCard icon="📈" title="Grow Your Career" description="Top-rated freelancers get priority placement and premium client access." />
+        </Column>
+      </Row>
+
+      <EmailButton href={profileUrl ?? `${appUrl}/profile/setup`} message="Complete your profile now — a strong first impression is your best asset. Add your skills, portfolio, and rate to start getting noticed.">
+        Complete Your Profile
+      </EmailButton>
+
+      <Text style={mutedTextStyle}>
+        Your profile is live the moment it's complete. Clients are searching right now — make sure you're ready to be found.
+      </Text>
     </EmailLayout>
   );
 }
@@ -76,26 +304,25 @@ export function VerificationEmail({
 }: BaseEmailProps & { verifyUrl: string }) {
   return (
     <EmailLayout
-      title="Verify your email"
-      preview="Confirm your email to activate your account."
-      appUrl={appUrl}
+      preview="Confirm your email to activate your 49GIG account."
+      heroLabel="One Step Left"
+      heroTitle="Verify your email address."
+      heroSubtitle="Just one click to activate your account and get started."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, please verify your email address to activate your account.
+        Hi <strong>{name}</strong>, please verify your email address to activate your account. This link will expire in 24 hours.
       </Text>
-      <EmailButton href={verifyUrl}>Verify email</EmailButton>
-      <Text style={{ ...textStyle, marginTop: "16px" }}>
-        If you did not create an account, you can ignore this email.
+      <EmailButton href={verifyUrl}>Verify Email Address</EmailButton>
+      <Text style={mutedTextStyle}>
+        If you did not create a 49GIG account, you can safely ignore this email.
       </Text>
     </EmailLayout>
   );
 }
 
-/**
- * Beautiful 6-digit verification code email for manual signups
- */
 export function VerificationCodeEmail({
   name = "there",
   code,
@@ -105,54 +332,22 @@ export function VerificationCodeEmail({
 }: BaseEmailProps & { code: string }) {
   return (
     <EmailLayout
-      title="Your verification code"
       preview="Enter this 6-digit code to verify your email and activate your account."
-      appUrl={appUrl}
+      heroLabel="Account Verification"
+      heroTitle="Your verification code is ready."
+      heroSubtitle="Enter the code below to activate your 49GIG account."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, welcome to 49GIG! Enter the verification code below to activate your account.
+        Hi <strong>{name}</strong>, welcome to 49GIG! Enter the code below on the verification page to complete your sign-up.
       </Text>
-      <Section
-        style={{
-          background: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdfa 100%)",
-          borderRadius: "16px",
-          padding: "28px 32px",
-          textAlign: "center",
-          margin: "24px 0",
-          border: "1px solid #bae6fd",
-        }}
-      >
-        <Text
-          style={{
-            fontSize: "12px",
-            fontWeight: 600,
-            color: "#0369a1",
-            margin: "0 0 16px",
-            letterSpacing: "0.5px",
-            textTransform: "uppercase",
-          }}
-        >
-          Your verification code
-        </Text>
-        <Text
-          style={{
-            fontSize: "32px",
-            fontWeight: 700,
-            letterSpacing: "8px",
-            margin: 0,
-            color: "#0c4a6e",
-            fontFamily: "ui-monospace, 'SF Mono', Monaco, monospace",
-          }}
-        >
-          {code}
-        </Text>
-      </Section>
-      <Text style={{ ...textStyle, marginTop: "8px" }}>
-        This code expires in 24 hours. Enter it on the verification page to complete your sign-up.
+      <CodeBlock code={code} />
+      <Text style={textStyle}>
+        This code expires in <strong>24 hours</strong>. Enter it on the verification page to complete your sign-up.
       </Text>
-      <Text style={{ ...textStyle, marginTop: "16px", color: "#6b7280", fontSize: "13px" }}>
+      <Text style={mutedTextStyle}>
         If you did not create an account, you can safely ignore this email.
       </Text>
     </EmailLayout>
@@ -168,17 +363,21 @@ export function PasswordResetEmail({
 }: BaseEmailProps & { resetUrl: string }) {
   return (
     <EmailLayout
-      title="Reset your password"
-      preview="Use this link to reset your password."
-      appUrl={appUrl}
+      preview="Reset your 49GIG password — link expires soon."
+      heroLabel="Account Security"
+      heroTitle="Reset your password."
+      heroSubtitle="Use the link below to set a new password for your account."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, click the button below to reset your password. This link will
-        expire soon.
+        Hi <strong>{name}</strong>, we received a request to reset your password. Click below to choose a new one. This link will expire soon.
       </Text>
-      <EmailButton href={resetUrl}>Reset password</EmailButton>
+      <EmailButton href={resetUrl}>Reset Password</EmailButton>
+      <Text style={mutedTextStyle}>
+        If you did not request a password reset, you can ignore this email — your account remains secure.
+      </Text>
     </EmailLayout>
   );
 }
@@ -193,39 +392,23 @@ export function TwoFactorCodeEmail({
 }: BaseEmailProps & { code: string; purpose: string }) {
   return (
     <EmailLayout
-      title="Your verification code"
-      preview="Use this code to complete your sign in."
-      appUrl={appUrl}
+      preview="Your 49GIG verification code — expires in 10 minutes."
+      heroLabel="Two-Factor Authentication"
+      heroTitle="Your sign-in code."
+      heroSubtitle={`Use this code to ${purpose}.`}
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, use the code below to {purpose}.
+        Hi <strong>{name}</strong>, use the code below to {purpose}.
       </Text>
-      <Section
-        style={{
-          backgroundColor: "#f9fafb",
-          borderRadius: "8px",
-          padding: "16px",
-          textAlign: "center",
-          marginBottom: "16px",
-        }}
-      >
-        <Text
-          style={{
-            fontSize: "24px",
-            fontWeight: 700,
-            letterSpacing: "4px",
-            margin: 0,
-            color: "#111827",
-          }}
-        >
-          {code}
-        </Text>
-      </Section>
+      <CodeBlock code={code} />
       <Text style={textStyle}>
-        This code expires in 10 minutes. If you did not request this, you can
-        ignore the email.
+        This code expires in <strong>10 minutes</strong>.
+      </Text>
+      <Text style={mutedTextStyle}>
+        If you did not request this code, please secure your account immediately.
       </Text>
     </EmailLayout>
   );
@@ -239,19 +422,21 @@ export function PasswordChangedEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      title="Your password was changed"
-      preview="If this was not you, contact support immediately."
-      appUrl={appUrl}
+      preview="Your 49GIG password was changed — review if this wasn't you."
+      heroLabel="Security Notice"
+      heroTitle="Your password was changed."
+      heroSubtitle="If you made this change, no action is needed. If not, secure your account immediately."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your password was successfully changed. If you did not
-        perform this action, please secure your account immediately.
+        Hi <strong>{name}</strong>, your password was successfully changed. If you performed this action, you're all set.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/settings`}>
-        Review security settings
-      </EmailButton>
+      <Text style={{ ...textStyle, marginBottom: "24px" }}>
+        If you did not make this change, please secure your account right away.
+      </Text>
+      <EmailButton href={`${appUrl}/dashboard/settings`}>Review Security Settings</EmailButton>
     </EmailLayout>
   );
 }
@@ -267,25 +452,35 @@ export function SecurityAlertEmail({
 }: BaseEmailProps & { device: string; location: string; time: string }) {
   return (
     <EmailLayout
-      title="New sign-in alert"
-      preview="We noticed a new login to your account."
-      appUrl={appUrl}
+      preview="New sign-in detected on your 49GIG account."
+      heroLabel="Security Alert"
+      heroTitle="A new sign-in was detected."
+      heroSubtitle="We noticed account activity that may not have been you."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, a new sign-in was detected from {device} in {location} at
-        {` ${time}`}.
+        Hi <strong>{name}</strong>, a new sign-in was detected on your account.
       </Text>
-      <Text style={textStyle}>
-        If this was not you, please reset your password.
+      <InfoBlock
+        rows={[
+          { label: "Device", value: device },
+          { label: "Location", value: location },
+          { label: "Time", value: time },
+        ]}
+      />
+      <Text style={{ ...textStyle, marginBottom: "24px" }}>
+        If this was you, no action is needed. If you don't recognise this activity, please reset your password immediately.
       </Text>
-      <EmailButton href={`${appUrl}/forgot-password`}>
-        Secure my account
-      </EmailButton>
+      <EmailButton href={`${appUrl}/forgot-password`}>Secure My Account</EmailButton>
     </EmailLayout>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROFILE & RESUME
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function ResumeUploadedEmail({
   name = "there",
@@ -295,19 +490,18 @@ export function ResumeUploadedEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      title="Resume received"
-      preview="We are processing your resume now."
-      appUrl={appUrl}
+      preview="Your resume has been received — we're processing it now."
+      heroLabel="Resume Received"
+      heroTitle="We've got your resume."
+      heroSubtitle="Our system is processing it now and will generate your executive summary shortly."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your resume is uploaded and is now being processed. We will
-        generate your executive summary shortly.
+        Hi <strong>{name}</strong>, your resume has been uploaded and is currently being processed. We'll notify you as soon as your executive summary is ready.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/profile`}>
-        View profile
-      </EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/profile`}>View Profile</EmailButton>
     </EmailLayout>
   );
 }
@@ -320,19 +514,18 @@ export function ResumeProcessedEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      title="Executive summary ready"
-      preview="Your resume has been parsed successfully."
-      appUrl={appUrl}
+      preview="Your executive summary is ready to review on 49GIG."
+      heroLabel="Profile Update"
+      heroTitle="Your executive summary is ready."
+      heroSubtitle="We've finished parsing your resume — take a look and make sure everything looks right."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, we finished processing your resume and generated your
-        executive summary.
+        Hi <strong>{name}</strong>, we've finished processing your resume and generated your executive summary. Review it now and make any edits before clients see your profile.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/profile`}>
-        Review executive summary
-      </EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/profile`}>Review Executive Summary</EmailButton>
     </EmailLayout>
   );
 }
@@ -345,17 +538,18 @@ export function ResumeFailedEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      title="Resume processing failed"
-      preview="Please reupload your resume."
-      appUrl={appUrl}
+      preview="We couldn't process your resume — please try again."
+      heroLabel="Action Required"
+      heroTitle="Resume processing failed."
+      heroSubtitle="We were unable to read your file. Please upload a new version so we can generate your summary."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, we could not process your resume. Please upload a new PDF so
-        we can generate your executive summary.
+        Hi <strong>{name}</strong>, unfortunately we couldn't process your resume. This is usually caused by a corrupted or unsupported file format. Please upload a new PDF and we'll try again.
       </Text>
-      <EmailButton href={`${appUrl}/resume-upload`}>Reupload resume</EmailButton>
+      <EmailButton href={`${appUrl}/resume-upload`}>Re-upload Resume</EmailButton>
     </EmailLayout>
   );
 }
@@ -368,15 +562,19 @@ export function VerificationStartedEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      title="Verification started"
-      preview="We have started your verification."
-      appUrl={appUrl}
+      preview="Your 49GIG verification is underway."
+      heroLabel="Verification"
+      heroTitle="Your verification is in progress."
+      heroSubtitle="We've started reviewing your submitted details. We'll notify you once it's complete."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your verification is now in progress. We will notify you once
-        it is complete.
+        Hi <strong>{name}</strong>, your verification is now in progress. Our team is reviewing your details and will notify you as soon as a decision has been made.
+      </Text>
+      <Text style={mutedTextStyle}>
+        This typically takes 1–2 business days. You'll receive an email either way.
       </Text>
     </EmailLayout>
   );
@@ -390,17 +588,21 @@ export function VerificationApprovedEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      title="Verification approved"
-      preview="Your account is verified."
-      appUrl={appUrl}
+      preview="Congratulations — your 49GIG account is now verified."
+      heroLabel="Verification Approved"
+      heroTitle="You're verified. Welcome in."
+      heroAccent="Welcome in."
+      heroSubtitle="Your account is fully verified. You now have complete access to the 49GIG platform."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Congratulations {name}, your verification is approved. You can now
-        access the dashboard.
+        Congratulations, <strong>{name}</strong>! Your verification has been approved. Your profile is now visible to clients and you have full access to the platform.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard`}>Go to dashboard</EmailButton>
+      <EmailButton href={`${appUrl}/dashboard`} message="Everything is ready — head to your dashboard and start exploring opportunities.">
+        Go to Dashboard
+      </EmailButton>
     </EmailLayout>
   );
 }
@@ -414,17 +616,24 @@ export function VerificationRejectedEmail({
 }: BaseEmailProps & { reason?: string }) {
   return (
     <EmailLayout
-      title="Verification needs attention"
-      preview="Please review your verification details."
-      appUrl={appUrl}
+      preview="Your 49GIG verification needs attention — please review."
+      heroLabel="Verification Update"
+      heroTitle="Your verification needs attention."
+      heroSubtitle="We were unable to fully approve your verification. Please review the details below and resubmit."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, we could not approve your verification yet.
+        Hi <strong>{name}</strong>, unfortunately we couldn't approve your verification at this time.
       </Text>
-      {reason && <Text style={textStyle}>Reason: {reason}</Text>}
-      <EmailButton href={`${appUrl}/verification`}>Continue verification</EmailButton>
+      {reason && (
+        <InfoBlock rows={[{ label: "Reason", value: reason }]} />
+      )}
+      <Text style={{ ...textStyle, marginBottom: "24px" }}>
+        Please review your submitted details and continue your verification. If you need help, our support team is available from your dashboard.
+      </Text>
+      <EmailButton href={`${appUrl}/verification`}>Continue Verification</EmailButton>
     </EmailLayout>
   );
 }
@@ -438,17 +647,19 @@ export function ProfileIncompleteEmail({
 }: BaseEmailProps & { missingItems: string[] }) {
   return (
     <EmailLayout
-      title="Complete your profile"
-      preview="Finish your profile to improve matches."
-      appUrl={appUrl}
+      preview="Your 49GIG profile is almost complete — a few things are missing."
+      heroLabel="Profile Reminder"
+      heroTitle="Your profile is almost there."
+      heroSubtitle="A complete profile gets you matched faster. Here's what's still missing."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your profile is almost complete. Please update the following:
+        Hi <strong>{name}</strong>, your profile is nearly complete. Finishing it improves your visibility and helps us match you with the right opportunities.
       </Text>
       <EmailList items={missingItems} />
-      <EmailButton href={`${appUrl}/dashboard/profile`}>Update profile</EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/profile`}>Complete Profile</EmailButton>
     </EmailLayout>
   );
 }
@@ -461,22 +672,28 @@ export function ClientOnboardingCompleteEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      title="You are ready to hire"
-      preview="Your client profile is complete."
-      appUrl={appUrl}
+      preview="Your client profile is complete — you're ready to hire on 49GIG."
+      heroLabel="You're All Set"
+      heroTitle="Ready to find great talent."
+      heroAccent="great talent."
+      heroSubtitle="Your client profile is fully set up. You can now browse matches and start building your team."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your client profile is complete. You can now post projects and
-        start reviewing matches.
+        Hi <strong>{name}</strong>, your client profile is complete. You can now browse vetted profiles and start reviewing matches.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects/create`}>
-        Post a project
+      <EmailButton href={`${appUrl}/dashboard`} message="Everything is in place — explore talent and kick off your first project.">
+        Go to Dashboard
       </EmailButton>
     </EmailLayout>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROJECTS & MATCHING
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function ProjectIntakeSubmittedEmail({
   name = "there",
@@ -487,17 +704,18 @@ export function ProjectIntakeSubmittedEmail({
 }: BaseEmailProps & { projectName: string }) {
   return (
     <EmailLayout
-      title="Project intake received"
-      preview="We are reviewing your project."
-      appUrl={appUrl}
+      preview={`Project intake for "${projectName}" received — we're on it.`}
+      heroLabel="Project Received"
+      heroTitle="Your project intake is in."
+      heroSubtitle="We've received your brief and are already working on finding the right talent match."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, we received your project intake for {projectName}. We will
-        start matching you with top talent.
+        Hi <strong>{name}</strong>, we've received your project intake for <strong>{projectName}</strong>. Our team will review it and start matching you with top talent.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects`}>View project</EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>View Project</EmailButton>
     </EmailLayout>
   );
 }
@@ -511,17 +729,18 @@ export function TeamRequestSubmittedEmail({
 }: BaseEmailProps & { projectName: string }) {
   return (
     <EmailLayout
-      title="Team request received"
-      preview="We are assembling your team."
-      appUrl={appUrl}
+      preview={`Team request for "${projectName}" received — assembling your team.`}
+      heroLabel="Team Request"
+      heroTitle="We're assembling your team."
+      heroSubtitle="Your team request has been received. We'll send over a proposal once we've found the best fit."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, we received your team request for {projectName}. We will send
-        a proposal once we have the best fit.
+        Hi <strong>{name}</strong>, we've received your team request for <strong>{projectName}</strong>. We'll be in touch with a proposal as soon as we've identified the right people.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects`}>Track status</EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>Track Status</EmailButton>
     </EmailLayout>
   );
 }
@@ -536,18 +755,19 @@ export function MatchFoundClientEmail({
 }: BaseEmailProps & { freelancerName: string; projectName: string }) {
   return (
     <EmailLayout
-      title="New match ready"
-      preview="A vetted freelancer has been matched."
-      appUrl={appUrl}
+      preview={`A vetted match is ready for "${projectName}" — review now.`}
+      heroLabel="Match Ready"
+      heroTitle="Your match is ready to review."
+      heroAccent="ready"
+      heroSubtitle="We've found a vetted professional that fits your project requirements."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, we matched {freelancerName} to your project {projectName}.
+        Hi <strong>{name}</strong>, we've matched <strong>{freelancerName}</strong> to your project <strong>{projectName}</strong>. Review their profile and decide if you'd like to move forward.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects`}>
-        Review match
-      </EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>Review Match</EmailButton>
     </EmailLayout>
   );
 }
@@ -562,21 +782,25 @@ export function OpportunityMatchFreelancerEmail({
 }: BaseEmailProps & { projectName: string; clientName: string }) {
   return (
     <EmailLayout
-      title="New opportunity match"
-      preview="A new project is ready for you."
-      appUrl={appUrl}
+      preview={`New opportunity: "${projectName}" — you've been matched.`}
+      heroLabel="New Opportunity"
+      heroTitle="A project match is waiting."
+      heroSubtitle="You've been matched to a new project that fits your skills and experience."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, you have been matched to {projectName} with {clientName}.
+        Hi <strong>{name}</strong>, you've been matched to <strong>{projectName}</strong> with <strong>{clientName}</strong>. Log in to review the project details and express your interest.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects`}>
-        View projects
-      </EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>View Opportunity</EmailButton>
     </EmailLayout>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTERVIEWS & OFFERS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function InterviewRequestEmail({
   name = "there",
@@ -588,16 +812,18 @@ export function InterviewRequestEmail({
 }: BaseEmailProps & { otherParty: string; interviewUrl: string }) {
   return (
     <EmailLayout
-      title="Interview requested"
-      preview="A client wants to schedule an interview."
-      appUrl={appUrl}
+      preview={`${otherParty} has requested an interview — confirm a time.`}
+      heroLabel="Interview Request"
+      heroTitle="An interview has been requested."
+      heroSubtitle="Confirm your availability to move forward with this opportunity."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, {otherParty} requested an interview. Please confirm a time.
+        Hi <strong>{name}</strong>, <strong>{otherParty}</strong> has requested an interview. Please confirm a time that works for you.
       </Text>
-      <EmailButton href={interviewUrl}>Schedule interview</EmailButton>
+      <EmailButton href={interviewUrl}>Schedule Interview</EmailButton>
     </EmailLayout>
   );
 }
@@ -612,14 +838,20 @@ export function InterviewConfirmedEmail({
 }: BaseEmailProps & { otherParty: string; schedule: string }) {
   return (
     <EmailLayout
-      title="Interview confirmed"
-      preview="Your interview is scheduled."
-      appUrl={appUrl}
+      preview={`Your interview with ${otherParty} is confirmed.`}
+      heroLabel="Interview Confirmed"
+      heroTitle="Your interview is confirmed."
+      heroSubtitle="Add it to your calendar and prepare to make a great impression."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your interview with {otherParty} is confirmed for {schedule}.
+        Hi <strong>{name}</strong>, your interview with <strong>{otherParty}</strong> has been confirmed.
+      </Text>
+      <InfoBlock rows={[{ label: "Scheduled", value: schedule }]} />
+      <Text style={mutedTextStyle}>
+        Please be on time and prepared. If you need to reschedule, contact the other party directly via the platform.
       </Text>
     </EmailLayout>
   );
@@ -635,16 +867,18 @@ export function OfferSentEmail({
 }: BaseEmailProps & { projectName: string; offerUrl: string }) {
   return (
     <EmailLayout
-      title="Offer sent"
-      preview="A new offer is waiting for you."
-      appUrl={appUrl}
+      preview={`A new offer for "${projectName}" is ready for your review.`}
+      heroLabel="New Offer"
+      heroTitle="You have a new offer."
+      heroSubtitle="Review the details and let us know if you'd like to accept."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, a new offer for {projectName} is ready for your review.
+        Hi <strong>{name}</strong>, a new offer for <strong>{projectName}</strong> is ready for your review. Take a look and respond at your earliest convenience.
       </Text>
-      <EmailButton href={offerUrl}>Review offer</EmailButton>
+      <EmailButton href={offerUrl}>Review Offer</EmailButton>
     </EmailLayout>
   );
 }
@@ -658,15 +892,19 @@ export function OfferAcceptedEmail({
 }: BaseEmailProps & { projectName: string }) {
   return (
     <EmailLayout
-      title="Offer accepted"
-      preview="Your offer has been accepted."
-      appUrl={appUrl}
+      preview={`Your offer for "${projectName}" has been accepted — let's get started.`}
+      heroLabel="Offer Accepted"
+      heroTitle="Your offer has been accepted."
+      heroAccent="accepted."
+      heroSubtitle="Both parties have agreed. The next step is to get the project set up and underway."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the offer for {projectName} has been accepted.
+        Hi <strong>{name}</strong>, the offer for <strong>{projectName}</strong> has been accepted. Head to your dashboard to see the next steps.
       </Text>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>Open Project</EmailButton>
     </EmailLayout>
   );
 }
@@ -680,19 +918,25 @@ export function OfferDeclinedEmail({
 }: BaseEmailProps & { projectName: string }) {
   return (
     <EmailLayout
-      title="Offer declined"
-      preview="Your offer was declined."
-      appUrl={appUrl}
+      preview={`Your offer for "${projectName}" was declined.`}
+      heroLabel="Offer Update"
+      heroTitle="Your offer was declined."
+      heroSubtitle="The other party didn't move forward this time. You can submit a new offer or reach out to support."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the offer for {projectName} was declined. You can submit a new
-        offer or contact support for help.
+        Hi <strong>{name}</strong>, the offer for <strong>{projectName}</strong> was declined. You're welcome to submit a revised offer or contact support if you need assistance.
       </Text>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>View Project</EmailButton>
     </EmailLayout>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTRACTS & MILESTONES
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function ContractReadyEmail({
   name = "there",
@@ -704,17 +948,18 @@ export function ContractReadyEmail({
 }: BaseEmailProps & { projectName: string; contractUrl: string }) {
   return (
     <EmailLayout
-      title="Contract ready"
-      preview="Your contract is ready to review."
-      appUrl={appUrl}
+      preview={`Your contract for "${projectName}" is ready to download.`}
+      heroLabel="Contract Ready"
+      heroTitle="Your contract is ready."
+      heroSubtitle="A signed PDF has been prepared for your records. Download it below."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the contract for {projectName} is ready. A signed PDF is
-        attached and can also be downloaded below.
+        Hi <strong>{name}</strong>, the contract for <strong>{projectName}</strong> is ready. A signed copy can be downloaded below and is also attached to this email.
       </Text>
-      <EmailButton href={contractUrl}>Download contract</EmailButton>
+      <EmailButton href={contractUrl}>Download Contract</EmailButton>
     </EmailLayout>
   );
 }
@@ -728,16 +973,19 @@ export function ProjectCreatedEmail({
 }: BaseEmailProps & { projectName: string }) {
   return (
     <EmailLayout
-      title="Project created"
-      preview="Your project workspace is ready."
-      appUrl={appUrl}
+      preview={`"${projectName}" has been created — your workspace is ready.`}
+      heroLabel="Project Created"
+      heroTitle="Your project workspace is live."
+      heroAccent="live."
+      heroSubtitle="Everything is set up and ready for you to start collaborating."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your project {projectName} has been created.
+        Hi <strong>{name}</strong>, your project <strong>{projectName}</strong> has been created. Your workspace is ready — head over to get started.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects`}>Open project</EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>Open Project</EmailButton>
     </EmailLayout>
   );
 }
@@ -752,19 +1000,22 @@ export function UnfundedProjectReminderEmail({
 }: BaseEmailProps & { projectName: string; daysLeft: number }) {
   return (
     <EmailLayout
-      title="Complete your project funding"
-      preview="Your project is awaiting payment."
-      appUrl={appUrl}
+      preview={`"${projectName}" is awaiting funding — ${daysLeft} day${daysLeft === 1 ? "" : "s"} remaining.`}
+      heroLabel="Action Required"
+      heroTitle="Your project is awaiting payment."
+      heroSubtitle="Complete funding to keep your project active and your match in place."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your project {projectName} is still awaiting funding.
+        Hi <strong>{name}</strong>, your project <strong>{projectName}</strong> is still awaiting funding.
       </Text>
-      <Text style={textStyle}>
-        You have {daysLeft} {daysLeft === 1 ? "day" : "days"} left to complete payment before the project is automatically removed.
+      <InfoBlock rows={[{ label: "Time Remaining", value: `${daysLeft} ${daysLeft === 1 ? "day" : "days"}` }]} />
+      <Text style={{ ...textStyle, marginBottom: "24px" }}>
+        Complete payment before the deadline to keep your project active. After this period, the project will be automatically removed.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects`}>Complete payment</EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>Complete Payment</EmailButton>
     </EmailLayout>
   );
 }
@@ -779,19 +1030,21 @@ export function MonthlyCyclePendingReminderEmail({
 }: BaseEmailProps & { projectName: string; monthLabel: string }) {
   return (
     <EmailLayout
-      title="Monthly payment approval pending"
-      preview="Review and approve this month's work."
-      appUrl={appUrl}
+      preview={`${monthLabel} payment for "${projectName}" is awaiting your approval.`}
+      heroLabel="Approval Needed"
+      heroTitle="Monthly payment pending your review."
+      heroSubtitle="Review this month's work and approve the payment to release funds to your freelancer."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the {monthLabel} payment for {projectName} is awaiting your approval.
+        Hi <strong>{name}</strong>, the <strong>{monthLabel}</strong> payment for <strong>{projectName}</strong> is awaiting your approval.
       </Text>
-      <Text style={textStyle}>
-        Please review the freelancer&apos;s work and approve the payment to release funds.
+      <Text style={{ ...textStyle, marginBottom: "24px" }}>
+        Please review the freelancer's submitted work and approve the payment to release their funds for this period.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/monthly-approvals`}>Review & approve</EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/monthly-approvals`}>Review & Approve</EmailButton>
     </EmailLayout>
   );
 }
@@ -806,17 +1059,24 @@ export function MilestoneCreatedEmail({
 }: BaseEmailProps & { projectName: string; milestoneName: string }) {
   return (
     <EmailLayout
-      title="New milestone created"
-      preview="A new milestone has been added."
-      appUrl={appUrl}
+      preview={`New milestone "${milestoneName}" added to "${projectName}".`}
+      heroLabel="Milestone Added"
+      heroTitle="A new milestone has been created."
+      heroSubtitle="Your project scope has been updated with a new deliverable."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, a new milestone &quot;{milestoneName}&quot; was created for{" "}
-        {projectName}.
+        Hi <strong>{name}</strong>, a new milestone has been added to your project.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/projects`}>View milestones</EmailButton>
+      <InfoBlock
+        rows={[
+          { label: "Milestone", value: milestoneName },
+          { label: "Project", value: projectName },
+        ]}
+      />
+      <EmailButton href={`${appUrl}/dashboard/projects`}>View Milestones</EmailButton>
     </EmailLayout>
   );
 }
@@ -831,16 +1091,19 @@ export function MilestoneApprovedEmail({
 }: BaseEmailProps & { projectName: string; milestoneName: string }) {
   return (
     <EmailLayout
-      title="Milestone approved"
-      preview="Milestone approved successfully."
-      appUrl={appUrl}
+      preview={`Milestone "${milestoneName}" has been approved.`}
+      heroLabel="Milestone Approved"
+      heroTitle="Milestone approved — great work."
+      heroAccent="great work."
+      heroSubtitle="The client has reviewed and approved this deliverable."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the milestone &quot;{milestoneName}&quot; for {projectName} has
-        been approved.
+        Hi <strong>{name}</strong>, the milestone <strong>"{milestoneName}"</strong> for <strong>{projectName}</strong> has been approved.
       </Text>
+      <EmailButton href={`${appUrl}/dashboard/projects`}>View Project</EmailButton>
     </EmailLayout>
   );
 }
@@ -856,17 +1119,19 @@ export function MilestoneRejectedEmail({
 }: BaseEmailProps & { projectName: string; milestoneName: string; reason?: string }) {
   return (
     <EmailLayout
-      title="Milestone needs revisions"
-      preview="The milestone was not approved."
-      appUrl={appUrl}
+      preview={`Milestone "${milestoneName}" needs revisions.`}
+      heroLabel="Revision Requested"
+      heroTitle="Your milestone needs revisions."
+      heroSubtitle="The client has reviewed your submission and requested some changes."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, the milestone &quot;{milestoneName}&quot; for {projectName} needs
-        revisions.
+        Hi <strong>{name}</strong>, the milestone <strong>"{milestoneName}"</strong> for <strong>{projectName}</strong> requires revisions before it can be approved.
       </Text>
-      {reason && <Text style={textStyle}>Reason: {reason}</Text>}
+      {reason && <InfoBlock rows={[{ label: "Feedback", value: reason }]} />}
+      <EmailButton href={`${appUrl}/dashboard/projects`}>View Project</EmailButton>
     </EmailLayout>
   );
 }
@@ -880,41 +1145,26 @@ export function ProjectCompletedEmail({
 }: BaseEmailProps & { projectName: string }) {
   return (
     <EmailLayout
-      title="Project completed"
-      preview="Congratulations on completing your project."
-      appUrl={appUrl}
+      preview={`"${projectName}" is complete — congratulations!`}
+      heroLabel="Project Complete"
+      heroTitle="Project completed. Well done."
+      heroAccent="Well done."
+      heroSubtitle="This project has been marked as complete. Thank you for working with 49GIG."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your project {projectName} is marked as completed. Thank you
-        for working with 49GIG.
+        Hi <strong>{name}</strong>, <strong>{projectName}</strong> has been marked as completed. We hope it was a great experience and look forward to your next project.
       </Text>
+      <EmailButton href={`${appUrl}/dashboard`}>Back to Dashboard</EmailButton>
     </EmailLayout>
   );
 }
 
-export function ActivityDigestEmail({
-  name = "there",
-  items,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { items: string[] }) {
-  return (
-    <EmailLayout
-      title="Your weekly activity summary"
-      preview="A quick summary of your recent activity."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>Hi {name}, here is a quick summary:</Text>
-      <EmailList items={items} />
-      <EmailButton href={`${appUrl}/dashboard`}>Open dashboard</EmailButton>
-    </EmailLayout>
-  );
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// PAYMENTS & FINANCE
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function EscrowFundedEmail({
   name = "there",
@@ -926,14 +1176,26 @@ export function EscrowFundedEmail({
 }: BaseEmailProps & { amount: string; projectName: string }) {
   return (
     <EmailLayout
-      title="Escrow funded"
-      preview="Payment has been secured."
-      appUrl={appUrl}
+      preview={`Escrow for "${projectName}" has been funded — funds are secured.`}
+      heroLabel="Payment Secured"
+      heroTitle="Escrow funded and secured."
+      heroSubtitle="Funds are now held safely in escrow and will be released upon milestone approval."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, escrow for {projectName} has been funded for {amount}.
+        Hi <strong>{name}</strong>, escrow for <strong>{projectName}</strong> has been successfully funded.
+      </Text>
+      <InfoBlock
+        rows={[
+          { label: "Amount", value: amount },
+          { label: "Project", value: projectName },
+          { label: "Status", value: "Held in escrow" },
+        ]}
+      />
+      <Text style={mutedTextStyle}>
+        Funds will be released to the freelancer upon milestone approval. You're protected throughout.
       </Text>
     </EmailLayout>
   );
@@ -949,15 +1211,24 @@ export function PaymentReleasedEmail({
 }: BaseEmailProps & { amount: string; projectName: string }) {
   return (
     <EmailLayout
-      title="Payment released"
-      preview="Your payment has been released."
-      appUrl={appUrl}
+      preview={`Payment of ${amount} for "${projectName}" has been released.`}
+      heroLabel="Payment Released"
+      heroTitle="Your payment has been released."
+      heroSubtitle="Funds have been released from escrow as agreed."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, payment of {amount} for {projectName} has been released.
+        Hi <strong>{name}</strong>, payment has been released for <strong>{projectName}</strong>.
       </Text>
+      <InfoBlock
+        rows={[
+          { label: "Amount", value: amount },
+          { label: "Project", value: projectName },
+        ]}
+      />
+      <EmailButton href={`${appUrl}/dashboard/transactions`}>View Transactions</EmailButton>
     </EmailLayout>
   );
 }
@@ -972,19 +1243,26 @@ export function PayoutSentEmail({
 }: BaseEmailProps & { amount: string; projectName: string }) {
   return (
     <EmailLayout
-      title="Payout sent"
-      preview="Your payout is on the way."
-      appUrl={appUrl}
+      preview={`Your payout of ${amount} for "${projectName}" is on the way.`}
+      heroLabel="Payout Sent"
+      heroTitle="Your payout is on the way."
+      heroAccent="on the way."
+      heroSubtitle="Your earnings have been sent to your connected account and should arrive shortly."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, a payout of {amount} for {projectName} has been sent to your
-        connected Stripe account.
+        Hi <strong>{name}</strong>, a payout has been sent to your connected account.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/transactions`}>
-        View transactions
-      </EmailButton>
+      <InfoBlock
+        rows={[
+          { label: "Amount", value: amount },
+          { label: "Project", value: projectName },
+          { label: "Destination", value: "Connected Stripe account" },
+        ]}
+      />
+      <EmailButton href={`${appUrl}/dashboard/transactions`}>View Transactions</EmailButton>
     </EmailLayout>
   );
 }
@@ -999,14 +1277,25 @@ export function RefundIssuedEmail({
 }: BaseEmailProps & { amount: string; projectName: string }) {
   return (
     <EmailLayout
-      title="Refund issued"
-      preview="Your refund is on its way."
-      appUrl={appUrl}
+      preview={`A refund of ${amount} for "${projectName}" has been issued.`}
+      heroLabel="Refund Issued"
+      heroTitle="Your refund is on its way."
+      heroSubtitle="The refund has been processed and will appear in your account within a few business days."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, a refund of {amount} for {projectName} has been issued.
+        Hi <strong>{name}</strong>, a refund has been issued for <strong>{projectName}</strong>.
+      </Text>
+      <InfoBlock
+        rows={[
+          { label: "Amount", value: amount },
+          { label: "Project", value: projectName },
+        ]}
+      />
+      <Text style={mutedTextStyle}>
+        Refunds typically appear within 3–5 business days depending on your bank.
       </Text>
     </EmailLayout>
   );
@@ -1021,19 +1310,18 @@ export function PaymentFailedEmail({
 }: BaseEmailProps & { amount: string }) {
   return (
     <EmailLayout
-      title="Payment failed"
-      preview="Please update your payment method."
-      appUrl={appUrl}
+      preview="A payment failed on your 49GIG account — please update your payment method."
+      heroLabel="Payment Failed"
+      heroTitle="We couldn't process your payment."
+      heroSubtitle="Please update your payment method to keep your project moving forward."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, a payment of {amount} failed. Please update your payment
-        method to continue.
+        Hi <strong>{name}</strong>, a payment of <strong>{amount}</strong> could not be processed. This may be due to insufficient funds or an expired card.
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/settings`}>
-        Update payment method
-      </EmailButton>
+      <EmailButton href={`${appUrl}/dashboard/settings`}>Update Payment Method</EmailButton>
     </EmailLayout>
   );
 }
@@ -1048,212 +1336,18 @@ export function InvoiceReceiptEmail({
 }: BaseEmailProps & { amount: string; invoiceUrl: string }) {
   return (
     <EmailLayout
-      title="Your receipt"
-      preview="Download your receipt."
-      appUrl={appUrl}
+      preview={`Your 49GIG receipt for ${amount} is ready to download.`}
+      heroLabel="Receipt Ready"
+      heroTitle="Your receipt is ready."
+      heroSubtitle="Download your receipt below for your records."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your receipt for {amount} is ready.
+        Hi <strong>{name}</strong>, your receipt for <strong>{amount}</strong> is available to download.
       </Text>
-      <EmailButton href={invoiceUrl}>Download receipt</EmailButton>
-    </EmailLayout>
-  );
-}
-
-export function DisputeOpenedEmail({
-  name = "there",
-  projectName,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { projectName: string }) {
-  return (
-    <EmailLayout
-      title="Dispute opened"
-      preview="A dispute has been opened."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi {name}, a dispute has been opened for {projectName}. Our team will
-        review and respond.
-      </Text>
-    </EmailLayout>
-  );
-}
-
-export function DisputeResolvedEmail({
-  name = "there",
-  projectName,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { projectName: string }) {
-  return (
-    <EmailLayout
-      title="Dispute resolved"
-      preview="Your dispute has been resolved."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi {name}, the dispute for {projectName} has been resolved. Check your
-        dashboard for details.
-      </Text>
-      <EmailButton href={`${appUrl}/dashboard/disputes`}>
-        View dispute
-      </EmailButton>
-    </EmailLayout>
-  );
-}
-
-export function SupportTicketCreatedEmail({
-  name = "there",
-  ticketId,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { ticketId: string }) {
-  return (
-    <EmailLayout
-      title="Support ticket created"
-      preview="We have received your request."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi {name}, your support ticket {ticketId} has been created.
-      </Text>
-      <EmailButton href={`${appUrl}/dashboard/support`}>
-        View ticket
-      </EmailButton>
-    </EmailLayout>
-  );
-}
-
-export function SupportTicketUpdatedEmail({
-  name = "there",
-  ticketId,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { ticketId: string }) {
-  return (
-    <EmailLayout
-      title="Support ticket updated"
-      preview="There is an update on your ticket."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi {name}, your support ticket {ticketId} has a new update.
-      </Text>
-      <EmailButton href={`${appUrl}/dashboard/support`}>
-        View update
-      </EmailButton>
-    </EmailLayout>
-  );
-}
-
-export function SupportTicketClosedEmail({
-  name = "there",
-  ticketId,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { ticketId: string }) {
-  return (
-    <EmailLayout
-      title="Support ticket closed"
-      preview="Your ticket has been closed."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi {name}, your support ticket {ticketId} has been closed. Reply to this
-        email if you need more help.
-      </Text>
-    </EmailLayout>
-  );
-}
-
-export function AdminFreelancerPendingEmail({
-  name = "there",
-  freelancerName,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { freelancerName: string }) {
-  return (
-    <EmailLayout
-      title="New freelancer pending verification"
-      preview="Verification queue update."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi {name}, {freelancerName} is ready for verification review.
-      </Text>
-      <EmailButton href={`${appUrl}/dashboard/verification`}>
-        Review verification
-      </EmailButton>
-    </EmailLayout>
-  );
-}
-
-export function AdminDisputeReviewEmail({
-  name = "there",
-  disputeId,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { disputeId: string }) {
-  return (
-    <EmailLayout
-      title="Dispute requires review"
-      preview="A dispute needs admin attention."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi {name}, dispute {disputeId} requires review.
-      </Text>
-      <EmailButton href={`${appUrl}/dashboard/disputes`}>
-        Review dispute
-      </EmailButton>
-    </EmailLayout>
-  );
-}
-
-export function AdminKycDigestEmail({
-  name = "there",
-  items,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & { items: string[] }) {
-  return (
-    <EmailLayout
-      title="Verification queue summary"
-      preview="Daily verification summary."
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={textStyle}>Hi {name}, here is the daily summary:</Text>
-      <EmailList items={items} />
-      <EmailButton href={`${appUrl}/dashboard/verification`}>
-        Open verification queue
-      </EmailButton>
+      <EmailButton href={invoiceUrl}>Download Receipt</EmailButton>
     </EmailLayout>
   );
 }
@@ -1269,22 +1363,297 @@ export function PayoutFailedEmail({
 }: BaseEmailProps & { amount: string; currency: string; reason: string }) {
   return (
     <EmailLayout
-      title="Payout failed"
-      preview="We could not complete your payout."
-      appUrl={appUrl}
+      preview={`Your payout of ${amount} ${currency} could not be completed.`}
+      heroLabel="Payout Failed"
+      heroTitle="We couldn't complete your payout."
+      heroSubtitle="There was an issue processing your payout. Please contact support to resolve this."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, we could not complete your payout of {amount} {currency}.
+        Hi <strong>{name}</strong>, we were unable to complete your payout.
       </Text>
-      <Text style={textStyle}>Reason: {reason}</Text>
-      <EmailButton href={`${appUrl}/dashboard/support`}>
-        Contact support
-      </EmailButton>
+      <InfoBlock
+        rows={[
+          { label: "Amount", value: `${amount} ${currency}` },
+          { label: "Reason", value: reason },
+        ]}
+      />
+      <EmailButton href={`${appUrl}/dashboard/support`}>Contact Support</EmailButton>
     </EmailLayout>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISPUTES & SUPPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function DisputeOpenedEmail({
+  name = "there",
+  projectName,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { projectName: string }) {
+  return (
+    <EmailLayout
+      preview={`A dispute has been opened for "${projectName}" — our team is reviewing.`}
+      heroLabel="Dispute Opened"
+      heroTitle="A dispute has been opened."
+      heroSubtitle="Our team has been notified and will review the details. We aim to resolve disputes fairly and promptly."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, a dispute has been opened for <strong>{projectName}</strong>. Our team is reviewing the details and will be in touch shortly.
+      </Text>
+      <Text style={mutedTextStyle}>
+        Please ensure all relevant project communication is available via the platform chat to assist our review.
+      </Text>
+    </EmailLayout>
+  );
+}
+
+export function DisputeResolvedEmail({
+  name = "there",
+  projectName,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { projectName: string }) {
+  return (
+    <EmailLayout
+      preview={`The dispute for "${projectName}" has been resolved.`}
+      heroLabel="Dispute Resolved"
+      heroTitle="Your dispute has been resolved."
+      heroSubtitle="Our team has reviewed all the details and reached a resolution."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, the dispute for <strong>{projectName}</strong> has been resolved. Check your dashboard for the full resolution details.
+      </Text>
+      <EmailButton href={`${appUrl}/dashboard/disputes`}>View Resolution</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function SupportTicketCreatedEmail({
+  name = "there",
+  ticketId,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { ticketId: string }) {
+  return (
+    <EmailLayout
+      preview={`Support ticket ${ticketId} has been created — we're on it.`}
+      heroLabel="Support Request"
+      heroTitle="We've received your request."
+      heroSubtitle="Your ticket has been created and assigned to our support team. We'll be in touch shortly."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, your support request has been received and is being reviewed.
+      </Text>
+      <InfoBlock rows={[{ label: "Ticket ID", value: ticketId }]} />
+      <EmailButton href={`${appUrl}/dashboard/support`}>View Ticket</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function SupportTicketUpdatedEmail({
+  name = "there",
+  ticketId,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { ticketId: string }) {
+  return (
+    <EmailLayout
+      preview={`There's an update on your support ticket ${ticketId}.`}
+      heroLabel="Ticket Update"
+      heroTitle="Your support ticket has been updated."
+      heroSubtitle="Our team has added a response to your ticket. Log in to see the latest update."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, there's a new update on your support ticket.
+      </Text>
+      <InfoBlock rows={[{ label: "Ticket ID", value: ticketId }]} />
+      <EmailButton href={`${appUrl}/dashboard/support`}>View Update</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function SupportTicketClosedEmail({
+  name = "there",
+  ticketId,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { ticketId: string }) {
+  return (
+    <EmailLayout
+      preview={`Your support ticket ${ticketId} has been closed.`}
+      heroLabel="Ticket Closed"
+      heroTitle="Your support ticket is closed."
+      heroSubtitle="We hope we were able to help. Reply to this email if you need further assistance."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, your support ticket <strong>{ticketId}</strong> has been closed. If you still need help or have follow-up questions, simply reply to this email.
+      </Text>
+    </EmailLayout>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN & BROADCASTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function ActivityDigestEmail({
+  name = "there",
+  items,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { items: string[] }) {
+  return (
+    <EmailLayout
+      preview="Your weekly 49GIG activity summary."
+      heroLabel="Weekly Summary"
+      heroTitle="Your activity this week."
+      heroSubtitle="Here's a quick overview of what happened on your account over the past 7 days."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, here's your weekly activity summary:
+      </Text>
+      <EmailList items={items} />
+      <EmailButton href={`${appUrl}/dashboard`}>Open Dashboard</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function AdminFreelancerPendingEmail({
+  name = "there",
+  freelancerName,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { freelancerName: string }) {
+  return (
+    <EmailLayout
+      preview={`${freelancerName} is pending verification review.`}
+      heroLabel="Verification Queue"
+      heroTitle="A freelancer is pending review."
+      heroSubtitle="A new submission is waiting in the verification queue."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, <strong>{freelancerName}</strong> has submitted their verification and is ready for review.
+      </Text>
+      <EmailButton href={`${appUrl}/dashboard/verification`}>Review Verification</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function AdminDisputeReviewEmail({
+  name = "there",
+  disputeId,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { disputeId: string }) {
+  return (
+    <EmailLayout
+      preview={`Dispute ${disputeId} requires admin review.`}
+      heroLabel="Admin Action"
+      heroTitle="A dispute requires your review."
+      heroSubtitle="A dispute has been escalated and needs admin attention."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, a dispute requires your review.
+      </Text>
+      <InfoBlock rows={[{ label: "Dispute ID", value: disputeId }]} />
+      <EmailButton href={`${appUrl}/dashboard/disputes`}>Review Dispute</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function AdminKycDigestEmail({
+  name = "there",
+  items,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & { items: string[] }) {
+  return (
+    <EmailLayout
+      preview="Daily verification queue summary — 49GIG Admin."
+      heroLabel="Admin Digest"
+      heroTitle="Daily verification summary."
+      heroSubtitle="Here's an overview of today's verification queue activity."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, here is today's verification queue summary:
+      </Text>
+      <EmailList items={items} />
+      <EmailButton href={`${appUrl}/dashboard/verification`}>Open Verification Queue</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function AdminBroadcastEmail({
+  subject,
+  body,
+  appUrl,
+  logoUrl,
+  date,
+}: {
+  subject: string;
+  body: string;
+  appUrl: string;
+  logoUrl?: string;
+  date: string;
+}) {
+  return (
+    <EmailLayout
+      preview={body.slice(0, 100)}
+      heroLabel="Message from 49GIG"
+      heroTitle={subject}
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={{ ...textStyle, whiteSpace: "pre-wrap" }}>{body}</Text>
+    </EmailLayout>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SESSIONS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function OneOnOneSessionScheduledEmail({
   name = "there",
@@ -1307,78 +1676,32 @@ export function OneOnOneSessionScheduledEmail({
 }) {
   return (
     <EmailLayout
-      title={isTeamKickoff ? "Kickoff session scheduled" : "One-on-one session scheduled"}
-      preview="Your live session is on the calendar."
-      appUrl={appUrl}
+      preview={`Your ${isTeamKickoff ? "kickoff" : "one-on-one"} session for "${projectName}" is confirmed.`}
+      heroLabel={isTeamKickoff ? "Kickoff Session" : "Session Scheduled"}
+      heroTitle={isTeamKickoff ? "Your kickoff session is set." : "Your session is scheduled."}
+      heroAccent="set."
+      heroSubtitle="Add it to your calendar and prepare for a productive conversation."
       logoUrl={logoUrl}
+      appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi {name}, your {isTeamKickoff ? "team kickoff" : "one-on-one"} session for the
-        project &quot;{projectName}&quot; has been scheduled.
+        Hi <strong>{name}</strong>, your {isTeamKickoff ? "team kickoff" : "one-on-one"} session for <strong>{projectName}</strong> has been scheduled.
       </Text>
-      <Section
-        style={{
-          backgroundColor: "#f0fdf4",
-          border: "1px solid #bbf7d0",
-          borderRadius: "8px",
-          padding: "16px",
-          marginBottom: "16px",
-        }}
-      >
-        <Text style={{ ...textStyle, margin: "0 0 8px", fontWeight: 600 }}>
-          When
-        </Text>
-        <Text style={{ ...textStyle, margin: "0 0 4px" }}>
-          {startTimeFormatted} – {endTimeFormatted}
-        </Text>
-        {participantNames && (
-          <>
-            <Text style={{ ...textStyle, margin: "12px 0 8px", fontWeight: 600 }}>
-              Participants
-            </Text>
-            <Text style={{ ...textStyle, margin: 0 }}>{participantNames}</Text>
-          </>
-        )}
-      </Section>
-      <Text style={textStyle}>
-        Join the session at the scheduled time using the link below. We recommend
-        testing your camera and microphone beforehand.
+      <InfoBlock
+        rows={[
+          { label: "When", value: `${startTimeFormatted} – ${endTimeFormatted}` },
+          ...(participantNames ? [{ label: "With", value: participantNames }] : []),
+          { label: "Project", value: projectName },
+        ]}
+      />
+      <Text style={{ ...textStyle, marginBottom: "24px" }}>
+        Join at the scheduled time using the link below. We recommend testing your camera and microphone beforehand.
       </Text>
       <EmailButton href={meetLink}>Join Google Meet</EmailButton>
-      <Text style={{ ...textStyle, marginTop: "16px", fontSize: "12px", color: "#6b7280" }}>
-        This session was scheduled through 49GIG. If you need to reschedule, please
-        contact support or the other participant(s) via the project chat.
+      <Text style={mutedTextStyle}>
+        If you need to reschedule, please contact the other participant(s) via the project chat or reach out to support.
       </Text>
-    </EmailLayout>
-  );
-}
-
-/**
- * Admin/moderator broadcast email - custom subject and body
- */
-export function AdminBroadcastEmail({
-  subject,
-  body,
-  appUrl,
-  logoUrl,
-  date,
-}: {
-  subject: string;
-  body: string;
-  appUrl: string;
-  logoUrl: string;
-  date: string;
-}) {
-  return (
-    <EmailLayout
-      title={subject}
-      preview={body.slice(0, 100)}
-      appUrl={appUrl}
-      logoUrl={logoUrl}
-      date={date}
-    >
-      <Text style={{ ...textStyle, whiteSpace: "pre-wrap" }}>{body}</Text>
     </EmailLayout>
   );
 }

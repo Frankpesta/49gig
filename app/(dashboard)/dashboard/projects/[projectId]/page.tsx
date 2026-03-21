@@ -241,6 +241,11 @@ export default function ProjectDetailPage() {
   const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
   const isClient = user.role === "client" && project.clientId === user._id;
+  const matchingInProgressForClient =
+    isClient &&
+    (project.awaitingMatch === true ||
+      (project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0) ||
+      (project.rolesAwaitingMatch != null && project.rolesAwaitingMatch.length > 0));
   const isMatchedFreelancer =
     project.matchedFreelancerId === user._id ||
     (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
@@ -489,6 +494,33 @@ export default function ProjectDetailPage() {
           </div>
         )}
       </div>
+
+      {matchingInProgressForClient && (
+        <Card className="rounded-xl border-amber-500/40 bg-amber-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-600" />
+              Matching in progress
+            </CardTitle>
+            <CardDescription>
+              {project.status === "matching" && (project.pendingTeamMemberSlots ?? 0) > 0
+                ? `We’re still confirming ${project.pendingTeamMemberSlots} more team member(s). You’ll get an email when there are people to review.`
+                : project.awaitingMatch
+                  ? "We’re finding the right freelancer(s) for this hire. You’ll get an email when matches are ready to review."
+                  : "Some roles are still being staffed. We’ll email you when there’s an update."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2 pt-0">
+            <Button asChild size="sm" className="rounded-lg">
+              <Link href={`/dashboard/projects/${project._id}/matches`}>
+                {project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0
+                  ? "Review & complete team"
+                  : "View matches"}
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}

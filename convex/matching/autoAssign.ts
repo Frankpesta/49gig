@@ -143,12 +143,25 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
       internalAny.projects.queries.getProjectInternal,
       { projectId }
     );
-    if (!project || project.status !== "funded") return 0;
+    if (
+      !project ||
+      (project.status !== "funded" && project.status !== "matching")
+    ) {
+      return 0;
+    }
 
-    const matchIds: string[] = await ctx.runAction(
-      apiAny.matching.actions.generateMatches,
-      { projectId, limit: 5 }
-    );
+    let matchIds: string[] = [];
+    if (project.intakeForm?.hireType === "team") {
+      const res = await ctx.runAction(apiAny.matching.actions.generateTeamMatches, {
+        projectId,
+      });
+      matchIds = res?.matchIds ?? [];
+    } else {
+      matchIds = await ctx.runAction(apiAny.matching.actions.generateMatches, {
+        projectId,
+        limit: 5,
+      });
+    }
 
     if (matchIds.length === 0) return 0;
 

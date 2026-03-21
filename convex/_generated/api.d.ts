@@ -51,6 +51,7 @@ import type * as kyc_queries from "../kyc/queries.js";
 import type * as matching_actions from "../matching/actions.js";
 import type * as matching_autoAssign from "../matching/autoAssign.js";
 import type * as matching_mutations from "../matching/mutations.js";
+import type * as matching_postFundPipeline from "../matching/postFundPipeline.js";
 import type * as matching_queries from "../matching/queries.js";
 import type * as matching_teamMatching from "../matching/teamMatching.js";
 import type * as milestones_mutations from "../milestones/mutations.js";
@@ -149,6 +150,7 @@ declare const fullApi: ApiFromModules<{
   "matching/actions": typeof matching_actions;
   "matching/autoAssign": typeof matching_autoAssign;
   "matching/mutations": typeof matching_mutations;
+  "matching/postFundPipeline": typeof matching_postFundPipeline;
   "matching/queries": typeof matching_queries;
   "matching/teamMatching": typeof matching_teamMatching;
   "milestones/mutations": typeof milestones_mutations;

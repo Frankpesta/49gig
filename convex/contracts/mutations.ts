@@ -48,7 +48,9 @@ export const storeContract = internalMutation({
 
 /**
  * Client or matched freelancer signs the project contract.
- * Records signature then schedules PDF regeneration and email.
+ * Records signature then schedules PDF regeneration. Emails all parties only when
+ * the contract is fully executed (client + every matched freelancer signed);
+ * intermediate signatures update the stored PDF without sending duplicate emails.
  */
 export const signContract = mutation({
   args: {
@@ -125,61 +127,62 @@ export const signContract = mutation({
       createdAt: now,
     });
 
+    const updatedProject = await ctx.db.get(projectId);
+    if (!updatedProject) {
+      return { success: true };
+    }
+
+    const clientSigned = !!updatedProject.clientContractSignedAt;
+    const freelancerIds = updatedProject.matchedFreelancerId
+      ? [updatedProject.matchedFreelancerId]
+      : updatedProject.matchedFreelancerIds ?? [];
+    const signatures = updatedProject.freelancerContractSignatures ?? [];
+    const allFreelancersSigned =
+      freelancerIds.length > 0 &&
+      freelancerIds.every((fid) =>
+        signatures.some((s) => s.freelancerId === fid)
+      );
+    const fullyExecuted = clientSigned && allFreelancersSigned;
+
     const apiModule = require("../_generated/api");
     await ctx.scheduler.runAfter(
       0,
       apiModule.internal.contracts.actions.regenerateContractPdfAndSend,
-      { projectId }
+      { projectId, sendEmails: fullyExecuted }
     );
 
     // When both parties have signed and project is still "matched", transition to in_progress
-    if (project.status === "matched") {
-      const updatedProject = await ctx.db.get(projectId);
-      if (!updatedProject) return { success: true };
-
-      const clientSigned = !!updatedProject.clientContractSignedAt;
-      const freelancerIds = updatedProject.matchedFreelancerId
-        ? [updatedProject.matchedFreelancerId]
-        : updatedProject.matchedFreelancerIds ?? [];
-      const signatures = updatedProject.freelancerContractSignatures ?? [];
-      const allFreelancersSigned =
-        freelancerIds.length > 0 &&
-        freelancerIds.every((fid) =>
-          signatures.some((s) => s.freelancerId === fid)
-        );
-
-      if (clientSigned && allFreelancersSigned) {
-        await ctx.db.patch(projectId, {
-          status: "in_progress",
-          startedAt: updatedProject.startedAt ?? now,
-          updatedAt: now,
-        });
-        await ctx.db.insert("auditLogs", {
-          action: "project_status_updated",
-          actionType: "system",
-          actorId: user._id,
-          actorRole: user.role,
-          targetType: "project",
-          targetId: projectId,
-          details: { oldStatus: "matched", newStatus: "in_progress", reason: "contract_fully_signed" },
-          createdAt: now,
-        });
-        // Ensure monthly cycles exist (idempotent; creates if missing, e.g. for projects that skipped payment flow)
-        await ctx.scheduler.runAfter(
-          0,
-          apiModule.internal.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
-          { projectId }
-        );
-        // Process upfront release when freelancer signs - run after cycles exist (500ms delay)
-        await ctx.scheduler.runAfter(
-          500,
-          apiModule.internal.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
-          { projectId }
-        );
-      }
+    if (project.status === "matched" && fullyExecuted) {
+      await ctx.db.patch(projectId, {
+        status: "in_progress",
+        startedAt: updatedProject.startedAt ?? now,
+        updatedAt: now,
+      });
+      await ctx.db.insert("auditLogs", {
+        action: "project_status_updated",
+        actionType: "system",
+        actorId: user._id,
+        actorRole: user.role,
+        targetType: "project",
+        targetId: projectId,
+        details: { oldStatus: "matched", newStatus: "in_progress", reason: "contract_fully_signed" },
+        createdAt: now,
+      });
+      // Ensure monthly cycles exist (idempotent; creates if missing, e.g. for projects that skipped payment flow)
+      await ctx.scheduler.runAfter(
+        0,
+        apiModule.internal.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
+        { projectId }
+      );
+      // Process upfront release when freelancer signs - run after cycles exist (500ms delay)
+      await ctx.scheduler.runAfter(
+        500,
+        apiModule.internal.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
+        { projectId }
+      );
     }
 
-    return { success: true };
+    return { success: true, emailedParties: fullyExecuted };
   },
 });
 

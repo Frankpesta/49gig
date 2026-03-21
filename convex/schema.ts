@@ -397,6 +397,10 @@ export default defineSchema({
     // Auto-assignment queue: true while the project is funded but has no matches yet
     awaitingMatch: v.optional(v.boolean()),
     awaitingMatchSince: v.optional(v.number()),
+    /** Team hires: role labels still being matched (empty slots or no candidates yet). */
+    rolesAwaitingMatch: v.optional(v.array(v.string())),
+    /** Team hires: how many additional freelancers we still need after partial payment/selection. */
+    pendingTeamMemberSlots: v.optional(v.number()),
 
     // Audit
     createdAt: v.number(),

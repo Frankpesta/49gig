@@ -306,10 +306,12 @@ export const handlePaymentSuccess = internalMutation({
         updatedAt: now,
       });
 
-      // Accept client's selected freelancer(s) and then auto-create milestones
-      await ctx.scheduler.runAfter(0, internalAny.projects.mutations.acceptSelectedMatchInternal, {
-        projectId,
-      });
+      // Generate post-fund matches, then accept client's selection (ordered pipeline)
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.matching.postFundPipeline.runPostFundMatchingForProject,
+        { projectId }
+      );
 
       // Log audit
       if (clientId) {

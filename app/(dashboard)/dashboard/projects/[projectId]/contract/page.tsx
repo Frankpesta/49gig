@@ -92,6 +92,30 @@ export default function ContractPage() {
   const canViewContract =
     isClient && (hasSelected || hasMatched);
 
+  if (
+    isClient &&
+    project.status === "matching" &&
+    (project.pendingTeamMemberSlots ?? 0) > 0
+  ) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold">Complete your team first</h3>
+            <p className="mb-4 text-center text-sm text-muted-foreground max-w-md">
+              Your hire is still missing one or more team members. Finish matching on the matches page,
+              then you can sign the contract for the full team.
+            </p>
+            <Button asChild>
+              <Link href={`/dashboard/projects/${projectId}/matches`}>Go to matches</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!canViewContract) {
     return (
       <div className="space-y-6">
