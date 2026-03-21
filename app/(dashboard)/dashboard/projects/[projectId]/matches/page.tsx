@@ -477,7 +477,7 @@ export default function ProjectMatchesPage() {
     !matchingRunning &&
     rolesForAvailabilityNote.length > 0 &&
     rolesForAvailabilityNote.some(
-      (role) => (matchesByRoleMap.get(role) ?? []).length === 0
+      (role: string) => (matchesByRoleMap.get(role) ?? []).length === 0,
     );
   const hasUnavailableSingleSlot =
     !isTeam && !matchingRunning && pendingMatches.length === 0;
