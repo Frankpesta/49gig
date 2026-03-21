@@ -450,20 +450,45 @@ export default function ProjectMatchesPage() {
     ? getRoleLabelsFromProject(project.intakeForm)
     : [];
 
+  const isFundedMatchingContinuation =
+    project?.status === "matching" &&
+    user?.role === "client" &&
+    (project.pendingTeamMemberSlots ?? 0) > 0;
+
   const singleList = !isTeam ? pendingMatches.slice(0, singleVisibleCount) : [];
   const hasMoreSingle =
     !isTeam && pendingMatches.length > singleVisibleCount;
+
+  /**
+   * Roles that still need matches for the policy note.
+   * After funding a partial team, only rolesAwaitingMatch counts — filled roles have
+   * zero pending matches too and must not trigger the note.
+   */
+  const rolesForAvailabilityNote =
+    isTeam && allRoleLabels.length > 0
+      ? isFundedMatchingContinuation
+        ? project.rolesAwaitingMatch ?? []
+        : project.rolesAwaitingMatch && project.rolesAwaitingMatch.length > 0
+          ? project.rolesAwaitingMatch
+          : allRoleLabels
+      : [];
+  const hasUnavailableTeamRole =
+    isTeam &&
+    !matchingRunning &&
+    rolesForAvailabilityNote.length > 0 &&
+    rolesForAvailabilityNote.some(
+      (role: string) => (matchesByRoleMap.get(role) ?? []).length === 0,
+    );
+  const hasUnavailableSingleSlot =
+    !isTeam && !matchingRunning && pendingMatches.length === 0;
+  const showMatchingPolicyNote =
+    hasUnavailableTeamRole || hasUnavailableSingleSlot;
 
   // Reset "attempted" and availability when project changes so a new project can trigger matching
   useEffect(() => {
     matchingAttemptedRef.current = false;
     setMatchingAvailability(null);
   }, [projectId]);
-
-  const isFundedMatchingContinuation =
-    project?.status === "matching" &&
-    user?.role === "client" &&
-    (project.pendingTeamMemberSlots ?? 0) > 0;
 
   // Run matching once when project is draft and no matches; do not retry on failure
   useEffect(() => {
@@ -751,25 +776,14 @@ export default function ProjectMatchesPage() {
         </div>
       </div>
 
-      {(isTeam ||
-        isFundedMatchingContinuation ||
-        !!matchingAvailability ||
-        (!isTeam && !matchingRunning && pendingMatches.length === 0)) && (
+      {showMatchingPolicyNote && (
         <Card className="rounded-xl border-amber-500/30 bg-amber-500/5">
           <CardContent className="py-4 px-4 sm:px-6 text-sm text-foreground/90 space-y-2">
-            <p className="font-medium text-foreground">Matching timeline &amp; availability</p>
+            <p className="font-medium text-foreground">Open role(s)</p>
             <p className="text-muted-foreground leading-relaxed">
-              If any role has limited availability right now (including team hires where you paid after selecting
-              whoever was available), we will keep matching the remaining role(s) within the next{" "}
-              <strong>48 hours</strong> and email you when there are people to review.
-            </p>
-            <p className="text-muted-foreground leading-relaxed">
-              If we still cannot staff the remaining role(s) after 48 hours, you will receive a{" "}
-              <strong>full refund</strong> for this hire.
-            </p>
-            <p className="text-muted-foreground leading-relaxed">
-              Freelancers who are already on another active hire may still appear in your shortlist — they are
-              ranked highly and can be matched if you choose them.
+              We keep matching for up to <strong>48 hours</strong> and email you when there are people to
+              review. If we can&apos;t staff the remaining role(s) in that window, you get a{" "}
+              <strong>full refund</strong>.
             </p>
           </CardContent>
         </Card>

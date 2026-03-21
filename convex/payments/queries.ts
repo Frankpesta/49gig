@@ -175,18 +175,39 @@ export const getPaymentStatus = query({
       return null;
     }
 
-    // Get payment
-    const payment = await ctx.db
+    const payments = await ctx.db
       .query("payments")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .filter((q) => q.eq(q.field("type"), "pre_funding"))
       .order("desc")
-      .first();
+      .collect();
+
+    const preFundingPayment = payments.find((p) => p.type === "pre_funding");
+    const latestTopUpPayment = payments.find((p) => p.type === "top_up");
+
+    const postFundingStatuses = new Set([
+      "funded",
+      "matching",
+      "matched",
+      "in_progress",
+    ]);
 
     return {
-      payment,
+      /** Latest pre-funding row (initial hire fund) */
+      payment: preFundingPayment,
+      topUpPayment: latestTopUpPayment,
       projectStatus: project.status,
+      /** True only while status is still `funded` before matching runs */
       isFunded: project.status === "funded",
+      /** Webhook processed pre-funding — use for success UI even when status is already matching/matched */
+      isPreFundingPaymentSucceeded: preFundingPayment?.status === "succeeded",
+      /** Latest top-up charge succeeded */
+      isLatestTopUpSucceeded: latestTopUpPayment?.status === "succeeded",
+      /** Project has moved past unfunded states after a successful fund */
+      isProjectPastFunding:
+        postFundingStatuses.has(project.status) ||
+        (project.escrowedAmount ?? 0) > 0,
+      totalAmount: preFundingPayment?.amount ?? project.totalAmount,
+      currency: preFundingPayment?.currency ?? project.currency,
     };
   },
 });

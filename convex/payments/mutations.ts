@@ -278,6 +278,8 @@ export const handlePaymentSuccess = internalMutation({
         "internal"
       >;
 
+    const alreadySucceeded = payment.status === "succeeded";
+
     // Update payment status
     const now = Date.now();
     await ctx.db.patch(payment._id, {
@@ -288,6 +290,11 @@ export const handlePaymentSuccess = internalMutation({
       processedAt: now,
       updatedAt: now,
     });
+
+    // Webhook + return URL can both call this; run fund/match side effects only once
+    if (alreadySucceeded) {
+      return payment._id;
+    }
 
     // Get project to access clientId for audit logs (projectId optional for payouts)
     const projectId = payment.projectId;
