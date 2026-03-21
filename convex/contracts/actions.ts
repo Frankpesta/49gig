@@ -9,7 +9,12 @@ import type { FunctionReference } from "convex/server";
 import { sendEmail } from "../email/send";
 import { ContractReadyEmail } from "../../emails/templates";
 import type { Doc, Id } from "../_generated/dataModel";
-import { getClientAgreementFilled, getFreelancerAgreementFilled } from "./content";
+import {
+  CLIENT_AGREEMENT_SECTIONS,
+  FREELANCER_AGREEMENT_SECTIONS,
+  applyClientAgreementPlaceholders,
+  applyFreelancerAgreementPlaceholders,
+} from "./content";
 
 const api = require("../_generated/api") as {
   api: {
@@ -55,6 +60,8 @@ function sanitizeForPdf(text: string): string {
     if (code >= 0x20 && code <= 0x7e) return c; // ASCII printable
     if (code >= 0xa0 && code <= 0xff) return c; // Latin-1 supplement
     // Map common Unicode punctuation to ASCII
+    if (code === 0x2022) return "- "; // bullet (list)
+    if (code === 0x2248) return "~"; // approx. equal
     const map: Record<number, string> = {
       0x2014: "-", 0x2013: "-", 0x2e3a: "-", 0x2e3b: "-",
       0x201c: '"', 0x201d: '"', 0x2018: "'", 0x2019: "'",
@@ -305,157 +312,418 @@ async function generateFullContractPdf({
   copyFor?: { name: string; role: string };
 }) {
   const pdfDoc = await PDFDocument.create();
-  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regular = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+  const bold = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
   const signatureFont = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+  const sansBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const pageWidth = 612;
   const pageHeight = 792;
-  const margin = 56;
-  const lineHeight = 14;
-  const titleSize = 16;
-  const headingSize = 12;
+  const margin = 54;
+  const lineHeight = 13;
   const bodySize = 10;
+  const minContentY = 78;
   const effectiveDate = formatDate();
+  const clientName = client.name || "Client";
   const freelancerNames = freelancers.map((f) => f.name || "Freelancer").join(", ");
 
+  const C = {
+    navy: rgb(0.051, 0.106, 0.165),
+    gold: rgb(0.961, 0.722, 0),
+    text: rgb(0.067, 0.067, 0.067),
+    muted: rgb(0.38, 0.38, 0.38),
+    rule: rgb(0.82, 0.82, 0.82),
+    banner: rgb(0.94, 0.945, 0.95),
+    white: rgb(1, 1, 1),
+  };
+
   let page = pdfDoc.addPage([pageWidth, pageHeight]);
-  let y = pageHeight - margin;
+
+  // ── Cover page
+  const bandH = 100;
+  page.drawRectangle({
+    x: 0,
+    y: pageHeight - bandH,
+    width: pageWidth,
+    height: bandH,
+    color: C.navy,
+  });
+  page.drawRectangle({
+    x: 0,
+    y: pageHeight - bandH - 3,
+    width: pageWidth,
+    height: 3,
+    color: C.gold,
+  });
+  page.drawText("49GIG", {
+    x: margin,
+    y: pageHeight - 42,
+    size: 26,
+    font: sansBold,
+    color: C.white,
+  });
+  page.drawText("CONFIDENTIAL", {
+    x: margin,
+    y: pageHeight - 64,
+    size: 8,
+    font: sansBold,
+    color: C.gold,
+  });
+
+  let cy = pageHeight - bandH - 40;
+  page.drawText("Combined Client & Freelancer Agreement", {
+    x: margin,
+    y: cy,
+    size: 17,
+    font: bold,
+    color: C.text,
+  });
+  cy -= 26;
+  page.drawText(`Effective date: ${sanitizeForPdf(effectiveDate)}`, {
+    x: margin,
+    y: cy,
+    size: 11,
+    font: regular,
+    color: C.muted,
+  });
+  cy -= 36;
 
   if (copyFor) {
-    page.drawText(`Copy for: ${sanitizeForPdf(copyFor.name)} (${copyFor.role})`, {
-      x: margin,
-      y,
-      size: 10,
-      font: bold,
-      color: rgb(0.2, 0.2, 0.2),
-    });
-    y -= lineHeight * 2;
+    page.drawText(
+      `Distribution copy: ${sanitizeForPdf(copyFor.name)} (${sanitizeForPdf(copyFor.role)})`,
+      { x: margin, y: cy, size: 9, font: bold, color: rgb(0.45, 0.22, 0.18) },
+    );
+    cy -= 28;
   }
+
+  const partyRows: [string, string][] = [
+    ["Project", project.intakeForm.title || "Engagement"],
+    ["Client", clientName],
+    ["Talent", freelancerNames || "As assigned"],
+  ];
+  for (const [label, value] of partyRows) {
+    page.drawText(sanitizeForPdf(label.toUpperCase()), {
+      x: margin,
+      y: cy,
+      size: 7,
+      font: sansBold,
+      color: C.muted,
+    });
+    cy -= 12;
+    page.drawText(sanitizeForPdf(value), {
+      x: margin,
+      y: cy,
+      size: 11,
+      font: regular,
+      color: C.text,
+    });
+    cy -= 26;
+  }
+
+  const coverNote =
+    "This document incorporates the 49GIG Client Agreement and Freelancer Agreement for the engagement described above.";
+  let noteY = cy;
+  for (const line of wrapText(
+    coverNote,
+    pageWidth - margin * 2,
+    regular,
+    9,
+  )) {
+    page.drawText(sanitizeForPdf(line), {
+      x: margin,
+      y: noteY,
+      size: 9,
+      font: regular,
+      color: C.muted,
+    });
+    noteY -= 12;
+  }
+
+  // ── Agreement body (structured; matches in-app sections)
+  page = pdfDoc.addPage([pageWidth, pageHeight]);
+  let y = pageHeight - margin;
 
   const ensureSpace = (need: number) => {
-    if (y < margin + need) {
+    if (y < minContentY + need) {
       page = pdfDoc.addPage([pageWidth, pageHeight]);
       y = pageHeight - margin;
+      page.drawLine({
+        start: { x: margin, y: y + 4 },
+        end: { x: pageWidth - margin, y: y + 4 },
+        thickness: 0.4,
+        color: C.rule,
+      });
+      y -= 18;
     }
   };
 
-  const drawHeading = (text: string) => {
-    ensureSpace(lineHeight + 8);
-    page.drawText(text, {
-      x: margin,
-      y,
-      size: headingSize,
-      font: bold,
-      color: rgb(0.1, 0.1, 0.1),
-    });
-    y -= lineHeight + 4;
+  const drawFilledBody = (filled: string) => {
+    const blocks = filled.split(/\n\n+/);
+    for (const block of blocks) {
+      for (const rawLine of block.split("\n")) {
+        const t = rawLine.trim();
+        if (!t) continue;
+        const isBullet =
+          /^\d+\.\d+\s/.test(t) || (t.startsWith("-") && t.charAt(1) === " ");
+        const indent = isBullet ? 14 : 0;
+        const wrapped = wrapText(
+          t,
+          pageWidth - 2 * margin - indent,
+          regular,
+          bodySize,
+        );
+        for (const wl of wrapped) {
+          ensureSpace(lineHeight);
+          page.drawText(sanitizeForPdf(wl), {
+            x: margin + indent,
+            y,
+            size: bodySize,
+            font: regular,
+            color: C.text,
+          });
+          y -= lineHeight;
+        }
+      }
+      y -= 5;
+    }
   };
 
-  const drawParagraph = (text: string) => {
-    const lines = wrapText(text, pageWidth - margin * 2, regular, bodySize);
-    for (const line of lines) {
-      ensureSpace(lineHeight);
-      page.drawText(line, {
+  const drawBanner = (text: string) => {
+    const h = 22;
+    ensureSpace(h + 14);
+    page.drawRectangle({
+      x: margin,
+      y: y - h,
+      width: pageWidth - 2 * margin,
+      height: h,
+      color: C.banner,
+    });
+    page.drawText(sanitizeForPdf(text), {
+      x: margin + 8,
+      y: y - 14,
+      size: 8.5,
+      font: sansBold,
+      color: C.navy,
+    });
+    y -= h + 12;
+  };
+
+  drawBanner("PART I   |   CLIENT AGREEMENT");
+
+  for (const s of CLIENT_AGREEMENT_SECTIONS) {
+    if ("level" in s && s.level === "title") {
+      ensureSpace(30);
+      page.drawText(sanitizeForPdf(s.title), {
         x: margin,
         y,
-        size: bodySize,
-        font: regular,
-        color: rgb(0.2, 0.2, 0.2),
+        size: 14,
+        font: bold,
+        color: C.navy,
       });
-      y -= lineHeight;
+      y -= 18;
+      page.drawLine({
+        start: { x: margin, y: y + 6 },
+        end: { x: pageWidth - margin, y: y + 6 },
+        thickness: 1.2,
+        color: C.gold,
+      });
+      y -= 18;
+    } else if ("level" in s && s.level === "heading") {
+      ensureSpace(22);
+      page.drawText(sanitizeForPdf(s.title), {
+        x: margin,
+        y,
+        size: 11,
+        font: bold,
+        color: C.text,
+      });
+      y -= 16;
+    } else if ("level" in s && s.level === "divider") {
+      ensureSpace(16);
+      page.drawLine({
+        start: { x: margin, y: y - 2 },
+        end: { x: pageWidth - margin, y: y - 2 },
+        thickness: 0.55,
+        color: C.rule,
+      });
+      y -= 18;
+    } else if ("body" in s) {
+      const filled = applyClientAgreementPlaceholders(
+        s.body,
+        clientName,
+        freelancerNames,
+        effectiveDate,
+      );
+      drawFilledBody(filled);
     }
-    y -= 4;
-  };
-
-  // Client Agreement
-  const clientBody = getClientAgreementFilled(
-    client.name || "Client",
-    freelancerNames,
-    effectiveDate
-  );
-  drawHeading("49GIG Client Project Agreement (Digital Contract)");
-  for (const block of clientBody.split(/\n\n+/)) {
-    const t = block.trim();
-    if (t.length > 0) drawParagraph(t);
   }
 
-  ensureSpace(lineHeight * 4);
-  drawHeading("49GIG FREELANCER AGREEMENT");
-  for (const f of freelancers) {
-    const freelancerBody = getFreelancerAgreementFilled(
-      f.name || "Freelancer",
-      effectiveDate
-    );
-    for (const block of freelancerBody.split(/\n\n+/)) {
-      const t = block.trim();
-      if (t.length > 0) drawParagraph(t);
+  drawBanner("PART II   |   FREELANCER AGREEMENT");
+
+  for (let fi = 0; fi < freelancers.length; fi++) {
+    const f = freelancers[fi];
+    const fname = f.name || "Freelancer";
+    if (freelancers.length > 1) {
+      const letter = String.fromCharCode(65 + fi);
+      drawBanner(`EXHIBIT ${letter}   |   ${fname.toUpperCase()}`);
+    }
+    for (const s of FREELANCER_AGREEMENT_SECTIONS) {
+      if ("level" in s && s.level === "title") {
+        ensureSpace(30);
+        page.drawText(sanitizeForPdf(s.title), {
+          x: margin,
+          y,
+          size: 14,
+          font: bold,
+          color: C.navy,
+        });
+        y -= 18;
+        page.drawLine({
+          start: { x: margin, y: y + 6 },
+          end: { x: pageWidth - margin, y: y + 6 },
+          thickness: 1.2,
+          color: C.gold,
+        });
+        y -= 18;
+      } else if ("level" in s && s.level === "heading") {
+        ensureSpace(22);
+        page.drawText(sanitizeForPdf(s.title), {
+          x: margin,
+          y,
+          size: 11,
+          font: bold,
+          color: C.text,
+        });
+        y -= 16;
+      } else if ("body" in s) {
+        const filled = applyFreelancerAgreementPlaceholders(
+          s.body,
+          fname,
+          effectiveDate,
+        );
+        drawFilledBody(filled);
+      }
     }
   }
 
-  // Signatures
-  ensureSpace(lineHeight * 6);
-  drawHeading("Signatures");
-  drawParagraph(
-    `Signed electronically via 49GIG. Names below indicate acceptance of the terms above.`
-  );
+  // ── Signatures
+  ensureSpace(88);
+  page.drawText("ELECTRONIC SIGNATURES", {
+    x: margin,
+    y,
+    size: 12,
+    font: bold,
+    color: C.navy,
+  });
   y -= 8;
+  page.drawLine({
+    start: { x: margin, y: y + 2 },
+    end: { x: pageWidth - margin, y: y + 2 },
+    thickness: 0.9,
+    color: C.gold,
+  });
+  y -= 22;
 
-  ensureSpace(lineHeight * 3);
-  page.drawText("Client:", { x: margin, y, size: bodySize, font: bold, color: rgb(0.1, 0.1, 0.1) });
-  y -= lineHeight;
-  if (clientSignedAt) {
-    page.drawText(sanitizeForPdf(client.name || "Client"), {
+  const sigIntro =
+    "By signing electronically through the 49GIG platform, the parties agree that electronic signatures have the same legal effect as handwritten signatures under applicable law.";
+  for (const line of wrapText(
+    sigIntro,
+    pageWidth - 2 * margin,
+    regular,
+    9,
+  )) {
+    ensureSpace(lineHeight);
+    page.drawText(sanitizeForPdf(line), {
       x: margin,
       y,
-      size: 12,
-      font: signatureFont,
-      color: rgb(0.15, 0.15, 0.4),
+      size: 9,
+      font: regular,
+      color: C.muted,
     });
     y -= lineHeight;
-    page.drawText(new Date(clientSignedAt).toLocaleDateString("en-US", { dateStyle: "long" }), {
+  }
+  y -= 16;
+
+  const drawSignatureBlock = (
+    roleLabel: string,
+    displayName: string,
+    signedAtMs: number | undefined,
+  ) => {
+    ensureSpace(62);
+    page.drawText(sanitizeForPdf(roleLabel.toUpperCase()), {
       x: margin,
       y,
-      size: bodySize,
-      font: regular,
-      color: rgb(0.3, 0.3, 0.3),
+      size: 7,
+      font: sansBold,
+      color: C.muted,
     });
-  } else {
-    page.drawText("(Pending signature)", { x: margin, y, size: bodySize, font: regular, color: rgb(0.5, 0.5, 0.5) });
-  }
-  y -= lineHeight * 2;
+    y -= 14;
+    if (signedAtMs) {
+      page.drawText(sanitizeForPdf(displayName), {
+        x: margin,
+        y,
+        size: 13,
+        font: signatureFont,
+        color: C.navy,
+      });
+      y -= 18;
+      page.drawText(
+        sanitizeForPdf(
+          new Date(signedAtMs).toLocaleDateString("en-US", {
+            dateStyle: "long",
+          }),
+        ),
+        { x: margin, y, size: 9, font: regular, color: C.muted },
+      );
+      y -= 14;
+    } else {
+      page.drawText("(Pending electronic signature)", {
+        x: margin,
+        y,
+        size: 10,
+        font: regular,
+        color: rgb(0.55, 0.55, 0.55),
+      });
+      y -= 16;
+    }
+    page.drawLine({
+      start: { x: margin, y: y - 2 },
+      end: { x: Math.min(margin + 280, pageWidth - margin), y: y - 2 },
+      thickness: 0.55,
+      color: C.text,
+    });
+    y -= 28;
+  };
+
+  drawSignatureBlock("Client", clientName, clientSignedAt);
 
   for (const f of freelancers) {
-    ensureSpace(lineHeight * 3);
     const sig = freelancerSignatures?.find((s) => s.freelancerId === f._id);
-    page.drawText(sanitizeForPdf(`Freelancer: ${f.name || "Freelancer"}`), {
-      x: margin,
-      y,
-      size: bodySize,
-      font: bold,
-      color: rgb(0.1, 0.1, 0.1),
+    drawSignatureBlock(
+      `Freelancer — ${f.name || "Freelancer"}`,
+      f.name || "Freelancer",
+      sig?.signedAt,
+    );
+  }
+
+  // ── Footers on every page
+  const pages = pdfDoc.getPages();
+  const total = pages.length;
+  for (let i = 0; i < total; i++) {
+    const p = pages[i];
+    const pw = p.getWidth();
+    p.drawLine({
+      start: { x: margin, y: 50 },
+      end: { x: pw - margin, y: 50 },
+      thickness: 0.45,
+      color: C.rule,
     });
-    y -= lineHeight;
-    if (sig) {
-      page.drawText(sanitizeForPdf(f.name || "Freelancer"), {
-        x: margin,
-        y,
-        size: 12,
-        font: signatureFont,
-        color: rgb(0.15, 0.15, 0.4),
-      });
-      y -= lineHeight;
-      page.drawText(new Date(sig.signedAt).toLocaleDateString("en-US", { dateStyle: "long" }), {
-        x: margin,
-        y,
-        size: bodySize,
-        font: regular,
-        color: rgb(0.3, 0.3, 0.3),
-      });
-    } else {
-      page.drawText("(Pending signature)", { x: margin, y, size: bodySize, font: regular, color: rgb(0.5, 0.5, 0.5) });
-    }
-    y -= lineHeight * 2;
+    p.drawText(
+      sanitizeForPdf(
+        `49GIG   |   Engagement Agreement   |   Page ${i + 1} of ${total}`,
+      ),
+      { x: margin, y: 34, size: 8, font: regular, color: C.muted },
+    );
   }
 
   return pdfDoc.save();
@@ -570,7 +838,16 @@ export const generateAndSendContract = action({
  * and an admin copy for record-keeping with all parties listed.
  */
 export const regenerateContractPdfAndSend = internalAction({
-  args: { projectId: v.id("projects") },
+  args: {
+    projectId: v.id("projects"),
+    /**
+     * When false, updates the stored PDF only (no client/freelancer/admin emails).
+     * Used after each signature until the contract is fully signed — avoids duplicate
+     * “contract ready” emails on every party signing. Post-funding kickoff omits this
+     * (defaults to true) so parties get the initial PDF link once.
+     */
+    sendEmails: v.optional(v.boolean()),
+  },
   handler: async (ctx, args) => {
     const apiModule = require("../_generated/api");
     const parties = await ctx.runQuery(
@@ -605,90 +882,97 @@ export const regenerateContractPdfAndSend = internalAction({
       { projectId: args.projectId, contractFileId: clientStorageId }
     );
 
+    const sendEmails = args.sendEmails !== false;
+
     const appUrl = getAppUrl();
     const logoUrl = getLogoUrl(appUrl);
     const date = formatDate();
     const baseFilename = `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}`;
 
-    const clientAttachment = {
-      filename: `${baseFilename}-Client-${(client.name || "Client").replace(/\s+/g, "-")}.pdf`,
-      content: Buffer.from(clientPdfBytes).toString("base64"),
-      contentType: "application/pdf",
-    };
-
-    await sendEmail({
-      to: client.email,
-      subject: `Contract ready / signed – ${project.intakeForm.title}`,
-      react: React.createElement(ContractReadyEmail, {
-        name: client.name || "there",
-        projectName: project.intakeForm.title,
-        contractUrl: (await ctx.storage.getUrl(clientStorageId)) || `${appUrl}/dashboard/projects/${args.projectId}`,
-        appUrl,
-        logoUrl,
-        date,
-      }),
-      attachments: [clientAttachment],
-    });
-
-    for (const f of freelancers as Doc<"users">[]) {
-      const freelancerPdfBytes = await generateFullContractPdf({
-        ...basePdfParams,
-        copyFor: { name: f.name || "Freelancer", role: "Freelancer" },
-      });
-      const freelancerAttachment = {
-        filename: `${baseFilename}-Freelancer-${(f.name || "Freelancer").replace(/\s+/g, "-")}.pdf`,
-        content: Buffer.from(freelancerPdfBytes).toString("base64"),
+    if (sendEmails) {
+      const clientAttachment = {
+        filename: `${baseFilename}-Client-${(client.name || "Client").replace(/\s+/g, "-")}.pdf`,
+        content: Buffer.from(clientPdfBytes).toString("base64"),
         contentType: "application/pdf",
       };
+
       await sendEmail({
-        to: f.email,
+        to: client.email,
         subject: `Contract ready / signed – ${project.intakeForm.title}`,
         react: React.createElement(ContractReadyEmail, {
-          name: f.name || "there",
+          name: client.name || "there",
           projectName: project.intakeForm.title,
           contractUrl: (await ctx.storage.getUrl(clientStorageId)) || `${appUrl}/dashboard/projects/${args.projectId}`,
           appUrl,
           logoUrl,
           date,
         }),
-        attachments: [freelancerAttachment],
+        attachments: [clientAttachment],
       });
+
+      for (const f of freelancers as Doc<"users">[]) {
+        const freelancerPdfBytes = await generateFullContractPdf({
+          ...basePdfParams,
+          copyFor: { name: f.name || "Freelancer", role: "Freelancer" },
+        });
+        const freelancerAttachment = {
+          filename: `${baseFilename}-Freelancer-${(f.name || "Freelancer").replace(/\s+/g, "-")}.pdf`,
+          content: Buffer.from(freelancerPdfBytes).toString("base64"),
+          contentType: "application/pdf",
+        };
+        await sendEmail({
+          to: f.email,
+          subject: `Contract ready / signed – ${project.intakeForm.title}`,
+          react: React.createElement(ContractReadyEmail, {
+            name: f.name || "there",
+            projectName: project.intakeForm.title,
+            contractUrl: (await ctx.storage.getUrl(clientStorageId)) || `${appUrl}/dashboard/projects/${args.projectId}`,
+            appUrl,
+            logoUrl,
+            date,
+          }),
+          attachments: [freelancerAttachment],
+        });
+      }
+
+      const admins = await ctx.runQuery(
+        apiModule.internal.users.queries.getModeratorsAndAdminsInternal,
+        {}
+      );
+      if (admins && admins.length > 0) {
+        const adminPdfBytes = await generateFullContractPdf({
+          ...basePdfParams,
+          copyFor: { name: "49GIG Admin", role: "Record (all parties listed in email)" },
+        });
+        const adminAttachment = {
+          filename: `${baseFilename}-Admin-Record.pdf`,
+          content: Buffer.from(adminPdfBytes).toString("base64"),
+          contentType: "application/pdf",
+        };
+        const partiesList = [
+          `Client: ${client.name || "Client"} (${client.email})`,
+          ...freelancers.map((f: Doc<"users">) => `Freelancer: ${f.name || "Freelancer"} (${f.email})`),
+        ].join("\n");
+        await sendEmail({
+          to: admins.map((a: { email: string }) => a.email),
+          subject: `[49GIG] Contract signed – ${project.intakeForm.title}`,
+          react: React.createElement(
+            "div",
+            { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
+            React.createElement("h2", { style: { marginBottom: "16px" } }, "Contract Signed – Admin Record"),
+            React.createElement("p", null, `Project: ${project.intakeForm.title}`),
+            React.createElement("p", { style: { marginTop: "12px", fontWeight: 600 } }, "Parties:"),
+            React.createElement("pre", { style: { whiteSpace: "pre-wrap", fontSize: "13px", margin: "8px 0" } }, partiesList),
+            React.createElement("p", { style: { marginTop: "16px", fontSize: "13px", color: "#6b7280" } }, "A signed copy is attached for your records.")
+          ),
+          attachments: [adminAttachment],
+        });
+      }
     }
 
-    const admins = await ctx.runQuery(
-      apiModule.internal.users.queries.getModeratorsAndAdminsInternal,
-      {}
-    );
-    if (admins && admins.length > 0) {
-      const adminPdfBytes = await generateFullContractPdf({
-        ...basePdfParams,
-        copyFor: { name: "49GIG Admin", role: "Record (all parties listed in email)" },
-      });
-      const adminAttachment = {
-        filename: `${baseFilename}-Admin-Record.pdf`,
-        content: Buffer.from(adminPdfBytes).toString("base64"),
-        contentType: "application/pdf",
-      };
-      const partiesList = [
-        `Client: ${client.name || "Client"} (${client.email})`,
-        ...freelancers.map((f: Doc<"users">) => `Freelancer: ${f.name || "Freelancer"} (${f.email})`),
-      ].join("\n");
-      await sendEmail({
-        to: admins.map((a: { email: string }) => a.email),
-        subject: `[49GIG] Contract signed – ${project.intakeForm.title}`,
-        react: React.createElement(
-          "div",
-          { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-          React.createElement("h2", { style: { marginBottom: "16px" } }, "Contract Signed – Admin Record"),
-          React.createElement("p", null, `Project: ${project.intakeForm.title}`),
-          React.createElement("p", { style: { marginTop: "12px", fontWeight: 600 } }, "Parties:"),
-          React.createElement("pre", { style: { whiteSpace: "pre-wrap", fontSize: "13px", margin: "8px 0" } }, partiesList),
-          React.createElement("p", { style: { marginTop: "16px", fontSize: "13px", color: "#6b7280" } }, "A signed copy is attached for your records.")
-        ),
-        attachments: [adminAttachment],
-      });
-    }
-
-    return { status: "sent", contractFileId: clientStorageId };
+    return {
+      status: sendEmails ? "sent" : "stored",
+      contractFileId: clientStorageId,
+    };
   },
 });

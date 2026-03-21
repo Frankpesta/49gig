@@ -3,6 +3,8 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
+import { resolveTargetTeamSize } from "../../lib/budget-calculator";
+import { getRoleLabelsFromProject } from "../../lib/platform-skills";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -1095,7 +1097,8 @@ export const autoCreateMilestonesInternal = internalMutation({
 /**
  * Internal: accept client's pre-funding selection and set matched freelancer(s).
  * Called after payment success so the selected freelancer(s) become assigned.
- * Sets project status to "matched", then schedules milestone creation and contract generation.
+ * Sets project status to "matched" (or "matching" when a team hire still needs more members),
+ * then schedules milestone creation and contract generation when fully matched.
  */
 export const acceptSelectedMatchInternal = internalMutation({
   args: {
@@ -1114,6 +1117,8 @@ export const acceptSelectedMatchInternal = internalMutation({
       .query("matches")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
+
+    let shouldKickOffMatchedFlow = false;
 
     if (selectedId) {
       const match = allMatches.find(
@@ -1134,6 +1139,9 @@ export const acceptSelectedMatchInternal = internalMutation({
         status: "matched",
         matchedAt: now,
         updatedAt: now,
+        awaitingMatch: undefined,
+        awaitingMatchSince: undefined,
+        rolesAwaitingMatch: undefined,
       });
       const otherPending = allMatches.filter(
         (m) => m.status === "pending" && m.freelancerId !== selectedId
@@ -1141,7 +1149,11 @@ export const acceptSelectedMatchInternal = internalMutation({
       for (const m of otherPending) {
         await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
       }
+      shouldKickOffMatchedFlow = true;
     } else if (selectedIds && selectedIds.length > 0) {
+      const intake = project.intakeForm;
+      const isTeam = intake.hireType === "team";
+
       const toAccept = allMatches.filter(
         (m) => selectedIds.includes(m.freelancerId) && m.status === "pending"
       );
@@ -1154,38 +1166,264 @@ export const acceptSelectedMatchInternal = internalMutation({
         });
         acceptedMatchIds.push(m._id);
       }
-      await ctx.db.patch(args.projectId, {
-        matchedFreelancerIds: selectedIds,
-        status: "matched",
-        matchedAt: now,
-        updatedAt: now,
-      });
-      const otherPending = allMatches.filter(
-        (m) => m.status === "pending" && !selectedIds.includes(m.freelancerId)
-      );
-      for (const m of otherPending) {
-        await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+
+      if (!isTeam) {
+        await ctx.db.patch(args.projectId, {
+          matchedFreelancerIds: selectedIds,
+          status: "matched",
+          matchedAt: now,
+          updatedAt: now,
+          awaitingMatch: undefined,
+          awaitingMatchSince: undefined,
+          rolesAwaitingMatch: undefined,
+        });
+        const otherPending = allMatches.filter(
+          (m) => m.status === "pending" && !selectedIds.includes(m.freelancerId)
+        );
+        for (const m of otherPending) {
+          await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+        }
+        shouldKickOffMatchedFlow = true;
+      } else {
+        const targetHeadcount = resolveTargetTeamSize(
+          intake.teamMemberCount,
+          intake.teamSize
+        );
+        const partialTeam = selectedIds.length < targetHeadcount;
+
+        const acceptedTeamRoles = new Set(
+          toAccept.map((m) => m.teamRole).filter((r): r is string => !!r)
+        );
+
+        const shouldRejectPending = (m: Doc<"matches">) => {
+          if (m.status !== "pending" || selectedIds.includes(m.freelancerId)) {
+            return false;
+          }
+          if (!partialTeam) return true;
+          if (!m.teamRole) return false;
+          return acceptedTeamRoles.has(m.teamRole);
+        };
+
+        for (const m of allMatches.filter(shouldRejectPending)) {
+          await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+        }
+
+        const allRoleLabels = getRoleLabelsFromProject(intake);
+        const selectedRolesLower = new Set(
+          toAccept.map((m) => (m.teamRole || "").toLowerCase()).filter(Boolean)
+        );
+        const rolesWaiting =
+          allRoleLabels.length > 0
+            ? allRoleLabels.filter((l) => !selectedRolesLower.has(l.toLowerCase()))
+            : [];
+
+        const patch: Record<string, unknown> = {
+          matchedFreelancerIds: selectedIds,
+          matchedAt: project.matchedAt ?? now,
+          updatedAt: now,
+        };
+
+        if (partialTeam) {
+          patch.status = "matching";
+          patch.pendingTeamMemberSlots = targetHeadcount - selectedIds.length;
+          patch.awaitingMatch = true;
+          patch.awaitingMatchSince = project.awaitingMatchSince ?? now;
+          patch.rolesAwaitingMatch =
+            rolesWaiting.length > 0 ? rolesWaiting : project.rolesAwaitingMatch;
+        } else {
+          patch.status = "matched";
+          patch.pendingTeamMemberSlots = undefined;
+          patch.awaitingMatch = undefined;
+          patch.awaitingMatchSince = undefined;
+          patch.rolesAwaitingMatch = undefined;
+          shouldKickOffMatchedFlow = true;
+        }
+
+        await ctx.db.patch(args.projectId, patch as any);
       }
     }
 
-    await ctx.scheduler.runAfter(0, internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal, {
-      projectId: args.projectId,
-    });
+    if (shouldKickOffMatchedFlow) {
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
+        {
+          projectId: args.projectId,
+        }
+      );
 
-    // Process upfront release for existing cycles (when cycles were created at contract signing before payment)
-    await ctx.scheduler.runAfter(500, internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal, {
-      projectId: args.projectId,
-    });
+      await ctx.scheduler.runAfter(
+        500,
+        internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
+        {
+          projectId: args.projectId,
+        }
+      );
 
-    // Generate contract PDF (with pending signatures); email sent when each party signs
-    await ctx.scheduler.runAfter(0, internalAny.contracts.actions.regenerateContractPdfAndSend, {
-      projectId: args.projectId,
-    });
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.contracts.actions.regenerateContractPdfAndSend,
+        {
+          projectId: args.projectId,
+        }
+      );
 
-    // Send match success emails to client and freelancer(s)
-    await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendMatchSuccessEmails, {
-      projectId: args.projectId,
-    });
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.projects.actions.sendMatchSuccessEmails,
+        {
+          projectId: args.projectId,
+        }
+      );
+    }
+  },
+});
+
+/**
+ * Client confirms additional freelancer(s) after paying with a partial team selection.
+ */
+export const confirmRemainingTeamSelections = mutation({
+  args: {
+    projectId: v.id("projects"),
+    freelancerIds: v.array(v.id("users")),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.clientId !== user._id && user.role !== "admin") {
+      throw new Error("Not authorized to update this hire");
+    }
+    if (project.intakeForm.hireType !== "team") {
+      throw new Error("Only team hires use this action");
+    }
+    if (project.status !== "matching") {
+      throw new Error("This hire is not waiting for additional team members");
+    }
+
+    const slots = project.pendingTeamMemberSlots ?? 0;
+    if (slots <= 0) {
+      throw new Error("No remaining team slots to fill");
+    }
+    if (args.freelancerIds.length === 0) {
+      throw new Error("Select at least one freelancer");
+    }
+    if (args.freelancerIds.length > slots) {
+      throw new Error(`You can add at most ${slots} more team member(s)`);
+    }
+
+    const merged = [...(project.matchedFreelancerIds ?? [])];
+    for (const id of args.freelancerIds) {
+      if (merged.includes(id)) {
+        throw new Error("This freelancer is already on the team");
+      }
+    }
+
+    const now = Date.now();
+    const allMatches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    const toAccept = allMatches.filter(
+      (m) => args.freelancerIds.includes(m.freelancerId) && m.status === "pending"
+    );
+    if (toAccept.length !== args.freelancerIds.length) {
+      throw new Error("Each selection must match a pending opportunity for this hire");
+    }
+
+    for (const m of toAccept) {
+      await ctx.db.patch(m._id, {
+        status: "accepted",
+        clientAction: "accepted",
+        clientActionAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const newAcceptedRoles = new Set(
+      toAccept.map((m) => m.teamRole).filter((r): r is string => !!r)
+    );
+    for (const m of allMatches) {
+      if (m.status !== "pending") continue;
+      if (args.freelancerIds.includes(m.freelancerId)) continue;
+      if (merged.includes(m.freelancerId)) continue;
+      if (!m.teamRole || !newAcceptedRoles.has(m.teamRole)) continue;
+      await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+    }
+
+    for (const id of args.freelancerIds) {
+      merged.push(id);
+    }
+
+    const targetHeadcount = resolveTargetTeamSize(
+      project.intakeForm.teamMemberCount,
+      project.intakeForm.teamSize
+    );
+    const remaining = targetHeadcount - merged.length;
+
+    if (remaining <= 0) {
+      await ctx.db.patch(args.projectId, {
+        matchedFreelancerIds: merged,
+        status: "matched",
+        pendingTeamMemberSlots: undefined,
+        awaitingMatch: undefined,
+        awaitingMatchSince: undefined,
+        rolesAwaitingMatch: undefined,
+        updatedAt: now,
+      });
+
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
+        { projectId: args.projectId }
+      );
+      await ctx.scheduler.runAfter(
+        500,
+        internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
+        { projectId: args.projectId }
+      );
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.contracts.actions.regenerateContractPdfAndSend,
+        { projectId: args.projectId }
+      );
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.projects.actions.sendMatchSuccessEmails,
+        { projectId: args.projectId }
+      );
+    } else {
+      const intake = project.intakeForm;
+      const allRoleLabels = getRoleLabelsFromProject(intake);
+      const acceptedRoleLower = new Set<string>();
+      for (const m of allMatches) {
+        if (m.status === "accepted" && merged.includes(m.freelancerId) && m.teamRole) {
+          acceptedRoleLower.add(m.teamRole.toLowerCase());
+        }
+      }
+      for (const m of toAccept) {
+        if (m.teamRole) acceptedRoleLower.add(m.teamRole.toLowerCase());
+      }
+      const rolesWaiting =
+        allRoleLabels.length > 0
+          ? allRoleLabels.filter((l) => !acceptedRoleLower.has(l.toLowerCase()))
+          : [];
+
+      await ctx.db.patch(args.projectId, {
+        matchedFreelancerIds: merged,
+        pendingTeamMemberSlots: remaining,
+        awaitingMatch: true,
+        rolesAwaitingMatch:
+          rolesWaiting.length > 0 ? rolesWaiting : project.rolesAwaitingMatch,
+        updatedAt: now,
+      });
+    }
+
+    return args.projectId;
   },
 });
 

@@ -78,6 +78,23 @@ export const SOFTWARE_DEV_FIELDS = [
 
 export type SoftwareDevFieldId = (typeof SOFTWARE_DEV_FIELDS)[number]["id"];
 
+/**
+ * Human-readable label for team-composition role keys (e.g. backend_dev, mobile_dev)
+ * used in post-funding team matching. Keeps copy aligned with draft matching labels where possible.
+ */
+export function humanizeTeamRoleKey(roleKey: string): string {
+  if (!roleKey) return roleKey;
+  const fromSoftware = SOFTWARE_DEV_FIELDS.find((f) => f.id === roleKey);
+  if (fromSoftware) return fromSoftware.label;
+  const fromPlatform = PLATFORM_ROLES.find((r) => r.id === roleKey);
+  if (fromPlatform) return fromPlatform.label;
+  return roleKey
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 /** Skills shown per software dev sub-field */
 export const SKILLS_BY_SOFTWARE_DEV_FIELD: Record<SoftwareDevFieldId, readonly string[]> = {
   backend_dev:   ["Node.js", "Python", "Java", "Go", "PHP", "Ruby", "C#", "Rust", "TypeScript", "SQL", "REST APIs", "GraphQL"],

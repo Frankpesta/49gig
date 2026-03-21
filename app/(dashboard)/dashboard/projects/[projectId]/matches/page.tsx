@@ -328,6 +328,11 @@ function MatchCard({
           {isVetted && (
             <Badge variant="secondary" className="text-xs">Fully vetted by 49GIG</Badge>
           )}
+          {f?.profile?.availability === "busy" && (
+            <Badge variant="outline" className="text-xs font-normal">
+              On another hire — still matchable
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-3 px-4 pb-4 sm:px-6 sm:pb-6">
@@ -398,6 +403,9 @@ export default function ProjectMatchesPage() {
   const setSelectedFreelancers = useMutation(
     (api as any)["projects/mutations"].setSelectedFreelancers
   );
+  const confirmRemainingTeamSelections = useMutation(
+    (api as any)["projects/mutations"].confirmRemainingTeamSelections
+  );
   const scheduleOneOnOneSession = useAction(
     (api as any)["scheduledCalls/actions"].scheduleOneOnOneSession
   );
@@ -452,6 +460,11 @@ export default function ProjectMatchesPage() {
     setMatchingAvailability(null);
   }, [projectId]);
 
+  const isFundedMatchingContinuation =
+    project?.status === "matching" &&
+    user?.role === "client" &&
+    (project.pendingTeamMemberSlots ?? 0) > 0;
+
   // Run matching once when project is draft and no matches; do not retry on failure
   useEffect(() => {
     if (
@@ -494,14 +507,27 @@ export default function ProjectMatchesPage() {
     []
   );
 
-  const handleSelectTeam = useCallback((freelancerId: Id<"users">) => {
-    setSelectedTeamIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(freelancerId)) next.delete(freelancerId);
-      else next.add(freelancerId);
-      return next;
-    });
-  }, []);
+  const handleSelectTeam = useCallback(
+    (freelancerId: Id<"users">) => {
+      setSelectedTeamIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(freelancerId)) {
+          next.delete(freelancerId);
+          return next;
+        }
+        const cap = isFundedMatchingContinuation
+          ? (project?.pendingTeamMemberSlots ?? 0)
+          : null;
+        if (cap != null && cap > 0 && next.size >= cap) {
+          toast.error(`You can select at most ${cap} more team member(s) for this step.`);
+          return prev;
+        }
+        next.add(freelancerId);
+        return next;
+      });
+    },
+    [isFundedMatchingContinuation, project?.pendingTeamMemberSlots]
+  );
 
   const handleConfirmTeamSelection = useCallback(() => {
     if (selectedTeamIds.size === 0) {
@@ -515,6 +541,24 @@ export default function ProjectMatchesPage() {
     if (!projectId || !user?._id) return;
     setDialogOpen(false);
     try {
+      if (project?.status === "matching" && isTeam) {
+        if (selectedTeamIds.size === 0) {
+          toast.error("Select at least one freelancer.");
+          return;
+        }
+        await confirmRemainingTeamSelections({
+          projectId,
+          freelancerIds: Array.from(selectedTeamIds),
+          userId: user._id,
+        });
+        trackEvent("accept_match", {
+          project_id: projectId,
+          freelancer_count: selectedTeamIds.size,
+        });
+        toast.success("Team updated.");
+        router.push(`/dashboard/projects/${projectId}`);
+        return;
+      }
       if (isTeam) {
         await setSelectedFreelancers({
           projectId,
@@ -539,8 +583,10 @@ export default function ProjectMatchesPage() {
     isTeam,
     selectedSingleId,
     selectedTeamIds,
+    project?.status,
     setSelectedFreelancer,
     setSelectedFreelancers,
+    confirmRemainingTeamSelections,
     router,
     trackEvent,
   ]);
@@ -584,6 +630,17 @@ export default function ProjectMatchesPage() {
       trackEvent("schedule_session", { project_id: projectId, freelancer_count: freelancerIds.length });
       setScheduleDialogOpen(false);
       toast.success("Session scheduled. Check your email for the Meet link.");
+      if (project?.status === "matching" && isTeam) {
+        await confirmRemainingTeamSelections({
+          projectId,
+          freelancerIds,
+          userId: user._id,
+        });
+        trackEvent("accept_match", { project_id: projectId, freelancer_count: freelancerIds.length });
+        toast.success("Team updated.");
+        router.push(`/dashboard/projects/${projectId}`);
+        return;
+      }
       if (isTeam) {
         await setSelectedFreelancers({
           projectId,
@@ -613,9 +670,11 @@ export default function ProjectMatchesPage() {
     selectedSingleId,
     selectedTeamIds,
     project?.intakeForm?.title,
+    project?.status,
     scheduleOneOnOneSession,
     setSelectedFreelancer,
     setSelectedFreelancers,
+    confirmRemainingTeamSelections,
     router,
     trackEvent,
   ]);
@@ -655,7 +714,8 @@ export default function ProjectMatchesPage() {
 
   if (
     project.status !== "draft" &&
-    project.status !== "pending_funding"
+    project.status !== "pending_funding" &&
+    !isFundedMatchingContinuation
   ) {
     return (
       <div className="space-y-6">
@@ -678,14 +738,42 @@ export default function ProjectMatchesPage() {
           </Button>
         </Link>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold sm:text-2xl">Matched freelancers</h1>
+          <h1 className="text-xl font-bold sm:text-2xl">
+            {isFundedMatchingContinuation ? "Complete your team" : "Matched freelancers"}
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isTeam
-              ? "Select one or more freelancers per role, then proceed."
-              : "We've matched you with top talent. Select one to continue."}
+            {isFundedMatchingContinuation
+              ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s) from the suggestions below.`
+              : isTeam
+                ? "Select one or more freelancers per role, then proceed."
+                : "We've matched you with top talent. Select one to continue."}
           </p>
         </div>
       </div>
+
+      {(isTeam ||
+        isFundedMatchingContinuation ||
+        !!matchingAvailability ||
+        (!isTeam && !matchingRunning && pendingMatches.length === 0)) && (
+        <Card className="rounded-xl border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-4 px-4 sm:px-6 text-sm text-foreground/90 space-y-2">
+            <p className="font-medium text-foreground">Matching timeline &amp; availability</p>
+            <p className="text-muted-foreground leading-relaxed">
+              If any role has limited availability right now (including team hires where you paid after selecting
+              whoever was available), we will keep matching the remaining role(s) within the next{" "}
+              <strong>48 hours</strong> and email you when there are people to review.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              If we still cannot staff the remaining role(s) after 48 hours, you will receive a{" "}
+              <strong>full refund</strong> for this hire.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Freelancers who are already on another active hire may still appear in your shortlist — they are
+              ranked highly and can be matched if you choose them.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {matchingRunning && (
         <Card className="rounded-xl border-primary/30 bg-primary/5">

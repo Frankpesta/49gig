@@ -7,7 +7,8 @@ import { sendEmail } from "../email/send";
 import {
   VerificationCodeEmail,
   PasswordResetEmail,
-  WelcomeEmail,
+  WelcomeClientEmail,
+  WelcomeFreelancerEmail,
   TwoFactorCodeEmail,
 } from "../../emails/templates";
 
@@ -121,18 +122,33 @@ export const sendWelcomeEmail = action({
     const appUrl = getAppUrl();
     const logoUrl = getLogoUrl(appUrl);
     const date = formatDate();
+    const name = args.name || "there";
 
-    await sendEmail({
-      to: args.email,
-      subject: "Welcome to 49GIG",
-      react: React.createElement(WelcomeEmail, {
-        name: args.name || "there",
-        role: args.role,
-        appUrl,
-        logoUrl,
-        date,
-      }),
-    });
+    if (args.role === "client") {
+      await sendEmail({
+        to: args.email,
+        subject: "Welcome to 49GIG — your next hire starts here",
+        react: React.createElement(WelcomeClientEmail, {
+          name,
+          appUrl,
+          logoUrl,
+          date,
+          dashboardUrl: `${appUrl}/dashboard`,
+        }),
+      });
+    } else {
+      await sendEmail({
+        to: args.email,
+        subject: "Welcome to 49GIG — complete your freelancer profile",
+        react: React.createElement(WelcomeFreelancerEmail, {
+          name,
+          appUrl,
+          logoUrl,
+          date,
+          profileUrl: `${appUrl}/profile/setup`,
+        }),
+      });
+    }
 
     return { success: true };
   },

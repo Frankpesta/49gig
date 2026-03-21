@@ -282,24 +282,12 @@ export const verifyPayment = action({
       throw new Error("Payment record not found");
     }
 
-    // Update payment status
+    // Update payment status (pre-funding pipeline schedules match generation + acceptance)
     await ctx.runMutation(internalAny.payments.mutations.handlePaymentSuccess, {
       transactionId: args.txRef,
       eventId: verification.data.id.toString(),
       data: verification.data,
-              });
-
-              // Trigger matching if this is a pre-funding payment
-    if (payment.type === "pre_funding") {
-      try {
-        await ctx.runAction(apiAny.matching.actions.generateMatches, {
-          projectId: payment.projectId,
-          limit: 5,
-        });
-      } catch (error) {
-        console.error("Failed to trigger matching:", error);
-      }
-    }
+    });
 
     return { success: true, status: verification.data.status };
   },
@@ -357,18 +345,6 @@ export const handleFlutterwaveWebhook = action({
                 eventId: args.data.id?.toString() || txRef,
                 data: args.data,
               });
-
-              // Trigger matching if this is a pre-funding payment
-    if (payment.type === "pre_funding") {
-      try {
-        await ctx.runAction(apiAny.matching.actions.generateMatches, {
-          projectId: payment.projectId,
-          limit: 5,
-        });
-                } catch (error) {
-                  console.error("Failed to trigger matching:", error);
-                }
-              }
             } else {
               await ctx.runMutation(internalAny.payments.mutations.handlePaymentFailure, {
                 transactionId: txRef,

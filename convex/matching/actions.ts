@@ -8,7 +8,18 @@ import {
   getRoleIdForSkill,
   getRoleIdFromCategoryLabel,
   freelancerMatchesRole,
+  humanizeTeamRoleKey,
 } from "../../lib/platform-skills";
+
+function projectAllowsPostFundMatchGeneration(project: Doc<"projects">): boolean {
+  if (project.status === "funded") return true;
+  if (project.status !== "matching") return false;
+  return (
+    project.awaitingMatch === true ||
+    (project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0) ||
+    (project.rolesAwaitingMatch != null && project.rolesAwaitingMatch.length > 0)
+  );
+}
 
 /**
  * Matching Engine - Deterministic, Explainable Algorithm
@@ -303,27 +314,20 @@ export const generateMatches = action({
       throw new Error("Project not found");
     }
 
-    // Only match funded projects
-    if (project.status !== "funded") {
-      throw new Error("Project must be funded before matching");
+    if (!projectAllowsPostFundMatchGeneration(project)) {
+      throw new Error("Project is not in a state that allows match generation");
     }
 
-    // Get all verified freelancers directly from database
+    // Get all verified freelancers directly from database (includes busy / on other hires — scored lower)
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
-    const activeProjectFreelancerIds = await ctx.runQuery(
-      internal.projects.queries.getFreelancerIdsWithActiveProjects,
-      {}
-    );
-    const activeSet = new Set(activeProjectFreelancerIds || []);
 
-    // Filter to verified freelancers (vetting + KYC approved) and exclude those with an active project
+    // Filter to verified freelancers (vetting + KYC approved)
     const verifiedFreelancers = (allUsers || []).filter(
       (u: any) =>
         u.role === "freelancer" &&
         u.status === "active" &&
         u.verificationStatus === "approved" &&
-        u.kycStatus === "approved" &&
-        !activeSet.has(u._id)
+        u.kycStatus === "approved"
     );
     
     // Get vetting results for each freelancer
@@ -423,6 +427,7 @@ export const generateMatches = action({
       await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
         projectId: args.projectId,
         awaiting: false,
+        clearRolesAwaitingMatch: true,
       });
     } else {
       // Freelancers exist but none scored well enough — still queue for retry
@@ -454,8 +459,8 @@ export const generateTeamMatches = action({
       throw new Error("Project not found");
     }
 
-    if (project.status !== "funded") {
-      throw new Error("Project must be funded before matching");
+    if (!projectAllowsPostFundMatchGeneration(project)) {
+      throw new Error("Project is not in a state that allows match generation");
     }
 
     // Check if project requires a team
@@ -480,21 +485,14 @@ export const generateTeamMatches = action({
       experienceLevel: intakeForm.experienceLevel as any,
     });
 
-    // Get all verified freelancers, excluding those with an active project
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
-    const activeProjectFreelancerIdsTeam = await ctx.runQuery(
-      internal.projects.queries.getFreelancerIdsWithActiveProjects,
-      {}
-    );
-    const activeSetTeam = new Set(activeProjectFreelancerIdsTeam || []);
 
     const verifiedFreelancers = (allUsers || []).filter(
       (u: any) =>
         u.role === "freelancer" &&
         u.status === "active" &&
         u.verificationStatus === "approved" &&
-        u.kycStatus === "approved" &&
-        !activeSetTeam.has(u._id)
+        u.kycStatus === "approved"
     );
 
     if (verifiedFreelancers.length === 0) {
@@ -502,7 +500,30 @@ export const generateTeamMatches = action({
         projectId: args.projectId,
         awaiting: true,
       });
-      return [];
+      return {
+        teamSize: 0,
+        composition: teamComposition,
+        matchIds: [] as string[],
+      };
+    }
+
+    const existingProjectMatches = await ctx.runQuery(
+      internal.matching.queries.listProjectMatchesInternal,
+      { projectId: args.projectId }
+    );
+
+    const acceptedCountByCompKey: Record<string, number> = {};
+    for (const key of Object.keys(teamComposition)) {
+      acceptedCountByCompKey[key] = 0;
+    }
+    for (const m of existingProjectMatches) {
+      if (m.status !== "accepted" || !m.teamRole) continue;
+      for (const key of Object.keys(teamComposition)) {
+        if (humanizeTeamRoleKey(key) === m.teamRole) {
+          acceptedCountByCompKey[key] = (acceptedCountByCompKey[key] ?? 0) + 1;
+          break;
+        }
+      }
     }
 
     // Get vetting results
@@ -525,6 +546,10 @@ export const generateTeamMatches = action({
     }> = [];
 
     for (const [role, count] of Object.entries(teamComposition)) {
+      const alreadyAccepted = acceptedCountByCompKey[role] ?? 0;
+      const effectiveNeed = Math.max(0, count - alreadyAccepted);
+      if (effectiveNeed === 0) continue;
+
       const roleMatches: Array<{
         freelancer: Doc<"users">;
         score: number;
@@ -566,7 +591,7 @@ export const generateTeamMatches = action({
 
       // Sort by score and take top N for this role
       roleMatches.sort((a, b) => b.score - a.score);
-      const topMatches = roleMatches.slice(0, count);
+      const topMatches = roleMatches.slice(0, effectiveNeed);
 
       for (const match of topMatches) {
         teamMatches.push({
@@ -578,13 +603,23 @@ export const generateTeamMatches = action({
       }
     }
 
+    const missingRoleLabels: string[] = [];
+    for (const [roleKey, need] of Object.entries(teamComposition)) {
+      const alreadyAccepted = acceptedCountByCompKey[roleKey] ?? 0;
+      const created = teamMatches.filter((t) => t.role === roleKey).length;
+      if (alreadyAccepted + created < need) {
+        missingRoleLabels.push(humanizeTeamRoleKey(roleKey));
+      }
+    }
+
     // Create match records for each team member
     const matchIds: string[] = [];
     const now = Date.now();
     const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
 
     for (const teamMatch of teamMatches) {
-      const explanation = `${teamMatch.freelancer.name} is matched for the ${teamMatch.role} role. ${teamMatch.matchReasons.join(". ")}.`;
+      const roleLabel = humanizeTeamRoleKey(teamMatch.role);
+      const explanation = `${teamMatch.freelancer.name} is matched for the ${roleLabel} role. ${teamMatch.matchReasons.join(". ")}.`;
 
       const confidence = teamMatch.score >= 80 ? "high" : teamMatch.score >= 60 ? "medium" : "low";
 
@@ -605,8 +640,7 @@ export const generateTeamMatches = action({
           },
           explanation,
           expiresAt,
-          // Add team-specific metadata
-          teamRole: teamMatch.role,
+          teamRole: roleLabel,
         }
       );
 
@@ -614,14 +648,21 @@ export const generateTeamMatches = action({
     }
 
     if (matchIds.length > 0) {
+      const slotsRemaining = project.pendingTeamMemberSlots ?? 0;
+      const stillAwaiting =
+        missingRoleLabels.length > 0 || slotsRemaining > 0;
       await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
         projectId: args.projectId,
-        awaiting: false,
+        awaiting: stillAwaiting,
+        rolesAwaitingMatch: stillAwaiting ? missingRoleLabels : [],
+        clearRolesAwaitingMatch: !stillAwaiting,
       });
     } else {
+      const allMissing = Object.keys(teamComposition).map((k) => humanizeTeamRoleKey(k));
       await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
         projectId: args.projectId,
         awaiting: true,
+        rolesAwaitingMatch: allMissing.length > 0 ? allMissing : undefined,
       });
     }
 
@@ -668,19 +709,13 @@ export const generateMatchesForDraft = action({
       return i >= 0 ? i : 1;
     };
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
-    const activeProjectFreelancerIdsDraft = await ctx.runQuery(
-      internal.projects.queries.getFreelancerIdsWithActiveProjects,
-      {}
-    );
-    const activeSetDraft = new Set(activeProjectFreelancerIdsDraft || []);
 
     const verifiedFreelancers = (allUsers || []).filter(
       (u: any) =>
         u.role === "freelancer" &&
         u.status === "active" &&
         u.verificationStatus === "approved" &&
-        u.kycStatus === "approved" &&
-        !activeSetDraft.has(u._id)
+        u.kycStatus === "approved"
     );
 
     const approvedFreelancers = await Promise.all(

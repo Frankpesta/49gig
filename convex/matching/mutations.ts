@@ -324,16 +324,26 @@ export const setProjectAwaitingMatch = internalMutation({
   args: {
     projectId: v.id("projects"),
     awaiting: v.boolean(),
+    /** When set, replaces roles awaiting match (omit to leave unchanged). */
+    rolesAwaitingMatch: v.optional(v.array(v.string())),
+    clearRolesAwaitingMatch: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     const project = await ctx.db.get(args.projectId);
     if (!project) return;
-    await ctx.db.patch(args.projectId, {
+    const patch: Record<string, unknown> = {
       awaitingMatch: args.awaiting || undefined,
       awaitingMatchSince: args.awaiting ? (project.awaitingMatchSince ?? now) : undefined,
       updatedAt: now,
-    });
+    };
+    if (args.clearRolesAwaitingMatch) {
+      patch.rolesAwaitingMatch = undefined;
+    } else if (args.rolesAwaitingMatch !== undefined) {
+      patch.rolesAwaitingMatch =
+        args.rolesAwaitingMatch.length > 0 ? args.rolesAwaitingMatch : undefined;
+    }
+    await ctx.db.patch(args.projectId, patch);
   },
 });
 
