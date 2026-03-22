@@ -9,8 +9,8 @@ import {
   getRoleIdFromCategoryLabel,
   freelancerMatchesRole,
   humanizeTeamRoleKey,
-  getRoleLabelsFromProject,
 } from "../../lib/platform-skills";
+import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
 
 function projectAllowsPostFundMatchGeneration(project: Doc<"projects">): boolean {
   if (project.status === "funded") return true;
@@ -513,19 +513,12 @@ export const generateTeamMatches = action({
       { projectId: args.projectId }
     );
 
-    const acceptedCountByCompKey: Record<string, number> = {};
-    for (const key of Object.keys(teamComposition)) {
-      acceptedCountByCompKey[key] = 0;
-    }
-    for (const m of existingProjectMatches) {
-      if (m.status !== "accepted" || !m.teamRole) continue;
-      for (const key of Object.keys(teamComposition)) {
-        if (humanizeTeamRoleKey(key) === m.teamRole) {
-          acceptedCountByCompKey[key] = (acceptedCountByCompKey[key] ?? 0) + 1;
-          break;
-        }
-      }
-    }
+    const { teamSlotsToMatchSpecs } = await import("../../lib/team-slots");
+    const defaultExp = (intakeForm.experienceLevel as any) || "mid";
+    const slotSpecs =
+      intakeForm.teamSlots?.some((s: { roleId?: string }) => !!s.roleId)
+        ? teamSlotsToMatchSpecs(intakeForm.teamSlots as any, defaultExp)
+        : [];
 
     // Get vetting results
     const approvedFreelancers = await Promise.all(
@@ -538,78 +531,189 @@ export const generateTeamMatches = action({
       })
     );
 
-    // Match freelancers to each role
     const teamMatches: Array<{
-      role: string;
+      roleKey: string;
+      teamRoleLabel: string;
       freelancer: Doc<"users">;
       score: number;
       matchReasons: string[];
     }> = [];
 
-    for (const [role, count] of Object.entries(teamComposition)) {
-      const alreadyAccepted = acceptedCountByCompKey[role] ?? 0;
-      const effectiveNeed = Math.max(0, count - alreadyAccepted);
-      if (effectiveNeed === 0) continue;
+    const reservedFreelancerIds = new Set(
+      (existingProjectMatches || [])
+        .filter((m: { status: string }) => m.status === "pending" || m.status === "accepted")
+        .map((m: { freelancerId: string }) => m.freelancerId as string)
+    );
 
-      const roleMatches: Array<{
-        freelancer: Doc<"users">;
-        score: number;
-        matchReasons: string[];
-        vettingScore: number;
-      }> = [];
-
-      for (const { freelancer, vettingResult } of approvedFreelancers) {
-        // Skip if already matched to this project
-        const existingMatch = await ctx.runQuery(
-          internal.matching.queries.getMatch,
-          {
-            projectId: args.projectId,
-            freelancerId: freelancer._id,
-          }
-        );
-
-        if (existingMatch) continue;
-
-        // Match freelancer to role
-        const matchResult = matchFreelancerToRole(
-          freelancer,
-          role,
-          intakeForm.requiredSkills || [],
-          intakeForm.experienceLevel as any
-        );
-
-        // Combine with vetting score
-        const vettingScore = vettingResult?.overallScore || 0;
-        const combinedScore = matchResult.score * 0.7 + vettingScore * 0.3;
-
-        roleMatches.push({
-          freelancer,
-          score: combinedScore,
-          matchReasons: matchResult.matchReasons,
-          vettingScore,
-        });
+    if (slotSpecs.length > 0) {
+      const acceptedBySlot = slotSpecs.map(() => 0);
+      for (const m of existingProjectMatches || []) {
+        if (m.status !== "accepted" || !m.teamRole) continue;
+        const idx = slotSpecs.findIndex((s) => s.teamRoleLabel === m.teamRole);
+        if (idx >= 0) acceptedBySlot[idx]++;
       }
 
-      // Sort by score and take top N for this role
-      roleMatches.sort((a, b) => b.score - a.score);
-      const topMatches = roleMatches.slice(0, effectiveNeed);
+      for (let slotIndex = 0; slotIndex < slotSpecs.length; slotIndex++) {
+        const spec = slotSpecs[slotIndex];
+        if (acceptedBySlot[slotIndex] >= 1) continue;
 
-      for (const match of topMatches) {
-        teamMatches.push({
-          role,
-          freelancer: match.freelancer,
-          score: match.score,
-          matchReasons: match.matchReasons,
-        });
+        const requiredSkills = [
+          ...(intakeForm.requiredSkills || []),
+          ...spec.skills,
+        ];
+
+        const roleMatches: Array<{
+          freelancer: Doc<"users">;
+          score: number;
+          matchReasons: string[];
+          vettingScore: number;
+        }> = [];
+
+        for (const { freelancer, vettingResult } of approvedFreelancers) {
+          if (reservedFreelancerIds.has(freelancer._id as string)) continue;
+
+          const existingMatch = await ctx.runQuery(
+            internal.matching.queries.getMatch,
+            {
+              projectId: args.projectId,
+              freelancerId: freelancer._id,
+            }
+          );
+
+          if (existingMatch) continue;
+
+          const matchResult = matchFreelancerToRole(
+            freelancer,
+            spec.roleKey,
+            requiredSkills,
+            spec.experienceLevel as any
+          );
+
+          const vettingScore = vettingResult?.overallScore || 0;
+          const combinedScore = matchResult.score * 0.7 + vettingScore * 0.3;
+
+          roleMatches.push({
+            freelancer,
+            score: combinedScore,
+            matchReasons: matchResult.matchReasons,
+            vettingScore,
+          });
+        }
+
+        roleMatches.sort((a, b) => b.score - a.score);
+        const best = roleMatches[0];
+        if (best) {
+          teamMatches.push({
+            roleKey: spec.roleKey,
+            teamRoleLabel: spec.teamRoleLabel,
+            freelancer: best.freelancer,
+            score: best.score,
+            matchReasons: best.matchReasons,
+          });
+          reservedFreelancerIds.add(best.freelancer._id as string);
+        }
+      }
+    } else {
+      const acceptedCountByCompKey: Record<string, number> = {};
+      for (const key of Object.keys(teamComposition)) {
+        acceptedCountByCompKey[key] = 0;
+      }
+      for (const m of existingProjectMatches || []) {
+        if (m.status !== "accepted" || !m.teamRole) continue;
+        for (const key of Object.keys(teamComposition)) {
+          if (humanizeTeamRoleKey(key) === m.teamRole) {
+            acceptedCountByCompKey[key] = (acceptedCountByCompKey[key] ?? 0) + 1;
+            break;
+          }
+        }
+      }
+
+      for (const [role, count] of Object.entries(teamComposition)) {
+        const alreadyAccepted = acceptedCountByCompKey[role] ?? 0;
+        const effectiveNeed = Math.max(0, count - alreadyAccepted);
+        if (effectiveNeed === 0) continue;
+
+        const roleMatches: Array<{
+          freelancer: Doc<"users">;
+          score: number;
+          matchReasons: string[];
+          vettingScore: number;
+        }> = [];
+
+        for (const { freelancer, vettingResult } of approvedFreelancers) {
+          if (reservedFreelancerIds.has(freelancer._id as string)) continue;
+
+          const existingMatch = await ctx.runQuery(
+            internal.matching.queries.getMatch,
+            {
+              projectId: args.projectId,
+              freelancerId: freelancer._id,
+            }
+          );
+
+          if (existingMatch) continue;
+
+          const matchResult = matchFreelancerToRole(
+            freelancer,
+            role,
+            intakeForm.requiredSkills || [],
+            intakeForm.experienceLevel as any
+          );
+
+          const vettingScore = vettingResult?.overallScore || 0;
+          const combinedScore = matchResult.score * 0.7 + vettingScore * 0.3;
+
+          roleMatches.push({
+            freelancer,
+            score: combinedScore,
+            matchReasons: matchResult.matchReasons,
+            vettingScore,
+          });
+        }
+
+        roleMatches.sort((a, b) => b.score - a.score);
+        const topMatches = roleMatches.slice(0, effectiveNeed);
+
+        for (const match of topMatches) {
+          teamMatches.push({
+            roleKey: role,
+            teamRoleLabel: humanizeTeamRoleKey(role),
+            freelancer: match.freelancer,
+            score: match.score,
+            matchReasons: match.matchReasons,
+          });
+          reservedFreelancerIds.add(match.freelancer._id as string);
+        }
       }
     }
 
-    const missingRoleLabels: string[] = [];
-    for (const [roleKey, need] of Object.entries(teamComposition)) {
-      const alreadyAccepted = acceptedCountByCompKey[roleKey] ?? 0;
-      const created = teamMatches.filter((t) => t.role === roleKey).length;
-      if (alreadyAccepted + created < need) {
-        missingRoleLabels.push(humanizeTeamRoleKey(roleKey));
+    let missingRoleLabels: string[] = [];
+    if (slotSpecs.length > 0) {
+      const acceptedBySlot = slotSpecs.map(() => 0);
+      for (const m of existingProjectMatches || []) {
+        if (m.status !== "accepted" || !m.teamRole) continue;
+        const idx = slotSpecs.findIndex((s) => s.teamRoleLabel === m.teamRole);
+        if (idx >= 0) acceptedBySlot[idx]++;
+      }
+      for (let i = 0; i < slotSpecs.length; i++) {
+        if (acceptedBySlot[i] >= 1) continue;
+        const created = teamMatches.some((t) => t.teamRoleLabel === slotSpecs[i].teamRoleLabel);
+        if (!created) missingRoleLabels.push(slotSpecs[i].teamRoleLabel);
+      }
+    } else {
+      for (const [roleKey, need] of Object.entries(teamComposition)) {
+        const alreadyAccepted = (() => {
+          let n = 0;
+          for (const m of existingProjectMatches || []) {
+            if (m.status !== "accepted" || !m.teamRole) continue;
+            if (humanizeTeamRoleKey(roleKey) === m.teamRole) n++;
+          }
+          return n;
+        })();
+        const created = teamMatches.filter((t) => t.roleKey === roleKey).length;
+        if (alreadyAccepted + created < need) {
+          missingRoleLabels.push(humanizeTeamRoleKey(roleKey));
+        }
       }
     }
 
@@ -619,8 +723,7 @@ export const generateTeamMatches = action({
     const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
 
     for (const teamMatch of teamMatches) {
-      const roleLabel = humanizeTeamRoleKey(teamMatch.role);
-      const explanation = `${teamMatch.freelancer.name} is matched for the ${roleLabel} role. ${teamMatch.matchReasons.join(". ")}.`;
+      const explanation = `${teamMatch.freelancer.name} is matched for the ${teamMatch.teamRoleLabel} role. ${teamMatch.matchReasons.join(". ")}.`;
 
       const confidence = teamMatch.score >= 80 ? "high" : teamMatch.score >= 60 ? "medium" : "low";
 
@@ -641,7 +744,7 @@ export const generateTeamMatches = action({
           },
           explanation,
           expiresAt,
-          teamRole: roleLabel,
+          teamRole: teamMatch.teamRoleLabel,
         }
       );
 
@@ -659,7 +762,10 @@ export const generateTeamMatches = action({
         clearRolesAwaitingMatch: !stillAwaiting,
       });
     } else {
-      const allMissing = Object.keys(teamComposition).map((k) => humanizeTeamRoleKey(k));
+      const allMissing =
+        slotSpecs.length > 0
+          ? slotSpecs.map((s) => s.teamRoleLabel)
+          : Object.keys(teamComposition).map((k) => humanizeTeamRoleKey(k));
       await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
         projectId: args.projectId,
         awaiting: true,
@@ -735,7 +841,7 @@ export const generateMatchesForDraft = action({
 
     if (approvedFreelancers.length === 0) {
       if (isTeam) {
-        const roleLabels = getRoleLabelsFromProject(intakeForm);
+        const roleLabels = getRoleLabelsForProjectIntake(intakeForm);
         await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
           projectId: args.projectId,
           awaiting: true,

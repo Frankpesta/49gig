@@ -23,10 +23,16 @@ export function useOAuth() {
       // Generate state for CSRF protection
       const state = `state_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
+      const referralCode =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("49gig_ref") || undefined
+          : undefined;
+
       // Get authorization URL
       const { authUrl } = await getGoogleAuthUrl({
         state,
         role,
+        referralCode: referralCode ?? undefined,
       });
 
       // Store state in sessionStorage for verification

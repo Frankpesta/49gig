@@ -180,6 +180,11 @@ export const signContract = mutation({
         apiModule.internal.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
         { projectId }
       );
+
+      await ctx.runMutation(
+        apiModule.internal.referrals.internalMutations.onProjectEnteredInProgress,
+        { projectId }
+      );
     }
 
     return { success: true, emailedParties: fullyExecuted };

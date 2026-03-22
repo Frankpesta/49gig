@@ -86,6 +86,8 @@ export default defineSchema({
         primaryRole: v.optional(v.string()),
         weeklyHours: v.optional(v.number()),
         earliestStartDate: v.optional(v.number()),
+        /** When techField is software_development: selected sub-fields (e.g. backend_dev, fullstack_dev) */
+        softwareDevFields: v.optional(v.array(v.string())),
       })
     ),
 
@@ -154,6 +156,11 @@ export default defineSchema({
     flutterwavePayoutBankCode: v.optional(v.string()), // Stored at subaccount creation for transfers
     flutterwavePayoutAccountNumber: v.optional(v.string()), // Stored at subaccount creation for transfers
 
+    // Referrals (unique share code for every user; attribution only for referred clients)
+    referralCode: v.optional(v.string()),
+    referredByUserId: v.optional(v.id("users")),
+    referralAttributedAt: v.optional(v.number()),
+
     // Audit
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -164,7 +171,39 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_verification_status", ["verificationStatus"])
     .index("by_resume_status", ["resumeStatus"])
-    .index("by_kyc_status", ["kycStatus"]),
+    .index("by_kyc_status", ["kycStatus"])
+    .index("by_referral_code", ["referralCode"])
+    .index("by_referred_by", ["referredByUserId"]),
+
+  /**
+   * Referrer reward when a referred client’s hire is funded and active 7+ days.
+   * Bonus = bonusPercent% of first successful pre_funding netAmount (after platform fee).
+   */
+  referralAccruals: defineTable({
+    referrerId: v.id("users"),
+    referredClientId: v.id("users"),
+    projectId: v.id("projects"),
+    firstPaymentId: v.id("payments"),
+    /** First funding net to escrow (after platform fee), in cents */
+    netAmountCents: v.number(),
+    bonusPercent: v.number(),
+    bonusCents: v.number(),
+    status: v.union(
+      v.literal("awaiting_in_progress"),
+      v.literal("awaiting_eligibility_period"),
+      v.literal("credited"),
+      v.literal("void")
+    ),
+    /** When project entered in_progress (work started) */
+    workStartedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    creditedAt: v.optional(v.number()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_referrer", ["referrerId"])
+    .index("by_referred_client", ["referredClientId"])
+    .index("by_status", ["status"]),
 
   // KYC submissions: one per freelancer; resubmit overwrites documents
   kycSubmissions: defineTable({
@@ -300,6 +339,14 @@ export default defineSchema({
           v.object({
             roleId: v.string(),
             softwareDevFieldId: v.optional(v.string()),
+            experienceLevel: v.optional(
+              v.union(
+                v.literal("junior"),
+                v.literal("mid"),
+                v.literal("senior"),
+                v.literal("expert")
+              )
+            ),
             skills: v.array(v.string()),
           })
         )
@@ -782,6 +829,14 @@ export default defineSchema({
       v.literal("debit"), // Withdrawal to bank
       v.literal("refund")
     ),
+    category: v.optional(
+      v.union(
+        v.literal("earnings"),
+        v.literal("referral_bonus"),
+        v.literal("client_referral_credit"),
+        v.literal("hiring_credit")
+      )
+    ),
     amountCents: v.number(),
     currency: v.string(),
     balanceAfterCents: v.optional(v.number()),
@@ -970,6 +1025,11 @@ export default defineSchema({
     currency: v.string(),
     platformFee: v.optional(v.number()),
     netAmount: v.number(), // After platform fee
+
+    /** Full funding obligation in dollars (before client referral wallet credit). Optional for legacy rows. */
+    fundingGrossAmount: v.optional(v.number()),
+    /** Dollars applied from client referral hiring wallet toward fundingGrossAmount */
+    clientWalletCreditApplied: v.optional(v.number()),
 
     // Recipient (for payout from wallet - identifies freelancer)
     recipientId: v.optional(v.id("users")),

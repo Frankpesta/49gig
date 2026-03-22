@@ -160,63 +160,69 @@ export default function Home() {
 
   return (
     <div className="w-full">
-      {/* Hero - clean editorial style */}
+      {/* Hero — Andela-style serif stack, brand secondary accents, rotating flip words */}
       <section
         className="relative -mt-14 overflow-hidden border-b border-border/30 bg-linear-to-b from-[#f5f4f1] to-background pt-14 md:-mt-16 md:pt-16 dark:from-[#0b1327] dark:to-background"
         aria-label="Hero"
       >
-        <div className="relative z-10 px-4 pb-20 pt-28 sm:px-6 sm:pt-32 lg:px-8 lg:pt-36">
+        <div className="relative z-10 px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8 lg:pt-36">
           <div className="mx-auto w-full max-w-5xl">
-            <div className="max-w-3xl">
-              <h1 className="text-5xl font-semibold tracking-tight text-primary sm:text-6xl lg:text-7xl dark:text-white">
-                Hire world-class African talent,{" "}
-                <span className="inline-flex align-middle text-secondary dark:text-amber-300">
-                  <FlipWords
-                    words={["faster", "smarter", "confidently", "securely"]}
-                    duration={4500}
-                  />
+            <div className="mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:max-w-3xl lg:items-start lg:text-left">
+              <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-[#0a0a0a] sm:text-6xl sm:leading-[1.08] lg:text-7xl lg:leading-[1.06] xl:text-8xl dark:text-white [font-family:var(--font-hero-serif),Georgia,serif]">
+                <span className="block">World-class</span>
+                <span className="block">African talent,</span>
+                <span className="mt-1 block italic text-secondary">
+                  <span className="inline-flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 lg:justify-start">
+                    <span className="whitespace-nowrap">Hire them</span>
+                    <FlipWords
+                      words={["faster", "smarter", "confidently", "securely"]}
+                      duration={4500}
+                      className="font-bold not-italic text-secondary"
+                    />
+                  </span>
                 </span>
               </h1>
-              <div className="mt-8 max-w-2xl space-y-4 text-lg leading-relaxed text-muted-foreground sm:text-xl">
-                <p>
-                  Connect with the top 3% vetted African tech professionals across Software Engineering,
-                  DevOps, Cloud, Data, and Product Design.
-                </p>
-                <p>Build reliable and exceptional teams with confidence.</p>
-              </div>
-            </div>
 
-            <div className="mt-10 flex flex-nowrap gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              <CTAButton
-                href="/signup/client"
-                variant="primary"
-                className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-white px-5 text-sm text-primary shadow-sm hover:bg-gray-100 dark:bg-primary dark:text-primary-foreground dark:border-primary/50 dark:hover:bg-primary/90"
-              >
-                Hire Talent
-                <ArrowRight className="h-4 w-4" />
-              </CTAButton>
-              <CTAButton
-                href="/signup/freelancer"
-                variant="secondary"
-                className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-primary/50 bg-transparent px-5 text-sm text-foreground hover:bg-primary/5"
-              >
-                Apply as Freelancer
-                <ArrowRight className="h-4 w-4" />
-              </CTAButton>
-            </div>
-            <div className="mt-8 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                100% vetted talent
-              </span>
-              <span className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-emerald-400" />
-                Secure payments
-              </span>
-              <span className="flex items-center gap-2">
-                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                4.9/5 rating
-              </span>
+              <p className="mt-8 max-w-xl text-base leading-relaxed text-[#3f3f3f] sm:text-lg dark:text-zinc-300">
+                49GIG connects you with the top 3% of vetted African tech professionals across Software
+                Engineering, AI, DevOps, Cloud, Data, and Product Design
+              </p>
+
+              <div className="mt-8 w-full max-w-md lg:max-w-lg">
+                <ul className="mx-auto inline-block space-y-3 text-left text-[0.9375rem] font-medium leading-snug text-foreground sm:text-base lg:mx-0">
+                  <li className="flex gap-3">
+                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
+                    <span>Rigorous vetting — only the top 3% make the network</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
+                    <span>Milestone-based delivery and secure payments</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
+                    <span>Fast matching to your stack, timeline, and team size</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="mt-10 flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                <CTAButton
+                  href="/signup/client"
+                  variant="primary"
+                  className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-border/60 bg-white px-6 text-sm text-primary shadow-sm hover:bg-gray-100 sm:w-auto dark:bg-primary dark:text-primary-foreground dark:border-primary/50 dark:hover:bg-primary/90"
+                >
+                  Hire Talent
+                  <ArrowRight className="h-4 w-4" />
+                </CTAButton>
+                <CTAButton
+                  href="/signup/freelancer"
+                  variant="secondary"
+                  className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/50 bg-transparent px-6 text-sm text-foreground hover:bg-primary/5 sm:w-auto"
+                >
+                  Apply as Freelancer
+                  <ArrowRight className="h-4 w-4" />
+                </CTAButton>
+              </div>
             </div>
           </div>
         </div>

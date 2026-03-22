@@ -798,6 +798,78 @@ export function OpportunityMatchFreelancerEmail({
   );
 }
 
+/** Email when automatic matching finds talent for a client's hire (cron / KYC trigger). */
+export function AutoMatchReadyClientEmail({
+  name = "there",
+  hireTitle,
+  matchedCount,
+  matchesPageUrl,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & {
+  hireTitle: string;
+  matchedCount: number;
+  matchesPageUrl: string;
+}) {
+  const many = matchedCount > 1;
+  return (
+    <EmailLayout
+      preview={`You've been automatically matched with ${many ? "freelancers" : "a freelancer"} for "${hireTitle}" — review on 49GIG.`}
+      heroLabel="Automatic match"
+      heroTitle="You have new matches for your hire."
+      heroAccent="hire"
+      heroSubtitle="Our matching system found vetted talent that fits this hire—review them when you're ready."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, good news: you&apos;ve been <strong>automatically matched</strong> with{" "}
+        {many ? <strong>{matchedCount} freelancers</strong> : <strong>a freelancer</strong>} for your hire{" "}
+        <strong>{hireTitle}</strong>. Open your dashboard to review profiles and decide how you&apos;d like to move
+        forward.
+      </Text>
+      <EmailButton href={matchesPageUrl}>Review matches</EmailButton>
+    </EmailLayout>
+  );
+}
+
+/** Email when automatic matching assigns a freelancer to a hire (cron / KYC trigger). */
+export function AutoMatchFreelancerEmail({
+  name = "there",
+  hireTitle,
+  clientName,
+  hirePageUrl,
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & {
+  hireTitle: string;
+  clientName: string;
+  hirePageUrl: string;
+}) {
+  return (
+    <EmailLayout
+      preview={`You've been automatically matched for a hire: "${hireTitle}".`}
+      heroLabel="Automatic match"
+      heroTitle="You've been automatically matched for a hire."
+      heroAccent="matched"
+      heroSubtitle="A client on 49GIG has an open role that lines up with your profile—review it in your dashboard."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>, you&apos;ve been <strong>automatically matched</strong> for a hire:{" "}
+        <strong>{hireTitle}</strong>, with <strong>{clientName}</strong>. Sign in to 49GIG to see the details and next
+        steps.
+      </Text>
+      <EmailButton href={hirePageUrl}>View hire</EmailButton>
+    </EmailLayout>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INTERVIEWS & OFFERS
 // ═══════════════════════════════════════════════════════════════════════════════

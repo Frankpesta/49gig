@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -46,12 +46,32 @@ export default function PaymentPage() {
       : "skip"
   );
 
+  const hiringBalance = useQuery(
+    api.wallets.queries.getMyClientReferralHiringBalance,
+    user?._id && project
+      ? { userId: user._id, currency: project.currency || "USD" }
+      : "skip"
+  );
+
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [txRef, setTxRef] = useState<string | null>(null);
   const [monthsToFund, setMonthsToFund] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [referralApplyCents, setReferralApplyCents] = useState(0);
+
+  const maxReferralApplyCents = useMemo(() => {
+    if (!project || hiringBalance === undefined) return 0;
+    const dm = getDurationMonths(project.intakeForm?.projectDuration);
+    const perM = dm > 0 ? project.totalAmount / dm : 0;
+    const grossCents = Math.round(perM * monthsToFund * 100);
+    return Math.min(hiringBalance.cents ?? 0, grossCents);
+  }, [project, hiringBalance, monthsToFund]);
+
+  useEffect(() => {
+    setReferralApplyCents(maxReferralApplyCents);
+  }, [maxReferralApplyCents]);
 
   useEffect(() => {
     if (project?.fundUpfrontMonths != null && project.fundUpfrontMonths >= 1) {
@@ -119,6 +139,7 @@ export default function PaymentPage() {
         amount: amountToPay,
         currency: project.currency || "USD",
         userId: user._id,
+        referralCreditCentsToApply: referralApplyCents,
       });
 
       setPaymentLink(result.paymentLink);
@@ -256,11 +277,50 @@ export default function PaymentPage() {
               </Select>
             </div>
             <div className="flex justify-between text-lg font-bold">
-              <span>Amount to pay</span>
+              <span>Funding total</span>
               <span>
                 {amountToPay.toFixed(2)} {project.currency.toUpperCase()}
               </span>
             </div>
+            {maxReferralApplyCents > 0 && (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="flex items-start gap-2">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="space-y-2 text-sm">
+                    <p className="font-medium">Referral hiring credit</p>
+                    <p className="text-xs text-muted-foreground">
+                      Apply up to {(maxReferralApplyCents / 100).toFixed(2)}{" "}
+                      {project.currency.toUpperCase()} from successful referrals. Platform fee is still
+                      calculated on the full funding amount; the remainder is charged to your card
+                      (minimum card charge rules apply).
+                    </p>
+                    <input
+                      type="range"
+                      min={0}
+                      max={maxReferralApplyCents}
+                      step={1}
+                      value={Math.min(referralApplyCents, maxReferralApplyCents)}
+                      onChange={(e) => setReferralApplyCents(parseInt(e.target.value, 10))}
+                      className="w-full accent-primary"
+                    />
+                    <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                      <span>
+                        Credit applied: {(Math.min(referralApplyCents, maxReferralApplyCents) / 100).toFixed(2)}{" "}
+                        {project.currency.toUpperCase()}
+                      </span>
+                      <span>
+                        Card charge (approx.):{" "}
+                        {(
+                          amountToPay -
+                          Math.min(referralApplyCents, maxReferralApplyCents) / 100
+                        ).toFixed(2)}{" "}
+                        {project.currency.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <p className="text-sm text-muted-foreground">
               Once payment is successful, the matched freelancer(s) will see their share in their pending balance in the wallet.
             </p>

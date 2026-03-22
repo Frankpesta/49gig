@@ -3,6 +3,30 @@ import { action, mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import type { FunctionReference } from "convex/server";
+import {
+  applyReferralAttributionForNewUser,
+  ensureUserReferralCode,
+} from "../referrals/helpers";
+
+function parseGoogleOAuthState(state: string): {
+  csrfToken: string;
+  role?: "client" | "freelancer";
+  refCode?: string;
+} {
+  const parts = state.split(":");
+  if (parts.length < 2) {
+    return { csrfToken: state };
+  }
+  const csrfToken = parts[0] ?? state;
+  const roleRaw = parts[1] ?? "";
+  const role = roleRaw === "freelancer" ? "freelancer" : roleRaw === "client" ? "client" : undefined;
+  let refCode: string | undefined;
+  if (parts.length >= 3) {
+    const raw = parts.slice(2).join(":").trim().toUpperCase();
+    if (/^[A-Z0-9]{6,12}$/.test(raw)) refCode = raw;
+  }
+  return { csrfToken, role, refCode };
+}
 
 const api = require("../_generated/api") as {
   api: {
@@ -26,10 +50,14 @@ export const getGoogleAuthUrl = action({
   args: {
     state: v.optional(v.string()), // CSRF protection
     role: v.optional(v.union(v.literal("client"), v.literal("freelancer"))),
+    referralCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const state = args.state || `state_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const role = args.role || "client";
+    const ref = args.referralCode?.trim().toUpperCase();
+    const stateParam =
+      ref && /^[A-Z0-9]{6,12}$/.test(ref) ? `${state}:${role}:${ref}` : `${state}:${role}`;
 
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
@@ -38,7 +66,7 @@ export const getGoogleAuthUrl = action({
       scope: "openid email profile",
       access_type: "offline",
       prompt: "consent",
-      state: `${state}:${role}`, // Include role in state for signup flow
+      state: stateParam,
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
@@ -76,9 +104,9 @@ export const handleGoogleCallback = action({
     isNewUser: boolean;
     userRole: "client" | "freelancer" | "admin" | "moderator";
   }> => {
-    // Parse state to get role (if signup) and CSRF token
-    const [csrfToken, role] = args.state.split(":");
-    const userRole = (role === "client" || role === "freelancer") ? role : "client";
+    const parsed = parseGoogleOAuthState(args.state);
+    const userRole = parsed.role ?? "client";
+    const refFromState = parsed.refCode;
 
     // Exchange authorization code for access token
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -127,15 +155,15 @@ export const handleGoogleCallback = action({
       }
     );
 
-    // If user doesn't exist and no role provided (from login), they need to signup first
-    if (!existingUser && !role) {
+    // If user doesn't exist and state has no role segment (e.g. malformed), require signup
+    if (!existingUser && !parsed.role) {
       throw new Error(
         "Account not found. Please sign up first at /signup"
       );
     }
 
     // If user doesn't exist but role is provided (from signup), create user and mark for onboarding
-    const isNewUserFromSignup = !existingUser && role;
+    const isNewUserFromSignup = !existingUser && !!parsed.role;
 
     // Create or update user via internal mutation
     const userId: any = await ctx.runMutation(
@@ -151,6 +179,7 @@ export const handleGoogleCallback = action({
             ? existingUser.role 
             : "client")
         : userRole,
+      referralCode: refFromState,
     });
 
     // Create session
@@ -213,6 +242,7 @@ export const createOrUpdateUser = mutation({
     picture: v.optional(v.string()),
     emailVerified: v.boolean(),
     role: v.union(v.literal("client"), v.literal("freelancer")),
+    referralCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Check if user exists by email
@@ -232,6 +262,9 @@ export const createOrUpdateUser = mutation({
           lastLoginAt: now,
           updatedAt: now,
         });
+        if (!existingUser.referralCode) {
+          await ensureUserReferralCode(ctx, existingUser._id);
+        }
         return existingUser._id;
       }
 
@@ -258,6 +291,10 @@ export const createOrUpdateUser = mutation({
         },
         createdAt: now,
       });
+
+      if (!existingUser.referralCode) {
+        await ensureUserReferralCode(ctx, existingUser._id);
+      }
 
       return existingUser._id;
     }
@@ -286,6 +323,13 @@ export const createOrUpdateUser = mutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    await applyReferralAttributionForNewUser(ctx, {
+      newUserId: userId,
+      role: args.role,
+      referralCode: args.referralCode,
+    });
+    await ensureUserReferralCode(ctx, userId);
 
     // Create audit log for new user signup
     await ctx.db.insert("auditLogs", {
@@ -370,6 +414,7 @@ export const completeOAuthSignup = action({
       emailVerified: v.boolean(),
     }),
     role: v.union(v.literal("client"), v.literal("freelancer")),
+    referralCode: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{
     success: boolean;
@@ -420,6 +465,7 @@ export const completeOAuthSignup = action({
         picture: args.oauthData.picture,
         emailVerified: args.oauthData.emailVerified,
         role: args.role,
+        referralCode: args.referralCode,
       }
     );
 

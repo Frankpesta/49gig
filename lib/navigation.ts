@@ -26,6 +26,7 @@ import {
   CalendarCheck,
   BookOpen,
   ShieldCheck,
+  Gift,
 } from "lucide-react";
 import type { UserRole } from "@/stores/authStore";
 
@@ -112,6 +113,15 @@ export const navigationItems: NavItem[] = [
     icon: Wallet,
     section: "menu",
     roles: ["freelancer"],
+  },
+
+  // Referrals (share link; clients earn hiring credit, freelancers wallet balance)
+  {
+    title: "Referrals",
+    url: "/dashboard/referrals",
+    icon: Gift,
+    section: "menu",
+    roles: ["client", "freelancer"],
   },
 
   // Monthly Approvals (Clients)

@@ -53,9 +53,15 @@ export default function SelectRolePage() {
     setError("");
 
     try {
+      const referralCode =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("49gig_ref") || undefined
+          : undefined;
+
       const result = await completeSignup({
         oauthData,
         role,
+        referralCode,
       });
 
       if (result.success) {

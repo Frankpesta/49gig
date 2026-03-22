@@ -54,11 +54,18 @@ crons.daily(
   internal["cron/paymentFollowUp"].sendPaymentFollowUpRemindersAndTerminate
 );
 
-// Retry matching for funded projects that had no available freelancers when they were paid
+// Retry matching for projects awaiting talent (draft, pending_funding, funded, matching)
 crons.interval(
   "retry awaiting-match projects",
   { hours: 4 },
   internal.matching.autoAssign.retryAwaitingMatchProjects
+);
+
+// Referral rewards: first funding net × % after hire active 7 days
+crons.interval(
+  "referral rewards eligibility",
+  { hours: 1 },
+  internal.referrals.internalMutations.creditDueReferralAccruals
 );
 
 export default crons;

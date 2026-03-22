@@ -3,8 +3,9 @@
 /**
  * Auto-Assignment System
  *
- * When a funded project has no suitable freelancers available, it is placed in an
- * "awaiting match" queue (awaitingMatch = true on the project).
+ * When a project has no suitable freelancers available, it can be placed in an
+ * "awaiting match" queue (awaitingMatch = true on the project) — draft, pending_funding,
+ * funded, or matching.
  *
  * Two triggers re-run matching for queued projects:
  *  1. `checkAndAutoAssignForFreelancer`  – called when a freelancer's KYC is approved
@@ -17,9 +18,30 @@ import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import React from "react";
 import { sendEmail } from "../email/send";
+import { AutoMatchReadyClientEmail, AutoMatchFreelancerEmail } from "../../emails/templates";
 
 const internalAny = require("../_generated/api").internal as any;
 const apiAny = require("../_generated/api").api as any;
+
+function getAppUrl() {
+  return (
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://49gig.com"
+  );
+}
+
+function getLogoUrl(appUrl: string) {
+  return `${appUrl}/logo-light.png`;
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Email helpers
@@ -28,103 +50,58 @@ const apiAny = require("../_generated/api").api as any;
 async function sendAutoMatchClientEmail(
   email: string,
   clientName: string,
-  projectTitle: string,
-  matchedCount: number
+  hireTitle: string,
+  matchedCount: number,
+  projectId: string
 ) {
+  const appUrl = getAppUrl();
+  const logoUrl = getLogoUrl(appUrl);
+  const date = formatDate();
+  const matchesPageUrl = `${appUrl}/dashboard/projects/${projectId}/matches`;
+  const subject =
+    matchedCount > 1
+      ? `Automatic match: ${matchedCount} freelancers for your hire on 49GIG`
+      : `Automatic match: a freelancer for your hire on 49GIG`;
+
   await sendEmail({
     to: email,
-    subject: `Great news — we found ${matchedCount > 1 ? "freelancers" : "a freelancer"} for your hire on 49GIG`,
-    react: React.createElement(
-      "div",
-      { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-      React.createElement("h2", { style: { marginBottom: "16px", color: "#111" } }, "A match has been found!"),
-      React.createElement("p", null, `Hi ${clientName},`),
-      React.createElement(
-        "p",
-        { style: { marginTop: "16px" } },
-        `We're pleased to let you know that we have found ${matchedCount > 1 ? `${matchedCount} freelancers` : "a freelancer"} for your hire — `,
-        React.createElement("strong", null, projectTitle),
-        "."
-      ),
-      React.createElement(
-        "p",
-        { style: { marginTop: "16px" } },
-        "Log in to your 49GIG dashboard to review the match and confirm."
-      ),
-      React.createElement(
-        "a",
-        {
-          href: "https://49gig.com/dashboard",
-          style: {
-            display: "inline-block",
-            marginTop: "20px",
-            padding: "12px 24px",
-            background: "#2563eb",
-            color: "#fff",
-            borderRadius: "8px",
-            textDecoration: "none",
-            fontWeight: "600",
-          },
-        },
-        "View match →"
-      ),
-      React.createElement(
-        "p",
-        { style: { marginTop: "24px", fontSize: "13px", color: "#666" } },
-        "The 49GIG team"
-      )
-    ),
+    subject,
+    react: React.createElement(AutoMatchReadyClientEmail, {
+      name: clientName,
+      hireTitle,
+      matchedCount,
+      matchesPageUrl,
+      appUrl,
+      logoUrl,
+      date,
+    }),
   });
 }
 
 async function sendAutoMatchFreelancerEmail(
   email: string,
   freelancerName: string,
-  projectTitle: string
+  hireTitle: string,
+  clientName: string,
+  projectId: string
 ) {
+  const appUrl = getAppUrl();
+  const logoUrl = getLogoUrl(appUrl);
+  const date = formatDate();
+  const hirePageUrl = `${appUrl}/dashboard/projects/${projectId}/matches`;
+
   await sendEmail({
     to: email,
-    subject: "You've been matched to a project on 49GIG",
-    react: React.createElement(
-      "div",
-      { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-      React.createElement("h2", { style: { marginBottom: "16px", color: "#111" } }, "You have a new project match!"),
-      React.createElement("p", null, `Hi ${freelancerName},`),
-      React.createElement(
-        "p",
-        { style: { marginTop: "16px" } },
-        "Congratulations! You have been automatically matched to a new project: ",
-        React.createElement("strong", null, projectTitle),
-        "."
-      ),
-      React.createElement(
-        "p",
-        { style: { marginTop: "16px" } },
-        "Log in to your 49GIG dashboard to review the details and get started."
-      ),
-      React.createElement(
-        "a",
-        {
-          href: "https://49gig.com/dashboard",
-          style: {
-            display: "inline-block",
-            marginTop: "20px",
-            padding: "12px 24px",
-            background: "#2563eb",
-            color: "#fff",
-            borderRadius: "8px",
-            textDecoration: "none",
-            fontWeight: "600",
-          },
-        },
-        "View project →"
-      ),
-      React.createElement(
-        "p",
-        { style: { marginTop: "24px", fontSize: "13px", color: "#666" } },
-        "The 49GIG team"
-      )
-    ),
+    subject: `You've been automatically matched for a hire on 49GIG`,
+    react: React.createElement(AutoMatchFreelancerEmail, {
+      name: freelancerName,
+      hireTitle,
+      clientName,
+      hirePageUrl,
+      appUrl,
+      logoUrl,
+      date,
+    }),
   });
 }
 
@@ -133,9 +110,66 @@ async function sendAutoMatchFreelancerEmail(
 // ---------------------------------------------------------------------------
 
 /**
+ * Notify client + freelancers for the given match rows (pre/post fund).
+ */
+async function notifyForMatches(
+  ctx: any,
+  project: { _id: string; clientId: string; intakeForm: { title: string } },
+  projectId: string,
+  matchDocs: Array<{ _id: string; freelancerId: string } | null | undefined>
+) {
+  const validMatches = matchDocs.filter(Boolean) as Array<{ _id: string; freelancerId: string }>;
+  if (validMatches.length === 0) return;
+
+  const client = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
+    userId: project.clientId,
+  });
+
+  if (client?.email) {
+    await sendAutoMatchClientEmail(
+      client.email,
+      client.name ?? "there",
+      project.intakeForm.title,
+      validMatches.length,
+      projectId
+    );
+  }
+
+  await ctx.runAction(internalAny.notifications.actions.sendSystemNotification, {
+    userIds: [project.clientId],
+    title: "Automatic match for your hire",
+    message: `You've been automatically matched with ${validMatches.length > 1 ? `${validMatches.length} freelancers` : "a freelancer"} for "${project.intakeForm.title}". Review them on your hire's matches page.`,
+    type: "match",
+    data: { projectId },
+  });
+
+  for (const match of validMatches) {
+    const freelancer = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
+      userId: match.freelancerId,
+    });
+    if (freelancer?.email) {
+      await sendAutoMatchFreelancerEmail(
+        freelancer.email,
+        freelancer.name ?? "there",
+        project.intakeForm.title,
+        client?.name ?? "a client",
+        projectId
+      );
+    }
+    await ctx.runAction(internalAny.notifications.actions.sendSystemNotification, {
+      userIds: [match.freelancerId],
+      title: "You've been automatically matched for a hire",
+      message: `You've been automatically matched for "${project.intakeForm.title}". Open your dashboard to review the hire and next steps.`,
+      type: "match",
+      data: { projectId, matchId: match._id },
+    });
+  }
+}
+
+/**
  * Attempt to generate matches for a single awaiting project.
- * Sends emails to client + matched freelancers when a match is found.
- * Returns the number of new matches created (0 = still no match).
+ * Sends emails to client + matched freelancers when new matches appear.
+ * Returns the number of new matches notified (0 = still no new match).
  */
 async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
   try {
@@ -143,13 +177,47 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
       internalAny.projects.queries.getProjectInternal,
       { projectId }
     );
-    if (
-      !project ||
-      (project.status !== "funded" && project.status !== "matching")
-    ) {
-      return 0;
+    if (!project) return 0;
+
+    const isPreFund =
+      project.status === "draft" || project.status === "pending_funding";
+    const isPostFund =
+      project.status === "funded" || project.status === "matching";
+    if (!isPreFund && !isPostFund) return 0;
+
+    // ── Pre-funding: generateMatchesForDraft (same as matches page).
+    // Only notify when new pending freelancers appear — avoids emailing every cron tick.
+    if (isPreFund) {
+      const beforeRows = await ctx.runQuery(
+        internalAny.matching.queries.listProjectMatchesInternal,
+        { projectId }
+      );
+      const beforeFreelancers = new Set(
+        beforeRows
+          .filter((m: { status: string }) => m.status === "pending")
+          .map((m: { freelancerId: string }) => m.freelancerId)
+      );
+
+      await ctx.runAction(apiAny.matching.actions.generateMatchesForDraft, {
+        projectId,
+      });
+
+      const afterRows = await ctx.runQuery(
+        internalAny.matching.queries.listProjectMatchesInternal,
+        { projectId }
+      );
+      const newMatches = afterRows.filter(
+        (m: { status: string; freelancerId: string }) =>
+          m.status === "pending" && !beforeFreelancers.has(m.freelancerId)
+      );
+
+      if (newMatches.length === 0) return 0;
+
+      await notifyForMatches(ctx, project, projectId, newMatches);
+      return newMatches.length;
     }
 
+    // ── Post-funding
     let matchIds: string[] = [];
     if (project.intakeForm?.hireType === "team") {
       const res = await ctx.runAction(apiAny.matching.actions.generateTeamMatches, {
@@ -165,64 +233,13 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
 
     if (matchIds.length === 0) return 0;
 
-    // Fetch client to send email
-    const client = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
-      userId: project.clientId,
-    });
-
-    if (client?.email) {
-      await sendAutoMatchClientEmail(
-        client.email,
-        client.name ?? "there",
-        project.intakeForm.title,
-        matchIds.length
-      );
-    }
-
-    // Notify client in-app
-    await ctx.runAction(
-      internalAny.notifications.actions.sendSystemNotification,
-      {
-        userIds: [project.clientId],
-        title: "A freelancer match has been found!",
-        message: `We found ${matchIds.length > 1 ? `${matchIds.length} freelancers` : "a freelancer"} for your hire "${project.intakeForm.title}". Review the match in your dashboard.`,
-        type: "match",
-        data: { projectId },
-      }
-    );
-
-    // Fetch matched freelancers and send each an email + in-app notification
     const matchDocs = await Promise.all(
       matchIds.map((id: string) =>
         ctx.runQuery(internalAny.matching.queries.getMatchById, { matchId: id })
       )
     );
 
-    for (const match of matchDocs) {
-      if (!match) continue;
-      const freelancer = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
-        userId: match.freelancerId,
-      });
-      if (freelancer?.email) {
-        await sendAutoMatchFreelancerEmail(
-          freelancer.email,
-          freelancer.name ?? "there",
-          project.intakeForm.title
-        );
-      }
-      // In-app notification for freelancer
-      await ctx.runAction(
-        internalAny.notifications.actions.sendSystemNotification,
-        {
-          userIds: [match.freelancerId],
-          title: "You've been matched to a project!",
-          message: `You have been matched to "${project.intakeForm.title}". Log in to review the details.`,
-          type: "match",
-          data: { projectId, matchId: match._id },
-        }
-      );
-    }
-
+    await notifyForMatches(ctx, project, projectId, matchDocs);
     return matchIds.length;
   } catch (err) {
     console.error("[autoAssign] tryMatchProject error for", projectId, err);
@@ -236,7 +253,7 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
 
 /**
  * Called immediately after a freelancer's KYC is approved.
- * Scans all funded projects awaiting a match and tries to assign this freelancer.
+ * Scans all projects awaiting a match (including draft) and tries to assign.
  */
 export const checkAndAutoAssignForFreelancer = internalAction({
   args: {
@@ -257,7 +274,7 @@ export const checkAndAutoAssignForFreelancer = internalAction({
 });
 
 /**
- * Periodic retry: re-runs matching for every funded project still awaiting assignment.
+ * Periodic retry: re-runs matching for every project still awaiting assignment.
  * Registered as a cron job in convex/crons.ts.
  */
 export const retryAwaitingMatchProjects = internalAction({

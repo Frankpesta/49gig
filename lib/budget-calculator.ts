@@ -5,6 +5,7 @@
 import {
   type TeamSlotIntake,
   compositionFromTeamSlots,
+  teamSlotsToBudgetLines,
 } from "./team-slots";
 
 export type ExperienceLevel = "junior" | "mid" | "senior" | "expert";
@@ -461,7 +462,7 @@ export function calculateProjectBudget(
   const hoursPerDay = HOURS_PER_DAY[roleType];
 
   if (hireType === "team") {
-    // Team pricing: exact composition from per-seat slots when provided
+    // Team pricing: per-seat experience when teamSlots rows include experienceLevel
     const composition =
       teamSlots && teamSlots.length > 0
         ? compositionFromTeamSlots(teamSlots)
@@ -474,22 +475,41 @@ export function calculateProjectBudget(
             softwareDevFields
           );
 
-    const teamMembers: TeamMemberBreakdown[] = composition.map(({ role, category, count }) => {
-      const catRates = getRates(baseRatesByCategory, category);
-      const hourlyRate = catRates[experienceLevel];
-      const monthlyPerPerson = hourlyRate * hoursPerMonth;
-      const monthlyTotal = monthlyPerPerson * count;
-      return {
-        role,
-        roleDisplayName: ROLE_DISPLAY_NAMES[role] || role.replace(/_/g, " "),
-        category,
-        count,
-        hourlyRate,
-        hoursPerMonth,
-        monthlyPerPerson,
-        monthlyTotal,
-      };
-    });
+    const teamMembers: TeamMemberBreakdown[] =
+      teamSlots && teamSlots.some((s) => s.roleId)
+        ? teamSlotsToBudgetLines(teamSlots, experienceLevel).map((line) => {
+            const catRates = getRates(baseRatesByCategory, line.category);
+            const hourlyRate = catRates[line.experienceLevel];
+            const monthlyPerPerson = hourlyRate * hoursPerMonth;
+            return {
+              role: line.budgetRoleKey,
+              roleDisplayName:
+                ROLE_DISPLAY_NAMES[line.budgetRoleKey] ||
+                line.budgetRoleKey.replace(/_/g, " "),
+              category: line.category,
+              count: 1,
+              hourlyRate,
+              hoursPerMonth,
+              monthlyPerPerson,
+              monthlyTotal: monthlyPerPerson,
+            };
+          })
+        : composition.map(({ role, category, count }) => {
+            const catRates = getRates(baseRatesByCategory, category);
+            const hourlyRate = catRates[experienceLevel];
+            const monthlyPerPerson = hourlyRate * hoursPerMonth;
+            const monthlyTotal = monthlyPerPerson * count;
+            return {
+              role,
+              roleDisplayName: ROLE_DISPLAY_NAMES[role] || role.replace(/_/g, " "),
+              category,
+              count,
+              hourlyRate,
+              hoursPerMonth,
+              monthlyPerPerson,
+              monthlyTotal,
+            };
+          });
 
     const totalMonthlyBeforeMultipliers = teamMembers.reduce(
       (sum, m) => sum + m.monthlyTotal,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,14 @@ export default function ClientSignupPage() {
   );
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref")?.trim().toUpperCase();
+    if (ref && /^[A-Z0-9]{6,12}$/.test(ref)) {
+      sessionStorage.setItem("49gig_ref", ref);
+    }
+  }, []);
+
   const selectedCountry = formData.country
     ? getCountryByCode(formData.country)
     : null;
@@ -72,11 +80,16 @@ export default function ClientSignupPage() {
     setIsLoading(true);
 
     try {
+      const refFromUrl = new URLSearchParams(window.location.search).get("ref")?.trim();
+      const refStored = sessionStorage.getItem("49gig_ref");
+      const referralCode = refFromUrl || refStored || undefined;
+
       const result = await signup({
         email: formData.email,
         password: formData.password,
         name: formData.name,
         role: "client",
+        referralCode,
         profile: {
           companyName: formData.companyName,
           workEmail: formData.workEmail || formData.email,

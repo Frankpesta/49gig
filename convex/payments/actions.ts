@@ -17,6 +17,8 @@ export const createPaymentIntent = action({
     amount: v.number(), // Amount in currency unit (e.g., dollars, not cents)
     currency: v.string(), // e.g., "NGN", "USD", "KES"
     userId: v.id("users"),
+    /** Apply up to this many cents from client referral hiring wallet (non-withdrawable). */
+    referralCreditCentsToApply: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<{ paymentLink: string; paymentId: string; txRef: string }> => {
     // Verify user and project
@@ -85,10 +87,41 @@ export const createPaymentIntent = action({
     const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://your-site.com";
     const redirectUrl = `${baseUrl}/dashboard/projects/${args.projectId}/payment/callback`;
 
+    const fundingGrossAmount = args.amount;
+    const currencyLower = args.currency.toLowerCase();
+    const balanceCents = await ctx.runQuery(
+      internalAny.wallets.queries.getClientReferralHiringBalanceCentsInternal,
+      { userId: args.userId, currency: args.currency }
+    );
+
+    const grossCents = Math.round(fundingGrossAmount * 100);
+    const requestedApply = Math.max(
+      0,
+      Math.floor(args.referralCreditCentsToApply ?? balanceCents)
+    );
+    let applyCents = Math.min(requestedApply, balanceCents, grossCents);
+
+    const MIN_FW_CENTS = 1;
+    let fwCents = grossCents - applyCents;
+    if (fwCents > 0 && fwCents < MIN_FW_CENTS) {
+      applyCents = Math.max(0, grossCents - MIN_FW_CENTS);
+      applyCents = Math.min(applyCents, balanceCents);
+      fwCents = grossCents - applyCents;
+    }
+    if (fwCents < 0) {
+      throw new Error("Invalid payment amount after referral credit");
+    }
+    if (fwCents > 0 && fwCents < MIN_FW_CENTS) {
+      throw new Error("Amount too small to charge after applying referral credit");
+    }
+
+    const flutterwaveAmount = fwCents / 100;
+    const clientWalletCreditApplied = applyCents / 100;
+
     // Initialize Flutterwave payment
     const paymentData = await flutterwave.initializePayment({
       tx_ref: txRef,
-      amount: args.amount,
+      amount: flutterwaveAmount,
       currency: args.currency.toUpperCase(),
       redirect_url: redirectUrl,
       customer: {
@@ -112,18 +145,21 @@ export const createPaymentIntent = action({
       {}
     );
     const platformFee = defaultPlatformFee;
-    const platformFeeAmount = (args.amount * platformFee) / 100;
-    const netAmount = args.amount - platformFeeAmount;
+    const platformFeeAmount = (fundingGrossAmount * platformFee) / 100;
+    const netAmount = fundingGrossAmount - platformFeeAmount;
 
     const paymentId = await ctx.runMutation(
       internalAny.payments.mutations.createPayment,
       {
         projectId: args.projectId,
         type: "pre_funding",
-        amount: args.amount,
-        currency: args.currency,
+        amount: flutterwaveAmount,
+        currency: currencyLower,
         platformFee: platformFeeAmount,
         netAmount: netAmount,
+        fundingGrossAmount,
+        clientWalletCreditApplied:
+          clientWalletCreditApplied > 0 ? clientWalletCreditApplied : undefined,
         flutterwaveTransactionId: txRef, // Store tx_ref as transaction ID
         flutterwaveCustomerEmail: user.email,
         userId: args.userId,
