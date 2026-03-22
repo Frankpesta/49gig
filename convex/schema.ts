@@ -449,6 +449,11 @@ export default defineSchema({
     /** Team hires: how many additional freelancers we still need after partial payment/selection. */
     pendingTeamMemberSlots: v.optional(v.number()),
 
+    /** Set when we first email the client that freelancers are available to review (unlocks View matches CTA). */
+    clientNotifiedOfAvailableMatchesAt: v.optional(v.number()),
+    /** Last time we emailed the client about available matches (initial or periodic reminder). */
+    lastClientMatchAvailabilityEmailAt: v.optional(v.number()),
+
     // Audit
     createdAt: v.number(),
     updatedAt: v.number(),

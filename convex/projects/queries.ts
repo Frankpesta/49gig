@@ -223,6 +223,12 @@ export const getProject = query({
       return null;
     }
 
+    const matchRows = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+    const pendingMatchesCount = matchRows.filter((m) => m.status === "pending").length;
+
     // Get client and freelancer info
     const client = await ctx.db.get(project.clientId);
     const freelancer = project.matchedFreelancerId
@@ -231,6 +237,7 @@ export const getProject = query({
 
     return {
       ...project,
+      pendingMatchesCount,
       client: client
         ? {
             _id: client._id,

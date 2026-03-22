@@ -1439,6 +1439,27 @@ export const confirmRemainingTeamSelections = mutation({
 });
 
 /**
+ * Record that the client was emailed about available matches (initial or reminder).
+ * Sets clientNotifiedOfAvailableMatchesAt on first send (for product UI gating).
+ */
+export const recordClientMatchAvailabilityEmailInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return;
+    const now = Date.now();
+    await ctx.db.patch(args.projectId, {
+      lastClientMatchAvailabilityEmailAt: now,
+      clientNotifiedOfAvailableMatchesAt:
+        project.clientNotifiedOfAvailableMatchesAt ?? now,
+      updatedAt: now,
+    });
+  },
+});
+
+/**
  * Internal: delete an unfunded project and its matches/scheduledCalls (14-day cleanup).
  */
 export const deleteUnfundedProjectInternal = internalMutation({

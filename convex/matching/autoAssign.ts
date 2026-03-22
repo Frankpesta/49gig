@@ -1,27 +1,31 @@
 "use node";
 
 /**
- * Auto-Assignment System
+ * Match-suggestion pipeline (cron every 4h + KYC trigger)
  *
- * When a project has no suitable freelancers available, it can be placed in an
- * "awaiting match" queue (awaitingMatch = true on the project) — draft, pending_funding,
- * funded, or matching.
+ * We still run the same match generators as before so `matches` rows exist for the client UI.
+ * We do **not** email freelancers when suggestions appear.
  *
- * Two triggers re-run matching for queued projects:
- *  1. `checkAndAutoAssignForFreelancer`  – called when a freelancer's KYC is approved
- *  2. `retryAwaitingMatchProjects`       – runs on a cron every 4 hours
+ * The client receives:
+ *  - An email when **new** pending matches appear (pre-fund: delta only; post-fund: new match rows).
+ *  - **Periodic reminder** emails (48h apart) while the hire is in the awaiting-match queue and has
+ *    at least one pending match.
  *
- * When a match IS found, both the client and the freelancer(s) receive an email.
+ * `clientNotifiedOfAvailableMatchesAt` is set on the first client email so the dashboard can show
+ * "View matches" only after we’ve notified them.
  */
 
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import React from "react";
 import { sendEmail } from "../email/send";
-import { AutoMatchReadyClientEmail, AutoMatchFreelancerEmail } from "../../emails/templates";
+import { FreelancersAvailableClientEmail } from "../../emails/templates";
 
 const internalAny = require("../_generated/api").internal as any;
 const apiAny = require("../_generated/api").api as any;
+
+/** Minimum time between client availability / reminder emails */
+const CLIENT_MATCH_EMAIL_REMINDER_MS = 48 * 60 * 60 * 1000;
 
 function getAppUrl() {
   return (
@@ -43,169 +47,131 @@ function formatDate() {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Email helpers
-// ---------------------------------------------------------------------------
+async function sendClientFreelancersAvailableEmail(
+  ctx: any,
+  project: { _id: string; clientId: string; intakeForm: { title: string } },
+  projectId: string,
+  pendingCount: number,
+  isReminder: boolean
+): Promise<boolean> {
+  const client = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
+    userId: project.clientId,
+  });
+  if (!client?.email) return false;
 
-async function sendAutoMatchClientEmail(
-  email: string,
-  clientName: string,
-  hireTitle: string,
-  matchedCount: number,
-  projectId: string
-) {
   const appUrl = getAppUrl();
   const logoUrl = getLogoUrl(appUrl);
   const date = formatDate();
   const matchesPageUrl = `${appUrl}/dashboard/projects/${projectId}/matches`;
-  const subject =
-    matchedCount > 1
-      ? `Automatic match: ${matchedCount} freelancers for your hire on 49GIG`
-      : `Automatic match: a freelancer for your hire on 49GIG`;
+  const subject = isReminder
+    ? `Reminder: review matches for your hire on 49GIG`
+    : pendingCount > 1
+      ? `Freelancers available for your hire on 49GIG`
+      : `A freelancer is available for your hire on 49GIG`;
 
-  await sendEmail({
-    to: email,
-    subject,
-    react: React.createElement(AutoMatchReadyClientEmail, {
-      name: clientName,
-      hireTitle,
-      matchedCount,
-      matchesPageUrl,
-      appUrl,
-      logoUrl,
-      date,
-    }),
-  });
-}
-
-async function sendAutoMatchFreelancerEmail(
-  email: string,
-  freelancerName: string,
-  hireTitle: string,
-  clientName: string,
-  projectId: string
-) {
-  const appUrl = getAppUrl();
-  const logoUrl = getLogoUrl(appUrl);
-  const date = formatDate();
-  const hirePageUrl = `${appUrl}/dashboard/projects/${projectId}/matches`;
-
-  await sendEmail({
-    to: email,
-    subject: `You've been automatically matched for a hire on 49GIG`,
-    react: React.createElement(AutoMatchFreelancerEmail, {
-      name: freelancerName,
-      hireTitle,
-      clientName,
-      hirePageUrl,
-      appUrl,
-      logoUrl,
-      date,
-    }),
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Core re-matching logic
-// ---------------------------------------------------------------------------
-
-/**
- * Notify client + freelancers for the given match rows (pre/post fund).
- */
-async function notifyForMatches(
-  ctx: any,
-  project: { _id: string; clientId: string; intakeForm: { title: string } },
-  projectId: string,
-  matchDocs: Array<{ _id: string; freelancerId: string } | null | undefined>
-) {
-  const validMatches = matchDocs.filter(Boolean) as Array<{ _id: string; freelancerId: string }>;
-  if (validMatches.length === 0) return;
-
-  const client = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
-    userId: project.clientId,
-  });
-
-  if (client?.email) {
-    await sendAutoMatchClientEmail(
-      client.email,
-      client.name ?? "there",
-      project.intakeForm.title,
-      validMatches.length,
-      projectId
-    );
+  try {
+    await sendEmail({
+      to: client.email,
+      subject,
+      react: React.createElement(FreelancersAvailableClientEmail, {
+        name: client.name ?? "there",
+        hireTitle: project.intakeForm.title,
+        matchesPageUrl,
+        appUrl,
+        logoUrl,
+        date,
+        isReminder,
+        pendingCount,
+      }),
+    });
+  } catch (e) {
+    console.error("[autoAssign] client availability email failed", projectId, e);
+    return false;
   }
+
+  await ctx.runMutation(internalAny.projects.mutations.recordClientMatchAvailabilityEmailInternal, {
+    projectId: project._id as any,
+  });
 
   await ctx.runAction(internalAny.notifications.actions.sendSystemNotification, {
     userIds: [project.clientId],
-    title: "Automatic match for your hire",
-    message: `You've been automatically matched with ${validMatches.length > 1 ? `${validMatches.length} freelancers` : "a freelancer"} for "${project.intakeForm.title}". Review them on your hire's matches page.`,
+    title: isReminder ? "Reminder: matches to review" : "Freelancers available for your hire",
+    message: isReminder
+      ? `You still have matches to review for "${project.intakeForm.title}". Open your hire to continue.`
+      : `Vetted freelancers are available for "${project.intakeForm.title}". Review matches and select who you’d like.`,
     type: "match",
     data: { projectId },
   });
 
-  for (const match of validMatches) {
-    const freelancer = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
-      userId: match.freelancerId,
+  return true;
+}
+
+/**
+ * When new match rows appear (pre- or post-fund): email client only.
+ */
+async function notifyClientForNewMatchSuggestions(
+  ctx: any,
+  project: { _id: string; clientId: string; intakeForm: { title: string } },
+  projectId: string,
+  newSuggestionCount: number
+) {
+  if (newSuggestionCount <= 0) return;
+  await sendClientFreelancersAvailableEmail(ctx, project, projectId, newSuggestionCount, false);
+}
+
+/**
+ * Periodic reminders for projects still waiting, with pending suggestions.
+ */
+async function sendPeriodicClientMatchReminders(ctx: any) {
+  const projects = await ctx.runQuery(internalAny.matching.queries.getProjectsAwaitingMatch, {});
+  if (!projects?.length) return;
+
+  const now = Date.now();
+
+  for (const project of projects) {
+    const rows = await ctx.runQuery(internalAny.matching.queries.listProjectMatchesInternal, {
+      projectId: project._id,
     });
-    if (freelancer?.email) {
-      await sendAutoMatchFreelancerEmail(
-        freelancer.email,
-        freelancer.name ?? "there",
-        project.intakeForm.title,
-        client?.name ?? "a client",
-        projectId
-      );
-    }
-    await ctx.runAction(internalAny.notifications.actions.sendSystemNotification, {
-      userIds: [match.freelancerId],
-      title: "You've been automatically matched for a hire",
-      message: `You've been automatically matched for "${project.intakeForm.title}". Open your dashboard to review the hire and next steps.`,
-      type: "match",
-      data: { projectId, matchId: match._id },
-    });
+    const pendingCount = (rows || []).filter((m: { status: string }) => m.status === "pending").length;
+    if (pendingCount === 0) continue;
+
+    const last = project.lastClientMatchAvailabilityEmailAt;
+    if (last != null && now - last < CLIENT_MATCH_EMAIL_REMINDER_MS) continue;
+
+    const isReminder = last != null;
+    await sendClientFreelancersAvailableEmail(ctx, project, project._id, pendingCount, isReminder);
   }
 }
 
 /**
  * Attempt to generate matches for a single awaiting project.
- * Sends emails to client + matched freelancers when new matches appear.
- * Returns the number of new matches notified (0 = still no new match).
+ * Emails the client when new suggestions appear (not freelancers).
+ * Returns the number of new matches notified (0 = none).
  */
 async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
   try {
-    const project = await ctx.runQuery(
-      internalAny.projects.queries.getProjectInternal,
-      { projectId }
-    );
+    const project = await ctx.runQuery(internalAny.projects.queries.getProjectInternal, { projectId });
     if (!project) return 0;
 
-    const isPreFund =
-      project.status === "draft" || project.status === "pending_funding";
-    const isPostFund =
-      project.status === "funded" || project.status === "matching";
+    const isPreFund = project.status === "draft" || project.status === "pending_funding";
+    const isPostFund = project.status === "funded" || project.status === "matching";
     if (!isPreFund && !isPostFund) return 0;
 
-    // ── Pre-funding: generateMatchesForDraft (same as matches page).
-    // Only notify when new pending freelancers appear — avoids emailing every cron tick.
     if (isPreFund) {
-      const beforeRows = await ctx.runQuery(
-        internalAny.matching.queries.listProjectMatchesInternal,
-        { projectId }
-      );
+      const beforeRows = await ctx.runQuery(internalAny.matching.queries.listProjectMatchesInternal, {
+        projectId,
+      });
       const beforeFreelancers = new Set(
         beforeRows
           .filter((m: { status: string }) => m.status === "pending")
           .map((m: { freelancerId: string }) => m.freelancerId)
       );
 
-      await ctx.runAction(apiAny.matching.actions.generateMatchesForDraft, {
+      await ctx.runAction(apiAny.matching.actions.generateMatchesForDraft, { projectId });
+
+      const afterRows = await ctx.runQuery(internalAny.matching.queries.listProjectMatchesInternal, {
         projectId,
       });
-
-      const afterRows = await ctx.runQuery(
-        internalAny.matching.queries.listProjectMatchesInternal,
-        { projectId }
-      );
       const newMatches = afterRows.filter(
         (m: { status: string; freelancerId: string }) =>
           m.status === "pending" && !beforeFreelancers.has(m.freelancerId)
@@ -213,16 +179,13 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
 
       if (newMatches.length === 0) return 0;
 
-      await notifyForMatches(ctx, project, projectId, newMatches);
+      await notifyClientForNewMatchSuggestions(ctx, project, projectId, newMatches.length);
       return newMatches.length;
     }
 
-    // ── Post-funding
     let matchIds: string[] = [];
     if (project.intakeForm?.hireType === "team") {
-      const res = await ctx.runAction(apiAny.matching.actions.generateTeamMatches, {
-        projectId,
-      });
+      const res = await ctx.runAction(apiAny.matching.actions.generateTeamMatches, { projectId });
       matchIds = res?.matchIds ?? [];
     } else {
       matchIds = await ctx.runAction(apiAny.matching.actions.generateMatches, {
@@ -233,13 +196,7 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
 
     if (matchIds.length === 0) return 0;
 
-    const matchDocs = await Promise.all(
-      matchIds.map((id: string) =>
-        ctx.runQuery(internalAny.matching.queries.getMatchById, { matchId: id })
-      )
-    );
-
-    await notifyForMatches(ctx, project, projectId, matchDocs);
+    await notifyClientForNewMatchSuggestions(ctx, project, projectId, matchIds.length);
     return matchIds.length;
   } catch (err) {
     console.error("[autoAssign] tryMatchProject error for", projectId, err);
@@ -247,43 +204,33 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Exported actions
-// ---------------------------------------------------------------------------
-
 /**
  * Called immediately after a freelancer's KYC is approved.
- * Scans all projects awaiting a match (including draft) and tries to assign.
  */
 export const checkAndAutoAssignForFreelancer = internalAction({
   args: {
     freelancerId: v.id("users"),
   },
-  handler: async (ctx, args) => {
-    const awaitingProjects = await ctx.runQuery(
-      internalAny.matching.queries.getProjectsAwaitingMatch,
-      {}
-    );
+  handler: async (ctx, _args) => {
+    const awaitingProjects = await ctx.runQuery(internalAny.matching.queries.getProjectsAwaitingMatch, {});
 
     if (!awaitingProjects || awaitingProjects.length === 0) return;
 
     for (const project of awaitingProjects) {
       await tryMatchProject(ctx, project._id);
     }
+
+    await sendPeriodicClientMatchReminders(ctx);
   },
 });
 
 /**
- * Periodic retry: re-runs matching for every project still awaiting assignment.
- * Registered as a cron job in convex/crons.ts.
+ * Periodic retry: regenerate suggestions + reminder emails.
  */
 export const retryAwaitingMatchProjects = internalAction({
   args: {},
   handler: async (ctx) => {
-    const awaitingProjects = await ctx.runQuery(
-      internalAny.matching.queries.getProjectsAwaitingMatch,
-      {}
-    );
+    const awaitingProjects = await ctx.runQuery(internalAny.matching.queries.getProjectsAwaitingMatch, {});
 
     if (!awaitingProjects || awaitingProjects.length === 0) return;
 
@@ -292,5 +239,7 @@ export const retryAwaitingMatchProjects = internalAction({
     for (const project of awaitingProjects) {
       await tryMatchProject(ctx, project._id);
     }
+
+    await sendPeriodicClientMatchReminders(ctx);
   },
 });

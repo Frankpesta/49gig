@@ -798,74 +798,78 @@ export function OpportunityMatchFreelancerEmail({
   );
 }
 
-/** Email when automatic matching finds talent for a client's hire (cron / KYC trigger). */
-export function AutoMatchReadyClientEmail({
+/**
+ * Client email: vetted freelancers are available to review (initial or periodic reminder).
+ * No freelancer-facing email is sent for this flow.
+ */
+export function FreelancersAvailableClientEmail({
   name = "there",
   hireTitle,
-  matchedCount,
   matchesPageUrl,
   appUrl,
   logoUrl,
   date,
+  isReminder,
+  pendingCount,
 }: BaseEmailProps & {
   hireTitle: string;
-  matchedCount: number;
   matchesPageUrl: string;
+  isReminder: boolean;
+  pendingCount: number;
 }) {
-  const many = matchedCount > 1;
-  return (
-    <EmailLayout
-      preview={`You've been automatically matched with ${many ? "freelancers" : "a freelancer"} for "${hireTitle}" — review on 49GIG.`}
-      heroLabel="Automatic match"
-      heroTitle="You have new matches for your hire."
-      heroAccent="hire"
-      heroSubtitle="Our matching system found vetted talent that fits this hire—review them when you're ready."
-      logoUrl={logoUrl}
-      appUrl={appUrl}
-      date={date}
-    >
-      <Text style={textStyle}>
-        Hi <strong>{name}</strong>, good news: you&apos;ve been <strong>automatically matched</strong> with{" "}
-        {many ? <strong>{matchedCount} freelancers</strong> : <strong>a freelancer</strong>} for your hire{" "}
-        <strong>{hireTitle}</strong>. Open your dashboard to review profiles and decide how you&apos;d like to move
-        forward.
-      </Text>
-      <EmailButton href={matchesPageUrl}>Review matches</EmailButton>
-    </EmailLayout>
-  );
-}
+  const many = pendingCount > 1;
+  const preview = isReminder
+    ? `Reminder: review suggested freelancers for "${hireTitle}" on 49GIG.`
+    : many
+      ? `${pendingCount} vetted freelancers are available for "${hireTitle}" — review on 49GIG.`
+      : `A vetted freelancer is available for "${hireTitle}" — review on 49GIG.`;
 
-/** Email when automatic matching assigns a freelancer to a hire (cron / KYC trigger). */
-export function AutoMatchFreelancerEmail({
-  name = "there",
-  hireTitle,
-  clientName,
-  hirePageUrl,
-  appUrl,
-  logoUrl,
-  date,
-}: BaseEmailProps & {
-  hireTitle: string;
-  clientName: string;
-  hirePageUrl: string;
-}) {
   return (
     <EmailLayout
-      preview={`You've been automatically matched for a hire: "${hireTitle}".`}
-      heroLabel="Automatic match"
-      heroTitle="You've been automatically matched for a hire."
-      heroAccent="matched"
-      heroSubtitle="A client on 49GIG has an open role that lines up with your profile—review it in your dashboard."
+      preview={preview}
+      heroLabel={isReminder ? "Reminder" : "Matches ready"}
+      heroTitle={isReminder ? "Still waiting for you to review matches." : "Freelancers are available for your hire."}
+      heroAccent={isReminder ? undefined : "hire"}
+      heroSubtitle={
+        isReminder
+          ? "You have suggestions waiting on your hire—open your matches page when you’re ready to choose."
+          : "Vetted professionals are ready for you to review. Select who you’d like and continue when it feels right."
+      }
       logoUrl={logoUrl}
       appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi <strong>{name}</strong>, you&apos;ve been <strong>automatically matched</strong> for a hire:{" "}
-        <strong>{hireTitle}</strong>, with <strong>{clientName}</strong>. Sign in to 49GIG to see the details and next
-        steps.
+        Hi <strong>{name}</strong>
+        {isReminder ? (
+          <>
+            , this is a friendly reminder: you still have{" "}
+            {many ? (
+              <>
+                <strong>{pendingCount} suggestions</strong>
+              </>
+            ) : (
+              <strong>a suggestion</strong>
+            )}{" "}
+            to review for your hire <strong>{hireTitle}</strong>. Use the button below to go straight to your matches
+            page and proceed when you’re ready.
+          </>
+        ) : (
+          <>
+            , there {many ? "are" : "is"}{" "}
+            {many ? (
+              <>
+                <strong>{pendingCount} vetted freelancers</strong>
+              </>
+            ) : (
+              <strong>a vetted freelancer</strong>
+            )}{" "}
+            available for your hire <strong>{hireTitle}</strong>. Review their profiles on your matches page and select
+            who you’d like to move forward with.
+          </>
+        )}
       </Text>
-      <EmailButton href={hirePageUrl}>View hire</EmailButton>
+      <EmailButton href={matchesPageUrl}>View matches</EmailButton>
     </EmailLayout>
   );
 }
