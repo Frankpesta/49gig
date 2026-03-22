@@ -14,6 +14,7 @@ import {
   DollarSign,
   Clock,
   User,
+  UserSearch,
   CheckCircle2,
   AlertCircle,
   XCircle,
@@ -241,6 +242,12 @@ export default function ProjectDetailPage() {
   const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
   const isClient = user.role === "client" && project.clientId === user._id;
+  const pendingMatchesCount =
+    (project as { pendingMatchesCount?: number }).pendingMatchesCount ?? 0;
+  const showClientViewMatches =
+    isClient &&
+    pendingMatchesCount > 0 &&
+    project.clientNotifiedOfAvailableMatchesAt != null;
   const matchingInProgressForClient =
     isClient &&
     (project.awaitingMatch === true ||
@@ -391,6 +398,16 @@ export default function ProjectDetailPage() {
                 </Link>
               </Button>
             )}
+            {showClientViewMatches && (
+              <Button asChild>
+                <Link href={`/dashboard/projects/${project._id}/matches`}>
+                  <UserSearch className="mr-2 h-4 w-4" />
+                  {project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0
+                    ? "Review & complete team"
+                    : "View matches"}
+                </Link>
+              </Button>
+            )}
             {(project.status === "draft" || project.status === "pending_funding") && !needContractSignPrePayment && (
               <Button asChild>
                 <Link href={`/dashboard/projects/${project._id}/payment`}>
@@ -517,20 +534,15 @@ export default function ProjectDetailPage() {
                 ? `We’re still confirming ${project.pendingTeamMemberSlots} more team member(s). You’ll get an email when there are people to review.`
                 : project.awaitingMatch
                   ? project.status === "draft"
-                    ? "We’re actively matching your hire to vetted talent. You’ll get an email when there are people to review—check the matches page anytime for updates."
-                    : "We’re finding the right freelancer(s) for this hire. You’ll get an email when matches are ready to review."
+                    ? showClientViewMatches
+                      ? "You have vetted suggestions ready—use View matches above to review and continue."
+                      : "We’re lining up vetted talent for your hire. You’ll get an email when there are people to review."
+                    : showClientViewMatches
+                      ? "You have suggestions ready to review—use View matches above to continue."
+                      : "We’re finding the right freelancer(s) for this hire. You’ll get an email when suggestions are ready to review."
                   : "Some roles are still being staffed. We’ll email you when there’s an update."}
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2 pt-0">
-            <Button asChild size="sm" className="rounded-lg">
-              <Link href={`/dashboard/projects/${project._id}/matches`}>
-                {project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0
-                  ? "Review & complete team"
-                  : "View matches"}
-              </Link>
-            </Button>
-          </CardContent>
         </Card>
       )}
 
