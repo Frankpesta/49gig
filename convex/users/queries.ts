@@ -191,6 +191,43 @@ export const getAllUsersAdmin = query({
 });
 
 /**
+ * Full user document for admin/moderator (e.g. inspect any account from Users page).
+ * Excludes password hash only.
+ */
+export const getUserProfileForAdmin = query({
+  args: {
+    targetUserId: v.id("users"),
+    adminUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    let currentUser: Doc<"users"> | null = null;
+    if (args.adminUserId) {
+      const u = await ctx.db.get(args.adminUserId);
+      if (u && (u as Doc<"users">).status === "active") currentUser = u as Doc<"users">;
+    }
+    if (!currentUser) {
+      const identity = await ctx.auth.getUserIdentity();
+      if (identity?.email) {
+        const u = await ctx.db
+          .query("users")
+          .withIndex("by_email", (q) => q.eq("email", identity.email!))
+          .first();
+        if (u && (u as Doc<"users">).status === "active") currentUser = u as Doc<"users">;
+      }
+    }
+    if (!currentUser || (currentUser.role !== "admin" && currentUser.role !== "moderator")) {
+      return null;
+    }
+
+    const target = await ctx.db.get(args.targetUserId);
+    if (!target) return null;
+
+    const { passwordHash, ...rest } = target;
+    return rest;
+  },
+});
+
+/**
  * Get user by ID (internal - returns name, email, role, status, profile for callers that need them e.g. vetting)
  */
 export const getUserByIdInternal = internalQuery({

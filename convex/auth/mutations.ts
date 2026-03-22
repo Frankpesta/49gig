@@ -4,6 +4,10 @@ import { checkRateLimit, clearRateLimit } from "./rateLimit";
 import { hashPassword, verifyPassword } from "./password";
 import type { FunctionReference } from "convex/server";
 import { Doc } from "../_generated/dataModel";
+import {
+  applyReferralAttributionForNewUser,
+  ensureUserReferralCode,
+} from "../referrals/helpers";
 
 const api = require("../_generated/api") as {
   api: {
@@ -174,8 +178,10 @@ export const signup = mutation({
         ),
         skills: v.optional(v.array(v.string())),
         languagesWritten: v.optional(v.array(v.string())),
+        softwareDevFields: v.optional(v.array(v.string())),
       })
     ),
+    referralCode: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Rate limiting: 5 signups per hour per email
@@ -221,6 +227,13 @@ export const signup = mutation({
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
+
+    await applyReferralAttributionForNewUser(ctx, {
+      newUserId: userId,
+      role: args.role,
+      referralCode: args.referralCode,
+    });
+    await ensureUserReferralCode(ctx, userId);
 
     // Create audit log
     await ctx.db.insert("auditLogs", {

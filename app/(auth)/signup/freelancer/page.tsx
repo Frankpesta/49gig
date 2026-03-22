@@ -20,7 +20,9 @@ import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import {
   PLATFORM_CATEGORIES,
   SKILLS_FOR_MCQ_CODING,
+  SOFTWARE_DEV_FIELDS,
   getSkillsForCategory,
+  getSoftwareDevFieldSkills,
 } from "@/lib/platform-skills";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -44,6 +46,7 @@ export default function FreelancerSignupPage() {
     password: "",
     confirmPassword: "",
     techField: "",
+    softwareDevField: "",
     experienceLevel: "",
     skills: [] as string[],
     languagesWritten: [] as string[],
@@ -56,7 +59,14 @@ export default function FreelancerSignupPage() {
   );
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
 
-  const categorySkills = formData.techField ? getSkillsForCategory(formData.techField) : [];
+  const categorySkills =
+    formData.techField === "software_development"
+      ? formData.softwareDevField
+        ? getSoftwareDevFieldSkills([formData.softwareDevField])
+        : []
+      : formData.techField
+        ? getSkillsForCategory(formData.techField)
+        : [];
 
   const handleAddSkill = () => {
     if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
@@ -108,6 +118,11 @@ export default function FreelancerSignupPage() {
 
     if (!formData.techField) {
       setError("Please select a tech field");
+      return;
+    }
+
+    if (formData.techField === "software_development" && !formData.softwareDevField) {
+      setError("Please select your software development focus (e.g. frontend, backend)");
       return;
     }
 
@@ -300,6 +315,7 @@ export default function FreelancerSignupPage() {
                           setFormData({
                             ...formData,
                             techField: value,
+                            softwareDevField: "",
                             experienceLevel: "",
                             skills: [],
                           });
@@ -318,6 +334,36 @@ export default function FreelancerSignupPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {formData.techField === "software_development" && (
+                      <div className="space-y-0.5">
+                        <Label htmlFor="softwareDevField" className="text-sm font-medium">
+                          Software focus
+                        </Label>
+                        <Select
+                          value={formData.softwareDevField || "__none__"}
+                          onValueChange={(value) =>
+                            setFormData({
+                              ...formData,
+                              softwareDevField: value === "__none__" ? "" : value,
+                              skills: [],
+                            })
+                          }
+                          disabled={isLoading}
+                        >
+                          <SelectTrigger id="softwareDevField" className="h-11 rounded-lg">
+                            <SelectValue placeholder="e.g. Frontend, Full-stack…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Choose…</SelectItem>
+                            {SOFTWARE_DEV_FIELDS.map((f) => (
+                              <SelectItem key={f.id} value={f.id}>
+                                {f.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     {formData.techField && (
                       <div className="space-y-0.5">
                         <Label

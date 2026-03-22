@@ -150,7 +150,7 @@ export const getFreelancerPublicProfile = query({
 });
 
 /**
- * Get all funded projects that are currently in the awaiting-match queue.
+ * Get all projects in the awaiting-match queue (pre- and post-funding).
  * Used by the auto-assignment cron and KYC-approval trigger.
  */
 export const getProjectsAwaitingMatch = internalQuery({
@@ -160,7 +160,12 @@ export const getProjectsAwaitingMatch = internalQuery({
       .query("projects")
       .withIndex("by_awaiting_match", (q) => q.eq("awaitingMatch", true))
       .filter((q) =>
-        q.or(q.eq(q.field("status"), "funded"), q.eq(q.field("status"), "matching"))
+        q.or(
+          q.eq(q.field("status"), "draft"),
+          q.eq(q.field("status"), "pending_funding"),
+          q.eq(q.field("status"), "funded"),
+          q.eq(q.field("status"), "matching")
+        )
       )
       .collect();
   },

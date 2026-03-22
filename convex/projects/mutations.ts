@@ -4,7 +4,7 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { resolveTargetTeamSize } from "../../lib/budget-calculator";
-import { getRoleLabelsFromProject } from "../../lib/platform-skills";
+import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -493,6 +493,17 @@ export const updateProjectStatus = mutation({
         internalAny.monthlyBillingCycles.mutations.releaseAllPendingCyclesForProjectInternal,
         { projectId: args.projectId }
       );
+    }
+
+    if (args.status === "in_progress") {
+      await ctx.runMutation(internalAny.referrals.internalMutations.onProjectEnteredInProgress, {
+        projectId: args.projectId,
+      });
+    }
+    if (args.status === "cancelled") {
+      await ctx.runMutation(internalAny.referrals.internalMutations.voidReferralAccrualsForProject, {
+        projectId: args.projectId,
+      });
     }
 
     // Log audit
@@ -1208,7 +1219,7 @@ export const acceptSelectedMatchInternal = internalMutation({
           await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
         }
 
-        const allRoleLabels = getRoleLabelsFromProject(intake);
+        const allRoleLabels = getRoleLabelsForProjectIntake(intake);
         const selectedRolesLower = new Set(
           toAccept.map((m) => (m.teamRole || "").toLowerCase()).filter(Boolean)
         );
@@ -1398,7 +1409,7 @@ export const confirmRemainingTeamSelections = mutation({
       );
     } else {
       const intake = project.intakeForm;
-      const allRoleLabels = getRoleLabelsFromProject(intake);
+      const allRoleLabels = getRoleLabelsForProjectIntake(intake);
       const acceptedRoleLower = new Set<string>();
       for (const m of allMatches) {
         if (m.status === "accepted" && merged.includes(m.freelancerId) && m.teamRole) {
@@ -1507,6 +1518,17 @@ export const updateProjectStatusInternal = internalMutation({
 
     await ctx.db.patch(args.projectId, updates);
 
+    if (args.status === "in_progress") {
+      await ctx.runMutation(internalAny.referrals.internalMutations.onProjectEnteredInProgress, {
+        projectId: args.projectId,
+      });
+    }
+    if (args.status === "cancelled") {
+      await ctx.runMutation(internalAny.referrals.internalMutations.voidReferralAccrualsForProject, {
+        projectId: args.projectId,
+      });
+    }
+
     // Log audit
     // For system events, we use the project's client ID as the actor
     await ctx.db.insert("auditLogs", {
@@ -1555,6 +1577,10 @@ export const cancelProjectForNonPaymentInternal = internalMutation({
       status: "cancelled",
       updatedAt: now,
       completedAt: now,
+    });
+
+    await ctx.runMutation(internalAny.referrals.internalMutations.voidReferralAccrualsForProject, {
+      projectId: args.projectId,
     });
 
     await ctx.db.insert("auditLogs", {

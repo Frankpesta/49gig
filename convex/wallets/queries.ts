@@ -3,6 +3,72 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 
+function sumClientReferralHiringCents(
+  txs: Doc<"walletTransactions">[],
+  currencyLower: string
+): number {
+  let sum = 0;
+  for (const t of txs) {
+    if (t.status !== "completed") continue;
+    if (t.currency.toLowerCase() !== currencyLower) continue;
+    if (t.type === "credit" && t.category === "client_referral_credit") {
+      sum += t.amountCents;
+    } else if (t.type === "debit" && t.category === "hiring_credit") {
+      sum -= t.amountCents;
+    }
+  }
+  return Math.max(0, sum);
+}
+
+/**
+ * Internal: client hiring balance from referral rewards (same currency as project checkout).
+ */
+export const getClientReferralHiringBalanceCentsInternal = internalQuery({
+  args: {
+    userId: v.id("users"),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    if (!wallet) return 0;
+    const cur = args.currency.toLowerCase();
+    const txs = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .collect();
+    return sumClientReferralHiringCents(txs, cur);
+  },
+});
+
+/** Client: referral hiring credits available toward pre-funding (not withdrawable). */
+export const getMyClientReferralHiringBalance = query({
+  args: {
+    userId: v.optional(v.id("users")),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await resolveUser(ctx, args.userId);
+    if (!user || user.role !== "client") {
+      return { cents: 0 };
+    }
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+    if (!wallet) return { cents: 0 };
+    const txs = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .collect();
+    return {
+      cents: sumClientReferralHiringCents(txs, args.currency.toLowerCase()),
+    };
+  },
+});
+
 async function resolveUser(ctx: any, userId?: Doc<"users">["_id"]): Promise<Doc<"users"> | null> {
   if (userId) {
     const user = await ctx.db.get(userId);

@@ -45,12 +45,16 @@ export default function PricingPage() {
   const setPricingBaseRates = useMutation(api.pricing.mutations.setPricingBaseRates);
   const platformFeePct = useQuery(api.platformSettings.queries.getPlatformFeePercentage);
   const setPlatformFeePct = useMutation(api.platformSettings.mutations.setPlatformFeePercentage);
+  const referralBonusPct = useQuery(api.platformSettings.queries.getReferralBonusPercentage);
+  const setReferralBonusPct = useMutation(api.platformSettings.mutations.setReferralBonusPercentage);
 
   const [rates, setRates] = useState<Record<string, { junior: number; mid: number; senior: number; expert: number }>>(buildEmptyRates);
   const [saving, setSaving] = useState(false);
   const [touched, setTouched] = useState(false);
   const [platformFee, setPlatformFee] = useState<number>(25);
   const [platformFeeTouched, setPlatformFeeTouched] = useState(false);
+  const [referralBonus, setReferralBonus] = useState<number>(4);
+  const [referralBonusTouched, setReferralBonusTouched] = useState(false);
 
   const hydrateFromConfig = useCallback(() => {
     if (config === undefined) return;
@@ -80,6 +84,12 @@ export default function PricingPage() {
       setPlatformFee(platformFeePct);
     }
   }, [platformFeePct]);
+
+  useEffect(() => {
+    if (referralBonusPct !== undefined) {
+      setReferralBonus(referralBonusPct);
+    }
+  }, [referralBonusPct]);
 
   const handleChange = (category: string, level: Level, value: string) => {
     const parsed = value.trim() === "" ? 0 : parseFloat(value);
@@ -150,6 +160,23 @@ export default function PricingPage() {
     }
   };
 
+  const handleSaveReferralBonus = async () => {
+    if (!user?._id) return;
+    setSaving(true);
+    try {
+      await setReferralBonusPct({
+        percentage: referralBonus,
+        userId: user._id,
+      });
+      setReferralBonusTouched(false);
+      toast.success("Referral bonus percentage updated.");
+    } catch (e) {
+      toast.error(getUserFriendlyError(e) || "Failed to save referral bonus");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!isAuthenticated || !user) {
     return <DashboardEmptyState icon={DollarSign} title="Please log in." iconTone="muted" />;
   }
@@ -215,6 +242,53 @@ export default function PricingPage() {
               Save
             </Button>
             {platformFeeTouched && (
+              <span className="text-sm text-amber-600 dark:text-amber-400">Unsaved</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Percent className="h-4 w-4" />
+            Referral bonus
+          </CardTitle>
+          <CardDescription>
+            Percentage of the first successful hire funding net (after platform fee) paid to referrers once
+            the hire is in progress for 7 days. Default 4%. Client referrers receive hiring credit; freelancers
+            receive wallet balance.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={referralBonus}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v) && v >= 0 && v <= 100) {
+                    setReferralBonus(v);
+                    setReferralBonusTouched(true);
+                  }
+                }}
+                className="w-24 h-9"
+              />
+              <span className="text-sm text-muted-foreground">%</span>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSaveReferralBonus}
+              disabled={saving || !referralBonusTouched}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save
+            </Button>
+            {referralBonusTouched && (
               <span className="text-sm text-amber-600 dark:text-amber-400">Unsaved</span>
             )}
           </div>

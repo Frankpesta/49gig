@@ -149,6 +149,7 @@ export const updateProfile = mutation({
         )
       ),
       languagesWritten: v.optional(v.array(v.string())),
+      softwareDevFields: v.optional(v.array(v.string())),
       hourlyRate: v.optional(v.number()),
       availability: v.optional(
         v.union(

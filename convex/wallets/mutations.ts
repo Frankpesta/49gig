@@ -42,6 +42,14 @@ export const creditWallet = internalMutation({
     projectId: v.optional(v.id("projects")),
     monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
     paymentId: v.optional(v.id("payments")),
+    category: v.optional(
+      v.union(
+        v.literal("earnings"),
+        v.literal("referral_bonus"),
+        v.literal("client_referral_credit"),
+        v.literal("hiring_credit")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     let wallet = await ctx.db
@@ -71,6 +79,7 @@ export const creditWallet = internalMutation({
       walletId: wallet._id,
       userId: args.userId,
       type: "credit",
+      category: args.category,
       amountCents: args.amountCents,
       currency: args.currency,
       balanceAfterCents: newBalance,
@@ -97,6 +106,14 @@ export const debitWallet = internalMutation({
     description: v.string(),
     flutterwaveTransferId: v.optional(v.string()),
     paymentId: v.optional(v.id("payments")),
+    category: v.optional(
+      v.union(
+        v.literal("earnings"),
+        v.literal("referral_bonus"),
+        v.literal("client_referral_credit"),
+        v.literal("hiring_credit")
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const wallet = await ctx.db
@@ -124,6 +141,7 @@ export const debitWallet = internalMutation({
       walletId: wallet._id,
       userId: args.userId,
       type: "debit",
+      category: args.category,
       amountCents: args.amountCents,
       currency: args.currency,
       balanceAfterCents: newBalance,

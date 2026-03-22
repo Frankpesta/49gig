@@ -71,6 +71,8 @@ export const createPayment = internalMutation({
         v.literal("cancelled")
       )
     ),
+    fundingGrossAmount: v.optional(v.number()),
+    clientWalletCreditApplied: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -125,6 +127,8 @@ export const createPayment = internalMutation({
       currency: args.currency,
       platformFee: args.platformFee,
       netAmount: args.netAmount,
+      fundingGrossAmount: args.fundingGrossAmount,
+      clientWalletCreditApplied: args.clientWalletCreditApplied,
       flutterwaveTransactionId: args.flutterwaveTransactionId,
       flutterwaveRefundId: args.flutterwaveRefundId,
       flutterwaveTransferId: args.flutterwaveTransferId,
@@ -303,6 +307,25 @@ export const handlePaymentSuccess = internalMutation({
       : null;
     const clientId = project?.clientId;
 
+    if (
+      payment.type === "pre_funding" &&
+      clientId &&
+      (payment.clientWalletCreditApplied ?? 0) > 0
+    ) {
+      const applyDollars = payment.clientWalletCreditApplied as number;
+      const cents = Math.round(applyDollars * 100);
+      if (cents > 0) {
+        await ctx.runMutation(internalAny.wallets.mutations.debitWallet, {
+          userId: clientId,
+          amountCents: cents,
+          currency: payment.currency.toLowerCase(),
+          description: "Applied to hire funding (referral hiring credit)",
+          paymentId: payment._id,
+          category: "hiring_credit",
+        });
+      }
+    }
+
     // Update project based on payment type (fee already taken; netAmount goes to escrow)
     if (payment.type === "pre_funding" && project && projectId) {
       const monthsFunded = Math.max(1, project.fundUpfrontMonths ?? 1);
@@ -419,6 +442,13 @@ export const handlePaymentSuccess = internalMutation({
           data: { paymentId: payment._id, projectId },
         });
       }
+    }
+
+    if (payment.type === "pre_funding") {
+      await ctx.runMutation(
+        internalAny.referrals.internalMutations.tryCreateReferralAccrualForPreFunding,
+        { paymentId: payment._id }
+      );
     }
 
     return payment._id;
@@ -620,6 +650,17 @@ export const updateProjectStatus = internalMutation({
     }
 
     await ctx.db.patch(args.projectId, updates);
+
+    if (args.status === "in_progress") {
+      await ctx.runMutation(internalAny.referrals.internalMutations.onProjectEnteredInProgress, {
+        projectId: args.projectId,
+      });
+    }
+    if (args.status === "cancelled") {
+      await ctx.runMutation(internalAny.referrals.internalMutations.voidReferralAccrualsForProject, {
+        projectId: args.projectId,
+      });
+    }
 
     // Log audit
     await ctx.db.insert("auditLogs", {

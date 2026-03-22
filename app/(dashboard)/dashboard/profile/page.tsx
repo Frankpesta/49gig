@@ -15,16 +15,36 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-heade
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PLATFORM_CATEGORIES, PROGRAMMING_LANGUAGES, getSkillsForCategory, type TechFieldValue, type ExperienceLevelValue } from "@/lib/platform-skills";
+import {
+  PLATFORM_CATEGORIES,
+  PROGRAMMING_LANGUAGES,
+  SOFTWARE_DEV_FIELDS,
+  getSkillsForCategory,
+  getSoftwareDevFieldSkills,
+  getSoftwareDevFieldLabel,
+  type TechFieldValue,
+  type ExperienceLevelValue,
+} from "@/lib/platform-skills";
+import { PROFILE_TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
+
+const TIMEZONES_BY_REGION = PROFILE_TIMEZONE_OPTIONS.reduce<
+  Record<string, typeof PROFILE_TIMEZONE_OPTIONS>
+>((acc, tz) => {
+  if (!acc[tz.region]) acc[tz.region] = [];
+  acc[tz.region].push(tz);
+  return acc;
+}, {});
 
 export default function ProfilePage() {
   const { user, isAuthenticated } = useAuth();
@@ -41,7 +61,7 @@ export default function ProfilePage() {
     experienceLevel: "",
     skills: [] as string[],
     languagesWritten: [] as string[],
-    hourlyRate: "",
+    softwareDevField: "",
     availability: "available" as "available" | "busy" | "unavailable",
     timezone: "",
     portfolioUrl: "",
@@ -92,7 +112,7 @@ export default function ProfilePage() {
         experienceLevel: source.profile?.experienceLevel || "",
         skills: source.profile?.skills || [],
         languagesWritten: source.profile?.languagesWritten || [],
-        hourlyRate: source.profile?.hourlyRate?.toString() || "",
+        softwareDevField: source.profile?.softwareDevFields?.[0] || "",
         availability: source.profile?.availability || "available",
         timezone: source.profile?.timezone || "",
         portfolioUrl: source.profile?.portfolioUrl || "",
@@ -105,9 +125,19 @@ export default function ProfilePage() {
     const targetUser = displayUser ?? user;
     if (!targetUser?._id) return;
 
+    if (
+      targetUser.role === "freelancer" &&
+      formData.techField === "software_development" &&
+      !formData.softwareDevField
+    ) {
+      toast.error("Please select your software focus (e.g. frontend, full-stack).");
+      return;
+    }
+
     setIsSaving(true);
     try {
       const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
+      const isFreelancerProfile = targetUser.role === "freelancer";
       await updateProfile({
         name: formData.name,
         profile: {
@@ -119,7 +149,14 @@ export default function ProfilePage() {
           experienceLevel: (formData.experienceLevel || undefined) as ExperienceLevelValue | undefined,
           skills: formData.skills.length > 0 ? formData.skills : undefined,
           languagesWritten: formData.languagesWritten.length > 0 ? formData.languagesWritten : undefined,
-          hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : undefined,
+          ...(isFreelancerProfile
+            ? {
+                softwareDevFields:
+                  formData.techField === "software_development" && formData.softwareDevField
+                    ? [formData.softwareDevField]
+                    : [],
+              }
+            : {}),
           availability: formData.availability,
           timezone: formData.timezone || undefined,
           portfolioUrl: formData.portfolioUrl || undefined,
@@ -209,6 +246,15 @@ export default function ProfilePage() {
   const isClient = effectiveUser?.role === "client";
   const isFreelancer = effectiveUser?.role === "freelancer";
 
+  const freelancerSkillPicker =
+    isFreelancer && formData.techField === "software_development"
+      ? formData.softwareDevField
+        ? getSoftwareDevFieldSkills([formData.softwareDevField])
+        : []
+      : isFreelancer && formData.techField
+        ? getSkillsForCategory(formData.techField)
+        : [];
+
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
@@ -252,6 +298,45 @@ export default function ProfilePage() {
             </FormField>
           </div>
         </ProfileCard>
+
+        <Card className="rounded-xl overflow-hidden border-border/60">
+          <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent py-4">
+            <CardTitle className="text-base">Timezone</CardTitle>
+            <CardDescription>Used for scheduling and client–freelancer matching.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-2 pb-6">
+            <FormField label="Your timezone" htmlFor="timezone">
+              <Select
+                value={formData.timezone || "__none__"}
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    timezone: value === "__none__" ? "" : value,
+                  })
+                }
+              >
+                <SelectTrigger id="timezone" className="rounded-lg h-11">
+                  <SelectValue placeholder="Select timezone" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[min(24rem,70vh)]">
+                  <SelectItem value="__none__">Not specified</SelectItem>
+                  {Object.entries(TIMEZONES_BY_REGION).map(([region, list]) => (
+                    <SelectGroup key={region}>
+                      <SelectLabel className="px-2 py-1.5 text-xs text-muted-foreground">
+                        {region}
+                      </SelectLabel>
+                      {list.map((tz) => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
+          </CardContent>
+        </Card>
 
         {/* Client-Specific Fields */}
         {isClient && (
@@ -404,6 +489,7 @@ export default function ProfilePage() {
                         ...formData,
                         techField: value,
                         skills: [],
+                        softwareDevField: "",
                       })
                     }
                   >
@@ -419,6 +505,36 @@ export default function ProfilePage() {
                     </SelectContent>
                   </Select>
                 </FormField>
+                {formData.techField === "software_development" && (
+                  <FormField
+                    label="Software focus"
+                    htmlFor="softwareDevField"
+                    description="Pick your primary track (same as when clients hire developers)."
+                  >
+                    <Select
+                      value={formData.softwareDevField || "__none__"}
+                      onValueChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          softwareDevField: value === "__none__" ? "" : value,
+                          skills: [],
+                        })
+                      }
+                    >
+                      <SelectTrigger id="softwareDevField" className="rounded-lg h-11">
+                        <SelectValue placeholder="Select focus area" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Choose…</SelectItem>
+                        {SOFTWARE_DEV_FIELDS.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>
+                            {f.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                )}
                 {formData.techField && (
                   <FormField label="Experience level" htmlFor="experienceLevel">
                     <Select
@@ -439,10 +555,17 @@ export default function ProfilePage() {
                     </Select>
                   </FormField>
                 )}
-                {formData.techField && getSkillsForCategory(formData.techField).length > 0 && (
-                  <FormField label="Skills (from category)" description="Select skills that match your expertise.">
+                {freelancerSkillPicker.length > 0 && (
+                  <FormField
+                    label={
+                      formData.techField === "software_development" && formData.softwareDevField
+                        ? `Skills (${getSoftwareDevFieldLabel(formData.softwareDevField)})`
+                        : "Skills (from category)"
+                    }
+                    description="Select skills that match your expertise."
+                  >
                     <div className="flex flex-wrap gap-2">
-                      {getSkillsForCategory(formData.techField).map((skill) => (
+                      {freelancerSkillPicker.map((skill) => (
                         <Button
                           key={skill}
                           type="button"
@@ -535,49 +658,22 @@ export default function ProfilePage() {
                     </div>
                   )}
                 </FormField>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField label="Hourly Rate ($)" htmlFor="hourlyRate">
-                    <Input
-                      id="hourlyRate"
-                      type="number"
-                      value={formData.hourlyRate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, hourlyRate: e.target.value })
-                      }
-                      placeholder="0.00"
-                      min="0"
-                      step="0.01"
-                      className="rounded-lg h-11"
-                    />
-                  </FormField>
-                  <FormField label="Availability" htmlFor="availability">
-                    <Select
-                      value={formData.availability}
-                      onValueChange={(value: "available" | "busy" | "unavailable") =>
-                        setFormData({ ...formData, availability: value })
-                      }
-                    >
-                      <SelectTrigger className="rounded-lg h-11">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="busy">Busy</SelectItem>
-                        <SelectItem value="unavailable">Unavailable</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormField>
-                </div>
-                <FormField label="Timezone" htmlFor="timezone" description="e.g., America/New_York">
-                  <Input
-                    id="timezone"
-                    value={formData.timezone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, timezone: e.target.value })
+                <FormField label="Availability" htmlFor="availability">
+                  <Select
+                    value={formData.availability}
+                    onValueChange={(value: "available" | "busy" | "unavailable") =>
+                      setFormData({ ...formData, availability: value })
                     }
-                    placeholder="e.g., America/New_York"
-                    className="rounded-lg h-11"
-                  />
+                  >
+                    <SelectTrigger className="rounded-lg h-11 max-w-md">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="available">Available</SelectItem>
+                      <SelectItem value="busy">Busy</SelectItem>
+                      <SelectItem value="unavailable">Unavailable</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </FormField>
                 <FormField label="Portfolio URL" htmlFor="portfolioUrl" description="Link to your portfolio or website.">
                   <Input

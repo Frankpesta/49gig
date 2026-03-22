@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Doc } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,7 +49,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Users, Shield, ShieldCheck, CheckCircle2, Search, AlertCircle } from "lucide-react";
+import { Loader2, Users, Shield, ShieldCheck, CheckCircle2, Search, AlertCircle, ExternalLink } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -75,6 +75,7 @@ export default function UsersPage() {
   const [verificationOverrideReason, setVerificationOverrideReason] = useState("");
   const [verificationOverrideApproveKyc, setVerificationOverrideApproveKyc] = useState(true);
   const [verificationOverrideLoading, setVerificationOverrideLoading] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<Id<"users"> | null>(null);
 
   const users = useQuery(
     api.users.queries.getAllUsersAdmin,
@@ -84,6 +85,13 @@ export default function UsersPage() {
           role: roleFilter !== "all" ? (roleFilter as "client" | "freelancer" | "moderator" | "admin") : undefined,
           status: statusFilter !== "all" ? (statusFilter as "active" | "suspended" | "deleted") : undefined,
         }
+      : "skip"
+  );
+
+  const profileDetail = useQuery(
+    api.users.queries.getUserProfileForAdmin,
+    profileUserId && user?._id
+      ? { targetUserId: profileUserId, adminUserId: user._id }
       : "skip"
   );
 
@@ -340,6 +348,15 @@ export default function UsersPage() {
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setProfileUserId(u._id)}
+                          >
+                            View profile
+                          </Button>
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button
@@ -458,6 +475,7 @@ export default function UsersPage() {
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -475,6 +493,96 @@ export default function UsersPage() {
           />
         </CardContent>
       </Card>
+
+      <Dialog
+        open={profileUserId !== null}
+        onOpenChange={(open) => {
+          if (!open) setProfileUserId(null);
+        }}
+      >
+        <DialogContent className="max-w-lg max-h-[min(85vh,720px)] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>User profile</DialogTitle>
+            <DialogDescription>
+              Read-only view for support and verification.
+            </DialogDescription>
+          </DialogHeader>
+          {profileUserId && profileDetail === undefined && (
+            <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading…
+            </div>
+          )}
+          {profileDetail === null && profileUserId && (
+            <p className="text-sm text-muted-foreground py-4">Could not load this profile.</p>
+          )}
+          {profileDetail && (
+            <div className="space-y-4 py-2 text-sm">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Name</p>
+                <p className="font-medium">{profileDetail.name ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</p>
+                <p>{profileDetail.email ?? "—"}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="outline" className="capitalize">{profileDetail.role}</Badge>
+                <Badge variant="secondary">{profileDetail.status}</Badge>
+              </div>
+              {profileDetail.profile && (
+                <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                  {profileDetail.profile.bio && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Bio</p>
+                      <p className="leading-relaxed">{profileDetail.profile.bio}</p>
+                    </div>
+                  )}
+                  {profileDetail.profile.companyName && (
+                    <p><span className="text-muted-foreground">Company:</span> {profileDetail.profile.companyName}</p>
+                  )}
+                  {profileDetail.profile.techField && (
+                    <p><span className="text-muted-foreground">Tech field:</span> {profileDetail.profile.techField}</p>
+                  )}
+                  {profileDetail.profile.experienceLevel && (
+                    <p><span className="text-muted-foreground">Experience:</span> {profileDetail.profile.experienceLevel}</p>
+                  )}
+                  {profileDetail.profile.timezone && (
+                    <p><span className="text-muted-foreground">Timezone:</span> {profileDetail.profile.timezone}</p>
+                  )}
+                  {profileDetail.profile.skills && profileDetail.profile.skills.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-1">Skills</p>
+                      <div className="flex flex-wrap gap-1">
+                        {profileDetail.profile.skills.map((s: string) => (
+                          <Badge key={s} variant="outline" className="font-normal text-xs">{s}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {profileDetail.role === "freelancer" && profileDetail.profile?.portfolioUrl && (
+                <Button variant="outline" className="w-full gap-2" asChild>
+                  <a
+                    href={profileDetail.profile.portfolioUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Open portfolio
+                  </a>
+                </Button>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setProfileUserId(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={verificationOverrideOpen}

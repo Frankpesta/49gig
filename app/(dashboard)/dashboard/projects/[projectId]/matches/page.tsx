@@ -38,7 +38,8 @@ import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getRoleLabelsFromProject, PLATFORM_CATEGORIES } from "@/lib/platform-skills";
+import { PLATFORM_CATEGORIES } from "@/lib/platform-skills";
+import { getRoleLabelsForProjectIntake } from "@/lib/team-slots";
 
 const PAGE_SIZE = 5;
 const TIME_SLOTS = (() => {
@@ -81,10 +82,8 @@ type FreelancerPublicProfile = {
     timezone?: string;
     techField?: string;
     experienceLevel?: string;
-    hourlyRate?: number;
     primaryRole?: string;
     weeklyHours?: number;
-    portfolioUrl?: string;
     languagesWritten?: string[];
     bio?: string;
   };
@@ -180,12 +179,6 @@ function FreelancerProfileContent({
               <p className="text-sm font-medium mt-0.5">{p.weeklyHours} hrs/week</p>
             </div>
           )}
-          {p?.hourlyRate != null && (
-            <div className="rounded-lg border border-border/60 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Hourly rate</p>
-              <p className="text-sm font-medium mt-0.5 text-primary">${p.hourlyRate}/hr</p>
-            </div>
-          )}
           <div className="rounded-lg border border-border/60 p-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rating</p>
             <p className="text-sm font-medium mt-0.5">
@@ -197,20 +190,6 @@ function FreelancerProfileContent({
             </p>
           </div>
         </section>
-
-        {p?.portfolioUrl && (
-          <section>
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">Portfolio</h3>
-            <a
-              href={p.portfolioUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline"
-            >
-              View portfolio →
-            </a>
-          </section>
-        )}
 
         {p?.languagesWritten && p.languagesWritten.length > 0 && (
           <section>
@@ -258,7 +237,6 @@ type EnrichedMatch = {
       timezone?: string;
       techField?: string;
       experienceLevel?: string;
-      hourlyRate?: number;
       primaryRole?: string;
       weeklyHours?: number;
     };
@@ -447,7 +425,7 @@ export default function ProjectMatchesPage() {
       })()
     : new Map<string, EnrichedMatch[]>();
   const allRoleLabels = isTeam && project
-    ? getRoleLabelsFromProject(project.intakeForm)
+    ? getRoleLabelsForProjectIntake(project.intakeForm)
     : [];
 
   const isFundedMatchingContinuation =

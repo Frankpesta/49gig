@@ -50,10 +50,10 @@ import {
   getRoleIdForSkill,
   getRoleLabel,
   getRoleLabelFromCategoryLabel,
-  getRoleLabelsFromProject,
   isCategoryLabel,
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
+import { getRoleLabelsForProjectIntake } from "@/lib/team-slots";
 
 const STATUS_CONFIG: Record<
   string,
@@ -730,7 +730,7 @@ export default function ProjectDetailPage() {
                 <div className="text-sm font-medium">Roles</div>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {(() => {
-                    const roleLabels = getRoleLabelsFromProject(project.intakeForm);
+                    const roleLabels = getRoleLabelsForProjectIntake(project.intakeForm);
                     return roleLabels.length > 0 ? (
                       roleLabels.map((role) => (
                         <Badge key={role} variant="secondary" className="text-xs">

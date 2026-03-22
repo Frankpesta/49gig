@@ -42,6 +42,7 @@ function updateSlot(
       ...merged,
       skills: [],
       softwareDevFieldId: undefined,
+      experienceLevel: undefined,
     };
   }
   if (
@@ -158,7 +159,7 @@ export function TeamSlotsEditor({
                   )}
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Role
@@ -215,6 +216,38 @@ export function TeamSlotsEditor({
                               {f.label}
                             </SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {slot.roleId && (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Experience for this seat
+                      </Label>
+                      <Select
+                        value={slot.experienceLevel ?? "__default__"}
+                        onValueChange={(v) =>
+                          onSlotsChange(
+                            updateSlot(slots, index, {
+                              experienceLevel:
+                                v === "__default__" ? undefined : (v as TeamSlotIntake["experienceLevel"]),
+                            })
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-11 rounded-xl border-border/70 bg-background">
+                          <SelectValue placeholder="Use project default" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__default__">
+                            Same as project default
+                          </SelectItem>
+                          <SelectItem value="junior">Junior</SelectItem>
+                          <SelectItem value="mid">Mid-Level</SelectItem>
+                          <SelectItem value="senior">Senior</SelectItem>
+                          <SelectItem value="expert">Expert</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
