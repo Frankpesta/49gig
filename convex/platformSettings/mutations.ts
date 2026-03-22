@@ -53,7 +53,7 @@ export const setPlatformFeePercentage = mutation({
 });
 
 /**
- * Set referral bonus percentage (admin only). % of first successful pre-funding net (after platform fee).
+ * Set referral bonus percentage (admin only). % of first successful pre-funding net.
  * Default 4%. Valid range 0–100.
  */
 export const setReferralBonusPercentage = mutation({

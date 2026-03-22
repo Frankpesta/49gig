@@ -64,7 +64,7 @@ export default function ReferralsPage() {
     <div className="space-y-8 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Referrals"
-        description="Share your link with new clients. When their first hire is funded and active for 7 days, you earn a percentage of the first funding net (after platform fee)."
+        description="Share your link with new clients. When their first hire is funded and active for 7 days, you earn a percentage of the first funding."
         icon={Gift}
       />
 

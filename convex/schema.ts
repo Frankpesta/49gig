@@ -177,14 +177,14 @@ export default defineSchema({
 
   /**
    * Referrer reward when a referred client’s hire is funded and active 7+ days.
-   * Bonus = bonusPercent% of first successful pre_funding netAmount (after platform fee).
+   * Bonus = bonusPercent% of first successful pre_funding netAmount.
    */
   referralAccruals: defineTable({
     referrerId: v.id("users"),
     referredClientId: v.id("users"),
     projectId: v.id("projects"),
     firstPaymentId: v.id("payments"),
-    /** First funding net to escrow (after platform fee), in cents */
+    /** First funding net to escrow, in cents */
     netAmountCents: v.number(),
     bonusPercent: v.number(),
     bonusCents: v.number(),

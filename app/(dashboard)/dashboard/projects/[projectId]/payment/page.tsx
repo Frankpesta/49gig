@@ -290,9 +290,8 @@ export default function PaymentPage() {
                     <p className="font-medium">Referral hiring credit</p>
                     <p className="text-xs text-muted-foreground">
                       Apply up to {(maxReferralApplyCents / 100).toFixed(2)}{" "}
-                      {project.currency.toUpperCase()} from successful referrals. Platform fee is still
-                      calculated on the full funding amount; the remainder is charged to your card
-                      (minimum card charge rules apply).
+                      {project.currency.toUpperCase()} from successful referrals. Any amount not covered by
+                      credit is charged to your card (minimum card charge rules apply).
                     </p>
                     <input
                       type="range"

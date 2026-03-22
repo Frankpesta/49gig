@@ -64,7 +64,7 @@ export const tryCreateReferralAccrualForPreFunding = internalMutation({
     await ctx.scheduler.runAfter(0, sendSystemNotificationRef, {
       userIds: [referrer._id],
       title: "Referral progress",
-      message: `A hire you referred has been funded. You'll earn ${pct}% of the first funding net (after platform fee) once the hire is active for 7 days.`,
+      message: `A hire you referred has been funded. You'll earn ${pct}% of the first funding once the hire is active for 7 days.`,
       type: "account",
       data: { projectId, paymentId: payment._id },
     });
