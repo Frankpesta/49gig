@@ -255,9 +255,8 @@ export default function PricingPage() {
             Referral bonus
           </CardTitle>
           <CardDescription>
-            Percentage of the first successful hire funding net (after platform fee) paid to referrers once
-            the hire is in progress for 7 days. Default 4%. Client referrers receive hiring credit; freelancers
-            receive wallet balance.
+            Percentage of the first successful hire funding paid to referrers once the hire is in progress for
+            7 days. Default 4%. Client referrers receive hiring credit; freelancers receive wallet balance.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -41,7 +41,7 @@ export const getPlatformFeePercentageInternal = internalQuery({
 
 const DEFAULT_REFERRAL_BONUS_PERCENT = 4;
 
-/** Referrer reward as % of first funding net (after platform fee). Default 4%. */
+/** Referrer reward as % of first funding net. Default 4%. */
 export const getReferralBonusPercentage = query({
   args: {},
   handler: async (ctx): Promise<number> => {
