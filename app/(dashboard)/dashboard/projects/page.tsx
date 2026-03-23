@@ -71,11 +71,10 @@ const VALID_PROJECT_STATUSES = [
   "disputed",
 ] as const;
 
-/** Status chips shown in the hire filter bar (active lifecycle only; rare/terminal states use &quot;All&quot;). */
+/** Status chips shown in the hire filter bar. Use &quot;Matching in progress&quot; for queue/partial team; no separate &quot;Matching&quot; chip (it overlapped with that filter). */
 const HIRE_FILTER_STATUSES = [
   "draft",
   "pending_funding",
-  "matching",
   "matched",
   "in_progress",
   "completed",
@@ -200,13 +199,7 @@ export default function ProjectsPage() {
                 asChild
                 className="rounded-lg"
               >
-                <Link
-                  href={
-                    matchingInProgressFilter
-                      ? `/dashboard/projects?status=${status}&matching_in_progress=1`
-                      : `/dashboard/projects?status=${status}`
-                  }
-                >
+                <Link href={`/dashboard/projects?status=${status}`}>
                   {config.label}
                 </Link>
               </Button>

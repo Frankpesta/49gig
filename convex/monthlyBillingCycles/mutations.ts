@@ -105,9 +105,8 @@ export const approveMonthlyCycle = mutation({
       throw new Error("Project not found");
     }
     const isClient = project.clientId === (user as Doc<"users">)._id;
-    const isAdmin = (user as Doc<"users">).role === "admin";
-    if (!isClient && !isAdmin) {
-      throw new Error("Only the project client or admin can approve monthly cycles");
+    if (!isClient) {
+      throw new Error("Only the project client can approve monthly cycles");
     }
 
     const now = Date.now();
@@ -229,6 +228,11 @@ export const approveMonthlyCycle = mutation({
       data: { projectId: cycle.projectId, monthlyCycleId: args.monthlyCycleId },
     });
 
+    await ctx.runMutation(
+      internalAny.referrals.internalMutations.creditReferralOnFirstMonthlyApproval,
+      { projectId: cycle.projectId }
+    );
+
     return { success: true };
   },
 });
@@ -252,9 +256,8 @@ export const ensureMonthlyCycles = mutation({
     if (!project) throw new Error("Project not found");
 
     const isClient = project.clientId === user._id;
-    const isAdmin = user.role === "admin";
-    if (!isClient && !isAdmin) {
-      throw new Error("Only the project client or admin can create monthly cycles");
+    if (!isClient) {
+      throw new Error("Only the project client can create monthly cycles");
     }
 
     if (project.status !== "matched" && project.status !== "in_progress") {

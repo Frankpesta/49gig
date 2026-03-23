@@ -22,6 +22,9 @@ import Link from "next/link";
 import { useState } from "react";
 import { AddEvidenceDialog } from "./add-evidence-dialog";
 import { Doc, Id } from "@/convex/_generated/dataModel";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 export default function DisputeDetailPage() {
   const params = useParams();
@@ -30,7 +33,10 @@ export default function DisputeDetailPage() {
   const disputeId = params.disputeId as string;
 
   const [isAddingEvidence, setIsAddingEvidence] = useState(false);
+  const [disputeChatText, setDisputeChatText] = useState("");
+  const [sendingChat, setSendingChat] = useState(false);
   const addEvidenceMutation = useMutation(api.disputes.mutations.addEvidence);
+  const sendDisputeChatMessage = useMutation(api.disputes.mutations.sendDisputeChatMessage);
 
   const dispute = useQuery(
     api.disputes.queries.getDispute,
@@ -43,6 +49,22 @@ export default function DisputeDetailPage() {
     (api as any)["projects/queries"].getProject,
     dispute && isAuthenticated && user?._id
       ? { projectId: dispute.projectId, userId: user._id }
+      : "skip"
+  );
+
+  const disputeMessages = useQuery(
+    api.disputes.queries.listDisputeMessages,
+    dispute && user?._id
+      ? { disputeId: dispute._id, userId: user._id }
+      : "skip"
+  );
+
+  const adminContext = useQuery(
+    api.disputes.queries.getDisputeAdminContext,
+    dispute &&
+      user?._id &&
+      (user.role === "admin" || user.role === "moderator")
+      ? { disputeId: dispute._id, userId: user._id }
       : "skip"
   );
 
@@ -94,10 +116,19 @@ export default function DisputeDetailPage() {
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      milestone_quality: "Milestone Quality",
-      payment: "Payment",
-      communication: "Communication",
-      freelancer_replacement: "Freelancer Replacement",
+      milestone_quality: "Deliverable / quality (legacy)",
+      payment: "Payment (legacy)",
+      communication: "Communication (legacy)",
+      freelancer_replacement: "Replacement (legacy)",
+      client_deliverable_quality: "Deliverable / quality (client)",
+      client_timeline_scope: "Timeline / scope (client)",
+      client_payment_billing: "Payment / billing (client)",
+      client_communication_conduct: "Communication / conduct (client)",
+      client_request_replacement: "Request replacement (client)",
+      freelancer_payment_issue: "Payment issue (freelancer)",
+      freelancer_scope_requirements: "Scope / requirements (freelancer)",
+      freelancer_communication: "Communication (freelancer)",
+      freelancer_platform_policy: "Platform / policy (freelancer)",
     };
     return labels[type] || type;
   };
@@ -108,6 +139,27 @@ export default function DisputeDetailPage() {
 
   const isModerator = user.role === "moderator" || user.role === "admin";
   const canResolve = isModerator && dispute.status !== "resolved" && dispute.status !== "closed";
+
+  const canPostInDisputeChat =
+    (user.role === "client" || user.role === "freelancer" || isModerator) &&
+    (dispute.status === "open" || dispute.status === "under_review");
+
+  const handleSendDisputeChat = async () => {
+    if (!user?._id || !disputeChatText.trim()) return;
+    setSendingChat(true);
+    try {
+      await sendDisputeChatMessage({
+        disputeId: dispute._id,
+        body: disputeChatText,
+        userId: user._id,
+      });
+      setDisputeChatText("");
+    } catch (e) {
+      toast.error(getUserFriendlyError(e) || "Could not send message");
+    } finally {
+      setSendingChat(false);
+    }
+  };
 
   return (
     <div className="container mx-auto max-w-7xl py-8">
@@ -164,6 +216,61 @@ export default function DisputeDetailPage() {
                       {dispute.monthlyCycleId ? "View Monthly Payment" : "View Milestone"}
                     </Link>
                   </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Dispute discussion (parties + moderators) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Dispute discussion</CardTitle>
+              <CardDescription>
+                Exchange messages here with the other party. 49GIG staff can review the full thread. Add structured evidence above when you have files or chat links.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="max-h-[min(420px,50vh)] space-y-3 overflow-y-auto rounded-lg border border-border/60 bg-muted/20 p-3">
+                {disputeMessages === undefined ? (
+                  <p className="text-sm text-muted-foreground">Loading messages…</p>
+                ) : disputeMessages.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No messages yet.</p>
+                ) : (
+                  disputeMessages.map((m: { _id: string; authorId: Id<"users">; authorName: string; authorRole: string; body: string; createdAt: number }) => (
+                    <div
+                      key={m._id}
+                      className={`rounded-lg px-3 py-2 text-sm ${
+                        m.authorRole === "system"
+                          ? "bg-amber-500/10 text-foreground border border-amber-500/20"
+                          : m.authorId === user._id
+                            ? "ml-4 bg-primary text-primary-foreground"
+                            : "mr-4 bg-card border border-border/60"
+                      }`}
+                    >
+                      <div className="text-xs font-medium opacity-80">
+                        {m.authorName} · {m.authorRole.replace("_", " ")} ·{" "}
+                        {new Date(m.createdAt).toLocaleString()}
+                      </div>
+                      <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+              {canPostInDisputeChat && (
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Write a message to the other party…"
+                    value={disputeChatText}
+                    onChange={(e) => setDisputeChatText(e.target.value)}
+                    rows={3}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleSendDisputeChat}
+                    disabled={sendingChat || !disputeChatText.trim()}
+                  >
+                    {sendingChat ? "Sending…" : "Send message"}
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -292,6 +399,72 @@ export default function DisputeDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {adminContext && (
+            <Card className="border-primary/25">
+              <CardHeader>
+                <CardTitle>Case overview (staff)</CardTitle>
+                <CardDescription>Hire, parties, and billing context</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Hire</span>
+                  <p className="font-medium">{adminContext.hireTitle}</p>
+                  <p className="text-xs text-muted-foreground capitalize">
+                    Status: {adminContext.projectStatus.replace(/_/g, " ")}
+                  </p>
+                </div>
+                {adminContext.client && (
+                  <div>
+                    <span className="text-muted-foreground">Client</span>
+                    <p className="font-medium">{adminContext.client.name}</p>
+                    <p className="text-xs break-all">{adminContext.client.email}</p>
+                  </div>
+                )}
+                {adminContext.freelancers?.length > 0 && (
+                  <div>
+                    <span className="text-muted-foreground">Freelancer(s)</span>
+                    <ul className="mt-1 space-y-2">
+                      {adminContext.freelancers.map((f: { _id: string; name: string; email?: string }) => (
+                        <li key={f._id}>
+                          <span className="font-medium">{f.name}</span>
+                          {f.email && (
+                            <span className="block text-xs break-all text-muted-foreground">{f.email}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {adminContext.initiator && (
+                  <div>
+                    <span className="text-muted-foreground">Opened by</span>
+                    <p className="font-medium">
+                      {adminContext.initiator.name} ({adminContext.initiator.role})
+                    </p>
+                  </div>
+                )}
+                {adminContext.monthlyCycle && (
+                  <div>
+                    <span className="text-muted-foreground">Monthly cycle</span>
+                    <p className="font-medium">
+                      Month {adminContext.monthlyCycle.monthIndex} ·{" "}
+                      {(adminContext.monthlyCycle.amountCents / 100).toFixed(2)}{" "}
+                      {adminContext.monthlyCycle.currency?.toUpperCase()}
+                    </p>
+                  </div>
+                )}
+                {adminContext.assignedTo && (
+                  <div>
+                    <span className="text-muted-foreground">Assigned</span>
+                    <p className="font-medium">
+                      {adminContext.assignedTo.name} ({adminContext.assignedTo.role})
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Project Info */}
           <Card>
             <CardHeader>

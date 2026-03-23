@@ -44,6 +44,8 @@ export interface NavItem {
   clientTitle?: string;
   /** Override title for freelancer role (e.g. "Projects" → "Hires") */
   freelancerTitle?: string;
+  /** Admin & moderator label (e.g. Help → Support queue) */
+  staffTitle?: string;
 }
 
 export const navigationItems: NavItem[] = [
@@ -106,13 +108,13 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Wallet (Freelancers)
+  // Wallet (freelancers: earnings; clients: referral cash withdrawals)
   {
     title: "Wallet",
     url: "/dashboard/wallet",
     icon: Wallet,
     section: "menu",
-    roles: ["freelancer"],
+    roles: ["freelancer", "client"],
   },
 
   // Referrals (share link; clients earn hiring credit, freelancers wallet balance)
@@ -271,6 +273,7 @@ export const navigationItems: NavItem[] = [
   // Support (All roles) - GENERAL
   {
     title: "Help & Support",
+    staffTitle: "Support queue",
     url: "/dashboard/support",
     icon: HelpCircle,
     section: "general",
@@ -282,6 +285,9 @@ export const navigationItems: NavItem[] = [
  * Get display title for nav item (uses clientTitle when role is client)
  */
 export function getNavItemTitle(item: NavItem, role: UserRole): string {
+  if ((role === "admin" || role === "moderator") && item.staffTitle) {
+    return item.staffTitle;
+  }
   if (role === "client" && item.clientTitle) return item.clientTitle;
   if (role === "freelancer" && item.freelancerTitle) return item.freelancerTitle;
   return item.title;

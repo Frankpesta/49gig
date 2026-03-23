@@ -4,10 +4,9 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Send,
@@ -221,60 +220,55 @@ export default function ChatDetailPage() {
   const otherParticipants = participantsList.filter((p) => p._id !== user._id);
 
   return (
-    <div className="space-y-4">
-      <Card className="overflow-hidden">
-        <div className="pointer-events-none h-px w-full bg-linear-to-r from-transparent via-primary/40 to-transparent" />
-        <CardContent className="px-3 py-3 sm:px-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            <div className="flex shrink-0 items-center gap-2">
-              <Button variant="ghost" size="icon" asChild className="h-9 w-9">
-                <Link href="/dashboard/chat">
-                  <ArrowLeft className="h-4 w-4" />
+    <div className="flex flex-col -mx-4 -mb-4 sm:-mx-6 min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] max-h-[calc(100dvh-3.5rem)] sm:max-h-[calc(100dvh-4rem)] overflow-hidden rounded-none sm:rounded-xl border border-border/60 bg-background shadow-sm">
+      {/* WhatsApp-style header */}
+      <div className="flex shrink-0 items-center gap-2 border-b border-primary/20 bg-primary px-2 py-2.5 text-primary-foreground sm:px-4 sm:py-3">
+        <Button variant="ghost" size="icon" asChild className="h-10 w-10 shrink-0 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground">
+          <Link href="/dashboard/chat" aria-label="Back to conversations">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+        </Button>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-base font-semibold sm:text-lg">{chat.title || "Chat"}</h1>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-primary-foreground/85">
+            <span className="capitalize">{chat.type}</span>
+            {chat.type === "project" && chat.projectId && (
+              <>
+                <span aria-hidden>·</span>
+                <Link
+                  href={`/dashboard/projects/${chat.projectId}`}
+                  className="truncate underline-offset-2 hover:underline"
+                >
+                  Hire details
                 </Link>
-              </Button>
-              <Badge variant="outline" className="border-primary/25 bg-primary/5 text-xs sm:hidden">{chat.type}</Badge>
-            </div>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg font-semibold sm:text-xl">{chat.title || "Chat"}</h1>
-              <p className="text-sm text-muted-foreground">
-                {chat.type === "project" && chat.projectId && (
-                  <Link
-                    href={`/dashboard/projects/${chat.projectId}`}
-                    className="text-primary hover:underline"
-                  >
-                    View project details
-                  </Link>
-                )}
-              </p>
-              {participantsList.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {participantsList.map((p) => (
-                    <div key={p._id} className="flex items-center gap-1.5 rounded-full border border-border/70 bg-primary/5 px-2 py-1">
-                      <Avatar className="h-5 w-5 sm:h-6 sm:w-6">
-                        {p.imageUrl && <AvatarImage src={p.imageUrl} alt={p.name} />}
-                        <AvatarFallback className="text-xs">
-                          {p.name.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-xs font-medium">
-                        {p._id === user._id ? "You" : p.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <Badge variant="outline" className="hidden border-primary/25 bg-primary/5 text-xs sm:inline-flex">{chat.type}</Badge>
+              </>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        {participantsList[0] && (
+          <Avatar className="h-9 w-9 shrink-0 border-2 border-primary-foreground/30 sm:h-10 sm:w-10">
+            {otherParticipants[0]?.imageUrl && (
+              <AvatarImage src={otherParticipants[0].imageUrl} alt={otherParticipants[0].name} />
+            )}
+            <AvatarFallback className="bg-primary-foreground/20 text-sm text-primary-foreground">
+              {(otherParticipants[0]?.name ?? "?").charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        )}
+      </div>
 
-      <Card className="flex min-h-[320px] flex-col lg:h-[calc(100vh-270px)]">
-        {/* Messages Area */}
-        <CardContent className="flex-1 space-y-3 overflow-y-auto bg-linear-to-b from-transparent to-primary/5 p-3 sm:space-y-4 sm:p-4 lg:p-5">
+      {/* Thread: subtle pattern like WhatsApp */}
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-4 sm:py-4"
+        style={{
+          backgroundColor: "color-mix(in oklab, var(--muted) 55%, var(--background))",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23000000' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }}
+      >
+        <div className="mx-auto flex max-w-3xl flex-col gap-2 sm:gap-3">
           {displayMessages.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-muted-foreground">No messages yet</p>
+            <div className="flex min-h-[40vh] items-center justify-center">
+              <p className="text-base text-muted-foreground">No messages yet — say hello.</p>
             </div>
           ) : (
             displayMessages.map((msg: Doc<"messages">) => {
@@ -286,32 +280,32 @@ export default function ChatDetailPage() {
               return (
                 <div
                   key={msg._id}
-                  className={`flex gap-3 ${isOwnMessage ? "justify-end" : "justify-start"}`}
+                  className={`flex gap-2 sm:gap-3 ${isOwnMessage ? "justify-end" : "justify-start"}`}
                 >
                   {!isOwnMessage && (
-                    <Avatar className="h-8 w-8 shrink-0">
+                    <Avatar className="h-9 w-9 shrink-0 self-end sm:h-10 sm:w-10">
                       {sender?.imageUrl && <AvatarImage src={sender.imageUrl} alt={senderName} />}
-                      <AvatarFallback className="text-xs">
+                      <AvatarFallback className="text-sm">
                         {senderName.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   )}
                   <div
-                    className={`flex flex-col max-w-[85%] sm:max-w-[75%] lg:max-w-[70%] ${isOwnMessage ? "items-end" : "items-start"}`}
+                    className={`flex max-w-[min(100%,28rem)] flex-col sm:max-w-[min(100%,32rem)] ${isOwnMessage ? "items-end" : "items-start"}`}
                   >
                     {!isOwnMessage && (
-                      <span className="text-xs font-medium text-muted-foreground mb-1">
+                      <span className="mb-0.5 px-1 text-xs font-medium text-muted-foreground">
                         {senderName}
                       </span>
                     )}
                     <div
-                      className={`rounded-2xl px-4 py-2.5 shadow-sm ${
+                      className={`rounded-2xl px-3.5 py-2.5 text-base leading-relaxed shadow-sm sm:px-4 sm:py-3 ${
                         isOwnMessage
-                          ? "bg-primary text-primary-foreground"
-                          : "border border-border/70 bg-card/90"
+                          ? "rounded-br-md bg-primary text-primary-foreground"
+                          : "rounded-bl-md border border-border/60 bg-card"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="mt-2 space-y-1">
                           {msg.attachments?.map((att: { fileId: Id<"_storage">; fileName: string; fileSize: number; mimeType: string; url: string }, idx: number) => (
@@ -320,7 +314,7 @@ export default function ChatDetailPage() {
                               href={att.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs underline block"
+                              className={`block text-sm underline ${isOwnMessage ? "text-primary-foreground/90" : ""}`}
                             >
                               📎 {att.fileName}
                             </a>
@@ -328,27 +322,27 @@ export default function ChatDetailPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(msg.createdAt).toLocaleTimeString()}
+                    <div className="mt-0.5 flex items-center gap-2 px-1">
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
                       {isOwnMessage && (
-                        <span className="text-xs">
+                        <span className="text-muted-foreground">
                           {isRead ? (
-                            <CheckCheck className="h-3 w-3 text-primary" />
+                            <CheckCheck className="h-3.5 w-3.5 text-primary" />
                           ) : (
-                            <Check className="h-3 w-3 text-muted-foreground" />
+                            <Check className="h-3.5 w-3.5" />
                           )}
                         </span>
                       )}
                     </div>
                   </div>
                   {isOwnMessage && (
-                    <Avatar className="h-8 w-8 shrink-0">
+                    <Avatar className="h-9 w-9 shrink-0 self-end sm:h-10 sm:w-10">
                       {getParticipant(user._id)?.imageUrl && (
                         <AvatarImage src={getParticipant(user._id)!.imageUrl!} alt="You" />
                       )}
-                      <AvatarFallback className="text-xs">You</AvatarFallback>
+                      <AvatarFallback className="text-sm">You</AvatarFallback>
                     </Avatar>
                   )}
                 </div>
@@ -356,16 +350,18 @@ export default function ChatDetailPage() {
             })
           )}
           <div ref={messagesEndRef} />
-        </CardContent>
+        </div>
+      </div>
 
-        {/* Input Area */}
-        <CardHeader className="border-t border-border/70 bg-card/70 p-3 sm:p-4">
+      {/* Composer */}
+      <div className="shrink-0 border-t border-border/70 bg-card px-2 py-2.5 sm:px-4 sm:py-3">
+        <div className="mx-auto max-w-3xl">
           {pendingFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
+            <div className="mb-2 flex flex-wrap gap-2">
               {pendingFiles.map((f, i) => (
                 <span
                   key={i}
-                  className="inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-xs"
+                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-sm"
                 >
                   📎 {f.fileName}
                   <button
@@ -382,7 +378,7 @@ export default function ChatDetailPage() {
               ))}
             </div>
           )}
-          <div className="flex gap-2">
+          <div className="flex items-end gap-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -395,36 +391,40 @@ export default function ChatDetailPage() {
               variant="ghost"
               size="icon"
               type="button"
+              className="h-11 w-11 shrink-0 rounded-full"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading || isSending}
               title="Attach file or image"
             >
-              <Paperclip className="h-4 w-4" />
+              <Paperclip className="h-5 w-5" />
             </Button>
             <Input
-              placeholder="Type a message or attach files..."
+              placeholder="Message…"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}
               disabled={isSending}
-              className="flex-1"
+              className="min-h-11 flex-1 rounded-2xl border-border/80 bg-background px-4 py-2.5 text-base"
             />
             <Button
+              size="icon"
+              className="h-11 w-11 shrink-0 rounded-full"
               onClick={handleSend}
               disabled={
                 isSending ||
                 isUploading ||
                 (!message.trim() && pendingFiles.length === 0)
               }
+              aria-label="Send"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-5 w-5" />
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Images, PDFs, docs, txt (max 10MB)
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Images, PDFs, documents (max 10MB). Enter to send, Shift+Enter for a new line is not supported — use attachments for long text.
           </p>
-        </CardHeader>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,8 @@ import {
 import { Scale, AlertCircle, CheckCircle2, Clock, User } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { toast } from "sonner";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { useRouter } from "next/navigation";
 import { Doc } from "@/convex/_generated/dataModel";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -35,6 +37,7 @@ import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-
 export default function ModeratorDisputesPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
+  const assignModerator = useMutation(api.disputes.mutations.assignModerator);
   const [statusFilter, setStatusFilter] = useState<
     "open" | "under_review" | "resolved" | "escalated" | "closed" | undefined
   >(undefined);
@@ -94,10 +97,19 @@ export default function ModeratorDisputesPage() {
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      milestone_quality: "Deliverable Quality",
-      payment: "Payment",
-      communication: "Communication",
-      freelancer_replacement: "Freelancer Replacement",
+      milestone_quality: "Deliverable Quality (legacy)",
+      payment: "Payment (legacy)",
+      communication: "Communication (legacy)",
+      freelancer_replacement: "Replacement (legacy)",
+      client_deliverable_quality: "Deliverable / quality (client)",
+      client_timeline_scope: "Timeline / scope (client)",
+      client_payment_billing: "Payment / billing (client)",
+      client_communication_conduct: "Communication / conduct (client)",
+      client_request_replacement: "Request replacement (client)",
+      freelancer_payment_issue: "Payment issue (freelancer)",
+      freelancer_scope_requirements: "Scope / requirements (freelancer)",
+      freelancer_communication: "Communication (freelancer)",
+      freelancer_platform_policy: "Platform / policy (freelancer)",
     };
     return labels[type] || type;
   };
@@ -249,11 +261,24 @@ export default function ModeratorDisputesPage() {
                           <Button
                             variant="default"
                             size="sm"
-                            onClick={() => {
-                              router.push(`/dashboard/disputes/${dispute._id}/assign`);
+                            onClick={async () => {
+                              if (!user?._id) return;
+                              try {
+                                await assignModerator({
+                                  disputeId: dispute._id,
+                                  moderatorId: user._id,
+                                });
+                                toast.success(
+                                  user.role === "admin"
+                                    ? "You are now assigned to this dispute."
+                                    : "Dispute assigned to you.",
+                                );
+                              } catch (e) {
+                                toast.error(getUserFriendlyError(e) || "Could not assign dispute");
+                              }
                             }}
                           >
-                            Assign
+                            {user.role === "admin" ? "Assign to me" : "Assign to me"}
                           </Button>
                         )}
                         {dispute.status !== "resolved" &&

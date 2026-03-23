@@ -254,3 +254,112 @@ export const getPendingDisputes = query({
   },
 });
 
+export const listDisputeMessages = query({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) return [];
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) return [];
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) return [];
+
+    const isClient = project.clientId === user._id;
+    const isFreelancer =
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds?.includes(user._id) ?? false);
+    const isStaff = user.role === "admin" || user.role === "moderator";
+    const isAssigned = dispute.assignedModeratorId === user._id;
+
+    if (!isClient && !isFreelancer && !isStaff && !isAssigned) {
+      return [];
+    }
+
+    const rows = await ctx.db
+      .query("disputeMessages")
+      .withIndex("by_dispute", (q) => q.eq("disputeId", args.disputeId))
+      .order("asc")
+      .collect();
+
+    const withNames = await Promise.all(
+      rows.map(async (m) => {
+        const author = await ctx.db.get(m.authorId);
+        return {
+          ...m,
+          authorName: author?.name ?? "Unknown",
+        };
+      })
+    );
+
+    return withNames;
+  },
+});
+
+/** Rich context for admin/moderator dispute review (party names, hire, cycle). */
+export const getDisputeAdminContext = query({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator")) {
+      return null;
+    }
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) return null;
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) return null;
+
+    const client = await ctx.db.get(project.clientId);
+    const fIds = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? [];
+    const freelancers = (
+      await Promise.all(fIds.map((id) => ctx.db.get(id)))
+    ).filter(Boolean) as Doc<"users">[];
+
+    const initiator = await ctx.db.get(dispute.initiatorId);
+    const monthlyCycle = dispute.monthlyCycleId
+      ? await ctx.db.get(dispute.monthlyCycleId)
+      : null;
+    const assignee = dispute.assignedModeratorId
+      ? await ctx.db.get(dispute.assignedModeratorId)
+      : null;
+
+    return {
+      dispute,
+      project,
+      hireTitle: project.intakeForm?.title ?? "Untitled hire",
+      projectStatus: project.status,
+      client: client
+        ? { _id: client._id, name: client.name, email: client.email }
+        : null,
+      freelancers: freelancers.map((f) => ({
+        _id: f._id,
+        name: f.name,
+        email: f.email,
+      })),
+      initiator: initiator
+        ? {
+            _id: initiator._id,
+            name: initiator.name,
+            email: initiator.email,
+            role: dispute.initiatorRole,
+          }
+        : null,
+      monthlyCycle,
+      assignedTo: assignee
+        ? { _id: assignee._id, name: assignee.name, role: assignee.role }
+        : null,
+    };
+  },
+});
+

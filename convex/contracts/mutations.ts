@@ -207,3 +207,13 @@ export const updateContractFile = internalMutation({
     });
   },
 });
+
+export const markContractFullyExecutedEmailed = internalMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      contractFullyExecutedEmailedAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  },
+});

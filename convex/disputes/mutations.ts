@@ -46,7 +46,16 @@ export const initiateDispute = mutation({
       v.literal("milestone_quality"),
       v.literal("payment"),
       v.literal("communication"),
-      v.literal("freelancer_replacement")
+      v.literal("freelancer_replacement"),
+      v.literal("client_deliverable_quality"),
+      v.literal("client_timeline_scope"),
+      v.literal("client_payment_billing"),
+      v.literal("client_communication_conduct"),
+      v.literal("client_request_replacement"),
+      v.literal("freelancer_payment_issue"),
+      v.literal("freelancer_scope_requirements"),
+      v.literal("freelancer_communication"),
+      v.literal("freelancer_platform_policy")
     ),
     reason: v.string(),
     description: v.string(),
@@ -100,6 +109,33 @@ export const initiateDispute = mutation({
 
     if (!isClient && !isFreelancer) {
       throw new Error("Unauthorized - must be project client or freelancer");
+    }
+
+    const CLIENT_DISPUTE_TYPES = new Set<string>([
+      "milestone_quality",
+      "payment",
+      "communication",
+      "freelancer_replacement",
+      "client_deliverable_quality",
+      "client_timeline_scope",
+      "client_payment_billing",
+      "client_communication_conduct",
+      "client_request_replacement",
+    ]);
+    const FREELANCER_DISPUTE_TYPES = new Set<string>([
+      "milestone_quality",
+      "payment",
+      "communication",
+      "freelancer_payment_issue",
+      "freelancer_scope_requirements",
+      "freelancer_communication",
+      "freelancer_platform_policy",
+    ]);
+    if (isClient && !CLIENT_DISPUTE_TYPES.has(args.type)) {
+      throw new Error("That dispute type is only available when you are the freelancer on the hire.");
+    }
+    if (isFreelancer && !FREELANCER_DISPUTE_TYPES.has(args.type)) {
+      throw new Error("That dispute type is only available when you are the client on the hire.");
     }
 
     // Check if dispute already exists for this project/milestone
@@ -220,9 +256,69 @@ export const initiateDispute = mutation({
         data: { disputeId, projectId },
       });
     }
-    // TODO: Create system message in project chat
+    await ctx.db.insert("disputeMessages", {
+      disputeId,
+      authorId: user._id,
+      authorRole: "system",
+      body: `Dispute opened by ${user.name ?? "a party"} (${isClient ? "client" : "freelancer"}). Reason: ${args.reason}`,
+      createdAt: Date.now(),
+    });
 
     return disputeId;
+  },
+});
+
+/**
+ * Post a message in the dispute thread (parties + moderators/admins).
+ */
+export const sendDisputeChatMessage = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    body: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const text = args.body.trim();
+    if (!text) throw new Error("Message cannot be empty");
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (dispute.status === "resolved" || dispute.status === "closed") {
+      throw new Error("This dispute is closed");
+    }
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) throw new Error("Project not found");
+
+    const isClient = project.clientId === user._id;
+    const isFreelancer =
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds?.includes(user._id) ?? false);
+    const isStaff = user.role === "admin" || user.role === "moderator";
+
+    if (!isClient && !isFreelancer && !isStaff) {
+      throw new Error("Not authorized to post in this dispute");
+    }
+
+    let authorRole: "client" | "freelancer" | "moderator" | "admin" | "system" =
+      "client";
+    if (user.role === "admin") authorRole = "admin";
+    else if (user.role === "moderator") authorRole = "moderator";
+    else if (isFreelancer) authorRole = "freelancer";
+    else authorRole = "client";
+
+    await ctx.db.insert("disputeMessages", {
+      disputeId: args.disputeId,
+      authorId: user._id,
+      authorRole,
+      body: text,
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
   },
 });
 
@@ -326,10 +422,9 @@ export const assignModerator = mutation({
       throw new Error("Dispute not found");
     }
 
-    // Verify moderator exists and is a moderator
-    const moderator = await ctx.db.get(args.moderatorId);
-    if (!moderator || moderator.role !== "moderator") {
-      throw new Error("Invalid moderator");
+    const assignee = await ctx.db.get(args.moderatorId);
+    if (!assignee || (assignee.role !== "moderator" && assignee.role !== "admin")) {
+      throw new Error("Assignee must be a moderator or admin");
     }
 
     // Assign moderator
@@ -356,6 +451,7 @@ export const assignModerator = mutation({
       targetId: args.disputeId,
       details: {
         moderatorId: args.moderatorId,
+        assigneeRole: assignee.role,
       },
       createdAt: Date.now(),
     });

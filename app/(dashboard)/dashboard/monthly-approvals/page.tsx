@@ -39,20 +39,29 @@ export default function MonthlyApprovalsPage() {
     return null;
   }
 
-  if (user.role !== "client" && user.role !== "admin") {
+  if (user.role !== "client") {
+    const isStaff = user.role === "admin" || user.role === "moderator";
     return (
       <div className="space-y-6 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
           title="Monthly Approvals"
-          description="Approve monthly payments for your hires."
+          description={
+            isStaff
+              ? "Approving months releases escrow to freelancers — only the hiring client can do that."
+              : "Approve monthly payments for your hires."
+          }
           icon={CalendarCheck}
         />
         <Card>
           <CardContent className="py-12">
             <DashboardEmptyState
               icon={CalendarCheck}
-              title="Clients only"
-              description="Monthly approvals are for clients. At the end of each month, you can approve or dispute payments for your hires."
+              title={isStaff ? "Client action" : "Clients only"}
+              description={
+                isStaff
+                  ? "Staff can open a hire to review billing cycles and disputes, but cannot approve releases on the client’s behalf."
+                  : "Monthly approvals are for clients. At the end of each month, you can approve or dispute payments for your hires."
+              }
               iconTone="muted"
             />
           </CardContent>

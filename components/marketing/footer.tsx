@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { ChevronDown, Linkedin, Twitter, Youtube } from "lucide-react";
+import { ChevronDown, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
 
 const footerSections = [
   {
@@ -51,9 +51,22 @@ const footerSections = [
 ];
 
 const socialLinks = [
-  { label: "LinkedIn", href: "https://linkedin.com/company/49gig", icon: Linkedin },
-  { label: "Twitter", href: "https://twitter.com/49gig", icon: Twitter },
-  { label: "YouTube", href: "https://youtube.com/@49gig", icon: Youtube },
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/49gigdotcom?igsh=eDl2cmM1emZ1aTB2",
+    icon: Instagram,
+  },
+  { label: "X", href: "https://x.com/49gigdotcom?s=21", icon: Twitter },
+  {
+    label: "LinkedIn",
+    href: "https://www.linkedin.com/company/49gig/",
+    icon: Linkedin,
+  },
+  {
+    label: "YouTube",
+    href: "https://www.youtube.com/@49gigdotcom",
+    icon: Youtube,
+  },
 ];
 
 export function Footer() {
@@ -190,7 +203,7 @@ export function Footer() {
                   className="text-secondary transition hover:text-white"
                   aria-label={social.label}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
                 </a>
               );
             })}

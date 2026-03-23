@@ -23,6 +23,7 @@ import { Loader2, LifeBuoy, MessageSquare, Send, CheckCircle2, AlertCircle } fro
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import Link from "next/link";
 
 export default function SupportPage() {
   const { user, isAuthenticated } = useAuth();
@@ -42,6 +43,35 @@ export default function SupportPage() {
 
   if (!isAuthenticated || !user) {
     return <DashboardEmptyState icon={LifeBuoy} title="Please log in" iconTone="muted" />;
+  }
+
+  const isStaff = user.role === "admin" || user.role === "moderator";
+  if (isStaff) {
+    return (
+      <div className="space-y-6 animate-in fade-in-50 duration-300">
+        <DashboardPageHeader
+          title="Support queue"
+          description="You don’t open tickets here — clients and freelancers do. Use Messages to reply in existing support chats and project threads."
+          icon={LifeBuoy}
+        />
+        <Card className="rounded-xl border-border/60">
+          <CardHeader>
+            <CardTitle>Where to work support</CardTitle>
+            <CardDescription>
+              Open Messages: support conversations appear under “Support Chats”. Project chats stay under “Project Chats”. This page is intentionally not a second inbox for staff.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Button asChild>
+              <Link href="/dashboard/chat">Open Messages</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/enquiries">Contact enquiries</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

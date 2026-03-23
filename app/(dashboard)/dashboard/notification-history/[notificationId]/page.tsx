@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { ArrowLeft, Bell, Trash2, AlertCircle, ExternalLink } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { toast } from "sonner";
 
 export default function NotificationDetailPage() {
@@ -145,31 +145,80 @@ export default function NotificationDetailPage() {
             <p className="text-foreground whitespace-pre-wrap">{notification.message}</p>
           </div>
 
-          {/* Action buttons for known notification types */}
-          {notification.data &&
-            typeof notification.data === "object" &&
-            "projectId" in notification.data &&
-            typeof (notification.data as { projectId?: string }).projectId === "string" && (
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button asChild>
-                  <Link
-                    href={`/dashboard/projects/${(notification.data as { projectId: string }).projectId}/matches`}
-                    className="gap-2"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    View project matches
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link
-                    href={`/dashboard/projects/${(notification.data as { projectId: string }).projectId}`}
-                    className="gap-2"
-                  >
-                    View project
-                  </Link>
-                </Button>
-              </div>
-            )}
+          {/* Contextual actions from notification payload */}
+          {notification.data && typeof notification.data === "object" && (() => {
+            const d = notification.data as Record<string, string>;
+            const actions: ReactNode[] = [];
+                if (typeof d.projectId === "string") {
+                  actions.push(
+                    <Button key="hire" variant="outline" asChild>
+                      <Link href={`/dashboard/projects/${d.projectId}`} className="gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        Open hire
+                      </Link>
+                    </Button>
+                  );
+                  if (notification.type === "match") {
+                    actions.push(
+                      <Button key="matches" asChild>
+                        <Link
+                          href={`/dashboard/projects/${d.projectId}/matches`}
+                          className="gap-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          View matches
+                        </Link>
+                      </Button>
+                    );
+                  }
+                }
+                if (typeof d.disputeId === "string") {
+                  actions.push(
+                    <Button key="dispute" asChild>
+                      <Link href={`/dashboard/disputes/${d.disputeId}`} className="gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        Open dispute
+                      </Link>
+                    </Button>
+                  );
+                }
+                if (typeof d.monthlyCycleId === "string" && typeof d.projectId === "string") {
+                  actions.push(
+                    <Button key="monthly" variant="outline" asChild>
+                      <Link
+                        href={`/dashboard/monthly-approvals`}
+                        className="gap-2"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Monthly approvals
+                      </Link>
+                    </Button>
+                  );
+                }
+                if (typeof d.chatId === "string") {
+                  actions.push(
+                    <Button key="chat" asChild>
+                      <Link href={`/dashboard/chat/${d.chatId}`} className="gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        Open chat
+                      </Link>
+                    </Button>
+                  );
+                }
+                if (notification.type === "payment" && user?.role === "client") {
+                  actions.push(
+                    <Button key="wallet" variant="outline" asChild>
+                      <Link href="/dashboard/wallet" className="gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        Wallet
+                      </Link>
+                    </Button>
+                  );
+                }
+            return actions.length > 0 ? (
+              <div className="mt-6 flex flex-wrap gap-2">{actions}</div>
+            ) : null;
+          })()}
 
           {/* Resolved references (human-readable labels) */}
           {notification.data &&
@@ -205,13 +254,23 @@ export default function NotificationDetailPage() {
                   milestoneId: "milestoneLabel",
                   paymentId: "paymentLabel",
                   vettingResultId: "vettingLabel",
+                  monthlyCycleId: "monthlyCycleLabel",
+                  referralAccrualId: "referralAccrualLabel",
+                  chatId: "chatLabel",
                 };
-                for (const k of keys.filter(
-                  (key) => !["projectId", "matchId", "disputeId"].includes(key)
-                )) {
+                const skipKeys = ["projectId", "matchId", "disputeId"];
+                for (const k of keys.filter((key) => !skipKeys.includes(key))) {
                   const resolvedKey = keyToResolved[k] ?? `${k.replace(/Id$/, "")}Label`;
+                  const label =
+                    k === "monthlyCycleId"
+                      ? "Monthly cycle"
+                      : k === "referralAccrualId"
+                        ? "Referral"
+                        : k === "chatId"
+                          ? "Chat"
+                          : k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
                   labelMap[k] = {
-                    label: k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()),
+                    label,
                     value: resolved[resolvedKey] ?? String(d[k]),
                   };
                 }
