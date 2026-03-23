@@ -61,10 +61,14 @@ export default function SendEmailPage() {
     }
     setIsSending(true);
     try {
+      const individualRecipientId =
+        recipientType === "individual" && recipientUserId !== ""
+          ? recipientUserId
+          : undefined;
       const result = await sendEmail({
         adminUserId: user._id,
         recipientType,
-        recipientUserId: recipientType === "individual" ? recipientUserId : undefined,
+        recipientUserId: individualRecipientId,
         subject: subject.trim(),
         body: body.trim(),
       });

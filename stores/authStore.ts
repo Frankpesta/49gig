@@ -22,22 +22,24 @@ export interface User {
     // Freelancer profile fields
     bio?: string;
     skills?: string[];
-        techField?:
-          | "development"
-          | "data_science"
-          | "technical_writing"
-          | "design"
-          | "other"
-          | "software_development"
-          | "ui_ux_design"
-          | "data_analytics"
-          | "devops_cloud"
-          | "cybersecurity_it"
-          | "ai"
-          | "machine_learning"
-          | "blockchain"
-          | "qa_testing";
+    techField?:
+      | "development"
+      | "data_science"
+      | "technical_writing"
+      | "design"
+      | "other"
+      | "software_development"
+      | "ui_ux_design"
+      | "data_analytics"
+      | "devops_cloud"
+      | "cybersecurity_it"
+      | "ai"
+      | "machine_learning"
+      | "blockchain"
+      | "qa_testing";
     experienceLevel?: "junior" | "mid" | "senior" | "expert";
+    /** When techField is software_development (e.g. backend_dev, mobile_dev) */
+    softwareDevFields?: string[];
     languagesWritten?: string[];
     hourlyRate?: number;
     availability?: "available" | "busy" | "unavailable";
