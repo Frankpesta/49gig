@@ -9,8 +9,16 @@ import {
   getRoleIdFromCategoryLabel,
   freelancerMatchesRole,
   humanizeTeamRoleKey,
+  getSkillsForCategory,
 } from "../../lib/platform-skills";
 import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
+import {
+  normalizeRequiredSkillsForMatching,
+  projectPrimaryRoleId,
+  calculateSkillOverlapPercent,
+  isFreelancerEligibleForProjectMatch,
+  platformRoleIdForTeamRoleKey,
+} from "../../lib/matching-skill-utils";
 
 function projectAllowsPostFundMatchGeneration(project: Doc<"projects">): boolean {
   if (project.status === "funded") return true;
@@ -40,50 +48,6 @@ interface ScoringBreakdown {
   availability: number;
   pastPerformance: number;
   timezoneCompatibility: number;
-}
-
-/**
- * Check if a freelancer skill matches a required skill.
- * Strict matching to avoid false positives (e.g. Java/JavaScript, C/C#, Go/Google).
- * Uses exact match, normalized variants, or whole-word containment only.
- */
-function skillMatches(required: string, freelancerSkill: string): boolean {
-  const r = required.toLowerCase().trim();
-  const f = freelancerSkill.toLowerCase().trim();
-  if (r === f) return true;
-  // Normalize common variants: "React.js" -> "react", "Node" -> "node.js"
-  const normalize = (s: string) =>
-    s.replace(/\s*[.\-]\s*js$/i, "").replace(/\s+/g, " ").trim();
-  if (normalize(r) === normalize(f)) return true;
-  // Whole-word containment only (avoids "Java" in "JavaScript", "C" in "C#", "Go" in "Google")
-  const isWordBoundary = (idx: number, len: number, str: string) => {
-    const beforeOk = idx === 0 || !/[\w]/.test(str[idx - 1]);
-    const afterOk = idx + len >= str.length || !/[\w]/.test(str[idx + len]);
-    return beforeOk && afterOk;
-  };
-  const idx = f.indexOf(r);
-  if (idx >= 0 && isWordBoundary(idx, r.length, f)) return true;
-  const idxR = r.indexOf(f);
-  if (idxR >= 0 && f.length >= 3 && isWordBoundary(idxR, f.length, r)) return true;
-  return false;
-}
-
-/**
- * Calculate skill overlap score (0-100).
- * Uses exact and closely related matches so freelancers with relevant or related skills are included.
- */
-function calculateSkillOverlap(
-  requiredSkills: string[],
-  freelancerSkills: string[]
-): number {
-  if (requiredSkills.length === 0) return 50; // Neutral if no skills required
-  if (freelancerSkills.length === 0) return 0;
-
-  const matchedSkills = requiredSkills.filter((skill) =>
-    freelancerSkills.some((fs) => skillMatches(skill, fs))
-  );
-
-  return (matchedSkills.length / requiredSkills.length) * 100;
 }
 
 /**
@@ -262,18 +226,29 @@ function computeOverallScore(breakdown: ScoringBreakdown): number {
 }
 
 /**
- * Score one freelancer against required skills. Shared by generateMatches and generateMatchesForDraft.
+ * Score one freelancer against normalized intake skills (or a per-role subset for team groups).
  */
 async function scoreOneFreelancer(
   ctx: any,
   freelancer: Doc<"users">,
-  requiredSkills: string[],
-  vettingScore: number
+  intakeForm: Doc<"projects">["intakeForm"],
+  vettingScore: number,
+  options?: { requiredSkillSubset?: string[]; categoryRoleId?: string }
 ): Promise<{ score: number; breakdown: ScoringBreakdown }> {
-  const skillOverlap = calculateSkillOverlap(
-    requiredSkills,
-    freelancer.profile?.skills || []
-  );
+  const categoryRoleId =
+    options?.categoryRoleId ?? projectPrimaryRoleId(intakeForm);
+  const subset = options?.requiredSkillSubset;
+  const normalized =
+    subset != null && subset.length > 0
+      ? subset
+      : normalizeRequiredSkillsForMatching(intakeForm);
+  const freelancerSkills = freelancer.profile?.skills || [];
+  const skillOverlap =
+    normalized.length > 0
+      ? calculateSkillOverlapPercent(normalized, freelancerSkills)
+      : freelancerMatchesRole(freelancer.profile?.techField, categoryRoleId)
+        ? 45
+        : 0;
   const ratings = await calculateRatingsScore(ctx, freelancer._id);
   const availability = calculateAvailabilityScore(freelancer.profile?.availability);
   const pastPerformance = await calculatePastPerformance(ctx, freelancer._id);
@@ -351,6 +326,10 @@ export const generateMatches = action({
       return [];
     }
 
+    const intakeForm = project.intakeForm;
+    const normalizedSkills = normalizeRequiredSkillsForMatching(intakeForm);
+    const projectRoleId = projectPrimaryRoleId(intakeForm);
+
     // Calculate scores for each freelancer
     const scores: Array<{
       freelancer: Doc<"users">;
@@ -373,11 +352,21 @@ export const generateMatches = action({
 
       if (existingMatch) continue;
 
+      if (
+        !isFreelancerEligibleForProjectMatch(
+          freelancer,
+          normalizedSkills,
+          projectRoleId
+        )
+      ) {
+        continue;
+      }
+
       const vettingScore = vettingResult?.overallScore || 0;
       const { score: overallScore, breakdown } = await scoreOneFreelancer(
         ctx,
         freelancer,
-        project.intakeForm.requiredSkills || [],
+        intakeForm,
         vettingScore
       );
 
@@ -470,6 +459,8 @@ export const generateTeamMatches = action({
       throw new Error("This project does not require a team");
     }
 
+    const normalizedIntakeSkills = normalizeRequiredSkillsForMatching(intakeForm);
+
     // Import team matching utilities
     const { determineTeamComposition, matchFreelancerToRole } = await import(
       "../../lib/team-matching"
@@ -557,10 +548,15 @@ export const generateTeamMatches = action({
         const spec = slotSpecs[slotIndex];
         if (acceptedBySlot[slotIndex] >= 1) continue;
 
-        const requiredSkills = [
-          ...(intakeForm.requiredSkills || []),
-          ...spec.skills,
-        ];
+        const requiredSkills = normalizeRequiredSkillsForMatching({
+          ...intakeForm,
+          requiredSkills: [
+            ...(intakeForm.requiredSkills || []),
+            ...(spec.skills || []),
+          ],
+        });
+
+        const slotCategoryRoleId = platformRoleIdForTeamRoleKey(spec.roleKey);
 
         const roleMatches: Array<{
           freelancer: Doc<"users">;
@@ -582,12 +578,24 @@ export const generateTeamMatches = action({
 
           if (existingMatch) continue;
 
+          if (
+            !isFreelancerEligibleForProjectMatch(
+              freelancer,
+              requiredSkills,
+              slotCategoryRoleId
+            )
+          ) {
+            continue;
+          }
+
           const matchResult = matchFreelancerToRole(
             freelancer,
             spec.roleKey,
             requiredSkills,
             spec.experienceLevel as any
           );
+
+          if (matchResult.score <= 0) continue;
 
           const vettingScore = vettingResult?.overallScore || 0;
           const combinedScore = matchResult.score * 0.7 + vettingScore * 0.3;
@@ -640,6 +648,8 @@ export const generateTeamMatches = action({
           vettingScore: number;
         }> = [];
 
+        const roleCategoryId = platformRoleIdForTeamRoleKey(role);
+
         for (const { freelancer, vettingResult } of approvedFreelancers) {
           if (reservedFreelancerIds.has(freelancer._id as string)) continue;
 
@@ -653,12 +663,24 @@ export const generateTeamMatches = action({
 
           if (existingMatch) continue;
 
+          if (
+            !isFreelancerEligibleForProjectMatch(
+              freelancer,
+              normalizedIntakeSkills,
+              roleCategoryId
+            )
+          ) {
+            continue;
+          }
+
           const matchResult = matchFreelancerToRole(
             freelancer,
             role,
-            intakeForm.requiredSkills || [],
+            normalizedIntakeSkills,
             intakeForm.experienceLevel as any
           );
+
+          if (matchResult.score <= 0) continue;
 
           const vettingScore = vettingResult?.overallScore || 0;
           const combinedScore = matchResult.score * 0.7 + vettingScore * 0.3;
@@ -808,7 +830,8 @@ export const generateMatchesForDraft = action({
 
     const intakeForm = project.intakeForm;
     const isTeam = intakeForm.hireType === "team";
-    const requiredSkills = intakeForm.requiredSkills || [];
+    const normalizedSkills = normalizeRequiredSkillsForMatching(intakeForm);
+    const projectRoleId = projectPrimaryRoleId(intakeForm);
     const requestedLevel = intakeForm.experienceLevel || "mid";
     const LEVEL_ORDER = ["junior", "mid", "senior", "expert"] as const;
     const levelIndex = (l: string) => {
@@ -881,29 +904,57 @@ export const generateMatchesForDraft = action({
       }> = [];
 
       for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
+        if (
+          !isFreelancerEligibleForProjectMatch(
+            freelancer,
+            normalizedSkills,
+            projectRoleId
+          )
+        ) {
+          continue;
+        }
         const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
           freelancer,
-          requiredSkills,
+          intakeForm,
           vettingScore
         );
         scores.push({ freelancer, score: overallScore, breakdown });
       }
 
       scores.sort((a, b) => b.score - a.score);
-      const top20 = scores.filter((m) => m.breakdown.skillOverlap > 0).slice(0, 20);
+      const top20 = scores
+        .filter((m) =>
+          normalizedSkills.length > 0
+            ? m.breakdown.skillOverlap > 0
+            : m.breakdown.skillOverlap >= 45
+        )
+        .slice(0, 20);
 
       // Check if we have higher-level freelancers (for availability message when 0 matches)
       let hasHigherLevelWithSkills = false;
       if (top20.length === 0 && higherLevelFreelancers.length > 0) {
         for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
+          if (
+            !isFreelancerEligibleForProjectMatch(
+              freelancer,
+              normalizedSkills,
+              projectRoleId
+            )
+          ) {
+            continue;
+          }
           const { breakdown } = await scoreOneFreelancer(
             ctx,
             freelancer,
-            requiredSkills,
+            intakeForm,
             vettingScore
           );
-          if (breakdown.skillOverlap > 0) {
+          if (
+            normalizedSkills.length > 0
+              ? breakdown.skillOverlap > 0
+              : breakdown.skillOverlap >= 45
+          ) {
             hasHigherLevelWithSkills = true;
             break;
           }
@@ -957,7 +1008,7 @@ export const generateMatchesForDraft = action({
     const fallbackRoleId = getRoleIdFromCategoryLabel(
       intakeForm.talentCategory || "Software Development"
     );
-    for (const skill of requiredSkills || []) {
+    for (const skill of normalizedSkills) {
       const roleId = getRoleIdForSkill(skill) ?? fallbackRoleId;
       if (!roleSkills[roleId]) roleSkills[roleId] = [];
       roleSkills[roleId].push(skill);
@@ -971,9 +1022,13 @@ export const generateMatchesForDraft = action({
             roleLabel: getRoleLabel(roleId),
             skills,
           }))
-        : (requiredSkills.length > 0 ? requiredSkills : [intakeForm.talentCategory || "Software Development"]).map(
-            (s) => ({ roleId: getRoleIdForSkill(s) ?? "software_development", roleLabel: s, skills: [s] })
-          );
+        : [
+            {
+              roleId: fallbackRoleId,
+              roleLabel: getRoleLabel(fallbackRoleId),
+              skills: getSkillsForCategory(fallbackRoleId).slice(0, 14),
+            },
+          ];
 
     const rolesMissing: string[] = [];
 
@@ -986,11 +1041,24 @@ export const generateMatchesForDraft = action({
       }> = [];
 
       for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
+        if (
+          !isFreelancerEligibleForProjectMatch(
+            freelancer,
+            group.skills,
+            group.roleId
+          )
+        ) {
+          continue;
+        }
         const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
           freelancer,
-          group.skills,
-          vettingScore
+          intakeForm,
+          vettingScore,
+          {
+            requiredSkillSubset: group.skills,
+            categoryRoleId: group.roleId,
+          }
         );
         groupScores.push({ freelancer, score: overallScore, breakdown });
       }
@@ -1037,11 +1105,24 @@ export const generateMatchesForDraft = action({
     if (matchIds.length === 0 && higherLevelFreelancers.length > 0) {
       for (const group of groups) {
         for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
+          if (
+            !isFreelancerEligibleForProjectMatch(
+              freelancer,
+              group.skills,
+              group.roleId
+            )
+          ) {
+            continue;
+          }
           const { breakdown } = await scoreOneFreelancer(
             ctx,
             freelancer,
-            group.skills,
-            vettingScore
+            intakeForm,
+            vettingScore,
+            {
+              requiredSkillSubset: group.skills,
+              categoryRoleId: group.roleId,
+            }
           );
           if (
             breakdown.skillOverlap > 0 &&

@@ -10,6 +10,7 @@ import {
   legacyTeamSizeToCount,
   resolveTargetTeamSize,
 } from "./budget-calculator";
+import { skillMatches } from "./matching-skill-utils";
 import {
   type TeamSlotIntake,
   teamSlotRoleCountsForMatching,
@@ -325,14 +326,6 @@ export function matchFreelancerToRole(
       return skill;
     });
   
-  const skillMatches = (required: string, fs: string) => {
-    const r = required.toLowerCase().trim();
-    const f = fs.toLowerCase().trim();
-    if (r === f) return true;
-    if (f.includes(r) || r.includes(f)) return true;
-    const norm = (s: string) => s.replace(/\s*[.\-]\s*js$/i, "").replace(/\s+/g, " ").trim();
-    return norm(r) === norm(f);
-  };
   const matchingSkills = roleSkills.filter((skill: string) =>
     freelancerSkills.some((fs: string) => skillMatches(skill, fs))
   );
@@ -361,17 +354,25 @@ export function matchFreelancerToRole(
     }
   }
   
-  // Check required skills overlap
-  const requiredSkillMatches = requiredSkills.filter((skill: string) =>
-    freelancerSkills.some((fs: string) => fs.toLowerCase() === skill.toLowerCase())
-  );
-  
-  if (requiredSkillMatches.length > 0) {
-    const requiredOverlap = (requiredSkillMatches.length / requiredSkills.length) * 100;
-    score += requiredOverlap * 0.3; // 30% weight
+  const requiredClean = requiredSkills
+    .map((s) => (typeof s === "string" ? s.trim() : ""))
+    .filter(Boolean);
+
+  if (requiredClean.length > 0) {
+    const requiredSkillMatches = requiredClean.filter((skill: string) =>
+      freelancerSkills.some((fs: string) => skillMatches(skill, fs))
+    );
+    if (requiredSkillMatches.length === 0) {
+      return { score: 0, matchReasons: [] };
+    }
+    const requiredOverlap =
+      (requiredSkillMatches.length / requiredClean.length) * 100;
+    score += requiredOverlap * 0.3;
     matchReasons.push(`${requiredSkillMatches.length} required skills matched`);
+  } else if (roleSkills.length > 0 && matchingSkills.length === 0) {
+    return { score: 0, matchReasons: [] };
   }
-  
+
   return {
     score: Math.min(100, score),
     matchReasons,

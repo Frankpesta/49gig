@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-import { fetchQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
+import { fetchPublishedBlogSlugs } from "@/lib/sitemap-convex-blog";
 
 const baseUrl =
   process.env.NEXT_PUBLIC_BASE_URL ||
@@ -35,7 +34,7 @@ const staticRoutes: MetadataRoute.Sitemap = [
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let blogPosts: { slug: string; updatedAt: number }[] = [];
   try {
-    blogPosts = await fetchQuery((api as any).blog.queries.getAllPublishedSlugs, {});
+    blogPosts = await fetchPublishedBlogSlugs();
   } catch {
     // Convex may not be available at build time; blog URLs will be added when deployed
   }
