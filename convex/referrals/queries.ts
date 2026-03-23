@@ -36,6 +36,7 @@ export const getMyReferralSummary = query({
     const credited = asReferrer.filter((a) => a.status === "credited").length;
     const pending = asReferrer.filter(
       (a) =>
+        a.status === "awaiting_first_monthly_approval" ||
         a.status === "awaiting_in_progress" ||
         a.status === "awaiting_eligibility_period"
     ).length;

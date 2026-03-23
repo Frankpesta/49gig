@@ -241,6 +241,7 @@ export default function ProjectDetailPage() {
 
   const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
+  const isStaff = user.role === "admin" || user.role === "moderator";
   const isClient = user.role === "client" && project.clientId === user._id;
   const pendingMatchesCount =
     (project as { pendingMatchesCount?: number }).pendingMatchesCount ?? 0;
@@ -256,9 +257,12 @@ export default function ProjectDetailPage() {
   const isMatchedFreelancer =
     project.matchedFreelancerId === user._id ||
     (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
+  const hasMatchedFreelancers =
+    !!project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0;
   const canChat =
-    (project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0) &&
-    (project.clientId === user._id || isMatchedFreelancer);
+    hasMatchedFreelancers && (project.clientId === user._id || isMatchedFreelancer);
+  const canStaffOpenProjectChat = isStaff && hasMatchedFreelancers;
+  const showProjectChat = canChat || canStaffOpenProjectChat;
 
   const hasSelected =
     project.selectedFreelancerId ||
@@ -275,7 +279,7 @@ export default function ProjectDetailPage() {
     !project.clientContractSignedAt &&
     (project.status === "draft" || project.status === "pending_funding");
 
-  if (needContractSign && projectId && user._id) {
+  if (needContractSign && projectId && user._id && !isStaff) {
     return (
       <div className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-4">
@@ -388,7 +392,7 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
-        {(isClient || user?.role === "admin") && (
+        {isClient && (
           <div className="flex flex-wrap gap-2 sm:shrink-0">
             {needContractSignPrePayment && (
               <Button asChild>
@@ -510,6 +514,27 @@ export default function ProjectDetailPage() {
             )}
           </div>
         )}
+        {isStaff && (
+          <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border/80 bg-muted/30 px-4 py-3 text-sm sm:max-w-md">
+            <p className="font-medium text-foreground">Staff overview</p>
+            <p className="text-muted-foreground">
+              Funding, monthly approvals, and completing this hire are client actions. Use the links below for support and disputes.
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/disputes">Disputes queue</Link>
+              </Button>
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/users">Users</Link>
+              </Button>
+              {hasOpenDispute && openDisputes?.[0] && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/dashboard/disputes/${openDisputes[0]._id}`}>This hire&apos;s dispute</Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {matchingInProgressForClient && (
@@ -587,11 +612,13 @@ export default function ProjectDetailPage() {
                   {isClient ? "Monthly Billing" : isMatchedFreelancer ? "Monthly Payments" : "Monthly Billing Cycles"}
                 </CardTitle>
                 <CardDescription>
-                  {isClient
-                    ? "Approve each month to release funds to the freelancer's wallet. They withdraw to their bank when ready."
-                    : isMatchedFreelancer
-                      ? "Funds are released to your wallet when the client approves each month. Withdraw to your bank account from the Wallet page."
-                      : "Payment cycles for this project. Funds go to freelancer wallets; they withdraw to their bank accounts."}
+                  {isStaff
+                    ? "Read-only: the hiring client approves each month to release escrow. Staff cannot approve or fund on their behalf."
+                    : isClient
+                      ? "Approve each month to release funds to the freelancer's wallet. They withdraw to their bank when ready."
+                      : isMatchedFreelancer
+                        ? "Funds are released to your wallet when the client approves each month. Withdraw to your bank account from the Wallet page."
+                        : "Payment cycles for this project. Funds go to freelancer wallets; they withdraw to their bank accounts."}
                 </CardDescription>
                 {isClient && (
                   <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm">
@@ -638,7 +665,10 @@ export default function ProjectDetailPage() {
                       ? (cycle.status === "pending" ? "Awaiting your approval" : cycle.status === "approved" ? "Approved" : cycle.status === "disputed" ? "Disputed" : cycle.status)
                       : (cycle.status === "pending" ? "Awaiting client approval" : cycle.status === "approved" ? "Approved, funds released" : cycle.status === "disputed" ? "Disputed" : cycle.status);
                     const durMonths = getDurationMonths(project?.intakeForm?.projectDuration) || monthlyCycles.length || 1;
-                    const displayAmount = isClient ? (project ? project.totalAmount / durMonths : cycle.amountCents / 100) : cycle.amountCents / 100;
+                    const displayAmount =
+                      isClient && project
+                        ? project.totalAmount / durMonths
+                        : cycle.amountCents / 100;
                     return (
                       <div key={cycle._id} className="flex items-center justify-between rounded-lg border p-4">
                         <div>
@@ -647,7 +677,7 @@ export default function ProjectDetailPage() {
                             ${typeof displayAmount === "number" ? displayAmount.toFixed(2) : (cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {statusLabel}
                           </div>
                         </div>
-                        {(isClient || user?.role === "admin") && isPending && (
+                        {isClient && isPending && (
                           <Button
                             size="sm"
                             onClick={async () => {
@@ -681,7 +711,7 @@ export default function ProjectDetailPage() {
                       ? "Monthly billing cycles are created automatically when the project is in progress. You'll approve each month to release payment to the freelancer."
                       : "Monthly billing cycles will appear here once the project is in progress. You'll get paid each month after the client approves."}
                   </p>
-                  {(project.status === "in_progress" || project.status === "matched") && (isClient || user?.role === "admin") && (
+                  {(project.status === "in_progress" || project.status === "matched") && isClient && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -707,7 +737,7 @@ export default function ProjectDetailPage() {
                   )}
                 </div>
                 )}
-                {(isClient || user?.role === "admin") && monthlyCycles && monthlyCycles.length > 0 && (
+                {isClient && monthlyCycles && monthlyCycles.length > 0 && (
                   <Button variant="outline" size="sm" className="mt-4" asChild>
                     <Link href="/dashboard/monthly-approvals">View all pending approvals</Link>
                   </Button>
@@ -761,12 +791,16 @@ export default function ProjectDetailPage() {
               <div>
                 <div className="text-sm font-medium">Budget</div>
                 <div className="text-lg font-semibold">
-                  {isClient
+                  {isClient || isStaff
                     ? `$${project.totalAmount.toLocaleString()}`
                     : `$${((project.totalAmount * (100 - (project.platformFee ?? 25))) / 100).toLocaleString()}`}
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {isClient ? "Total amount for this hire" : "Your share for this engagement"}
+                  {isClient
+                    ? "Total amount for this hire"
+                    : isStaff
+                      ? "Hire total (staff view)"
+                      : "Your share for this engagement"}
                 </div>
               </div>
               <Separator />
@@ -830,14 +864,18 @@ export default function ProjectDetailPage() {
                   </div>
                 </>
               )}
-              {canChat && (
+              {showProjectChat && (
                 <>
                   <Separator />
                   {projectChat ? (
                     <Button asChild className="w-full">
                       <Link href={`/dashboard/chat/${projectChat._id}`}>
                         <MessageCircle className="mr-2 h-4 w-4" />
-                        {isClient ? "Chat with freelancer" : "Chat with client"}
+                        {isStaff
+                          ? "View project chat"
+                          : isClient
+                            ? "Chat with freelancer"
+                            : "Chat with client"}
                       </Link>
                     </Button>
                   ) : (
@@ -849,9 +887,11 @@ export default function ProjectDetailPage() {
                       <MessageCircle className="mr-2 h-4 w-4" />
                       {isOpeningChat
                         ? "Opening..."
-                        : isClient
-                          ? "Chat with freelancer"
-                          : "Chat with client"}
+                        : isStaff
+                          ? "Open project chat"
+                          : isClient
+                            ? "Chat with freelancer"
+                            : "Chat with client"}
                     </Button>
                   )}
                 </>

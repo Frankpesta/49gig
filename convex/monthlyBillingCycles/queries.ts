@@ -46,8 +46,7 @@ export const getCyclesByProjectId = query({
 });
 
 /**
- * Get pending cycles awaiting client approval (for client dashboard).
- * Admins see all pending cycles across projects.
+ * Get pending cycles awaiting client approval (client dashboard only).
  */
 export const getPendingCyclesForClient = query({
   args: {},
@@ -55,31 +54,22 @@ export const getPendingCyclesForClient = query({
     const user = await getCurrentUser(ctx);
     if (!user || (user as Doc<"users">).status !== "active") return [];
 
-    const isAdmin = (user as Doc<"users">).role === "admin";
-    let allCycles: Doc<"monthlyBillingCycles">[];
+    if ((user as Doc<"users">).role !== "client") return [];
 
-    if (isAdmin) {
-      allCycles = await ctx.db
+    const clientId = (user as Doc<"users">)._id;
+    const myProjects = await ctx.db
+      .query("projects")
+      .withIndex("by_client", (q) => q.eq("clientId", clientId))
+      .collect();
+    const projectIds = myProjects.map((p) => p._id);
+    const allCycles: Doc<"monthlyBillingCycles">[] = [];
+    for (const pid of projectIds) {
+      const cycles = await ctx.db
         .query("monthlyBillingCycles")
-        .withIndex("by_status", (q) => q.eq("status", "pending"))
+        .withIndex("by_project", (q) => q.eq("projectId", pid))
+        .filter((q) => q.eq(q.field("status"), "pending"))
         .collect();
-    } else {
-      const clientId = (user as Doc<"users">)._id;
-      if ((user as Doc<"users">).role !== "client") return [];
-      const myProjects = await ctx.db
-        .query("projects")
-        .withIndex("by_client", (q) => q.eq("clientId", clientId))
-        .collect();
-      const projectIds = myProjects.map((p) => p._id);
-      allCycles = [];
-      for (const pid of projectIds) {
-        const cycles = await ctx.db
-          .query("monthlyBillingCycles")
-          .withIndex("by_project", (q) => q.eq("projectId", pid))
-          .filter((q) => q.eq(q.field("status"), "pending"))
-          .collect();
-        allCycles.push(...cycles);
-      }
+      allCycles.push(...cycles);
     }
 
     return allCycles.sort((a, b) => a.monthStartDate - b.monthStartDate);

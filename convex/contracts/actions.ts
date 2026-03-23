@@ -816,71 +816,11 @@ export const generateAndSendContract = action({
       freelancerId: freelancer._id,
     });
 
-    const contractUrl = await ctx.storage.getUrl(storageId);
-    const appUrl = getAppUrl();
-    const logoUrl = getLogoUrl(appUrl);
-    const date = formatDate();
-    const attachment = {
-      filename: `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}.pdf`,
-      content: Buffer.from(pdfBytes).toString("base64"),
-      contentType: "application/pdf",
-    };
+    // Do not email here — the same PDF was going to both parties and duplicated
+    // the “fully signed” emails from regenerateContractPdfAndSend. Parties open
+    // the contract from the dashboard; final PDFs are emailed once when signing completes.
 
-    const emailTasks: Promise<void>[] = [];
-    const contractLink =
-      contractUrl || `${appUrl}/dashboard/projects/${project._id}`;
-
-    if (isValidEmail(client.email)) {
-      emailTasks.push(
-        sendResendEmail("contract email (match flow, client)", () =>
-          sendEmail({
-            to: client.email.trim(),
-            subject: `Contract ready for ${project.intakeForm.title}`,
-            react: React.createElement(ContractReadyEmail, {
-              name: client.name || "there",
-              projectName: project.intakeForm.title,
-              contractUrl: contractLink,
-              appUrl,
-              logoUrl,
-              date,
-            }),
-            attachments: [attachment],
-          }),
-        ),
-      );
-    } else {
-      console.warn(
-        "[contracts] skip match-flow client email: invalid or missing email",
-      );
-    }
-
-    if (isValidEmail(freelancer.email)) {
-      emailTasks.push(
-        sendResendEmail("contract email (match flow, freelancer)", () =>
-          sendEmail({
-            to: freelancer.email.trim(),
-            subject: `Contract ready for ${project.intakeForm.title}`,
-            react: React.createElement(ContractReadyEmail, {
-              name: freelancer.name || "there",
-              projectName: project.intakeForm.title,
-              contractUrl: contractLink,
-              appUrl,
-              logoUrl,
-              date,
-            }),
-            attachments: [attachment],
-          }),
-        ),
-      );
-    } else {
-      console.warn(
-        "[contracts] skip match-flow freelancer email: invalid or missing email",
-      );
-    }
-
-    await Promise.all(emailTasks);
-
-    return { status: "sent", contractFileId: storageId };
+    return { status: "generated", contractFileId: storageId };
   },
 });
 
@@ -943,6 +883,10 @@ export const regenerateContractPdfAndSend = internalAction({
     const baseFilename = `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}`;
 
     if (sendEmails) {
+      if (project.contractFullyExecutedEmailedAt) {
+        return { status: "already_emailed", contractFileId: clientStorageId };
+      }
+
       const contractUrl =
         (await ctx.storage.getUrl(clientStorageId)) ||
         `${appUrl}/dashboard/projects/${args.projectId}`;
@@ -1056,6 +1000,11 @@ export const regenerateContractPdfAndSend = internalAction({
           }),
         );
       }
+
+      await ctx.runMutation(
+        apiModule.internal.contracts.mutations.markContractFullyExecutedEmailed,
+        { projectId: args.projectId },
+      );
     }
 
     return {

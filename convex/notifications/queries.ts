@@ -68,6 +68,25 @@ export const getNotificationById = query({
       if (typeof data.vettingResultId === "string") {
         resolved.vettingLabel = "Verification";
       }
+      if (typeof data.monthlyCycleId === "string") {
+        const c = await ctx.db.get(data.monthlyCycleId as Doc<"monthlyBillingCycles">["_id"]);
+        resolved.monthlyCycleLabel = c
+          ? `Month ${c.monthIndex} (${new Date(c.monthStartDate).toLocaleString("default", { month: "short", year: "numeric" })})`
+          : "Monthly cycle";
+      }
+      if (typeof data.referralAccrualId === "string") {
+        const acc = await ctx.db.get(data.referralAccrualId as Doc<"referralAccruals">["_id"]);
+        if (acc) {
+          const proj = await ctx.db.get(acc.projectId);
+          resolved.referralAccrualLabel = proj?.intakeForm?.title
+            ? `Referral · ${proj.intakeForm.title}`
+            : "Referral reward";
+        }
+      }
+      if (typeof data.chatId === "string") {
+        const chat = await ctx.db.get(data.chatId as Doc<"chats">["_id"]);
+        resolved.chatLabel = chat?.title ?? "Conversation";
+      }
     }
 
     return { ...notification, resolved };

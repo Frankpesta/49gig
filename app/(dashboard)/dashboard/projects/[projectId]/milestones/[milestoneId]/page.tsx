@@ -124,13 +124,12 @@ export default function MilestoneDetailPage() {
 
   const isFreelancer = user.role === "freelancer" && project.matchedFreelancerId === user._id;
   const isClient = user.role === "client" && project.clientId === user._id;
-  const isAdmin = user.role === "admin";
 
   const canStart = isFreelancer && milestone.status === "pending";
   const canSubmit = isFreelancer && milestone.status === "in_progress";
-  const canApprove = (isClient || isAdmin) && milestone.status === "submitted";
-  const canReject = (isClient || isAdmin) && milestone.status === "submitted";
-  const canRelease = (isClient || isAdmin) && milestone.status === "approved" && milestone.status !== "paid";
+  const canApprove = isClient && milestone.status === "submitted";
+  const canReject = isClient && milestone.status === "submitted";
+  const canRelease = isClient && milestone.status === "approved" && milestone.status !== "paid";
 
   const addDeliverable = () => {
     setDeliverables([...deliverables, { name: "", url: "" }]);
@@ -468,7 +467,7 @@ export default function MilestoneDetailPage() {
           )}
 
           {/* Client Actions */}
-          {(isClient || isAdmin) && (
+          {isClient && (
             <>
               {canApprove && (
                 <Card>

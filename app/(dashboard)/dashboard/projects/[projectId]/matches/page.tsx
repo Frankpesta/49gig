@@ -715,11 +715,27 @@ export default function ProjectMatchesPage() {
     );
   }
 
-  if (
-    project.status !== "draft" &&
-    project.status !== "pending_funding" &&
-    !isFundedMatchingContinuation
-  ) {
+  const clientCanViewMatches =
+    isClient &&
+    (project.status === "draft" ||
+      project.status === "pending_funding" ||
+      project.status === "funded" ||
+      project.status === "matching");
+
+  const freelancerHasPendingSuggestion =
+    !isClient &&
+    user.role === "freelancer" &&
+    (matches ?? []).some(
+      (m: EnrichedMatch) =>
+        m.freelancerId === user._id && m.status === "pending"
+    );
+
+  const canUseMatchesPage =
+    isFundedMatchingContinuation ||
+    clientCanViewMatches ||
+    freelancerHasPendingSuggestion;
+
+  if (!canUseMatchesPage) {
     return (
       <div className="space-y-6">
         <p className="text-muted-foreground">

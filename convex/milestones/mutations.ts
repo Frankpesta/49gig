@@ -154,8 +154,7 @@ export const approveMilestone = mutation({
       throw new Error("Project not found");
     }
 
-    // Only client who owns project or admin can approve
-    if (project.clientId !== user._id && user.role !== "admin") {
+    if (project.clientId !== user._id) {
       throw new Error("Not authorized to approve this milestone");
     }
 
@@ -237,8 +236,7 @@ export const rejectMilestone = mutation({
       throw new Error("Project not found");
     }
 
-    // Only client who owns project or admin can reject
-    if (project.clientId !== user._id && user.role !== "admin") {
+    if (project.clientId !== user._id) {
       throw new Error("Not authorized to reject this milestone");
     }
 

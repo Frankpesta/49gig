@@ -189,6 +189,7 @@ export default defineSchema({
     bonusPercent: v.number(),
     bonusCents: v.number(),
     status: v.union(
+      v.literal("awaiting_first_monthly_approval"),
       v.literal("awaiting_in_progress"),
       v.literal("awaiting_eligibility_period"),
       v.literal("credited"),
@@ -421,6 +422,8 @@ export default defineSchema({
         signedAtUserAgent: v.optional(v.string()),
       }))
     ),
+    /** Set once final signed PDF emails are sent to parties (prevents duplicate sends). */
+    contractFullyExecutedEmailedAt: v.optional(v.number()),
 
     // Payment
     totalAmount: v.number(),
@@ -839,7 +842,9 @@ export default defineSchema({
         v.literal("earnings"),
         v.literal("referral_bonus"),
         v.literal("client_referral_credit"),
-        v.literal("hiring_credit")
+        v.literal("client_referral_payout"),
+        v.literal("hiring_credit"),
+        v.literal("withdrawal_referral")
       )
     ),
     amountCents: v.number(),
@@ -932,12 +937,21 @@ export default defineSchema({
       v.literal("freelancer")
     ),
 
-    // Type
+    // Type (legacy shared literals + role-specific; validated in initiateDispute)
     type: v.union(
       v.literal("milestone_quality"),
       v.literal("payment"),
       v.literal("communication"),
-      v.literal("freelancer_replacement")
+      v.literal("freelancer_replacement"),
+      v.literal("client_deliverable_quality"),
+      v.literal("client_timeline_scope"),
+      v.literal("client_payment_billing"),
+      v.literal("client_communication_conduct"),
+      v.literal("client_request_replacement"),
+      v.literal("freelancer_payment_issue"),
+      v.literal("freelancer_scope_requirements"),
+      v.literal("freelancer_communication"),
+      v.literal("freelancer_platform_policy")
     ),
 
     // Details
@@ -1000,6 +1014,53 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_initiator", ["initiatorId"])
     .index("by_moderator", ["assignedModeratorId"]),
+
+  /** P2P-style dispute thread: parties + moderators; evidence links optional. */
+  disputeMessages: defineTable({
+    disputeId: v.id("disputes"),
+    authorId: v.id("users"),
+    authorRole: v.union(
+      v.literal("client"),
+      v.literal("freelancer"),
+      v.literal("moderator"),
+      v.literal("admin"),
+      v.literal("system")
+    ),
+    body: v.string(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          fileId: v.id("_storage"),
+          fileName: v.string(),
+          fileSize: v.number(),
+          mimeType: v.string(),
+        })
+      )
+    ),
+    createdAt: v.number(),
+  })
+    .index("by_dispute", ["disputeId", "createdAt"]),
+
+  /** Client referral cash / crypto withdrawal requests (manual or automated processing). */
+  clientReferralPayoutRequests: defineTable({
+    userId: v.id("users"),
+    amountCents: v.number(),
+    currency: v.string(),
+    method: v.union(v.literal("bank"), v.literal("crypto")),
+    cryptoNetwork: v.optional(v.string()),
+    cryptoAddress: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("rejected")
+    ),
+    adminNote: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_status", ["status"]),
 
   payments: defineTable({
     // Project (optional for payout from wallet)

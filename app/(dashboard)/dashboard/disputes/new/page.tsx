@@ -38,6 +38,15 @@ export default function NewDisputePage() {
       | "payment"
       | "communication"
       | "freelancer_replacement"
+      | "client_deliverable_quality"
+      | "client_timeline_scope"
+      | "client_payment_billing"
+      | "client_communication_conduct"
+      | "client_request_replacement"
+      | "freelancer_payment_issue"
+      | "freelancer_scope_requirements"
+      | "freelancer_communication"
+      | "freelancer_platform_policy"
       | "",
     reason: "",
     description: "",
@@ -247,14 +256,45 @@ export default function NewDisputePage() {
                   <SelectValue placeholder="Select dispute type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="milestone_quality">
-                    Work / Deliverable Quality
-                  </SelectItem>
-                  <SelectItem value="payment">Payment</SelectItem>
-                  <SelectItem value="communication">Communication</SelectItem>
-                  <SelectItem value="freelancer_replacement">
-                    Freelancer Replacement
-                  </SelectItem>
+                  {user.role === "client" ? (
+                    <>
+                      <SelectItem value="client_deliverable_quality">
+                        Deliverable quality or work not meeting agreement
+                      </SelectItem>
+                      <SelectItem value="client_timeline_scope">
+                        Timeline delays or scope issues
+                      </SelectItem>
+                      <SelectItem value="client_payment_billing">
+                        Payment, invoice, or billing dispute
+                      </SelectItem>
+                      <SelectItem value="client_communication_conduct">
+                        Communication or professional conduct
+                      </SelectItem>
+                      <SelectItem value="client_request_replacement">
+                        Request a different freelancer / team member
+                      </SelectItem>
+                    </>
+                  ) : (
+                    <>
+                      <SelectItem value="freelancer_payment_issue">
+                        Late or missing payment from client
+                      </SelectItem>
+                      <SelectItem value="freelancer_scope_requirements">
+                        Scope creep or unclear requirements
+                      </SelectItem>
+                      <SelectItem value="freelancer_communication">
+                        Client communication issues
+                      </SelectItem>
+                      <SelectItem value="freelancer_platform_policy">
+                        Platform, contract, or policy concern
+                      </SelectItem>
+                      <SelectItem value="milestone_quality">
+                        Deliverable / quality (legacy category)
+                      </SelectItem>
+                      <SelectItem value="payment">Payment (legacy)</SelectItem>
+                      <SelectItem value="communication">Communication (legacy)</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>

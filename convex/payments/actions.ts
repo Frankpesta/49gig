@@ -516,8 +516,8 @@ export const withdrawFromWallet = action({
       userId: args.userId,
     });
 
-    if (!user || user.role !== "freelancer") {
-      throw new Error("Only freelancers can withdraw from wallet");
+    if (!user || (user.role !== "freelancer" && user.role !== "client")) {
+      throw new Error("Only clients and freelancers can withdraw from wallet");
     }
 
     const userDoc = user as typeof user & {
@@ -543,6 +543,19 @@ export const withdrawFromWallet = action({
       throw new Error("Insufficient wallet balance");
     }
 
+    if (user.role === "client") {
+      const referralCash = await ctx.runQuery(
+        apiAny.wallets.queries.getClientReferralCashBalanceCents,
+        { userId: args.userId },
+      );
+      const cap = referralCash?.cents ?? 0;
+      if (args.amountCents > cap) {
+        throw new Error(
+          "You can only withdraw referral reward cash (available balance shown on your wallet). Hiring credits cannot be withdrawn."
+        );
+      }
+    }
+
     const amountDollars = args.amountCents / 100;
     const transferRef = `49gig-wallet-${args.userId}-${Date.now()}`;
 
@@ -550,7 +563,10 @@ export const withdrawFromWallet = action({
       account_bank: userDoc.flutterwavePayoutBankCode,
       account_number: userDoc.flutterwavePayoutAccountNumber,
       amount: amountDollars,
-      narration: `49GIG wallet withdrawal`,
+      narration:
+        user.role === "client"
+          ? `49GIG referral reward withdrawal`
+          : `49GIG wallet withdrawal`,
       currency: "USD",
       reference: transferRef,
       beneficiary_name: user.name,
@@ -560,8 +576,10 @@ export const withdrawFromWallet = action({
       userId: args.userId,
       amountCents: args.amountCents,
       currency: "usd",
-      description: `Withdrawal to bank`,
+      description:
+        user.role === "client" ? `Referral cash withdrawal` : `Withdrawal to bank`,
       flutterwaveTransferId: transferRef,
+      category: user.role === "client" ? "withdrawal_referral" : undefined,
     });
 
     const paymentId = await ctx.runMutation(internalAny.payments.mutations.createPayment, {
@@ -571,7 +589,7 @@ export const withdrawFromWallet = action({
       platformFee: 0,
       netAmount: amountDollars,
       flutterwaveTransferId: transferRef,
-      flutterwaveSubaccountId: (user as any).flutterwaveSubaccountId,
+      flutterwaveSubaccountId: (user as { flutterwaveSubaccountId?: string }).flutterwaveSubaccountId,
       userId: args.userId,
       recipientId: args.userId,
       status: transferData.data.status === "NEW" ? "processing" : "succeeded",
@@ -834,8 +852,7 @@ export const releaseMilestonePayment = action({
       throw new Error("Project not found");
     }
 
-    // Only client who owns project or admin can release
-    if (project.clientId !== user._id && user.role !== "admin") {
+    if (project.clientId !== user._id) {
       throw new Error("Not authorized to release this milestone payment");
     }
 

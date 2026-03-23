@@ -54,7 +54,7 @@ export const tryCreateReferralAccrualForPreFunding = internalMutation({
       netAmountCents: netCents,
       bonusPercent: pct,
       bonusCents,
-      status: "awaiting_in_progress",
+      status: "awaiting_first_monthly_approval",
       workStartedAt: undefined,
       createdAt: now,
       updatedAt: now,
@@ -64,7 +64,7 @@ export const tryCreateReferralAccrualForPreFunding = internalMutation({
     await ctx.scheduler.runAfter(0, sendSystemNotificationRef, {
       userIds: [referrer._id],
       title: "Referral progress",
-      message: `A hire you referred has been funded. You'll earn ${pct}% of the first funding once the hire is active for 7 days.`,
+      message: `A hire you referred has been funded. You'll earn ${pct}% of the first funding after the client approves the first monthly payment for that hire.`,
       type: "account",
       data: { projectId, paymentId: payment._id },
     });
@@ -107,6 +107,95 @@ export const voidReferralAccrualsForProject = internalMutation({
   },
 });
 
+/**
+ * When the client approves the first monthly cycle for a hire, credit the referrer
+ * (client or freelancer) if a referral accrual exists for that project.
+ */
+export const creditReferralOnFirstMonthlyApproval = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const approved = await ctx.db
+      .query("monthlyBillingCycles")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .collect();
+    if (approved.length !== 1) return;
+
+    const a = await ctx.db
+      .query("referralAccruals")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .first();
+    if (!a) return;
+
+    const latest = await ctx.db.get(a._id);
+    if (!latest || latest.status === "credited" || latest.status === "void") return;
+
+    const creditable = new Set([
+      "awaiting_first_monthly_approval",
+      "awaiting_in_progress",
+    ]);
+    if (!creditable.has(latest.status)) return;
+
+    const now = Date.now();
+    const project = await ctx.db.get(latest.projectId);
+    if (!project || project.status === "cancelled") {
+      await ctx.db.patch(latest._id, { status: "void", updatedAt: now });
+      return;
+    }
+
+    const referrer = await ctx.db.get(latest.referrerId);
+    if (!referrer || referrer.status !== "active") {
+      await ctx.db.patch(latest._id, { status: "void", updatedAt: now });
+      return;
+    }
+
+    const pay = await ctx.db.get(latest.firstPaymentId);
+    const currency = (pay?.currency ?? "usd").toLowerCase();
+
+    const category =
+      referrer.role === "client"
+        ? ("client_referral_payout" as const)
+        : ("referral_bonus" as const);
+
+    await ctx.runMutation(internalAny.wallets.mutations.getOrCreateWallet, {
+      userId: referrer._id,
+      currency,
+    });
+
+    await ctx.runMutation(internalAny.wallets.mutations.creditWallet, {
+      userId: referrer._id,
+      amountCents: latest.bonusCents,
+      currency,
+      description:
+        referrer.role === "client"
+          ? "Referral reward (first month approved)"
+          : "Referral reward (first month approved)",
+      projectId: latest.projectId,
+      paymentId: latest.firstPaymentId,
+      category,
+    });
+
+    await ctx.db.patch(latest._id, {
+      status: "credited",
+      creditedAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.scheduler.runAfter(0, sendSystemNotificationRef, {
+      userIds: [referrer._id],
+      title: "Referral reward credited",
+      message:
+        referrer.role === "client"
+          ? `You received ${(latest.bonusCents / 100).toFixed(2)} ${currency.toUpperCase()} referral reward in your wallet (you can withdraw from the Wallet page).`
+          : `You received ${(latest.bonusCents / 100).toFixed(2)} ${currency.toUpperCase()} to your wallet from a referral.`,
+      type: "payment",
+      data: { referralAccrualId: latest._id, projectId: latest.projectId },
+    });
+  },
+});
+
 export const creditDueReferralAccruals = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -117,27 +206,30 @@ export const creditDueReferralAccruals = internalMutation({
       .collect();
 
     for (const a of pending) {
-      const start = a.workStartedAt;
+      const fresh = await ctx.db.get(a._id);
+      if (!fresh || fresh.status !== "awaiting_eligibility_period") continue;
+
+      const start = fresh.workStartedAt;
       if (!start || now < start + SEVEN_DAYS_MS) continue;
 
-      const project = await ctx.db.get(a.projectId);
+      const project = await ctx.db.get(fresh.projectId);
       if (!project || project.status === "cancelled") {
-        await ctx.db.patch(a._id, { status: "void", updatedAt: now });
+        await ctx.db.patch(fresh._id, { status: "void", updatedAt: now });
         continue;
       }
 
-      const referrer = await ctx.db.get(a.referrerId);
+      const referrer = await ctx.db.get(fresh.referrerId);
       if (!referrer || referrer.status !== "active") {
-        await ctx.db.patch(a._id, { status: "void", updatedAt: now });
+        await ctx.db.patch(fresh._id, { status: "void", updatedAt: now });
         continue;
       }
 
-      const pay = await ctx.db.get(a.firstPaymentId);
+      const pay = await ctx.db.get(fresh.firstPaymentId);
       const currency = (pay?.currency ?? "usd").toLowerCase();
 
       const category =
         referrer.role === "client"
-          ? ("client_referral_credit" as const)
+          ? ("client_referral_payout" as const)
           : ("referral_bonus" as const);
 
       await ctx.runMutation(internalAny.wallets.mutations.getOrCreateWallet, {
@@ -147,18 +239,18 @@ export const creditDueReferralAccruals = internalMutation({
 
       await ctx.runMutation(internalAny.wallets.mutations.creditWallet, {
         userId: referrer._id,
-        amountCents: a.bonusCents,
+        amountCents: fresh.bonusCents,
         currency,
         description:
           referrer.role === "client"
-            ? "Referral reward (hiring credit)"
+            ? "Referral reward (withdrawable)"
             : "Referral reward",
-        projectId: a.projectId,
-        paymentId: a.firstPaymentId,
+        projectId: fresh.projectId,
+        paymentId: fresh.firstPaymentId,
         category,
       });
 
-      await ctx.db.patch(a._id, {
+      await ctx.db.patch(fresh._id, {
         status: "credited",
         creditedAt: now,
         updatedAt: now,
@@ -169,10 +261,10 @@ export const creditDueReferralAccruals = internalMutation({
         title: "Referral reward credited",
         message:
           referrer.role === "client"
-            ? `You received hiring credit from a successful referral.`
-            : `You received ${(a.bonusCents / 100).toFixed(2)} ${currency.toUpperCase()} to your wallet from a referral.`,
+            ? `You received ${(fresh.bonusCents / 100).toFixed(2)} ${currency.toUpperCase()} referral reward in your wallet (you can withdraw from the Wallet page).`
+            : `You received ${(fresh.bonusCents / 100).toFixed(2)} ${currency.toUpperCase()} to your wallet from a referral.`,
         type: "payment",
-        data: { referralAccrualId: a._id, projectId: a.projectId },
+        data: { referralAccrualId: fresh._id, projectId: fresh.projectId },
       });
     }
   },

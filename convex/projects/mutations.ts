@@ -439,8 +439,8 @@ export const updateProjectStatus = mutation({
     }
 
     // Role-based authorization for specific transitions
-    if (args.status === "pending_funding" && !isClient && !isAdmin) {
-      throw new Error("Only client or admin can move project to pending_funding");
+    if (args.status === "pending_funding" && !isClient) {
+      throw new Error("Only the project client can move this hire to pending funding");
     }
 
     if (args.status === "cancelled" && !isClient && !isAdmin) {
@@ -451,8 +451,8 @@ export const updateProjectStatus = mutation({
       throw new Error("Only client, moderator, or admin can dispute project");
     }
 
-    if (args.status === "completed" && !isClient && !isAdmin) {
-      throw new Error("Only the client or admin can mark a project as completed");
+    if (args.status === "completed" && !isClient) {
+      throw new Error("Only the project client can mark this hire as completed");
     }
 
     if (args.status === "completed") {

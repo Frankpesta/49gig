@@ -43,6 +43,40 @@ export const getClientReferralHiringBalanceCentsInternal = internalQuery({
   },
 });
 
+/**
+ * Client: withdrawable referral rewards (credited after first monthly approval).
+ * Excludes legacy hiring-only credits (client_referral_credit).
+ */
+export const getClientReferralCashBalanceCents = query({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await resolveUser(ctx, args.userId);
+    if (!user || user.role !== "client") return { cents: 0 };
+
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+    if (!wallet) return { cents: 0 };
+
+    const txs = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .collect();
+
+    let sum = 0;
+    for (const t of txs) {
+      if (t.status !== "completed") continue;
+      if (t.type === "credit" && t.category === "client_referral_payout") {
+        sum += t.amountCents;
+      } else if (t.type === "debit" && t.category === "withdrawal_referral") {
+        sum -= t.amountCents;
+      }
+    }
+    return { cents: Math.max(0, sum) };
+  },
+});
+
 /** Client: referral hiring credits available toward pre-funding (not withdrawable). */
 export const getMyClientReferralHiringBalance = query({
   args: {

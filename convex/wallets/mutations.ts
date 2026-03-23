@@ -47,7 +47,9 @@ export const creditWallet = internalMutation({
         v.literal("earnings"),
         v.literal("referral_bonus"),
         v.literal("client_referral_credit"),
-        v.literal("hiring_credit")
+        v.literal("client_referral_payout"),
+        v.literal("hiring_credit"),
+        v.literal("withdrawal_referral")
       )
     ),
   },
@@ -111,7 +113,9 @@ export const debitWallet = internalMutation({
         v.literal("earnings"),
         v.literal("referral_bonus"),
         v.literal("client_referral_credit"),
-        v.literal("hiring_credit")
+        v.literal("client_referral_payout"),
+        v.literal("hiring_credit"),
+        v.literal("withdrawal_referral")
       )
     ),
   },
