@@ -54,6 +54,11 @@ export const listSessionsForToken = query({
       return { currentSessionId: null, sessions: [] };
     }
 
+    const sessionUser = await ctx.db.get(session.userId);
+    if (!sessionUser || sessionUser.status !== "active") {
+      return { currentSessionId: null, sessions: [] };
+    }
+
     const sessions = await ctx.db
       .query("sessions")
       .withIndex("by_user", (q) => q.eq("userId", session.userId))

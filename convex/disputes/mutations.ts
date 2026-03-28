@@ -35,7 +35,7 @@ async function getCurrentUserInMutation(
 
 /**
  * Initiate a dispute
- * Locks funds in escrow
+ * Records full unreleased escrow as lockedAmount (dollars); project becomes disputed so releases are blocked until resolution.
  */
 export const initiateDispute = mutation({
   args: {
@@ -150,7 +150,27 @@ export const initiateDispute = mutation({
       )
       .collect();
 
+    let monthlyCycleDoc: Doc<"monthlyBillingCycles"> | undefined;
     if (monthlyCycleId) {
+      const cycle = await ctx.db.get(monthlyCycleId);
+      if (!cycle) {
+        throw new Error("Monthly cycle not found");
+      }
+      if (cycle.projectId !== projectId) {
+        throw new Error("Monthly cycle does not belong to this project");
+      }
+      const now = Date.now();
+      if (now < cycle.monthEndDate) {
+        throw new Error(
+          "This billing period has not ended yet. Disputes open after the period ends.",
+        );
+      }
+      if (project.status !== "in_progress" && project.status !== "disputed") {
+        throw new Error(
+          "Monthly payment disputes can only be opened while the hire is in progress (or on an hire that is already disputed).",
+        );
+      }
+      monthlyCycleDoc = cycle;
       const cycleDispute = existingDisputes.find(
         (d) => d.monthlyCycleId === monthlyCycleId
       );
@@ -173,21 +193,8 @@ export const initiateDispute = mutation({
       }
     }
 
-    // Calculate locked amount
-    let lockedAmount = 0;
-    if (monthlyCycleId) {
-      const cycle = await ctx.db.get(monthlyCycleId);
-      if (cycle && cycle.status === "pending") {
-        lockedAmount = cycle.amountCents / 100; // Convert cents to dollars for lockedAmount (stored as dollars)
-      }
-    } else if (milestoneId) {
-      const milestone = await ctx.db.get(milestoneId);
-      if (milestone) {
-        lockedAmount = milestone.amount;
-      }
-    } else {
-      lockedAmount = project.escrowedAmount || 0;
-    }
+    // All unreleased escrow is frozen while a dispute is open (same currency units as project.escrowedAmount: dollars).
+    const lockedAmount = Math.max(0, project.escrowedAmount ?? 0);
 
     // Create dispute
     const disputeId = await ctx.db.insert("disputes", {
@@ -538,11 +545,14 @@ export const resolveDispute = mutation({
     // Update project status
     let newProjectStatus: Doc<"projects">["status"] = "disputed";
     if (args.decision === "replacement") {
-      newProjectStatus = "matching"; // Start matching for new freelancer
-    } else if (args.decision === "client_favor" || args.decision === "partial") {
-      newProjectStatus = "in_progress"; // Continue project
+      newProjectStatus = "matching";
+    } else if (args.decision === "client_favor") {
+      newProjectStatus = "cancelled";
+    } else if (args.decision === "partial") {
+      newProjectStatus = "in_progress";
     } else {
-      newProjectStatus = "completed"; // Freelancer favor - project complete
+      // Freelancer favor — work continues; unreleased escrow stays until normal monthly approval flow
+      newProjectStatus = "in_progress";
     }
 
     await ctx.db.patch(dispute.projectId, {
@@ -553,7 +563,6 @@ export const resolveDispute = mutation({
     await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
       disputeId: args.disputeId,
     });
-    // TODO: Handle freelancer replacement if needed
     const notifyUserIds = [project.clientId, project.matchedFreelancerId].filter(
       Boolean
     ) as Doc<"users">["_id"][];
@@ -636,10 +645,12 @@ export const resolveDisputeInternal = internalMutation({
     let newProjectStatus: Doc<"projects">["status"] = "disputed";
     if (args.decision === "replacement") {
       newProjectStatus = "matching";
-    } else if (args.decision === "client_favor" || args.decision === "partial") {
+    } else if (args.decision === "client_favor") {
+      newProjectStatus = "cancelled";
+    } else if (args.decision === "partial") {
       newProjectStatus = "in_progress";
     } else {
-      newProjectStatus = "completed";
+      newProjectStatus = "in_progress";
     }
 
     await ctx.db.patch(dispute.projectId, {

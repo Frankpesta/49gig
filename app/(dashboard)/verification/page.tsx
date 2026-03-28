@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CheckCircle2, XCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { EnglishTest } from "@/components/vetting/english-test";
@@ -326,6 +327,40 @@ export default function VerificationPage() {
             </Card>
           )}
 
+          {status === "pending_review" &&
+            vettingResult?.status === "pending_admin" &&
+            !kycComplete && (
+              <Alert className="border-primary/30 bg-primary/5">
+                <AlertCircle className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-sm leading-relaxed">
+                  Your tests met the automated bar. Complete <strong>ID &amp; address (KYC)</strong> below while our
+                  team gives a quick final approval. You&apos;ll get full access once both are done.
+                </AlertDescription>
+              </Alert>
+            )}
+
+          {status === "pending_review" &&
+            vettingResult?.status === "pending_admin" &&
+            kycComplete && (
+              <Alert className="border-amber-500/40 bg-amber-500/5">
+                <Clock className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-sm leading-relaxed">
+                  KYC is complete. A team member is doing the final review of your test results and proctoring
+                  signals. We&apos;ll notify you when your profile is fully verified.
+                </AlertDescription>
+              </Alert>
+            )}
+
+          {status === "pending_review" && vettingResult?.status === "flagged" && (
+            <Alert className="border-amber-500/40 bg-amber-500/5">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-sm leading-relaxed">
+                Your submission is in manual review (some integrity signals need a human look). Complete any open KYC
+                steps below if applicable.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Step Components */}
           {(status === "in_progress" || status === "pending_review") && (
             <div className="space-y-6">
@@ -348,7 +383,9 @@ export default function VerificationPage() {
                   <Card>
                     <CardContent className="p-4 sm:p-5">
                       <p className="text-sm text-muted-foreground mb-4">
-                        You have completed the English proficiency and skill assessments. Complete the ID & address verification (KYC) below if you haven&apos;t already, then submit for review.
+                        You have completed the English proficiency and skill assessments. Complete the ID &amp; address
+                        verification (KYC) below if you haven&apos;t already, then submit. After submission, our team
+                        gives a final approval (automated checks already passed).
                       </p>
                       <Button
                         onClick={async () => {

@@ -1,5 +1,23 @@
-import { query, internalQuery } from "../_generated/server";
+import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
+import { Doc, Id } from "../_generated/dataModel";
+
+async function resolveViewerForVerificationQuery(
+  ctx: QueryCtx,
+  adminUserId?: Id<"users">
+): Promise<Doc<"users"> | null> {
+  if (adminUserId) {
+    const u = await ctx.db.get(adminUserId);
+    if (!u || u.status !== "active") return null;
+    return u;
+  }
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.email) return null;
+  return await ctx.db
+    .query("users")
+    .withIndex("by_email", (q) => q.eq("email", identity.email!))
+    .first();
+}
 
 /**
  * Get verification status for current freelancer
@@ -87,27 +105,19 @@ export const getVerificationStatus = query({
 export const getVerificationResults = query({
   args: {
     freelancerId: v.id("users"),
+    adminUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity || !identity.email) {
+    const viewer = await resolveViewerForVerificationQuery(ctx, args.adminUserId);
+    if (!viewer) {
       throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
     }
 
     // Only admins, moderators, or the freelancer themselves can view
     const isAuthorized =
-      user.role === "admin" ||
-      user.role === "moderator" ||
-      user._id === args.freelancerId;
+      viewer.role === "admin" ||
+      viewer.role === "moderator" ||
+      viewer._id === args.freelancerId;
 
     if (!isAuthorized) {
       throw new Error("Unauthorized");
@@ -145,26 +155,19 @@ export const getPendingVerifications = query({
       v.union(
         v.literal("pending"),
         v.literal("in_progress"),
-        v.literal("flagged")
+        v.literal("flagged"),
+        v.literal("pending_admin")
       )
     ),
+    adminUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity || !identity.email) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!user || (user.role !== "admin" && user.role !== "moderator")) {
+    const viewer = await resolveViewerForVerificationQuery(ctx, args.adminUserId);
+    if (!viewer || (viewer.role !== "admin" && viewer.role !== "moderator")) {
       throw new Error("Unauthorized");
     }
 
-    const status = args.status || "pending";
+    const status = args.status ?? "pending_admin";
     const results = await ctx.db
       .query("vettingResults")
       .withIndex("by_status", (q) => q.eq("status", status))

@@ -324,7 +324,9 @@ async function generateContractPdf({
   return pdfDoc.save();
 }
 
-/** Generate full 49GIG contract PDF (client + freelancer agreements) with signature lines. */
+type PdfScope = "full" | "client" | "freelancer";
+
+/** Generate 49GIG contract PDF. Use pdfScope so parties only receive their agreement in email attachments. */
 async function generateFullContractPdf({
   project,
   client,
@@ -332,6 +334,8 @@ async function generateFullContractPdf({
   clientSignedAt,
   freelancerSignatures,
   copyFor,
+  pdfScope = "full",
+  freelancerSubjectId,
 }: {
   project: Doc<"projects">;
   client: Doc<"users">;
@@ -339,6 +343,8 @@ async function generateFullContractPdf({
   clientSignedAt?: number;
   freelancerSignatures?: { freelancerId: Id<"users">; signedAt: number }[];
   copyFor?: { name: string; role: string };
+  pdfScope?: PdfScope;
+  freelancerSubjectId?: Id<"users">;
 }) {
   const pdfDoc = await PDFDocument.create();
   const regular = await pdfDoc.embedFont(StandardFonts.TimesRoman);
@@ -355,6 +361,18 @@ async function generateFullContractPdf({
   const effectiveDate = formatDate();
   const clientName = client.name || "Client";
   const freelancerNames = freelancers.map((f) => f.name || "Freelancer").join(", ");
+  const freelancersForAgreement =
+    pdfScope === "freelancer"
+      ? freelancers.filter((f) =>
+          freelancerSubjectId
+            ? f._id === freelancerSubjectId
+            : freelancers.length === 1,
+        )
+      : freelancers;
+  const talentDisplayForCover =
+    pdfScope === "freelancer"
+      ? freelancersForAgreement[0]?.name || "Freelancer"
+      : freelancerNames || "As assigned";
 
   const C = {
     navy: rgb(0.051, 0.106, 0.165),
@@ -400,7 +418,13 @@ async function generateFullContractPdf({
   });
 
   let cy = pageHeight - bandH - 40;
-  page.drawText("Combined Client & Freelancer Agreement", {
+  const documentMainTitle =
+    pdfScope === "client"
+      ? "49GIG Client Agreement"
+      : pdfScope === "freelancer"
+        ? "49GIG Freelancer Agreement"
+        : "Combined Client & Freelancer Agreement";
+  page.drawText(documentMainTitle, {
     x: margin,
     y: cy,
     size: 17,
@@ -428,7 +452,7 @@ async function generateFullContractPdf({
   const partyRows: [string, string][] = [
     ["Project", project.intakeForm.title || "Engagement"],
     ["Client", clientName],
-    ["Talent", freelancerNames || "As assigned"],
+    ["Talent", talentDisplayForCover],
   ];
   for (const [label, value] of partyRows) {
     page.drawText(sanitizeForPdf(label.toUpperCase()), {
@@ -450,7 +474,11 @@ async function generateFullContractPdf({
   }
 
   const coverNote =
-    "This document incorporates the 49GIG Client Agreement and Freelancer Agreement for the engagement described above.";
+    pdfScope === "client"
+      ? "This copy contains only the 49GIG Client Agreement and signature record for this engagement. The Freelancer Agreement is provided on a separate copy to talent."
+      : pdfScope === "freelancer"
+        ? "This copy contains only the 49GIG Freelancer Agreement and signature record for this engagement. The Client Agreement is provided on a separate copy to the client."
+        : "This document incorporates the 49GIG Client Agreement and Freelancer Agreement for the engagement described above.";
   let noteY = cy;
   for (const line of wrapText(
     coverNote,
@@ -537,66 +565,10 @@ async function generateFullContractPdf({
     y -= h + 12;
   };
 
-  drawBanner("PART I   |   CLIENT AGREEMENT");
+  if (pdfScope !== "freelancer") {
+    drawBanner("PART I   |   CLIENT AGREEMENT");
 
-  for (const s of CLIENT_AGREEMENT_SECTIONS) {
-    if ("level" in s && s.level === "title") {
-      ensureSpace(30);
-      page.drawText(sanitizeForPdf(s.title), {
-        x: margin,
-        y,
-        size: 14,
-        font: bold,
-        color: C.navy,
-      });
-      y -= 18;
-      page.drawLine({
-        start: { x: margin, y: y + 6 },
-        end: { x: pageWidth - margin, y: y + 6 },
-        thickness: 1.2,
-        color: C.gold,
-      });
-      y -= 18;
-    } else if ("level" in s && s.level === "heading") {
-      ensureSpace(22);
-      page.drawText(sanitizeForPdf(s.title), {
-        x: margin,
-        y,
-        size: 11,
-        font: bold,
-        color: C.text,
-      });
-      y -= 16;
-    } else if ("level" in s && s.level === "divider") {
-      ensureSpace(16);
-      page.drawLine({
-        start: { x: margin, y: y - 2 },
-        end: { x: pageWidth - margin, y: y - 2 },
-        thickness: 0.55,
-        color: C.rule,
-      });
-      y -= 18;
-    } else if ("body" in s) {
-      const filled = applyClientAgreementPlaceholders(
-        s.body,
-        clientName,
-        freelancerNames,
-        effectiveDate,
-      );
-      drawFilledBody(filled);
-    }
-  }
-
-  drawBanner("PART II   |   FREELANCER AGREEMENT");
-
-  for (let fi = 0; fi < freelancers.length; fi++) {
-    const f = freelancers[fi];
-    const fname = f.name || "Freelancer";
-    if (freelancers.length > 1) {
-      const letter = String.fromCharCode(65 + fi);
-      drawBanner(`EXHIBIT ${letter}   |   ${fname.toUpperCase()}`);
-    }
-    for (const s of FREELANCER_AGREEMENT_SECTIONS) {
+    for (const s of CLIENT_AGREEMENT_SECTIONS) {
       if ("level" in s && s.level === "title") {
         ensureSpace(30);
         page.drawText(sanitizeForPdf(s.title), {
@@ -624,13 +596,73 @@ async function generateFullContractPdf({
           color: C.text,
         });
         y -= 16;
+      } else if ("level" in s && s.level === "divider") {
+        ensureSpace(16);
+        page.drawLine({
+          start: { x: margin, y: y - 2 },
+          end: { x: pageWidth - margin, y: y - 2 },
+          thickness: 0.55,
+          color: C.rule,
+        });
+        y -= 18;
       } else if ("body" in s) {
-        const filled = applyFreelancerAgreementPlaceholders(
+        const filled = applyClientAgreementPlaceholders(
           s.body,
-          fname,
+          clientName,
+          freelancerNames,
           effectiveDate,
         );
         drawFilledBody(filled);
+      }
+    }
+  }
+
+  if (pdfScope !== "client") {
+    drawBanner("PART II   |   FREELANCER AGREEMENT");
+
+    for (let fi = 0; fi < freelancersForAgreement.length; fi++) {
+      const f = freelancersForAgreement[fi];
+      const fname = f.name || "Freelancer";
+      if (freelancersForAgreement.length > 1) {
+        const letter = String.fromCharCode(65 + fi);
+        drawBanner(`EXHIBIT ${letter}   |   ${fname.toUpperCase()}`);
+      }
+      for (const s of FREELANCER_AGREEMENT_SECTIONS) {
+        if ("level" in s && s.level === "title") {
+          ensureSpace(30);
+          page.drawText(sanitizeForPdf(s.title), {
+            x: margin,
+            y,
+            size: 14,
+            font: bold,
+            color: C.navy,
+          });
+          y -= 18;
+          page.drawLine({
+            start: { x: margin, y: y + 6 },
+            end: { x: pageWidth - margin, y: y + 6 },
+            thickness: 1.2,
+            color: C.gold,
+          });
+          y -= 18;
+        } else if ("level" in s && s.level === "heading") {
+          ensureSpace(22);
+          page.drawText(sanitizeForPdf(s.title), {
+            x: margin,
+            y,
+            size: 11,
+            font: bold,
+            color: C.text,
+          });
+          y -= 16;
+        } else if ("body" in s) {
+          const filled = applyFreelancerAgreementPlaceholders(
+            s.body,
+            fname,
+            effectiveDate,
+          );
+          drawFilledBody(filled);
+        }
       }
     }
   }
@@ -724,15 +756,20 @@ async function generateFullContractPdf({
     y -= 28;
   };
 
-  drawSignatureBlock("Client", clientName, clientSignedAt);
-
-  for (const f of freelancers) {
-    const sig = freelancerSignatures?.find((s) => s.freelancerId === f._id);
-    drawSignatureBlock(
-      `Freelancer — ${f.name || "Freelancer"}`,
-      f.name || "Freelancer",
-      sig?.signedAt,
-    );
+  if (pdfScope !== "freelancer") {
+    drawSignatureBlock("Client", clientName, clientSignedAt);
+  }
+  if (pdfScope !== "client") {
+    const sigFreelancers =
+      pdfScope === "freelancer" ? freelancersForAgreement : freelancers;
+    for (const f of sigFreelancers) {
+      const sig = freelancerSignatures?.find((s) => s.freelancerId === f._id);
+      drawSignatureBlock(
+        `Freelancer — ${f.name || "Freelancer"}`,
+        f.name || "Freelancer",
+        sig?.signedAt,
+      );
+    }
   }
 
   // ── Footers on every page
@@ -858,21 +895,18 @@ export const regenerateContractPdfAndSend = internalAction({
       freelancerSignatures: project.freelancerContractSignatures,
     };
 
-    const clientPdfBytes = await generateFullContractPdf({
-      ...basePdfParams,
-      copyFor: { name: client.name || "Client", role: "Client" },
-    });
-    const clientArrayBuffer = clientPdfBytes.buffer.slice(
-      clientPdfBytes.byteOffset,
-      clientPdfBytes.byteOffset + clientPdfBytes.byteLength
+    const fullPdfBytes = await generateFullContractPdf(basePdfParams);
+    const fullArrayBuffer = fullPdfBytes.buffer.slice(
+      fullPdfBytes.byteOffset,
+      fullPdfBytes.byteOffset + fullPdfBytes.byteLength,
     ) as ArrayBuffer;
-    const clientStorageId = await ctx.storage.store(
-      new Blob([clientArrayBuffer], { type: "application/pdf" })
+    const fullStorageId = await ctx.storage.store(
+      new Blob([fullArrayBuffer], { type: "application/pdf" }),
     );
 
     await ctx.runMutation(
       apiModule.internal.contracts.mutations.updateContractFile,
-      { projectId: args.projectId, contractFileId: clientStorageId }
+      { projectId: args.projectId, contractFileId: fullStorageId },
     );
 
     const sendEmails = args.sendEmails !== false;
@@ -882,134 +916,142 @@ export const regenerateContractPdfAndSend = internalAction({
     const date = formatDate();
     const baseFilename = `49GIG-Contract-${project.intakeForm.title.replace(/\s+/g, "-")}`;
 
-    if (sendEmails) {
-      if (project.contractFullyExecutedEmailedAt) {
-        return { status: "already_emailed", contractFileId: clientStorageId };
-      }
+    if (!sendEmails) {
+      return { status: "stored", contractFileId: fullStorageId };
+    }
 
-      const contractUrl =
-        (await ctx.storage.getUrl(clientStorageId)) ||
-        `${appUrl}/dashboard/projects/${args.projectId}`;
+    if (project.contractFullyExecutedEmailedAt) {
+      return { status: "already_emailed", contractFileId: fullStorageId };
+    }
 
-      const clientAttachment = {
-        filename: `${baseFilename}-Client-${(client.name || "Client").replace(/\s+/g, "-")}.pdf`,
-        content: Buffer.from(clientPdfBytes).toString("base64"),
-        contentType: "application/pdf",
-      };
+    const contractUrl = `${appUrl}/dashboard/projects/${args.projectId}/contract`;
 
-      if (isValidEmail(client.email)) {
-        await sendResendEmail("contract email (client)", () =>
-          sendEmail({
-            to: client.email.trim(),
-            subject: `Contract ready / signed – ${project.intakeForm.title}`,
-            react: React.createElement(ContractReadyEmail, {
-              name: client.name || "there",
-              projectName: project.intakeForm.title,
-              contractUrl,
-              appUrl,
-              logoUrl,
-              date,
-            }),
-            attachments: [clientAttachment],
+    const clientPdfBytes = await generateFullContractPdf({
+      ...basePdfParams,
+      pdfScope: "client",
+      copyFor: { name: client.name || "Client", role: "Client" },
+    });
+
+    const clientAttachment = {
+      filename: `${baseFilename}-Client-${(client.name || "Client").replace(/\s+/g, "-")}.pdf`,
+      content: Buffer.from(clientPdfBytes).toString("base64"),
+      contentType: "application/pdf",
+    };
+
+    if (isValidEmail(client.email)) {
+      await sendResendEmail("contract email (client)", () =>
+        sendEmail({
+          to: client.email.trim(),
+          subject: `Contract ready / signed – ${project.intakeForm.title}`,
+          react: React.createElement(ContractReadyEmail, {
+            name: client.name || "there",
+            projectName: project.intakeForm.title,
+            contractUrl,
+            appUrl,
+            logoUrl,
+            date,
           }),
-        );
-      } else {
-        console.warn(
-          "[contracts] skip client contract email: invalid or missing client email",
-        );
-      }
-
-      for (const f of freelancers as Doc<"users">[]) {
-        if (!isValidEmail(f.email)) {
-          console.warn(
-            `[contracts] skip freelancer contract email: invalid email for ${f._id}`,
-          );
-          continue;
-        }
-        const freelancerPdfBytes = await generateFullContractPdf({
-          ...basePdfParams,
-          copyFor: { name: f.name || "Freelancer", role: "Freelancer" },
-        });
-        const freelancerAttachment = {
-          filename: `${baseFilename}-Freelancer-${(f.name || "Freelancer").replace(/\s+/g, "-")}.pdf`,
-          content: Buffer.from(freelancerPdfBytes).toString("base64"),
-          contentType: "application/pdf",
-        };
-        await sendResendEmail(`contract email (freelancer ${f._id})`, () =>
-          sendEmail({
-            to: f.email!.trim(),
-            subject: `Contract ready / signed – ${project.intakeForm.title}`,
-            react: React.createElement(ContractReadyEmail, {
-              name: f.name || "there",
-              projectName: project.intakeForm.title,
-              contractUrl,
-              appUrl,
-              logoUrl,
-              date,
-            }),
-            attachments: [freelancerAttachment],
-          }),
-        );
-      }
-
-      const admins = await ctx.runQuery(
-        apiModule.internal.users.queries.getModeratorsAndAdminsInternal,
-        {},
+          attachments: [clientAttachment],
+        }),
       );
-      const adminEmails =
-        admins?.filter((a: { email?: string }) => isValidEmail(a.email)).map(
-          (a: { email: string }) => a.email.trim(),
-        ) ?? [];
-      if (adminEmails.length > 0) {
-        const adminPdfBytes = await generateFullContractPdf({
-          ...basePdfParams,
-          copyFor: {
-            name: "49GIG Admin",
-            role: "Record (all parties listed in email)",
-          },
-        });
-        const adminAttachment = {
-          filename: `${baseFilename}-Admin-Record.pdf`,
-          content: Buffer.from(adminPdfBytes).toString("base64"),
-          contentType: "application/pdf",
-        };
-        const partyRows: { label: string; value: string }[] = [
-          {
-            label: "Client",
-            value: `${client.name || "Client"} (${client.email || "no email"})`,
-          },
-          ...(freelancers as Doc<"users">[]).map((f) => ({
-            label: "Freelancer",
-            value: `${f.name || "Freelancer"} (${f.email || "no email"})`,
-          })),
-        ];
-        const dashboardUrl = `${appUrl}/dashboard/projects/${args.projectId}`;
-        await sendResendEmail("contract email (admins)", () =>
-          sendEmail({
-            to: adminEmails,
-            subject: `[49GIG] Contract signed – ${project.intakeForm.title}`,
-            react: React.createElement(AdminContractRecordEmail, {
-              projectName: project.intakeForm.title,
-              partyRows,
-              dashboardUrl,
-              appUrl,
-              logoUrl,
-              date,
-            }),
-            attachments: [adminAttachment],
-          }),
-        );
-      }
-
-      await ctx.runMutation(
-        apiModule.internal.contracts.mutations.markContractFullyExecutedEmailed,
-        { projectId: args.projectId },
+    } else {
+      console.warn(
+        "[contracts] skip client contract email: invalid or missing client email",
       );
     }
 
+    for (const f of freelancers as Doc<"users">[]) {
+      if (!isValidEmail(f.email)) {
+        console.warn(
+          `[contracts] skip freelancer contract email: invalid email for ${f._id}`,
+        );
+        continue;
+      }
+      const freelancerPdfBytes = await generateFullContractPdf({
+        ...basePdfParams,
+        pdfScope: "freelancer",
+        freelancerSubjectId: f._id,
+        copyFor: { name: f.name || "Freelancer", role: "Freelancer" },
+      });
+      const freelancerAttachment = {
+        filename: `${baseFilename}-Freelancer-${(f.name || "Freelancer").replace(/\s+/g, "-")}.pdf`,
+        content: Buffer.from(freelancerPdfBytes).toString("base64"),
+        contentType: "application/pdf",
+      };
+      await sendResendEmail(`contract email (freelancer ${f._id})`, () =>
+        sendEmail({
+          to: f.email!.trim(),
+          subject: `Contract ready / signed – ${project.intakeForm.title}`,
+          react: React.createElement(ContractReadyEmail, {
+            name: f.name || "there",
+            projectName: project.intakeForm.title,
+            contractUrl,
+            appUrl,
+            logoUrl,
+            date,
+          }),
+          attachments: [freelancerAttachment],
+        }),
+      );
+    }
+
+    const admins = await ctx.runQuery(
+      apiModule.internal.users.queries.getModeratorsAndAdminsInternal,
+      {},
+    );
+    const adminEmails =
+      admins?.filter((a: { email?: string }) => isValidEmail(a.email)).map(
+        (a: { email: string }) => a.email.trim(),
+      ) ?? [];
+    if (adminEmails.length > 0) {
+      const adminPdfBytes = await generateFullContractPdf({
+        ...basePdfParams,
+        copyFor: {
+          name: "49GIG Admin",
+          role: "Record (all parties listed in email)",
+        },
+      });
+      const adminAttachment = {
+        filename: `${baseFilename}-Admin-Record.pdf`,
+        content: Buffer.from(adminPdfBytes).toString("base64"),
+        contentType: "application/pdf",
+      };
+      const partyRows: { label: string; value: string }[] = [
+        {
+          label: "Client",
+          value: `${client.name || "Client"} (${client.email || "no email"})`,
+        },
+        ...(freelancers as Doc<"users">[]).map((f) => ({
+          label: "Freelancer",
+          value: `${f.name || "Freelancer"} (${f.email || "no email"})`,
+        })),
+      ];
+      const dashboardUrl = `${appUrl}/dashboard/projects/${args.projectId}`;
+      await sendResendEmail("contract email (admins)", () =>
+        sendEmail({
+          to: adminEmails,
+          subject: `[49GIG] Contract signed – ${project.intakeForm.title}`,
+          react: React.createElement(AdminContractRecordEmail, {
+            projectName: project.intakeForm.title,
+            partyRows,
+            dashboardUrl,
+            appUrl,
+            logoUrl,
+            date,
+          }),
+          attachments: [adminAttachment],
+        }),
+      );
+    }
+
+    await ctx.runMutation(
+      apiModule.internal.contracts.mutations.markContractFullyExecutedEmailed,
+      { projectId: args.projectId },
+    );
+
     return {
-      status: sendEmails ? "sent" : "stored",
-      contractFileId: clientStorageId,
+      status: "sent",
+      contractFileId: fullStorageId,
     };
   },
 });

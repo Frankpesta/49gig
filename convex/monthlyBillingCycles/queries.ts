@@ -38,6 +38,13 @@ export const getCyclesByProjectId = query({
       return [];
     }
 
+    const monthlyBillingVisibleStatuses = new Set<
+      Doc<"projects">["status"]
+    >(["in_progress", "completed", "disputed"]);
+    if (!monthlyBillingVisibleStatuses.has(project.status)) {
+      return [];
+    }
+
     return await ctx.db
       .query("monthlyBillingCycles")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -47,21 +54,27 @@ export const getCyclesByProjectId = query({
 
 /**
  * Get pending cycles awaiting client approval (client dashboard only).
+ * Only cycles whose billing period has ended (`monthEndDate <= now`) — same rule as approval & reminders.
+ * Pass `clockMs` from the client (e.g. updated every minute) so the list refreshes when a period matures
+ * without requiring a database change.
  */
 export const getPendingCyclesForClient = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { clockMs: v.optional(v.number()) },
+  handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
     if (!user || (user as Doc<"users">).status !== "active") return [];
 
     if ((user as Doc<"users">).role !== "client") return [];
 
+    const now = args.clockMs ?? Date.now();
     const clientId = (user as Doc<"users">)._id;
     const myProjects = await ctx.db
       .query("projects")
       .withIndex("by_client", (q) => q.eq("clientId", clientId))
       .collect();
-    const projectIds = myProjects.map((p) => p._id);
+    const projectIds = myProjects
+      .filter((p) => p.status === "in_progress")
+      .map((p) => p._id);
     const allCycles: Doc<"monthlyBillingCycles">[] = [];
     for (const pid of projectIds) {
       const cycles = await ctx.db
@@ -69,23 +82,60 @@ export const getPendingCyclesForClient = query({
         .withIndex("by_project", (q) => q.eq("projectId", pid))
         .filter((q) => q.eq(q.field("status"), "pending"))
         .collect();
-      allCycles.push(...cycles);
+      for (const c of cycles) {
+        if (c.monthEndDate <= now) {
+          allCycles.push(c);
+        }
+      }
     }
 
     return allCycles.sort((a, b) => a.monthStartDate - b.monthStartDate);
   },
 });
 
+const REMINDER_THROTTLE_MS = 3 * 24 * 60 * 60 * 1000;
+
 /**
- * Get all pending cycles with project/client info (internal - for reminder cron)
+ * Cycles eligible for client reminder: month has ended, hire is active, throttled,
+ * and at most one row per project (the earliest billing month still pending).
  */
 export const getPendingCyclesForReminderInternal = internalQuery({
   args: {},
   handler: async (ctx) => {
+    const now = Date.now();
+
     const cycles = await ctx.db
       .query("monthlyBillingCycles")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
       .collect();
+
+    const eligible: Doc<"monthlyBillingCycles">[] = [];
+
+    for (const c of cycles) {
+      // Do not remind for future periods — client can't approve until the month is over.
+      if (c.monthEndDate > now) continue;
+
+      const project = await ctx.db.get(c.projectId);
+      if (!project) continue;
+      if (project.status !== "in_progress") continue;
+
+      const last = c.clientApprovalReminderSentAt ?? 0;
+      if (now - last < REMINDER_THROTTLE_MS) continue;
+
+      eligible.push(c);
+    }
+
+    eligible.sort((a, b) => a.monthStartDate - b.monthStartDate);
+
+    const byProject = new Map<
+      Doc<"projects">["_id"],
+      Doc<"monthlyBillingCycles">
+    >();
+    for (const c of eligible) {
+      if (!byProject.has(c.projectId)) {
+        byProject.set(c.projectId, c);
+      }
+    }
 
     const result: Array<{
       cycleId: Doc<"monthlyBillingCycles">["_id"];
@@ -95,7 +145,7 @@ export const getPendingCyclesForReminderInternal = internalQuery({
       monthLabel: string;
     }> = [];
 
-    for (const c of cycles) {
+    for (const c of byProject.values()) {
       const project = await ctx.db.get(c.projectId);
       if (!project) continue;
       result.push({
@@ -104,11 +154,12 @@ export const getPendingCyclesForReminderInternal = internalQuery({
         clientId: project.clientId,
         projectName: project.intakeForm.title,
         monthLabel: new Date(c.monthStartDate).toLocaleString("default", {
-          month: "short",
+          month: "long",
           year: "numeric",
         }),
       });
     }
+
     return result;
   },
 });
@@ -128,9 +179,14 @@ export const getCyclesReadyForAutoReleaseInternal = internalQuery({
       .withIndex("by_status", (q) => q.eq("status", "pending"))
       .collect();
 
-    return cycles.filter((c) => {
+    const ready: typeof cycles = [];
+    for (const c of cycles) {
       const releaseAt = c.autoReleaseAt ?? c.monthEndDate + AUTO_RELEASE_DELAY_MS;
-      return releaseAt <= now;
-    });
+      if (releaseAt > now) continue;
+      const project = await ctx.db.get(c.projectId);
+      if (!project || project.status !== "in_progress") continue;
+      ready.push(c);
+    }
+    return ready;
   },
 });

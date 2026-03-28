@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
@@ -18,7 +18,14 @@ import { Doc, Id } from "@/convex/_generated/dataModel";
 
 export default function MonthlyApprovalsPage() {
   const { user } = useAuth();
-  const pendingCycles = useQuery(api.monthlyBillingCycles.queries.getPendingCyclesForClient);
+  const [approvalClockMs, setApprovalClockMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setApprovalClockMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const pendingCycles = useQuery(api.monthlyBillingCycles.queries.getPendingCyclesForClient, {
+    clockMs: approvalClockMs,
+  });
   const approveCycle = useMutation(api.monthlyBillingCycles.mutations.approveMonthlyCycle);
 
   const [approvingId, setApprovingId] = useState<Id<"monthlyBillingCycles"> | null>(null);
@@ -82,7 +89,7 @@ export default function MonthlyApprovalsPage() {
         <CardHeader>
           <CardTitle>Pending Approvals</CardTitle>
           <CardDescription>
-            Review and approve each month&apos;s work. Funds are released to the freelancer&apos;s wallet; they withdraw to their bank when ready.
+            Months appear here only after their billing period has ended. Approve to release funds to the freelancer&apos;s wallet; they withdraw to their bank when ready.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -96,7 +103,7 @@ export default function MonthlyApprovalsPage() {
             <DashboardEmptyState
               icon={CalendarCheck}
               title="No pending approvals"
-              description="All monthly payments are up to date. New approvals will appear here at the end of each billing cycle."
+              description="All matured billing months are approved or none are due yet. Pending periods appear here after each month ends."
               iconTone="muted"
               className="border-0 bg-transparent py-8 shadow-none"
             />

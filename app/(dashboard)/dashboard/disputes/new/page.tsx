@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChatEvidenceSelector } from "@/components/disputes/chat-evidence-selector";
 
 export default function NewDisputePage() {
@@ -54,6 +54,11 @@ export default function NewDisputePage() {
   const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [disputeClockMs, setDisputeClockMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setDisputeClockMs(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const allProjects = useQuery(
     (api as any)["projects/queries"].getProjects,
@@ -78,8 +83,23 @@ export default function NewDisputePage() {
   );
 
   const pendingCycles = (monthlyCycles ?? []).filter(
-    (c: { status: string }) => c.status === "pending"
+    (c: Doc<"monthlyBillingCycles">) =>
+      c.status === "pending" && c.monthEndDate <= disputeClockMs
   );
+
+  useEffect(() => {
+    if (!formData.monthlyCycleId || !monthlyCycles) return;
+    const selected = monthlyCycles.find(
+      (c: Doc<"monthlyBillingCycles">) => c._id === formData.monthlyCycleId
+    );
+    if (
+      !selected ||
+      selected.status !== "pending" ||
+      selected.monthEndDate > disputeClockMs
+    ) {
+      setFormData((f) => ({ ...f, monthlyCycleId: "" }));
+    }
+  }, [monthlyCycles, formData.monthlyCycleId, disputeClockMs]);
 
   const initiateDispute = useMutation(api.disputes.mutations.initiateDispute);
 
@@ -238,7 +258,7 @@ export default function NewDisputePage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Select a specific monthly payment to dispute, or leave blank to dispute the entire project.
+                  Only billing months that have ended appear here. Select a specific month to dispute, or leave blank for a project-level dispute.
                 </p>
               </div>
             )}

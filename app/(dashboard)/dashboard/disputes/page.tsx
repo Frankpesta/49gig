@@ -178,7 +178,7 @@ export default function DisputesPage() {
                       {dispute.initiatorRole === "client" ? "Client" : "Freelancer"}
                     </DataTableCell>
                     <DataTableCell>
-                      ${(dispute.lockedAmount / 100).toFixed(2)}
+                      ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                     </DataTableCell>
                     <DataTableCell>
                       {new Date(dispute.createdAt).toLocaleDateString()}

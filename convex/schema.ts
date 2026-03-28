@@ -125,6 +125,12 @@ export default defineSchema({
       v.literal("deleted")
     ),
 
+    /** Set when status becomes suspended (cleared when reactivated) */
+    suspendedAt: v.optional(v.number()),
+    suspendedBy: v.optional(v.id("users")),
+    /** Internal note for admins/moderators (not shown to the user) */
+    suspensionReason: v.optional(v.string()),
+
     // Verification Status (for freelancers)
     verificationStatus: v.optional(
       v.union(
@@ -457,6 +463,11 @@ export default defineSchema({
     /** Last time we emailed the client about available matches (initial or periodic reminder). */
     lastClientMatchAvailabilityEmailAt: v.optional(v.number()),
 
+    /** Dispute resolved as freelancer replacement — client must pick a new match (cleared when matched again). */
+    replacementMatchingAt: v.optional(v.number()),
+    /** Idempotency + audit: which dispute triggered the replacement flow. */
+    replacementFlowDisputeId: v.optional(v.id("disputes")),
+
     // Audit
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -684,6 +695,7 @@ export default defineSchema({
     status: v.union(
       v.literal("pending"),
       v.literal("in_progress"),
+      v.literal("pending_admin"),
       v.literal("approved"),
       v.literal("flagged"),
       v.literal("rejected")
@@ -726,6 +738,22 @@ export default defineSchema({
           resolved: v.boolean(),
         })
       )
+    ),
+
+    /**
+     * Lightweight proctoring (no video storage, no ML): webcam consent + tab/window/paste signals.
+     */
+    proctoringSummary: v.optional(
+      v.object({
+        englishProctoringReadyAt: v.optional(v.number()),
+        skillsProctoringReadyAt: v.optional(v.number()),
+        visibilityHiddenMsTotal: v.optional(v.number()),
+        windowBlurEvents: v.optional(v.number()),
+        pasteAttempts: v.optional(v.number()),
+        cameraOffSegments: v.optional(v.number()),
+        fullscreenExitEvents: v.optional(v.number()),
+        lastMetricsAt: v.optional(v.number()),
+      })
     ),
 
     // Immutable Audit
@@ -876,12 +904,15 @@ export default defineSchema({
     status: v.union(
       v.literal("pending"), // Awaiting client approval
       v.literal("approved"), // Client approved, funds to wallet
-      v.literal("disputed")
+      v.literal("disputed"),
+      v.literal("cancelled") // Unreleased funds returned to client (e.g. dispute)
     ),
     approvedBy: v.optional(v.id("users")),
     approvedAt: v.optional(v.number()),
     disputeId: v.optional(v.id("disputes")),
     autoReleaseAt: v.optional(v.number()), // 48h after monthEndDate; auto-approve if client hasn't
+    /** Last time we emailed the client a pending-approval reminder for this cycle (throttles spam). */
+    clientApprovalReminderSentAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

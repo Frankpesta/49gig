@@ -245,7 +245,7 @@ export default function ModeratorDisputesPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      ${(dispute.lockedAmount / 100).toFixed(2)}
+                      ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell>
                       {new Date(dispute.createdAt).toLocaleDateString()}

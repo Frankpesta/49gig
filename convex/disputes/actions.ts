@@ -184,54 +184,74 @@ export const releaseDisputeFunds = action({
     const currency = (basePayment?.currency || project.currency || "usd").toLowerCase();
 
     if (decision === "client_favor") {
-      await ctx.runAction(api.payments.actions.refundPaymentIntent, {
-        projectId: dispute.projectId,
-        amount: dispute.lockedAmount,
-        reason: "dispute_client_favor",
-      });
       await ctx.runMutation(
-        (api as any)["projects/mutations"].updateProjectStatusInternal,
-        {
-          projectId: dispute.projectId,
-          status: "cancelled",
-          escrowedAmount: 0,
-        }
-      );
-    } else if (decision === "freelancer_favor") {
-      const amount = resolutionAmount ?? dispute.lockedAmount;
-      const amountCents = Math.round(amount * 100);
-      await ctx.runMutation(
-        internal.monthlyBillingCycles.mutations.releaseDisputeFundsToWalletInternal,
+        internal.monthlyBillingCycles.mutations.finalizeClientWinsDisputeInternal,
         {
           projectId: dispute.projectId,
           disputeId: args.disputeId,
-          amountCents,
           currency,
-          monthlyCycleId: dispute.monthlyCycleId,
         }
       );
+    } else if (decision === "freelancer_favor") {
+      // Unblock work only — escrow stays until normal monthly approval / auto-release.
+      if (dispute.monthlyCycleId) {
+        await ctx.runMutation(
+          internal.monthlyBillingCycles.mutations.clearMonthlyCycleDisputeInternal,
+          { monthlyCycleId: dispute.monthlyCycleId }
+        );
+      }
     } else if (decision === "partial") {
-      if (resolutionAmount != null) {
-        const clientRefund = dispute.lockedAmount - resolutionAmount;
-        if (clientRefund > 0) {
-          await ctx.runAction(api.payments.actions.refundPaymentIntent, {
-            projectId: dispute.projectId,
-            amount: clientRefund,
-            reason: "dispute_partial_refund",
-          });
+      if (resolutionAmount != null && resolutionAmount > 0) {
+        const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+        const freelancerCents = Math.min(resolutionAmount, escrowCents);
+        const clientCents = Math.max(0, escrowCents - freelancerCents);
+        if (clientCents > 0) {
+          await ctx.runMutation(
+            internal.monthlyBillingCycles.mutations.creditClientWalletFromEscrowInternal,
+            {
+              projectId: dispute.projectId,
+              amountCents: clientCents,
+              currency,
+              description: `Dispute partial resolution — credited to your balance (${project.intakeForm.title})`,
+            }
+          );
         }
-        if (resolutionAmount > 0) {
-          const amountCents = Math.round(resolutionAmount * 100);
+        if (freelancerCents > 0) {
           await ctx.runMutation(
             internal.monthlyBillingCycles.mutations.releaseDisputeFundsToWalletInternal,
             {
               projectId: dispute.projectId,
               disputeId: args.disputeId,
-              amountCents,
+              amountCents: freelancerCents,
               currency,
-              monthlyCycleId: dispute.monthlyCycleId,
+              // Do not mark cycle approved here; split may be less than one full cycle.
+              monthlyCycleId: undefined,
             }
           );
+        }
+        // Full escrow was split; cancel unreleased cycles so they cannot be approved again.
+        await ctx.runMutation(
+          internal.monthlyBillingCycles.mutations.cancelPendingAndDisputedCyclesInternal,
+          { projectId: dispute.projectId }
+        );
+      }
+    } else if (decision === "replacement") {
+      const result = await ctx.runMutation(
+        internal.projects.replacement.applyFreelancerReplacementInternal,
+        {
+          projectId: dispute.projectId,
+          disputeId: args.disputeId,
+        }
+      );
+      if (result.applied) {
+        if (result.isTeam) {
+          await ctx.runAction(api.matching.actions.generateTeamMatches, {
+            projectId: dispute.projectId,
+          });
+        } else {
+          await ctx.runAction(api.matching.actions.generateMatches, {
+            projectId: dispute.projectId,
+          });
         }
       }
     }

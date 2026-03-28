@@ -246,11 +246,15 @@ export const sendMonthlyCyclePendingReminderEmail = internalAction({
     clientName: v.optional(v.string()),
     projectName: v.string(),
     monthLabel: v.string(),
+    projectId: v.id("projects"),
+    monthlyCycleId: v.id("monthlyBillingCycles"),
   },
   handler: async (ctx, args) => {
     const appUrl = getAppUrl();
     const logoUrl = getLogoUrl(appUrl);
     const date = formatDate();
+
+    const reviewHref = `${appUrl}/dashboard/projects/${args.projectId}?cycle=${args.monthlyCycleId}`;
 
     await sendEmail({
       to: args.clientEmail,
@@ -262,6 +266,7 @@ export const sendMonthlyCyclePendingReminderEmail = internalAction({
         appUrl,
         logoUrl,
         date,
+        reviewHref,
       }),
     });
 

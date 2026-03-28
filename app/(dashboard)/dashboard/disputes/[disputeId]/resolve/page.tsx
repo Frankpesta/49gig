@@ -16,7 +16,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, Info } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
 import { useState } from "react";
@@ -205,6 +206,22 @@ export default function ResolveDisputePage() {
               </Select>
             </div>
 
+            {formData.decision === "replacement" && (
+              <Alert className="border-violet-500/35 bg-violet-500/[0.06]">
+                <Info className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                <AlertTitle className="text-violet-950 dark:text-violet-100">
+                  Freelancer replacement
+                </AlertTitle>
+                <AlertDescription className="text-sm leading-relaxed text-muted-foreground">
+                  The assigned freelancer(s) will be removed from this hire, past match records cleared,
+                  monthly billing cycles reset for a fresh schedule after you match again, and the contract
+                  will be regenerated for signatures. The client must pick a replacement;{" "}
+                  <strong className="text-foreground font-medium">escrow is not refunded</strong> by this
+                  decision.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {formData.decision === "partial" && (
               <div className="space-y-2">
                 <Label htmlFor="resolutionAmount">
@@ -223,7 +240,7 @@ export default function ResolveDisputePage() {
                   required
                 />
                 <p className="text-sm text-muted-foreground">
-                  Amount to be released to freelancer (in USD). Remaining amount will be refunded to client.
+                  Amount credited to the freelancer&apos;s wallet (USD). The rest of current escrow is credited to the client&apos;s in-platform balance. Unreleased monthly cycles are cancelled after this split.
                 </p>
               </div>
             )}
@@ -253,8 +270,8 @@ export default function ResolveDisputePage() {
                   {dispute.type.replace("_", " ")}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Amount Locked:</span>{" "}
-                  ${(dispute.lockedAmount / 100).toFixed(2)}
+                  <span className="text-muted-foreground">Escrow locked (USD):</span>{" "}
+                  ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                 </div>
                 <div>
                   <span className="text-muted-foreground">Initiator:</span>{" "}

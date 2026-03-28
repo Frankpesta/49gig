@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Video, ChevronDown, Loader2, ShieldCheck, User } from "lucide-react";
+import { ArrowLeft, Video, ChevronDown, Loader2, ShieldCheck, User, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
@@ -40,6 +40,7 @@ import { useAnalytics } from "@/hooks/use-analytics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PLATFORM_CATEGORIES } from "@/lib/platform-skills";
 import { getRoleLabelsForProjectIntake } from "@/lib/team-slots";
+import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
 
 const PAGE_SIZE = 5;
 const TIME_SLOTS = (() => {
@@ -375,6 +376,10 @@ export default function ProjectMatchesPage() {
   const generateMatchesForDraft = useAction(
     (api as any)["matching/actions"].generateMatchesForDraft
   );
+  const generateMatches = useAction((api as any)["matching/actions"].generateMatches);
+  const generateTeamMatches = useAction(
+    (api as any)["matching/actions"].generateTeamMatches
+  );
   const setSelectedFreelancer = useMutation(
     (api as any)["projects/mutations"].setSelectedFreelancer
   );
@@ -390,6 +395,7 @@ export default function ProjectMatchesPage() {
 
   const [matchingRunning, setMatchingRunning] = useState(false);
   const matchingAttemptedRef = useRef(false);
+  const replacementGenAttemptedRef = useRef(false);
   const [matchingAvailability, setMatchingAvailability] = useState<{
     atRequestedLevel: number;
     hasHigherLevelWithSkills: boolean;
@@ -408,6 +414,7 @@ export default function ProjectMatchesPage() {
   const [scheduling, setScheduling] = useState(false);
 
   const isTeam = project?.intakeForm?.hireType === "team";
+  const isFreelancerReplacementFlow = Boolean(project?.replacementMatchingAt);
   const pendingMatches = (matches ?? []).filter(
     (m: EnrichedMatch) => m.status === "pending"
   );
@@ -465,8 +472,9 @@ export default function ProjectMatchesPage() {
   // Reset "attempted" and availability when project changes so a new project can trigger matching
   useEffect(() => {
     matchingAttemptedRef.current = false;
+    replacementGenAttemptedRef.current = false;
     setMatchingAvailability(null);
-  }, [projectId]);
+  }, [projectId, project?.replacementMatchingAt]);
 
   // Run matching once when project is draft and no matches; do not retry on failure
   useEffect(() => {
@@ -500,6 +508,69 @@ export default function ProjectMatchesPage() {
     matches?.length,
     matchingRunning,
     generateMatchesForDraft,
+  ]);
+
+  // Post–dispute replacement: funded hire back in matching — generate fresh candidates once.
+  useEffect(() => {
+    if (!projectId || !user?._id || matchingRunning || !project) return;
+    if (!project.replacementMatchingAt) return;
+    if (project.status !== "matching") return;
+    if (matches === undefined) return;
+    if (matches.length > 0) return;
+    if (replacementGenAttemptedRef.current) return;
+
+    replacementGenAttemptedRef.current = true;
+    setMatchingRunning(true);
+    const isTeam = project.intakeForm?.hireType === "team";
+    const run = isTeam
+      ? generateTeamMatches({ projectId })
+      : generateMatches({ projectId });
+    run
+      .then(() => {
+        setMatchingRunning(false);
+        toast.success(
+          isTeam ? "Replacement team suggestions are ready." : "Replacement matches are ready."
+        );
+      })
+      .catch(() => {
+        replacementGenAttemptedRef.current = false;
+        setMatchingRunning(false);
+        toast.error("Couldn’t generate replacement matches. Try refreshing the page.");
+      });
+  }, [
+    projectId,
+    user?._id,
+    project?.replacementMatchingAt,
+    project?.status,
+    project?.intakeForm?.hireType,
+    matches,
+    matchingRunning,
+    generateMatches,
+    generateTeamMatches,
+  ]);
+
+  const handleRetryReplacementMatches = useCallback(async () => {
+    if (!projectId || !project?.replacementMatchingAt) return;
+    setMatchingRunning(true);
+    try {
+      const isTeam = project.intakeForm?.hireType === "team";
+      if (isTeam) {
+        await generateTeamMatches({ projectId });
+      } else {
+        await generateMatches({ projectId });
+      }
+      toast.success("Suggestions updated.");
+    } catch {
+      toast.error("Couldn’t refresh matches. Try again shortly.");
+    } finally {
+      setMatchingRunning(false);
+    }
+  }, [
+    projectId,
+    project?.replacementMatchingAt,
+    project?.intakeForm?.hireType,
+    generateMatches,
+    generateTeamMatches,
   ]);
 
   const handleSelectSingle = useCallback(
@@ -750,7 +821,17 @@ export default function ProjectMatchesPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex items-start gap-3 sm:gap-4 min-w-0">
+      {isClient && isFreelancerReplacementFlow && projectId && (
+        <FreelancerReplacementBanner
+          projectId={projectId}
+          className="scroll-mt-6"
+        />
+      )}
+
+      <div
+        id="replacement-matches-anchor"
+        className="flex items-start gap-3 sm:gap-4 min-w-0 scroll-mt-24"
+      >
         <Link href={`/dashboard/projects/${projectId}`} className="shrink-0">
           <Button variant="ghost" size="icon" className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
@@ -758,27 +839,47 @@ export default function ProjectMatchesPage() {
         </Link>
         <div className="min-w-0">
           <h1 className="text-xl font-bold sm:text-2xl">
-            {isFundedMatchingContinuation ? "Complete your team" : "Matched freelancers"}
+            {isFreelancerReplacementFlow
+              ? "Select a replacement"
+              : isFundedMatchingContinuation
+                ? "Complete your team"
+                : "Matched freelancers"}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isFundedMatchingContinuation
-              ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s) from the suggestions below.`
-              : isTeam
-                ? "Select one or more freelancers per role, then proceed."
-                : "We've matched you with top talent. Select one to continue."}
+            {isFreelancerReplacementFlow
+              ? isTeam
+                ? "Fill each open role with a new freelancer. Your escrow is unchanged — you’ll sign an updated contract after selection."
+                : "Pick a new freelancer for this hire. Funds stay in escrow until you approve monthly payouts as usual."
+              : isFundedMatchingContinuation
+                ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s) from the suggestions below.`
+                : isTeam
+                  ? "Select one or more freelancers per role, then proceed."
+                  : "We've matched you with top talent. Select one to continue."}
           </p>
         </div>
       </div>
 
       {showMatchingPolicyNote && (
         <Card className="rounded-xl border-amber-500/30 bg-amber-500/5">
-          <CardContent className="py-4 px-4 sm:px-6 text-sm text-foreground/90 space-y-2">
+          <CardContent className="py-4 px-4 sm:px-6 text-sm text-foreground/90 space-y-3">
             <p className="font-medium text-foreground">Open role(s)</p>
             <p className="text-muted-foreground leading-relaxed">
               We keep matching for up to <strong>48 hours</strong> and email you when there are people to
               review. If we can&apos;t staff the remaining role(s) in that window, you get a{" "}
               <strong>full refund</strong>.
             </p>
+            {isFreelancerReplacementFlow && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="rounded-lg gap-2"
+                onClick={() => void handleRetryReplacementMatches()}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh replacement matches
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -792,7 +893,33 @@ export default function ProjectMatchesPage() {
         </Card>
       )}
 
-      {!matchingRunning && pendingMatches.length === 0 && !(isTeam && allRoleLabels.length > 0) && (
+      {!matchingRunning &&
+        pendingMatches.length === 0 &&
+        isFreelancerReplacementFlow &&
+        (!isTeam || allRoleLabels.length === 0) && (
+          <Card className="rounded-xl border-violet-500/25 bg-violet-500/4">
+            <CardContent className="py-10 px-4 sm:px-8 text-center space-y-4">
+              <p className="font-medium text-foreground text-base sm:text-lg">
+                No replacement suggestions yet
+              </p>
+              <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+                We couldn’t line up candidates automatically, or they&apos;re still loading. Refresh to run
+                matching again — your hire stays protected in escrow.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl gap-2"
+                onClick={() => void handleRetryReplacementMatches()}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Run matching again
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+      {!matchingRunning && pendingMatches.length === 0 && !(isTeam && allRoleLabels.length > 0) && !isFreelancerReplacementFlow && (
         <Card className="rounded-xl border-border/60">
           <CardContent className="py-12 px-4 sm:px-8 text-center space-y-4">
             {matchingAvailability ? (

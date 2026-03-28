@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +55,7 @@ import {
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
 import { getRoleLabelsForProjectIntake } from "@/lib/team-slots";
+import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
 
 const STATUS_CONFIG: Record<
   string,
@@ -106,9 +107,27 @@ function isValidConvexId(id: string | string[] | undefined): id is Id<"projects"
   return /^[a-zA-Z][a-zA-Z0-9]*$/.test(id);
 }
 
+/** Advances once per minute so approval UI unlocks when billing period ends (server enforces the same rule). */
+function useBillingPeriodClockMs() {
+  const [clockMs, setClockMs] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setClockMs(Date.now());
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return clockMs;
+}
+
+function isBillingPeriodMature(monthEndDate: number, clockMs: number | null) {
+  return clockMs !== null && monthEndDate <= clockMs;
+}
+
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const cycleDeepLinkId = searchParams.get("cycle");
   const { user } = useAuth();
   const { trackEvent } = useAnalytics();
   const projectIdParam = params.projectId;
@@ -139,6 +158,7 @@ export default function ProjectDetailPage() {
   );
   const [approvingCycleId, setApprovingCycleId] = useState<Id<"monthlyBillingCycles"> | null>(null);
   const [isCreatingCycles, setIsCreatingCycles] = useState(false);
+  const billingPeriodClockMs = useBillingPeriodClockMs();
 
   const project = useQuery(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,6 +170,12 @@ export default function ProjectDetailPage() {
     api.monthlyBillingCycles.queries.getCyclesByProjectId,
     projectId ? { projectId } : "skip"
   );
+
+  useEffect(() => {
+    if (!cycleDeepLinkId || !monthlyCycles?.length) return;
+    const el = document.getElementById(`monthly-cycle-${cycleDeepLinkId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [cycleDeepLinkId, monthlyCycles]);
 
   const openDisputes = useQuery(
     (api as any)["disputes/queries"].getOpenDisputesForProject,
@@ -254,6 +280,10 @@ export default function ProjectDetailPage() {
     (project.awaitingMatch === true ||
       (project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0) ||
       (project.rolesAwaitingMatch != null && project.rolesAwaitingMatch.length > 0));
+  const isFreelancerReplacementMatching =
+    isClient &&
+    project.status === "matching" &&
+    project.replacementMatchingAt != null;
   const isMatchedFreelancer =
     project.matchedFreelancerId === user._id ||
     (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
@@ -369,6 +399,14 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
+      {isFreelancerReplacementMatching && projectId && (
+        <FreelancerReplacementBanner
+          projectId={projectId}
+          compact
+          className="animate-in fade-in slide-in-from-top-2 duration-500"
+        />
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3 sm:gap-4">
@@ -402,13 +440,15 @@ export default function ProjectDetailPage() {
                 </Link>
               </Button>
             )}
-            {showClientViewMatches && (
-              <Button asChild>
+            {(showClientViewMatches || isFreelancerReplacementMatching) && (
+              <Button asChild className={isFreelancerReplacementMatching ? "shadow-md" : undefined}>
                 <Link href={`/dashboard/projects/${project._id}/matches`}>
                   <UserSearch className="mr-2 h-4 w-4" />
-                  {project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0
-                    ? "Review & complete team"
-                    : "View matches"}
+                  {isFreelancerReplacementMatching
+                    ? "Choose replacement"
+                    : project.pendingTeamMemberSlots != null && project.pendingTeamMemberSlots > 0
+                      ? "Review & complete team"
+                      : "View matches"}
                 </Link>
               </Button>
             )}
@@ -615,7 +655,7 @@ export default function ProjectDetailPage() {
                   {isStaff
                     ? "Read-only: the hiring client approves each month to release escrow. Staff cannot approve or fund on their behalf."
                     : isClient
-                      ? "Approve each month to release funds to the freelancer's wallet. They withdraw to their bank when ready."
+                      ? "Approve each month after that billing period ends to release funds to the freelancer's wallet. They withdraw to their bank when ready."
                       : isMatchedFreelancer
                         ? "Funds are released to your wallet when the client approves each month. Withdraw to your bank account from the Wallet page."
                         : "Payment cycles for this project. Funds go to freelancer wallets; they withdraw to their bank accounts."}
@@ -658,26 +698,58 @@ export default function ProjectDetailPage() {
                       </p>
                     );
                   })()}
-                  {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; amountCents: number; currency: string; status: string }) => {
+                  {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; monthEndDate: number; amountCents: number; currency: string; status: string }) => {
                     const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", { month: "long", year: "numeric" });
                     const isPending = cycle.status === "pending";
+                    const matured = isBillingPeriodMature(cycle.monthEndDate, billingPeriodClockMs);
+                    const periodEndShort = new Date(cycle.monthEndDate).toLocaleDateString("en-US", {
+                      dateStyle: "medium",
+                    });
                     const statusLabel = isClient
-                      ? (cycle.status === "pending" ? "Awaiting your approval" : cycle.status === "approved" ? "Approved" : cycle.status === "disputed" ? "Disputed" : cycle.status)
-                      : (cycle.status === "pending" ? "Awaiting client approval" : cycle.status === "approved" ? "Approved, funds released" : cycle.status === "disputed" ? "Disputed" : cycle.status);
+                      ? cycle.status === "pending"
+                        ? matured
+                          ? "Awaiting your approval"
+                          : `Period in progress — approve after ${periodEndShort}`
+                        : cycle.status === "approved"
+                          ? "Approved"
+                          : cycle.status === "disputed"
+                            ? "Disputed"
+                            : cycle.status === "cancelled"
+                              ? "Cancelled"
+                              : cycle.status
+                      : cycle.status === "pending"
+                        ? matured
+                          ? "Awaiting client approval"
+                          : "Billing period in progress"
+                        : cycle.status === "approved"
+                          ? "Approved, funds released"
+                          : cycle.status === "disputed"
+                            ? "Disputed"
+                            : cycle.status === "cancelled"
+                              ? "Cancelled"
+                              : cycle.status;
                     const durMonths = getDurationMonths(project?.intakeForm?.projectDuration) || monthlyCycles.length || 1;
                     const displayAmount =
                       isClient && project
                         ? project.totalAmount / durMonths
                         : cycle.amountCents / 100;
                     return (
-                      <div key={cycle._id} className="flex items-center justify-between rounded-lg border p-4">
+                      <div
+                        key={cycle._id}
+                        id={`monthly-cycle-${cycle._id}`}
+                        className={`flex items-center justify-between rounded-lg border p-4 transition-shadow ${
+                          cycleDeepLinkId === cycle._id
+                            ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                            : ""
+                        }`}
+                      >
                         <div>
                           <div className="font-medium">Month {cycle.monthIndex}: {monthLabel}</div>
                           <div className="text-sm text-muted-foreground">
                             ${typeof displayAmount === "number" ? displayAmount.toFixed(2) : (cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {statusLabel}
                           </div>
                         </div>
-                        {isClient && isPending && (
+                        {isClient && isPending && matured && (
                           <Button
                             size="sm"
                             onClick={async () => {
@@ -711,7 +783,7 @@ export default function ProjectDetailPage() {
                       ? "Monthly billing cycles are created automatically when the project is in progress. You'll approve each month to release payment to the freelancer."
                       : "Monthly billing cycles will appear here once the project is in progress. You'll get paid each month after the client approves."}
                   </p>
-                  {(project.status === "in_progress" || project.status === "matched") && isClient && (
+                  {project.status === "in_progress" && isClient && (
                     <Button
                       variant="outline"
                       size="sm"

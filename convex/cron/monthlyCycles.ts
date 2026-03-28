@@ -42,11 +42,11 @@ export const sendMonthlyCyclePendingReminders = internalAction({
       {}
     );
 
-    const sentTo = new Set<string>(); // Avoid duplicate emails per client per project
+    const sentTo = new Set<string>();
     let sent = 0;
 
     for (const p of pending) {
-      const key = `${p.clientId}:${p.projectId}:${p.monthLabel}`;
+      const key = `${p.clientId}:${p.projectId}`;
       if (sentTo.has(key)) continue;
       sentTo.add(key);
 
@@ -62,7 +62,14 @@ export const sendMonthlyCyclePendingReminders = internalAction({
             clientName: client.name,
             projectName: p.projectName,
             monthLabel: p.monthLabel,
+            projectId: p.projectId,
+            monthlyCycleId: p.cycleId,
           }
+        );
+        await ctx.runMutation(
+          internalAny.monthlyBillingCycles.mutations
+            .markMonthlyCycleReminderSentInternal,
+          { monthlyCycleId: p.cycleId }
         );
         sent++;
       }

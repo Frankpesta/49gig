@@ -20,6 +20,7 @@ import { Code, FileQuestion, Loader2, CheckCircle2, ChevronLeft, ChevronRight, P
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ErrorHandler } from "./error-handler";
+import { useSkillProctoringTelemetry } from "./test-proctoring";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -75,6 +76,7 @@ export function SkillTestPathFlow() {
   );
 
   const startSkillTest = useAction(api.vetting.skillTestSession.startSkillTest);
+  const confirmProctoringCamera = useMutation(api.vetting.mutations.confirmProctoringCamera);
   const submitMcqAnswers = useMutation(api.vetting.mutations.submitMcqAnswers);
   const submitCodingSubmission = useMutation(api.vetting.mutations.submitCodingSubmission);
   const setSessionPortfolioScore = useMutation(api.vetting.mutations.setSessionPortfolioScore);
@@ -185,12 +187,25 @@ export function SkillTestPathFlow() {
       .catch(() => {});
   }, [timeUp, session?.status, session?._id, mcqAnswers, mcqQuestions, userId, submitMcqAnswers]);
 
+  const proctoringTelemetryActive =
+    !!session && session.status !== "completed" && session.status !== "not_started";
+  useSkillProctoringTelemetry(userId ?? undefined, proctoringTelemetryActive);
+
   if (!userId) return null;
 
   const handleStartTest = async () => {
     setError(null);
     setStarting(true);
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera access is required for the skill assessment. Use a supported browser.");
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false,
+      });
+      stream.getTracks().forEach((t) => t.stop());
+      await confirmProctoringCamera({ userId, segment: "skills" });
       await startSkillTest({ userId });
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
@@ -218,7 +233,8 @@ export function SkillTestPathFlow() {
         <CardHeader>
           <CardTitle>Skill assessment</CardTitle>
           <CardDescription>
-            Start the skill test. Questions are generated from your profile (category and skills).
+            You&apos;ll be asked to allow your webcam before the timed test starts (video is not uploaded).
+            Questions are generated from your profile (category and skills).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

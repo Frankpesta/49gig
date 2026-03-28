@@ -78,6 +78,115 @@ async function creditWalletInline(
   return { walletId: wallet._id, newBalanceCents: newBalance };
 }
 
+async function cancelPendingAndDisputedMonthlyCycles(
+  ctx: MutationCtx,
+  projectId: Doc<"projects">["_id"]
+) {
+  const cycles = await ctx.db
+    .query("monthlyBillingCycles")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .collect();
+  const now = Date.now();
+  for (const c of cycles) {
+    if (c.status === "pending" || c.status === "disputed") {
+      await ctx.db.patch(c._id, {
+        status: "cancelled",
+        disputeId: undefined,
+        updatedAt: now,
+      });
+    }
+  }
+}
+
+/** Credit the client's in-platform wallet and reduce project escrow (cents). */
+export const creditClientWalletFromEscrowInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    amountCents: v.number(),
+    currency: v.string(),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (args.amountCents <= 0) return { credited: 0 };
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return { credited: 0 };
+    const maxCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+    const cents = Math.min(args.amountCents, maxCents);
+    if (cents <= 0) return { credited: 0 };
+    await creditWalletInline(ctx, {
+      userId: project.clientId,
+      amountCents: cents,
+      currency: args.currency,
+      description: args.description,
+      projectId: args.projectId,
+    });
+    await ctx.db.patch(args.projectId, {
+      escrowedAmount: Math.max(0, (project.escrowedAmount ?? 0) - cents / 100),
+      updatedAt: Date.now(),
+    });
+    return { credited: cents };
+  },
+});
+
+/**
+ * Client wins dispute: credit all remaining escrow to client wallet, zero escrow,
+ * cancel unreleased monthly cycles (pending/disputed).
+ */
+export const finalizeClientWinsDisputeInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    disputeId: v.id("disputes"),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return { success: false };
+
+    const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+    if (escrowCents > 0) {
+      await creditWalletInline(ctx, {
+        userId: project.clientId,
+        amountCents: escrowCents,
+        currency: args.currency,
+        description: `Dispute resolved in your favor — unreleased escrow credited to your balance (${project.intakeForm.title})`,
+        projectId: args.projectId,
+      });
+    }
+
+    await ctx.db.patch(args.projectId, {
+      escrowedAmount: 0,
+      updatedAt: Date.now(),
+    });
+
+    await cancelPendingAndDisputedMonthlyCycles(ctx, args.projectId);
+
+    return { success: true };
+  },
+});
+
+/** Cancel all pending/disputed cycles (e.g. after partial split that depleted escrow). */
+export const cancelPendingAndDisputedCyclesInternal = internalMutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await cancelPendingAndDisputedMonthlyCycles(ctx, args.projectId);
+    return { success: true };
+  },
+});
+
+/** Restore a disputed monthly cycle to pending so normal approval can resume. */
+export const clearMonthlyCycleDisputeInternal = internalMutation({
+  args: { monthlyCycleId: v.id("monthlyBillingCycles") },
+  handler: async (ctx, args) => {
+    const c = await ctx.db.get(args.monthlyCycleId);
+    if (!c || c.status !== "disputed") return;
+    await ctx.db.patch(args.monthlyCycleId, {
+      status: "pending",
+      disputeId: undefined,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 /**
  * Approve a monthly billing cycle (client action).
  * Credits freelancer(s) wallet(s) and updates cycle status.
@@ -109,7 +218,23 @@ export const approveMonthlyCycle = mutation({
       throw new Error("Only the project client can approve monthly cycles");
     }
 
+    if (project.status === "disputed") {
+      throw new Error("Cannot approve a monthly payment while a dispute is open.");
+    }
+
+    if (project.status !== "in_progress") {
+      throw new Error(
+        "Monthly approvals are only available while the hire is in progress.",
+      );
+    }
+
     const now = Date.now();
+
+    if (now < cycle.monthEndDate) {
+      throw new Error(
+        "This billing month has not ended yet. You can approve after the period ends.",
+      );
+    }
 
     // Get freelancer(s)
     const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
@@ -238,9 +363,24 @@ export const approveMonthlyCycle = mutation({
 });
 
 /**
- * Ensure monthly cycles exist for a project (client/admin). Idempotent.
- * Use when cycles are missing for an in_progress project.
+ * Ensure monthly cycles exist for a project (client). Idempotent.
+ * Only allowed while the hire is `in_progress`.
  */
+/**
+ * Internal: record that we sent a client reminder for this cycle (cron).
+ */
+export const markMonthlyCycleReminderSentInternal = internalMutation({
+  args: { monthlyCycleId: v.id("monthlyBillingCycles") },
+  handler: async (ctx, args) => {
+    const cycle = await ctx.db.get(args.monthlyCycleId);
+    if (!cycle) return;
+    await ctx.db.patch(args.monthlyCycleId, {
+      clientApprovalReminderSentAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 export const ensureMonthlyCycles = mutation({
   args: {
     projectId: v.id("projects"),
@@ -260,8 +400,10 @@ export const ensureMonthlyCycles = mutation({
       throw new Error("Only the project client can create monthly cycles");
     }
 
-    if (project.status !== "matched" && project.status !== "in_progress") {
-      throw new Error("Monthly cycles can only be created for matched or in-progress projects");
+    if (project.status !== "in_progress") {
+      throw new Error(
+        "Monthly cycles can only be set up while the hire is in progress.",
+      );
     }
 
     await ctx.scheduler.runAfter(0, internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal, {
@@ -273,7 +415,8 @@ export const ensureMonthlyCycles = mutation({
 });
 
 /**
- * Internal: create monthly billing cycles for a project (called after match acceptance)
+ * Internal: create monthly billing cycles for a project (idempotent).
+ * Runs only while status is `in_progress` — scheduled when the hire enters in progress (contract signed or status update).
  */
 export const autoCreateMonthlyCyclesInternal = internalMutation({
   args: {
@@ -282,6 +425,9 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
     if (!project) return [];
+    if (project.status !== "in_progress") {
+      return [];
+    }
 
     const existing = await ctx.db
       .query("monthlyBillingCycles")
@@ -371,6 +517,12 @@ export const autoReleaseMonthlyCycleInternal = internalMutation({
 
     const project = await ctx.db.get(cycle.projectId);
     if (!project) return { released: false };
+    if (project.status === "disputed") {
+      return { released: false };
+    }
+    if (project.status !== "in_progress") {
+      return { released: false };
+    }
 
     const now = Date.now();
 
