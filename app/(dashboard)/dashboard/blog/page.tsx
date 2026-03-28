@@ -11,7 +11,7 @@ import { formatDistanceToNow } from "date-fns";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
-import { FileText, Plus, Pencil, Trash2, Eye, Loader2 } from "lucide-react";
+import { FileText, Plus, Pencil, Trash2, Eye, Loader2, Send } from "lucide-react";
 import { useState } from "react";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -32,6 +32,7 @@ export default function DashboardBlogPage() {
   const { user, isAuthenticated } = useAuth();
   const [deleteId, setDeleteId] = useState<Id<"blogPosts"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [publishingId, setPublishingId] = useState<Id<"blogPosts"> | null>(null);
 
   const posts = useQuery(
     (api as any).blog.queries.listAllForAdmin,
@@ -40,6 +41,20 @@ export default function DashboardBlogPage() {
       : "skip"
   );
   const removePost = useMutation((api as any).blog.mutations.remove);
+  const updatePost = useMutation((api as any).blog.mutations.update);
+
+  const handlePublishDraft = async (postId: Id<"blogPosts">) => {
+    if (!user?._id) return;
+    setPublishingId(postId);
+    try {
+      await updatePost({ userId: user._id, postId, status: "published" });
+      toast.success("Post published");
+    } catch (e) {
+      toast.error(getUserFriendlyError(e) ?? "Failed to publish");
+    } finally {
+      setPublishingId(null);
+    }
+  };
 
   const handleDelete = async () => {
     if (!deleteId || !user?._id) return;
@@ -121,11 +136,29 @@ export default function DashboardBlogPage() {
                     <Badge variant={post.status === "published" ? "default" : "secondary"}>
                       {post.status}
                     </Badge>
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/blog/${post.slug}`} target="_blank" rel="noopener">
-                        <Eye className="h-4 w-4" />
-                      </Link>
-                    </Button>
+                    {post.status === "draft" && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={publishingId === post._id}
+                        onClick={() => void handlePublishDraft(post._id)}
+                      >
+                        {publishingId === post._id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Send className="h-3.5 w-3.5" />
+                        )}
+                        Publish
+                      </Button>
+                    )}
+                    {post.status === "published" && (
+                      <Button variant="ghost" size="icon" asChild title="View on site">
+                        <Link href={`/blog/${post.slug}`} target="_blank" rel="noopener">
+                          <Eye className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon" asChild>
                       <Link href={`/dashboard/blog/${post._id}/edit`}>
                         <Pencil className="h-4 w-4" />

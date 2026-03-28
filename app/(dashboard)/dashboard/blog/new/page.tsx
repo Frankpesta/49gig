@@ -26,10 +26,10 @@ export default function NewBlogPostPage() {
   const [excerpt, setExcerpt] = useState("");
   const [content, setContent] = useState(EMPTY_TIPTAP_DOC_JSON);
   const [bannerImageId, setBannerImageId] = useState<Id<"_storage"> | null>(null);
-  const [status, setStatus] = useState<"draft" | "published">("draft");
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingAs, setSubmittingAs] = useState<"draft" | "published" | null>(null);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
   const createPost = useMutation((api as any).blog.mutations.create);
@@ -65,7 +65,7 @@ export default function NewBlogPostPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const submitPost = async (nextStatus: "draft" | "published") => {
     if (!user?._id || !title.trim()) {
       toast.error("Title is required");
       return;
@@ -75,6 +75,7 @@ export default function NewBlogPostPage() {
       return;
     }
     setIsSubmitting(true);
+    setSubmittingAs(nextStatus);
     try {
       await createPost({
         userId: user._id,
@@ -83,16 +84,17 @@ export default function NewBlogPostPage() {
         excerpt: excerpt.trim(),
         content: content.trim() ? content : EMPTY_TIPTAP_DOC_JSON,
         bannerImageId: bannerImageId ?? undefined,
-        status,
+        status: nextStatus,
         metaTitle: metaTitle.trim() || undefined,
         metaDescription: metaDescription.trim() || undefined,
       });
-      toast.success(status === "published" ? "Post published" : "Draft saved");
+      toast.success(nextStatus === "published" ? "Post published" : "Draft saved");
       router.push("/dashboard/blog");
     } catch (err) {
       toast.error(getUserFriendlyError(err) ?? "Failed to save");
     } finally {
       setIsSubmitting(false);
+      setSubmittingAs(null);
     }
   };
 
@@ -120,13 +122,30 @@ export default function NewBlogPostPage() {
           description="Create a new blog post for the marketing site."
           icon={FileText}
         />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href="/dashboard/blog">Cancel</Link>
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="gap-2">
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {status === "draft" ? "Save draft" : "Publish"}
+          <Button
+            variant="secondary"
+            onClick={() => void submitPost("draft")}
+            disabled={isSubmitting}
+            className="gap-2"
+          >
+            {isSubmitting && submittingAs === "draft" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            Save draft
+          </Button>
+          <Button
+            onClick={() => void submitPost("published")}
+            disabled={isSubmitting}
+            className="gap-2"
+          >
+            {isSubmitting && submittingAs === "published" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : null}
+            Publish
           </Button>
         </div>
       </div>
@@ -176,29 +195,11 @@ export default function NewBlogPostPage() {
             {isUploadingBanner && <p className="text-sm text-muted-foreground">Uploading…</p>}
             {bannerImageId && <p className="text-sm text-green-600">Banner uploaded.</p>}
           </div>
-          <div className="grid gap-2">
-            <Label>Status</Label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="status"
-                  checked={status === "draft"}
-                  onChange={() => setStatus("draft")}
-                />
-                Draft
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="status"
-                  checked={status === "published"}
-                  onChange={() => setStatus("published")}
-                />
-                Published
-              </label>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Use <span className="font-medium text-foreground">Save draft</span> or{" "}
+            <span className="font-medium text-foreground">Publish</span> in the bar above — published posts appear on
+            the marketing site.
+          </p>
           <div className="grid gap-2">
             <Label htmlFor="metaTitle">Meta title (SEO, optional)</Label>
             <Input
@@ -236,13 +237,26 @@ export default function NewBlogPostPage() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button variant="outline" asChild>
           <Link href="/dashboard/blog">Cancel</Link>
         </Button>
-        <Button onClick={handleSubmit} disabled={isSubmitting} className="gap-2">
-          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {status === "draft" ? "Save draft" : "Publish"}
+        <Button
+          variant="secondary"
+          onClick={() => void submitPost("draft")}
+          disabled={isSubmitting}
+          className="gap-2"
+        >
+          {isSubmitting && submittingAs === "draft" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
+          Save draft
+        </Button>
+        <Button onClick={() => void submitPost("published")} disabled={isSubmitting} className="gap-2">
+          {isSubmitting && submittingAs === "published" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
+          Publish
         </Button>
       </div>
     </div>
