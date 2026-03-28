@@ -5,7 +5,7 @@ import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { BlogEditor } from "@/components/blog/blog-editor";
+import { BlogEditor, EMPTY_TIPTAP_DOC_JSON } from "@/components/blog/blog-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,7 @@ export default function NewBlogPostPage() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [excerpt, setExcerpt] = useState("");
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(EMPTY_TIPTAP_DOC_JSON);
   const [bannerImageId, setBannerImageId] = useState<Id<"_storage"> | null>(null);
   const [status, setStatus] = useState<"draft" | "published">("draft");
   const [metaTitle, setMetaTitle] = useState("");
@@ -81,7 +81,7 @@ export default function NewBlogPostPage() {
         title: title.trim(),
         slug: slug.trim() || undefined,
         excerpt: excerpt.trim(),
-        content: content || "{}",
+        content: content.trim() ? content : EMPTY_TIPTAP_DOC_JSON,
         bannerImageId: bannerImageId ?? undefined,
         status,
         metaTitle: metaTitle.trim() || undefined,
