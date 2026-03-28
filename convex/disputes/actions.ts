@@ -24,11 +24,10 @@ export const attemptAutomatedResolution = action({
       return { canAutoResolve: false, reason: "Dispute not in open status" };
     }
 
-    // Get project
-    const project = await ctx.runQuery(
-      (api as any)["projects/queries"].getProject,
-      { projectId: dispute.projectId }
-    );
+    // Actions have no viewer identity — use internal query (getProject requires userId + auth).
+    const project = await ctx.runQuery(internal.projects.queries.getProjectInternal, {
+      projectId: dispute.projectId,
+    });
 
     if (!project) {
       throw new Error("Project not found");
@@ -167,10 +166,9 @@ export const releaseDisputeFunds = action({
       throw new Error("Dispute not resolved");
     }
 
-    const project = await ctx.runQuery(
-      (api as any)["projects/queries"].getProject,
-      { projectId: dispute.projectId }
-    );
+    const project = await ctx.runQuery(internal.projects.queries.getProjectInternal, {
+      projectId: dispute.projectId,
+    });
 
     if (!project) {
       throw new Error("Project not found");

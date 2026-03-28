@@ -20,6 +20,39 @@ import {
   Redo,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+/** Valid empty document for TipTap JSON storage (never use raw `{}`). */
+export const EMPTY_TIPTAP_DOC_JSON = JSON.stringify({ type: "doc", content: [] });
+
+export function parseTipTapDocJson(raw: string | undefined | null): Record<string, unknown> {
+  const s = raw?.trim() ?? "";
+  if (s === "" || s === "{}") {
+    return { type: "doc", content: [] };
+  }
+  try {
+    const v = JSON.parse(s) as { type?: string };
+    if (!v || typeof v !== "object" || v.type !== "doc") {
+      return { type: "doc", content: [] };
+    }
+    return v as Record<string, unknown>;
+  } catch {
+    return { type: "doc", content: [] };
+  }
+}
+
+/** TipTap + ProseMirror content area: explicit list/heading/blockquote/image styles (no @tailwindcss/typography). */
+const editorContentClass = cn(
+  "max-w-none min-h-[280px] px-4 py-3 focus:outline-none text-foreground",
+  "[&_p]:my-2 [&_p]:leading-relaxed",
+  "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2",
+  "[&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-6",
+  "[&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-6",
+  "[&_li]:my-1 [&_li]:pl-1",
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-4 [&_blockquote]:border-muted-foreground/40 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-muted-foreground",
+  "[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2",
+  "[&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_img]:my-3",
+);
 
 const MenuBar = ({
   editor,
@@ -39,29 +72,29 @@ const MenuBar = ({
       const file = e.target.files?.[0];
       e.target.value = "";
       if (!file || !editor || !onImageUpload) return;
-      const url = await onImageUpload(file);
-      editor.chain().focus().setImage({ src: url }).run();
+      try {
+        const url = await onImageUpload(file);
+        if (!url?.trim()) throw new Error("No image URL returned");
+        editor.chain().focus().setImage({ src: url.trim() }).run();
+      } catch (err) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Image upload failed");
+      }
     },
-    [editor, onImageUpload]
+    [editor, onImageUpload],
   );
 
   if (!editor) return null;
   return (
     <div className="flex flex-wrap items-center gap-1 border-b border-border bg-muted/30 px-2 py-1.5 rounded-t-lg">
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={onFile}
-      />
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
       <Button
         type="button"
         variant="ghost"
         size="icon"
         className="h-8 w-8"
         onClick={() => editor.chain().focus().toggleBold().run()}
-        disabled={!editor.can().chain().focus().toggleBold().run()}
+        disabled={!editor.can().toggleBold()}
       >
         <Bold className="h-4 w-4" />
       </Button>
@@ -71,7 +104,7 @@ const MenuBar = ({
         size="icon"
         className="h-8 w-8"
         onClick={() => editor.chain().focus().toggleItalic().run()}
-        disabled={!editor.can().chain().focus().toggleItalic().run()}
+        disabled={!editor.can().toggleItalic()}
       >
         <Italic className="h-4 w-4" />
       </Button>
@@ -118,7 +151,7 @@ const MenuBar = ({
         className="h-8 w-8"
         onClick={() => {
           const url = window.prompt("URL");
-          if (url) editor.chain().focus().setLink({ href: url }).run();
+          if (url?.trim()) editor.chain().focus().setLink({ href: url.trim() }).run();
         }}
       >
         <LinkIcon className="h-4 w-4" />
@@ -135,7 +168,7 @@ const MenuBar = ({
         size="icon"
         className="h-8 w-8"
         onClick={() => editor.chain().focus().undo().run()}
-        disabled={!editor.can().chain().focus().undo().run()}
+        disabled={!editor.can().undo()}
       >
         <Undo className="h-4 w-4" />
       </Button>
@@ -145,7 +178,7 @@ const MenuBar = ({
         size="icon"
         className="h-8 w-8"
         onClick={() => editor.chain().focus().redo().run()}
-        disabled={!editor.can().chain().focus().redo().run()}
+        disabled={!editor.can().redo()}
       >
         <Redo className="h-4 w-4" />
       </Button>
@@ -173,29 +206,25 @@ export function BlogEditor({
       Link.configure({ openOnClick: false, HTMLAttributes: { class: "text-primary underline" } }),
       Placeholder.configure({ placeholder }),
     ],
-    content: content ? (typeof content === "string" ? (JSON.parse(content) as object) : content) : undefined,
+    immediatelyRender: false,
+    content: parseTipTapDocJson(content),
     editorProps: {
       attributes: {
-        class:
-          "prose prose-neutral dark:prose-invert max-w-none min-h-[280px] px-4 py-3 focus:outline-none",
+        class: editorContentClass,
       },
     },
-    onUpdate: ({ editor }) => {
-      onChange(JSON.stringify(editor.getJSON()));
+    onUpdate: ({ editor: ed }) => {
+      onChange(JSON.stringify(ed.getJSON()));
     },
   });
 
   useEffect(() => {
     if (!editor) return;
-    const parsed = (() => {
-      try {
-        return content ? JSON.parse(content) : null;
-      } catch {
-        return null;
-      }
-    })();
-    if (parsed && JSON.stringify(parsed) !== JSON.stringify(editor.getJSON())) {
-      editor.commands.setContent(parsed);
+    const parsed = parseTipTapDocJson(content);
+    const next = JSON.stringify(parsed);
+    const current = JSON.stringify(editor.getJSON());
+    if (next !== current) {
+      editor.commands.setContent(parsed, { emitUpdate: false });
     }
   }, [content, editor]);
 

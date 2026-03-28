@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PageHero } from "@/components/marketing/page-hero";
 import { BlogContentRenderer } from "@/components/blog/blog-content-renderer";
+import { EMPTY_TIPTAP_DOC_JSON } from "@/components/blog/blog-editor";
 import { BlogComments } from "@/components/blog/blog-comments";
 import { useAuth } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
@@ -100,9 +101,10 @@ export default function BlogPostPage() {
             )}
           </div>
 
-          <div className="prose-custom">
-            <BlogContentRenderer contentJson={post.content ?? "{}"} className="text-foreground" />
-          </div>
+          <BlogContentRenderer
+            contentJson={post.content ?? EMPTY_TIPTAP_DOC_JSON}
+            className="text-foreground"
+          />
 
           <div className="mt-12 pt-8 border-t border-border">
             <div className="flex flex-wrap items-center gap-4">

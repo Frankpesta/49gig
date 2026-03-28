@@ -5,7 +5,7 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useParams, useRouter } from "next/navigation";
-import { BlogEditor } from "@/components/blog/blog-editor";
+import { BlogEditor, EMPTY_TIPTAP_DOC_JSON } from "@/components/blog/blog-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,7 +45,7 @@ export default function EditBlogPostPage() {
       setTitle(post.title);
       setSlug(post.slug);
       setExcerpt(post.excerpt);
-      setContent(post.content ?? "{}");
+      setContent(post.content ?? EMPTY_TIPTAP_DOC_JSON);
       setBannerImageId(post.bannerImageId ?? null);
       setStatus(post.status);
       setMetaTitle(post.metaTitle ?? "");
@@ -103,7 +103,7 @@ export default function EditBlogPostPage() {
         title: title.trim(),
         slug: slug.trim() || undefined,
         excerpt: excerpt.trim(),
-        content: content || "{}",
+        content: content.trim() ? content : EMPTY_TIPTAP_DOC_JSON,
         bannerImageId: bannerImageId ?? undefined,
         status,
         metaTitle: metaTitle.trim() || undefined,
