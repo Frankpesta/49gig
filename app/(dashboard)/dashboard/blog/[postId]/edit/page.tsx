@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { Badge } from "@/components/ui/badge";
 import { FileText, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ export default function EditBlogPostPage() {
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingAs, setSubmittingAs] = useState<"draft" | "published" | null>(null);
   const [isUploadingBanner, setIsUploadingBanner] = useState(false);
 
   useEffect(() => {
@@ -86,7 +88,7 @@ export default function EditBlogPostPage() {
     }
   };
 
-  const handleSubmit = async () => {
+  const submitUpdate = async (nextStatus: "draft" | "published") => {
     if (!user?._id || !postId || !title.trim()) {
       toast.error("Title is required");
       return;
@@ -96,6 +98,7 @@ export default function EditBlogPostPage() {
       return;
     }
     setIsSubmitting(true);
+    setSubmittingAs(nextStatus);
     try {
       await updatePost({
         userId: user._id,
@@ -105,16 +108,18 @@ export default function EditBlogPostPage() {
         excerpt: excerpt.trim(),
         content: content.trim() ? content : EMPTY_TIPTAP_DOC_JSON,
         bannerImageId: bannerImageId ?? undefined,
-        status,
+        status: nextStatus,
         metaTitle: metaTitle.trim() || undefined,
         metaDescription: metaDescription.trim() || undefined,
       });
-      toast.success("Post updated");
+      setStatus(nextStatus);
+      toast.success(nextStatus === "published" ? "Post published" : "Draft saved");
       router.push("/dashboard/blog");
     } catch (err) {
       toast.error(getUserFriendlyError(err) ?? "Failed to update");
     } finally {
       setIsSubmitting(false);
+      setSubmittingAs(null);
     }
   };
 
@@ -166,19 +171,43 @@ export default function EditBlogPostPage() {
           description={`Editing: ${post.title}`}
           icon={FileText}
         />
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/blog/${post.slug}`} target="_blank" rel="noopener">
-              View
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/blog">Cancel</Link>
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="gap-2">
-            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Save
-          </Button>
+        <div className="flex flex-col items-end gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <Badge variant={status === "published" ? "default" : "secondary"} className="order-first sm:order-0">
+            {status === "published" ? "Live on site" : "Draft"}
+          </Badge>
+          <div className="flex flex-wrap justify-end gap-2">
+            {status === "published" && (
+              <Button variant="outline" asChild>
+                <Link href={`/blog/${post.slug}`} target="_blank" rel="noopener">
+                  View
+                </Link>
+              </Button>
+            )}
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/blog">Cancel</Link>
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => void submitUpdate("draft")}
+              disabled={isSubmitting}
+              className="gap-2"
+            >
+              {isSubmitting && submittingAs === "draft" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
+              Save draft
+            </Button>
+            <Button
+              onClick={() => void submitUpdate("published")}
+              disabled={isSubmitting}
+              className="gap-2"
+            >
+              {isSubmitting && submittingAs === "published" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
+              Publish
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -215,24 +244,11 @@ export default function EditBlogPostPage() {
             {isUploadingBanner && <p className="text-sm text-muted-foreground">Uploading…</p>}
             {bannerImageId && <p className="text-sm text-green-600">New banner uploaded.</p>}
           </div>
-          <div className="grid gap-2">
-            <Label>Status</Label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="status" checked={status === "draft"} onChange={() => setStatus("draft")} />
-                Draft
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="status"
-                  checked={status === "published"}
-                  onChange={() => setStatus("published")}
-                />
-                Published
-              </label>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Save draft</span> keeps the post private.{" "}
+            <span className="font-medium text-foreground">Publish</span> makes it visible on /blog (drafts are hidden
+            there).
+          </p>
           <div className="grid gap-2">
             <Label htmlFor="metaTitle">Meta title (SEO, optional)</Label>
             <Input
@@ -270,13 +286,26 @@ export default function EditBlogPostPage() {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button variant="outline" asChild>
           <Link href="/dashboard/blog">Cancel</Link>
         </Button>
-        <Button onClick={handleSubmit} disabled={isSubmitting} className="gap-2">
-          {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Save
+        <Button
+          variant="secondary"
+          onClick={() => void submitUpdate("draft")}
+          disabled={isSubmitting}
+          className="gap-2"
+        >
+          {isSubmitting && submittingAs === "draft" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
+          Save draft
+        </Button>
+        <Button onClick={() => void submitUpdate("published")} disabled={isSubmitting} className="gap-2">
+          {isSubmitting && submittingAs === "published" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
+          Publish
         </Button>
       </div>
     </div>
