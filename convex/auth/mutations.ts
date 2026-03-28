@@ -322,6 +322,11 @@ export const signin = mutation({
       if (user.status === "deleted") {
         throw new Error("This account has been removed. If you believe this is an error, please contact support.");
       }
+      if (user.status === "suspended") {
+        throw new Error(
+          "Your account has been suspended. You cannot sign in until it is reinstated. Contact support if you need help."
+        );
+      }
       throw new Error("Account is not active");
     }
 

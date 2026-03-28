@@ -512,6 +512,15 @@ export const createOAuthSession = mutation({
       throw new Error("User not found");
     }
 
+    if (user.status !== "active") {
+      if (user.status === "suspended") {
+        throw new Error(
+          "Your account has been suspended. You cannot sign in until it is reinstated."
+        );
+      }
+      throw new Error("This account is not available for sign-in.");
+    }
+
     const now = Date.now();
     const sessionToken = `token_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     const refreshToken = `refresh_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;

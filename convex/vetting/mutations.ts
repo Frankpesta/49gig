@@ -46,6 +46,107 @@ async function getCurrentUserInMutation(
   return userDoc;
 }
 
+async function resolveStaffUser(
+  ctx: MutationCtx,
+  adminUserId?: string
+): Promise<Doc<"users"> | null> {
+  if (adminUserId) {
+    const u = await ctx.db.get(adminUserId as Doc<"users">["_id"]);
+    if (!u || u.status !== "active") return null;
+    if (u.role !== "admin" && u.role !== "moderator") return null;
+    return u;
+  }
+  const u = await getCurrentUser(ctx);
+  if (!u || u.status !== "active") return null;
+  if (u.role !== "admin" && u.role !== "moderator") return null;
+  return u;
+}
+
+type FraudFlag = NonNullable<Doc<"vettingResults">["fraudFlags"]>[number];
+
+/**
+ * Freelancer confirms webcam is on for a test segment (no recording; server-side timestamp only).
+ */
+export const confirmProctoringCamera = mutation({
+  args: {
+    userId: v.optional(v.id("users")),
+    segment: v.union(v.literal("english"), v.literal("skills")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    if (user.role !== "freelancer") throw new Error("Only freelancers can confirm proctoring");
+
+    const vettingResult = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .first();
+    if (!vettingResult) throw new Error("Verification not initialized");
+
+    const prev = vettingResult.proctoringSummary ?? {};
+    const now = Date.now();
+    const proctoringSummary = {
+      ...prev,
+      ...(args.segment === "english"
+        ? { englishProctoringReadyAt: now }
+        : { skillsProctoringReadyAt: now }),
+      lastMetricsAt: now,
+    };
+    await ctx.db.patch(vettingResult._id, {
+      proctoringSummary,
+      updatedAt: now,
+    });
+    return { success: true };
+  },
+});
+
+/**
+ * Batch lightweight proctoring signals (tab hidden, blur, paste, camera dropped). No video upload.
+ */
+export const submitProctoringMetrics = mutation({
+  args: {
+    userId: v.optional(v.id("users")),
+    delta: v.object({
+      visibilityHiddenMs: v.optional(v.number()),
+      windowBlurEvents: v.optional(v.number()),
+      pasteAttempts: v.optional(v.number()),
+      cameraOffSegments: v.optional(v.number()),
+      fullscreenExitEvents: v.optional(v.number()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    if (user.role !== "freelancer") throw new Error("Only freelancers can submit proctoring metrics");
+
+    const vettingResult = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .first();
+    if (!vettingResult) return { success: false };
+
+    const prev = vettingResult.proctoringSummary ?? {};
+    const now = Date.now();
+    const d = args.delta;
+    const proctoringSummary = {
+      ...prev,
+      visibilityHiddenMsTotal:
+        (prev.visibilityHiddenMsTotal ?? 0) + (d.visibilityHiddenMs ?? 0),
+      windowBlurEvents: (prev.windowBlurEvents ?? 0) + (d.windowBlurEvents ?? 0),
+      pasteAttempts: (prev.pasteAttempts ?? 0) + (d.pasteAttempts ?? 0),
+      cameraOffSegments: (prev.cameraOffSegments ?? 0) + (d.cameraOffSegments ?? 0),
+      fullscreenExitEvents:
+        (prev.fullscreenExitEvents ?? 0) + (d.fullscreenExitEvents ?? 0),
+      lastMetricsAt: now,
+    };
+    await ctx.db.patch(vettingResult._id, {
+      proctoringSummary,
+      updatedAt: now,
+    });
+    return { success: true };
+  },
+});
+
 /**
  * Initialize verification process for a freelancer
  * Supports both Convex Auth and session token authentication
@@ -154,6 +255,12 @@ export const submitEnglishProficiency = mutation({
 
     if (!vettingResult) {
       throw new Error("Verification not initialized");
+    }
+
+    if (!vettingResult.proctoringSummary?.englishProctoringReadyAt) {
+      throw new Error(
+        "Enable your webcam for proctoring before submitting the English assessment."
+      );
     }
 
     // Validate scores
@@ -539,53 +646,91 @@ export const completeVerification = mutation({
       };
     }
 
+    const proc = vettingResult.proctoringSummary;
+    if (!proc?.englishProctoringReadyAt || !proc?.skillsProctoringReadyAt) {
+      throw new Error(
+        "Enable your webcam for both the English and skill assessments before submitting. Open each section, allow camera access, then submit again."
+      );
+    }
+
     // Recalculate overall score (English 30%, Skills 70%)
     const overallScore = calculateOverallScore({
       englishScore,
       skillScores: vettingResult.skillAssessments.map((a) => a.score),
     });
 
-    // Determine status based on score and fraud flags
-    let status: "approved" | "flagged" | "rejected" = "approved";
-
-    if (vettingResult.fraudFlags && vettingResult.fraudFlags.length > 0) {
-      const criticalFlags = vettingResult.fraudFlags.filter(
-        (f) => f.severity === "critical" || f.severity === "high"
-      );
-      if (criticalFlags.length > 0) {
-        status = "rejected";
-      } else {
-        status = "flagged";
-      }
-    } else if (overallScore < 70) {
-      status = "flagged";
+    const now = Date.now();
+    const proctoringFlags: FraudFlag[] = [];
+    const hiddenMs = proc.visibilityHiddenMsTotal ?? 0;
+    if (hiddenMs > 5 * 60 * 1000) {
+      proctoringFlags.push({
+        flagType: "proctoring_hidden_long",
+        severity: "medium",
+        description: `Test window was hidden or in background for ${Math.round(hiddenMs / 60000)}+ minutes total (browser-reported).`,
+        detectedAt: now,
+        resolved: false,
+      });
+    }
+    if ((proc.pasteAttempts ?? 0) > 8) {
+      proctoringFlags.push({
+        flagType: "proctoring_excessive_paste",
+        severity: "medium",
+        description: `Elevated paste activity during tests (${proc.pasteAttempts} events).`,
+        detectedAt: now,
+        resolved: false,
+      });
+    }
+    if ((proc.cameraOffSegments ?? 0) >= 3) {
+      proctoringFlags.push({
+        flagType: "proctoring_camera_interruptions",
+        severity: "high",
+        description: `Webcam stream was interrupted ${proc.cameraOffSegments} times during assessments.`,
+        detectedAt: now,
+        resolved: false,
+      });
     }
 
-    // Update vetting result
-    await ctx.db.patch(vettingResult._id, {
-      overallScore,
-      status,
-      currentStep: "complete",
-      updatedAt: Date.now(),
-    });
+    const existingFlags = [...(vettingResult.fraudFlags ?? [])];
+    const allFlags = [...existingFlags, ...proctoringFlags];
 
-    // Auto-approve when they pass; only pending_review for flagged cases
-    let userVerificationStatus: "not_started" | "in_progress" | "pending_review" | "approved" | "rejected" | "suspended" | undefined;
+    const criticalOrHigh = allFlags.filter(
+      (f) => f.severity === "critical" || f.severity === "high"
+    );
+    const hasMediumOrLow = allFlags.some(
+      (f) => f.severity === "medium" || f.severity === "low"
+    );
 
-    if (status === "approved") {
-      userVerificationStatus = "approved"; // Automatic — no admin review needed
-    } else if (status === "rejected") {
+    let vettingStatus: "pending_admin" | "flagged" | "rejected";
+    let userVerificationStatus:
+      | "not_started"
+      | "in_progress"
+      | "pending_review"
+      | "approved"
+      | "rejected"
+      | "suspended";
+
+    if (criticalOrHigh.length > 0) {
+      vettingStatus = "rejected";
       userVerificationStatus = "rejected";
-    } else if (status === "flagged") {
+    } else if (overallScore < 70 || hasMediumOrLow) {
+      vettingStatus = "flagged";
       userVerificationStatus = "pending_review";
     } else {
-      userVerificationStatus = "in_progress";
+      vettingStatus = "pending_admin";
+      userVerificationStatus = "pending_review";
     }
+
+    await ctx.db.patch(vettingResult._id, {
+      overallScore,
+      fraudFlags: allFlags.length > 0 ? allFlags : undefined,
+      status: vettingStatus,
+      currentStep: "complete",
+      updatedAt: now,
+    });
 
     await ctx.db.patch(user._id, {
       verificationStatus: userVerificationStatus,
-      ...(userVerificationStatus === "approved" && { verificationCompletedAt: Date.now() }),
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     await ctx.db.insert("auditLogs", {
@@ -597,10 +742,10 @@ export const completeVerification = mutation({
       targetId: vettingResult._id,
       details: {
         overallScore,
-        status,
+        vettingStatus,
         stepsCompleted: vettingResult.stepsCompleted,
       },
-      createdAt: Date.now(),
+      createdAt: now,
     });
 
     const sendSystemNotification =
@@ -610,13 +755,14 @@ export const completeVerification = mutation({
       >;
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [user._id],
-      title: status === "approved" ? "Verification approved" : "Verification submitted",
+      title:
+        vettingStatus === "rejected"
+          ? "Verification not approved"
+          : "Verification submitted",
       message:
-        status === "approved"
-          ? "Your verification has been approved. Welcome aboard!"
-          : status === "flagged"
-          ? "Verification completed and pending review."
-          : "Verification was rejected due to fraud flags.",
+        vettingStatus === "rejected"
+          ? "Your verification could not be approved automatically. Check your dashboard for details."
+          : "Your tests are complete. Our team will review and finalize your verification shortly.",
       type: "verification",
       data: { vettingResultId: vettingResult._id },
     });
@@ -624,14 +770,14 @@ export const completeVerification = mutation({
     return {
       success: true,
       accountDeleted: false,
-      status,
+      status: vettingStatus,
       overallScore,
       message:
-        status === "approved"
-          ? "Verification approved. You can now access the full platform."
-          : status === "flagged"
-          ? "Verification completed but flagged for review."
-          : "Verification rejected due to fraud flags.",
+        vettingStatus === "rejected"
+          ? "Verification was rejected due to integrity checks. Contact support if you need help."
+          : vettingStatus === "flagged"
+            ? "Submitted for review — our team will assess your results and any flags."
+            : "Submitted — final approval is pending a quick review by our team.",
     };
   },
 });
@@ -643,19 +789,11 @@ export const approveVerification = mutation({
   args: {
     freelancerId: v.id("users"),
     reviewNotes: v.optional(v.string()),
+    adminUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity || !identity.email) {
-      throw new Error("Not authenticated");
-    }
-
-    const admin = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!admin || (admin.role !== "admin" && admin.role !== "moderator")) {
+    const admin = await resolveStaffUser(ctx, args.adminUserId);
+    if (!admin) {
       throw new Error("Unauthorized");
     }
 
@@ -671,6 +809,10 @@ export const approveVerification = mutation({
 
     if (!vettingResult) {
       throw new Error("Verification not found");
+    }
+
+    if (vettingResult.status !== "pending_admin" && vettingResult.status !== "flagged") {
+      throw new Error("This freelancer is not awaiting admin approval");
     }
 
     // Update vetting result
@@ -728,19 +870,11 @@ export const rejectVerification = mutation({
   args: {
     freelancerId: v.id("users"),
     reviewNotes: v.string(),
+    adminUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity || !identity.email) {
-      throw new Error("Not authenticated");
-    }
-
-    const admin = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .first();
-
-    if (!admin || (admin.role !== "admin" && admin.role !== "moderator")) {
+    const admin = await resolveStaffUser(ctx, args.adminUserId);
+    if (!admin) {
       throw new Error("Unauthorized");
     }
 

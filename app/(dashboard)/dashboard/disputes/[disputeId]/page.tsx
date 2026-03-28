@@ -371,6 +371,12 @@ export default function DisputeDetailPage() {
                   <p className="mt-1 capitalize">
                     {dispute.resolution.decision.replace("_", " ")}
                   </p>
+                  {dispute.resolution.decision === "replacement" && (
+                    <p className="mt-2 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2 text-sm leading-relaxed text-muted-foreground">
+                      The hire returned to matching so the client can choose a replacement. Escrow was not
+                      refunded; prior freelancers were removed from the hire.
+                    </p>
+                  )}
                 </div>
                 {dispute.resolution.resolutionAmount && (
                   <div>
@@ -495,7 +501,7 @@ export default function DisputeDetailPage() {
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Amount Locked</span>
                   <span className="font-medium">
-                    ${(dispute.lockedAmount / 100).toFixed(2)}
+                    ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                   </span>
                 </div>
               </div>

@@ -2,6 +2,7 @@ import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
+import { clearReplacementFlowFieldsOnProject } from "../projects/replacement";
 
 const api = require("../_generated/api") as {
   api: {
@@ -160,12 +161,13 @@ export const acceptMatch = mutation({
       updatedAt: now,
     });
 
-    // Update project to matched status
-    await ctx.db.patch(match.projectId, {
+    const acceptProjectPatch: Record<string, unknown> = {
       matchedFreelancerId: match.freelancerId,
       status: "matched",
       updatedAt: now,
-    });
+    };
+    clearReplacementFlowFieldsOnProject(acceptProjectPatch);
+    await ctx.db.patch(match.projectId, acceptProjectPatch as any);
 
     // Reject all other pending matches for this project
     const otherMatches = await ctx.db

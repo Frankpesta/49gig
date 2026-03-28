@@ -1195,7 +1195,17 @@ export function MonthlyCyclePendingReminderEmail({
   appUrl,
   logoUrl,
   date,
-}: BaseEmailProps & { projectName: string; monthLabel: string }) {
+  reviewHref,
+}: BaseEmailProps & {
+  projectName: string;
+  monthLabel: string;
+  /** Deep link to the hire + monthly billing section for this cycle */
+  reviewHref?: string;
+}) {
+  const href =
+    reviewHref && reviewHref.length > 0
+      ? reviewHref
+      : `${appUrl}/dashboard/monthly-approvals`;
   return (
     <EmailLayout
       preview={`${monthLabel} payment for "${projectName}" is awaiting your approval.`}
@@ -1207,12 +1217,12 @@ export function MonthlyCyclePendingReminderEmail({
       date={date}
     >
       <Text style={textStyle}>
-        Hi <strong>{name}</strong>, the <strong>{monthLabel}</strong> payment for <strong>{projectName}</strong> is awaiting your approval.
+        Hi <strong>{name}</strong>, the <strong>{monthLabel}</strong> billing period for <strong>{projectName}</strong> has ended and this month is ready for your approval.
       </Text>
       <Text style={{ ...textStyle, marginBottom: "24px" }}>
-        Please review the freelancer's submitted work and approve the payment to release their funds for this period.
+        Open the hire below to review monthly billing and approve this month. (Other future months will become available when each period ends.)
       </Text>
-      <EmailButton href={`${appUrl}/dashboard/monthly-approvals`}>Review & Approve</EmailButton>
+      <EmailButton href={href}>Review &amp; approve on hire</EmailButton>
     </EmailLayout>
   );
 }

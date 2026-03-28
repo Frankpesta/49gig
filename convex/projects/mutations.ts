@@ -5,6 +5,7 @@ import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { resolveTargetTeamSize } from "../../lib/budget-calculator";
 import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
+import { clearReplacementFlowFieldsOnProject } from "./replacement";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -499,6 +500,11 @@ export const updateProjectStatus = mutation({
       await ctx.runMutation(internalAny.referrals.internalMutations.onProjectEnteredInProgress, {
         projectId: args.projectId,
       });
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
+        { projectId: args.projectId },
+      );
     }
     if (args.status === "cancelled") {
       await ctx.runMutation(internalAny.referrals.internalMutations.voidReferralAccrualsForProject, {
@@ -618,7 +624,13 @@ export const setSelectedFreelancer = mutation({
     if (project.intakeForm.hireType !== "single") {
       throw new Error("Use setSelectedFreelancers for team projects");
     }
-    if (project.status !== "draft" && project.status !== "pending_funding") {
+    const isFreelancerReplacementSelection =
+      project.status === "matching" && project.replacementMatchingAt != null;
+    if (
+      project.status !== "draft" &&
+      project.status !== "pending_funding" &&
+      !isFreelancerReplacementSelection
+    ) {
       throw new Error("Can only set selection before funding");
     }
 
@@ -628,6 +640,11 @@ export const setSelectedFreelancer = mutation({
       selectedFreelancerIds: undefined,
       updatedAt: now,
     });
+    if (isFreelancerReplacementSelection) {
+      await ctx.scheduler.runAfter(0, internalAny.projects.mutations.acceptSelectedMatchInternal, {
+        projectId: args.projectId,
+      });
+    }
     return args.projectId;
   },
 });
@@ -1145,7 +1162,7 @@ export const acceptSelectedMatchInternal = internalMutation({
         acceptedMatchIds.push(match._id);
       }
       // Always set matched and status to "matched" when client pre-selected - freelancer must be able to sign contract
-      await ctx.db.patch(args.projectId, {
+      const singleMatchedPatch: Record<string, unknown> = {
         matchedFreelancerId: selectedId,
         status: "matched",
         matchedAt: now,
@@ -1153,7 +1170,9 @@ export const acceptSelectedMatchInternal = internalMutation({
         awaitingMatch: undefined,
         awaitingMatchSince: undefined,
         rolesAwaitingMatch: undefined,
-      });
+      };
+      clearReplacementFlowFieldsOnProject(singleMatchedPatch);
+      await ctx.db.patch(args.projectId, singleMatchedPatch as any);
       const otherPending = allMatches.filter(
         (m) => m.status === "pending" && m.freelancerId !== selectedId
       );
@@ -1179,7 +1198,7 @@ export const acceptSelectedMatchInternal = internalMutation({
       }
 
       if (!isTeam) {
-        await ctx.db.patch(args.projectId, {
+        const multiMatchedPatch: Record<string, unknown> = {
           matchedFreelancerIds: selectedIds,
           status: "matched",
           matchedAt: now,
@@ -1187,7 +1206,9 @@ export const acceptSelectedMatchInternal = internalMutation({
           awaitingMatch: undefined,
           awaitingMatchSince: undefined,
           rolesAwaitingMatch: undefined,
-        });
+        };
+        clearReplacementFlowFieldsOnProject(multiMatchedPatch);
+        await ctx.db.patch(args.projectId, multiMatchedPatch as any);
         const otherPending = allMatches.filter(
           (m) => m.status === "pending" && !selectedIds.includes(m.freelancerId)
         );
@@ -1248,6 +1269,7 @@ export const acceptSelectedMatchInternal = internalMutation({
           patch.awaitingMatchSince = undefined;
           patch.rolesAwaitingMatch = undefined;
           shouldKickOffMatchedFlow = true;
+          clearReplacementFlowFieldsOnProject(patch);
         }
 
         await ctx.db.patch(args.projectId, patch as any);
@@ -1255,14 +1277,6 @@ export const acceptSelectedMatchInternal = internalMutation({
     }
 
     if (shouldKickOffMatchedFlow) {
-      await ctx.scheduler.runAfter(
-        0,
-        internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
-        {
-          projectId: args.projectId,
-        }
-      );
-
       await ctx.scheduler.runAfter(
         500,
         internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
@@ -1377,7 +1391,7 @@ export const confirmRemainingTeamSelections = mutation({
     const remaining = targetHeadcount - merged.length;
 
     if (remaining <= 0) {
-      await ctx.db.patch(args.projectId, {
+      const teamCompletePatch: Record<string, unknown> = {
         matchedFreelancerIds: merged,
         status: "matched",
         pendingTeamMemberSlots: undefined,
@@ -1385,13 +1399,10 @@ export const confirmRemainingTeamSelections = mutation({
         awaitingMatchSince: undefined,
         rolesAwaitingMatch: undefined,
         updatedAt: now,
-      });
+      };
+      clearReplacementFlowFieldsOnProject(teamCompletePatch);
+      await ctx.db.patch(args.projectId, teamCompletePatch as any);
 
-      await ctx.scheduler.runAfter(
-        0,
-        internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
-        { projectId: args.projectId }
-      );
       await ctx.scheduler.runAfter(
         500,
         internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
@@ -1543,6 +1554,11 @@ export const updateProjectStatusInternal = internalMutation({
       await ctx.runMutation(internalAny.referrals.internalMutations.onProjectEnteredInProgress, {
         projectId: args.projectId,
       });
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.monthlyBillingCycles.mutations.autoCreateMonthlyCyclesInternal,
+        { projectId: args.projectId },
+      );
     }
     if (args.status === "cancelled") {
       await ctx.runMutation(internalAny.referrals.internalMutations.voidReferralAccrualsForProject, {

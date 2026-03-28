@@ -49,7 +49,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Users, Shield, ShieldCheck, CheckCircle2, Search, AlertCircle, ExternalLink } from "lucide-react";
+import {
+  Loader2,
+  Users,
+  Shield,
+  ShieldCheck,
+  CheckCircle2,
+  Search,
+  AlertCircle,
+  ExternalLink,
+  Ban,
+  UserCheck,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -76,6 +87,11 @@ export default function UsersPage() {
   const [verificationOverrideApproveKyc, setVerificationOverrideApproveKyc] = useState(true);
   const [verificationOverrideLoading, setVerificationOverrideLoading] = useState(false);
   const [profileUserId, setProfileUserId] = useState<Id<"users"> | null>(null);
+  const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
+  const [suspendReason, setSuspendReason] = useState("");
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReviewNotes, setRejectReviewNotes] = useState("");
+  const [vettingActionLoading, setVettingActionLoading] = useState(false);
 
   const users = useQuery(
     api.users.queries.getAllUsersAdmin,
@@ -99,6 +115,15 @@ export default function UsersPage() {
   const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
   const adminOverrideVerification = useMutation(
     api.vetting.mutations.adminOverrideFreelancerVerificationAndTests
+  );
+  const approveVerification = useMutation(api.vetting.mutations.approveVerification);
+  const rejectVerification = useMutation(api.vetting.mutations.rejectVerification);
+
+  const vettingForSelected = useQuery(
+    api.vetting.queries.getVerificationResults,
+    selectedUser?.role === "freelancer" && user?._id && (user.role === "admin" || user.role === "moderator")
+      ? { freelancerId: selectedUser._id, adminUserId: user._id }
+      : "skip"
   );
 
   useEffect(() => {
@@ -165,6 +190,103 @@ export default function UsersPage() {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleConfirmSuspend = async () => {
+    if (!user?._id || !selectedUser) return;
+    setIsUpdating(true);
+    try {
+      await updateUserStatus({
+        userId: selectedUser._id,
+        newStatus: "suspended",
+        adminUserId: user._id,
+        suspensionReason: suspendReason.trim() || undefined,
+      });
+      toast.success("Account suspended. All sessions were revoked.");
+      setSuspendDialogOpen(false);
+      setSuspendReason("");
+      setSelectedUser(null);
+    } catch (error) {
+      setErrorDialog({
+        open: true,
+        title: "Suspend failed",
+        message: getUserFriendlyError(error) || "Could not suspend this account.",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleReinstate = async () => {
+    if (!user?._id || !selectedUser) return;
+    setIsUpdating(true);
+    try {
+      await updateUserStatus({
+        userId: selectedUser._id,
+        newStatus: "active",
+        adminUserId: user._id,
+      });
+      toast.success("Account reinstated.");
+      setSelectedUser(null);
+    } catch (error) {
+      setErrorDialog({
+        open: true,
+        title: "Reinstate failed",
+        message: getUserFriendlyError(error) || "Could not reinstate this account.",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleApproveFreelancerVetting = async () => {
+    if (!user?._id || !selectedUser) return;
+    setVettingActionLoading(true);
+    try {
+      await approveVerification({
+        freelancerId: selectedUser._id,
+        adminUserId: user._id,
+      });
+      toast.success("Freelancer verification approved.");
+      setSelectedUser(null);
+    } catch (error) {
+      setErrorDialog({
+        open: true,
+        title: "Approval failed",
+        message: getUserFriendlyError(error) || "Could not approve verification.",
+      });
+    } finally {
+      setVettingActionLoading(false);
+    }
+  };
+
+  const handleRejectFreelancerVetting = async () => {
+    if (!user?._id || !selectedUser) return;
+    const notes = rejectReviewNotes.trim();
+    if (!notes) {
+      toast.error("Add review notes explaining the rejection.");
+      return;
+    }
+    setVettingActionLoading(true);
+    try {
+      await rejectVerification({
+        freelancerId: selectedUser._id,
+        reviewNotes: notes,
+        adminUserId: user._id,
+      });
+      toast.success("Verification rejected.");
+      setRejectDialogOpen(false);
+      setRejectReviewNotes("");
+      setSelectedUser(null);
+    } catch (error) {
+      setErrorDialog({
+        open: true,
+        title: "Rejection failed",
+        message: getUserFriendlyError(error) || "Could not reject verification.",
+      });
+    } finally {
+      setVettingActionLoading(false);
     }
   };
 
@@ -333,6 +455,8 @@ export default function UsersPage() {
                                 ? "default"
                                 : u.verificationStatus === "rejected"
                                 ? "destructive"
+                                : u.verificationStatus === "pending_review"
+                                ? "outline"
                                 : "secondary"
                             }
                           >
@@ -436,6 +560,179 @@ export default function UsersPage() {
                                     </p>
                                   )}
                                 </div>
+
+                                {selectedUser._id !== user._id &&
+                                  selectedUser.status === "active" &&
+                                  (user.role === "admin" ||
+                                    (user.role === "moderator" &&
+                                      selectedUser.role !== "admin" &&
+                                      selectedUser.role !== "moderator")) && (
+                                    <div className="rounded-lg border border-destructive/25 bg-destructive/5 p-3 space-y-2">
+                                      <p className="text-xs text-muted-foreground leading-relaxed">
+                                        Suspending immediately revokes all active sessions. Add an optional internal
+                                        note (visible to staff only).
+                                      </p>
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        className="gap-2 w-full sm:w-auto"
+                                        onClick={() => {
+                                          setSuspendReason("");
+                                          setSuspendDialogOpen(true);
+                                        }}
+                                        disabled={isUpdating}
+                                      >
+                                        <Ban className="h-4 w-4" />
+                                        Suspend account…
+                                      </Button>
+                                    </div>
+                                  )}
+
+                                {selectedUser._id !== user._id && selectedUser.status === "suspended" && (
+                                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
+                                    {selectedUser.suspensionReason ? (
+                                      <p className="text-xs text-muted-foreground leading-relaxed">
+                                        <span className="font-medium text-foreground">Internal note: </span>
+                                        {selectedUser.suspensionReason}
+                                      </p>
+                                    ) : null}
+                                    <Button
+                                      type="button"
+                                      variant="default"
+                                      size="sm"
+                                      className="gap-2 w-full sm:w-auto"
+                                      onClick={() => void handleReinstate()}
+                                      disabled={isUpdating}
+                                    >
+                                      <UserCheck className="h-4 w-4" />
+                                      Reinstate account
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {selectedUser.role === "freelancer" && (
+                                  <>
+                                    <Separator />
+                                    <div className="space-y-3 rounded-lg border border-border/80 bg-muted/15 p-3">
+                                      <div className="flex items-center gap-2 text-sm font-semibold">
+                                        <Shield className="h-4 w-4" />
+                                        Verification &amp; test scores
+                                      </div>
+                                      {vettingForSelected === undefined && (
+                                        <p className="text-xs text-muted-foreground flex items-center gap-2">
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                          Loading…
+                                        </p>
+                                      )}
+                                      {vettingForSelected && !vettingForSelected.vettingResult && (
+                                        <p className="text-xs text-muted-foreground">No vetting record yet.</p>
+                                      )}
+                                      {vettingForSelected?.vettingResult && (() => {
+                                        const vr = vettingForSelected.vettingResult;
+                                        const en = vr.englishProficiency;
+                                        const proc = vr.proctoringSummary;
+                                        const canFinalApprove =
+                                          (vr.status === "pending_admin" || vr.status === "flagged") &&
+                                          selectedUser.verificationStatus === "pending_review";
+                                        return (
+                                          <div className="space-y-3 text-sm">
+                                            <div className="flex flex-wrap gap-2">
+                                              <Badge variant="outline">Vetting: {vr.status}</Badge>
+                                              <Badge variant="secondary">
+                                                User: {selectedUser.verificationStatus ?? "—"}
+                                              </Badge>
+                                              {vr.overallScore > 0 && (
+                                                <Badge variant="outline">Overall {vr.overallScore}%</Badge>
+                                              )}
+                                            </div>
+                                            <div className="grid gap-2 sm:grid-cols-2 text-xs">
+                                              <div className="rounded-md bg-background/60 border border-border/50 p-2">
+                                                <p className="font-medium text-foreground mb-1">English</p>
+                                                <p className="text-muted-foreground">
+                                                  Grammar: {en.grammarScore ?? "—"}% · Comprehension:{" "}
+                                                  {en.comprehensionScore ?? "—"}%
+                                                </p>
+                                                <p className="text-muted-foreground">
+                                                  Written: {en.writtenResponseScore ?? "—"}% · Overall:{" "}
+                                                  {en.overallScore ?? "—"}%
+                                                </p>
+                                              </div>
+                                              <div className="rounded-md bg-background/60 border border-border/50 p-2">
+                                                <p className="font-medium text-foreground mb-1">Skills</p>
+                                                {vr.skillAssessments.length === 0 ? (
+                                                  <p className="text-muted-foreground">No assessments</p>
+                                                ) : (
+                                                  <ul className="text-muted-foreground space-y-0.5">
+                                                    {vr.skillAssessments.map((a) => (
+                                                      <li key={a.skillId}>
+                                                        {a.skillName}: {a.score}%
+                                                      </li>
+                                                    ))}
+                                                  </ul>
+                                                )}
+                                              </div>
+                                            </div>
+                                            {proc && (
+                                              <div className="rounded-md border border-border/50 bg-background/40 p-2 text-xs text-muted-foreground space-y-1">
+                                                <p className="font-medium text-foreground">Proctoring (signals only)</p>
+                                                <p>
+                                                  Hidden/tab time (reported):{" "}
+                                                  {Math.round((proc.visibilityHiddenMsTotal ?? 0) / 1000)}s · Blur
+                                                  events: {proc.windowBlurEvents ?? 0} · Paste: {proc.pasteAttempts ?? 0}{" "}
+                                                  · Camera drops: {proc.cameraOffSegments ?? 0}
+                                                </p>
+                                              </div>
+                                            )}
+                                            {vr.fraudFlags && vr.fraudFlags.length > 0 && (
+                                              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs space-y-1">
+                                                <p className="font-medium text-amber-900 dark:text-amber-100">Flags</p>
+                                                <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                                                  {vr.fraudFlags.map((f, i) => (
+                                                    <li key={i}>
+                                                      [{f.severity}] {f.description}
+                                                    </li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            )}
+                                            {canFinalApprove && (
+                                              <div className="flex flex-wrap gap-2 pt-1">
+                                                <Button
+                                                  type="button"
+                                                  size="sm"
+                                                  className="gap-1.5"
+                                                  disabled={vettingActionLoading || isUpdating}
+                                                  onClick={() => void handleApproveFreelancerVetting()}
+                                                >
+                                                  {vettingActionLoading ? (
+                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                  ) : (
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                  )}
+                                                  Final approve
+                                                </Button>
+                                                <Button
+                                                  type="button"
+                                                  size="sm"
+                                                  variant="outline"
+                                                  className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                                                  disabled={vettingActionLoading || isUpdating}
+                                                  onClick={() => {
+                                                    setRejectReviewNotes("");
+                                                    setRejectDialogOpen(true);
+                                                  }}
+                                                >
+                                                  Reject verification…
+                                                </Button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                    </div>
+                                  </>
+                                )}
 
                                 {user.role === "admin" && selectedUser.role === "freelancer" && (
                                   <>
@@ -658,6 +955,89 @@ export default function UsersPage() {
               ) : (
                 "Confirm override"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={suspendDialogOpen}
+        onOpenChange={(open) => {
+          setSuspendDialogOpen(open);
+          if (!open) setSuspendReason("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Suspend this account?</DialogTitle>
+            <DialogDescription>
+              {selectedUser?.name ?? "This user"} will be signed out everywhere immediately and cannot sign in until
+              reinstated.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="suspend-reason">Internal note (optional)</Label>
+            <Textarea
+              id="suspend-reason"
+              placeholder="Reason for suspension (staff only)"
+              value={suspendReason}
+              onChange={(e) => setSuspendReason(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setSuspendDialogOpen(false)} disabled={isUpdating}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={() => void handleConfirmSuspend()} disabled={isUpdating}>
+              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Suspend account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={rejectDialogOpen}
+        onOpenChange={(open) => {
+          setRejectDialogOpen(open);
+          if (!open) setRejectReviewNotes("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject freelancer verification?</DialogTitle>
+            <DialogDescription>
+              The freelancer will be notified. Provide clear notes they can act on.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="reject-notes">Review notes (required)</Label>
+            <Textarea
+              id="reject-notes"
+              placeholder="Explain what failed or what they should fix"
+              value={rejectReviewNotes}
+              onChange={(e) => setRejectReviewNotes(e.target.value)}
+              rows={4}
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRejectDialogOpen(false)}
+              disabled={vettingActionLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleRejectFreelancerVetting()}
+              disabled={vettingActionLoading}
+            >
+              {vettingActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reject verification"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -446,6 +446,8 @@ export const updateUserStatus = mutation({
       v.literal("deleted")
     ),
     adminUserId: v.optional(v.id("users")),
+    /** Shown only in admin tools; stored when suspending */
+    suspensionReason: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const admin = await getCurrentUserInMutation(ctx, args.adminUserId);
@@ -473,11 +475,62 @@ export const updateUserStatus = mutation({
       throw new Error("Cannot change your own status");
     }
 
+    // Moderators cannot suspend or delete admins or other moderators
+    if (
+      admin.role === "moderator" &&
+      (targetUser.role === "admin" || targetUser.role === "moderator") &&
+      (args.newStatus === "suspended" || args.newStatus === "deleted")
+    ) {
+      throw new Error("Only an admin can suspend or remove staff accounts");
+    }
+
     const now = Date.now();
-    await ctx.db.patch(args.userId, {
-      status: args.newStatus,
-      updatedAt: now,
-    });
+
+    if (args.newStatus === "active") {
+      const { suspendedAt: _sa, suspendedBy: _sb, suspensionReason: _sr, ...rest } =
+        targetUser as Doc<"users"> & {
+          suspendedAt?: number;
+          suspendedBy?: Doc<"users">["_id"];
+          suspensionReason?: string;
+        };
+      await ctx.db.replace(args.userId, {
+        ...rest,
+        status: "active",
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.patch(args.userId, {
+        status: args.newStatus,
+        updatedAt: now,
+        ...(args.newStatus === "suspended"
+          ? {
+              suspendedAt: now,
+              suspendedBy: admin._id,
+              suspensionReason:
+                args.suspensionReason?.trim() || targetUser.suspensionReason,
+            }
+          : {}),
+      });
+    }
+
+    // Immediately revoke all sessions so suspended users lose access without waiting for token expiry
+    if (args.newStatus === "suspended" || args.newStatus === "deleted") {
+      const sessions = await ctx.db
+        .query("sessions")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+      for (const session of sessions) {
+        if (session.isActive) {
+          await ctx.db.patch(session._id, {
+            isActive: false,
+            revokedAt: now,
+            revokedReason:
+              args.newStatus === "deleted" ? "account_deleted" : "account_suspended",
+            updatedAt: now,
+          });
+        }
+      }
+    }
 
     // Log audit
     await ctx.db.insert("auditLogs", {
@@ -490,6 +543,8 @@ export const updateUserStatus = mutation({
       details: {
         oldStatus: targetUser.status,
         newStatus: args.newStatus,
+        suspensionReason:
+          args.newStatus === "suspended" ? args.suspensionReason?.trim() : undefined,
       },
       createdAt: now,
     });
@@ -502,7 +557,12 @@ export const updateUserStatus = mutation({
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [args.userId],
       title: "Account status updated",
-      message: `Your account status is now ${args.newStatus}.`,
+      message:
+        args.newStatus === "suspended"
+          ? "Your account has been suspended. Contact support if you need help."
+          : args.newStatus === "deleted"
+            ? "Your account has been removed."
+            : "Your account is active again.",
       type: "account",
       data: { userId: args.userId, status: args.newStatus },
     });

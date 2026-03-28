@@ -25,6 +25,7 @@ import {
 } from "@/lib/browser-fingerprint";
 import { handleApiCall, getUserFriendlyError } from "@/lib/error-handling";
 import { ErrorHandler } from "./error-handler";
+import { TestProctoringGate } from "./test-proctoring";
 
 interface EnglishTestProps {
   onComplete?: () => void;
@@ -32,7 +33,7 @@ interface EnglishTestProps {
 
 type TestPhase = "grammar" | "comprehension" | "written" | "completed";
 
-export function EnglishTest({ onComplete }: EnglishTestProps) {
+function EnglishTestInner({ onComplete }: EnglishTestProps) {
   const { user } = useAuth();
   const [phase, setPhase] = useState<TestPhase>("grammar");
   const [sessionId, setSessionId] = useState<string>("");
@@ -606,4 +607,20 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
   }
 
   return null;
+}
+
+export function EnglishTest({ onComplete }: EnglishTestProps) {
+  const { user } = useAuth();
+  if (!user?._id) return null;
+  return (
+    <TestProctoringGate
+      userId={user._id}
+      segment="english"
+      title="English assessment — webcam"
+      description="Allow camera access to start. Video is not recorded or uploaded; we only log lightweight integrity signals while you test."
+      onReady={() => {}}
+    >
+      <EnglishTestInner onComplete={onComplete} />
+    </TestProctoringGate>
+  );
 }
