@@ -303,10 +303,11 @@ export default function UserDetailPage() {
             <CardContent className="space-y-0 divide-y divide-border/40">
               <InfoRow label="User ID" value={profileData._id} icon={Shield} />
               <InfoRow label="Phone" value={profileData.profile?.phoneNumber} icon={Phone} />
+              <InfoRow label="Address" value={(profileData.profile as any)?.address} icon={MapPin} />
               <InfoRow
                 label="Country"
                 value={profileData.profile?.country}
-                icon={MapPin}
+                icon={Globe}
               />
               <InfoRow
                 label="Date Joined"
@@ -426,6 +427,8 @@ export default function UserDetailPage() {
                   <InfoRow label="Primary Role" value={profileData.profile?.primaryRole} icon={Briefcase} />
                   <InfoRow label="Experience Level" value={profileData.profile?.experienceLevel} icon={Award} />
                   <InfoRow label="Tech Field" value={profileData.profile?.techField?.replace(/_/g, " ")} icon={Activity} />
+                  <InfoRow label="Phone Number" value={profileData.profile?.phoneNumber} icon={Phone} />
+                  <InfoRow label="Address" value={(profileData.profile as any)?.address} icon={MapPin} />
                   <InfoRow label="Hourly Rate" value={profileData.profile?.hourlyRate ? `$${profileData.profile.hourlyRate}/hr` : null} icon={CreditCard} />
                   <InfoRow label="Timezone" value={profileData.profile?.timezone} icon={Globe} />
                   <InfoRow label="Availability" value={profileData.profile?.availability} icon={Clock} />

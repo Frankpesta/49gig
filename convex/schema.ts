@@ -37,6 +37,7 @@ export default defineSchema({
         industry: v.optional(v.string()),
         workEmail: v.optional(v.string()),
         phoneNumber: v.optional(v.string()),
+        address: v.optional(v.string()),
         companyWebsite: v.optional(v.string()),
         country: v.optional(v.string()),
 
