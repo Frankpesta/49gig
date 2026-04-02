@@ -78,6 +78,11 @@ export default function DisputeDetailPage() {
       : "skip"
   );
 
+  // Must be declared before any early returns — Rules of Hooks
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [disputeMessages]);
+
   if (!isAuthenticated || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -153,10 +158,6 @@ export default function DisputeDetailPage() {
   const canPostInDisputeChat =
     (user.role === "client" || user.role === "freelancer" || isModerator) &&
     (dispute.status === "open" || dispute.status === "under_review");
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [disputeMessages]);
 
   const handleSendDisputeChat = async () => {
     if (!user?._id || (!disputeChatText.trim() && pendingFiles.length === 0)) return;

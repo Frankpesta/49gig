@@ -41,7 +41,9 @@ export default function EnquiriesPage() {
 
   const enquiries = useQuery(
     api.contactEnquiries.queries.getContactEnquiries,
-    isAuthenticated && (user?.role === "admin" || user?.role === "moderator") ? {} : "skip"
+    isAuthenticated && user?._id && (user?.role === "admin" || user?.role === "moderator")
+      ? { userId: user._id }
+      : "skip"
   );
   const replyMutation = useMutation(api.contactEnquiries.mutations.replyToContactEnquiry);
   const sendReplyEmail = useAction(api.contactEnquiries.actions.sendContactEnquiryReplyEmail);
@@ -50,7 +52,7 @@ export default function EnquiriesPage() {
     if (!selectedEnquiry || !replyMessage.trim()) return;
     setIsReplying(true);
     try {
-      await replyMutation({ enquiryId: selectedEnquiry, replyMessage: replyMessage.trim() });
+      await replyMutation({ enquiryId: selectedEnquiry, replyMessage: replyMessage.trim(), userId: user._id });
       await sendReplyEmail({ enquiryId: selectedEnquiry });
       setReplyMessage("");
       setSelectedEnquiry(null);

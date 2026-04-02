@@ -446,10 +446,11 @@ export const assignModerator = mutation({
   args: {
     disputeId: v.id("disputes"),
     moderatorId: v.id("users"),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.status !== "active") {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
       throw new Error("Not authenticated");
     }
 

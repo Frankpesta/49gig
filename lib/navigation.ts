@@ -272,14 +272,13 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Support (All roles) - GENERAL
+  // Support (clients & freelancers only) - GENERAL
   {
     title: "Help & Support",
-    staffTitle: "Support queue",
     url: "/dashboard/support",
     icon: HelpCircle,
     section: "general",
-    roles: ["client", "freelancer", "admin", "moderator"],
+    roles: ["client", "freelancer"],
   },
 ];
 
