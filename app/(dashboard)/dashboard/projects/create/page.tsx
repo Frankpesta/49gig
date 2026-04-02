@@ -202,6 +202,13 @@ export default function CreateProjectPage() {
 
   const projectType = roleTypeToProjectType(formData.roleType);
 
+  // Parsed client estimate (null if empty/invalid)
+  const clientEstimateNum = useMemo(() => {
+    if (!formData.clientEstimatedBudget) return null;
+    const n = parseFloat(formData.clientEstimatedBudget.replace(/[^0-9.]/g, ""));
+    return !isNaN(n) && n > 0 ? n : null;
+  }, [formData.clientEstimatedBudget]);
+
   const allRequiredSkills = useMemo(() => {
     if (formData.hireType === "team") {
       return allSkillsFromTeamSlots(formData.teamSlots);
@@ -291,6 +298,7 @@ export default function CreateProjectPage() {
       if (process.env.NODE_ENV !== "production") console.error("[budgetCalculation]", err);
       return null;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     formData.hireType,
     formData.teamMemberCount,
@@ -306,6 +314,15 @@ export default function CreateProjectPage() {
     pricingConfig,
     allRequiredSkills,
   ]);
+
+  // Effective budget: client's if larger than ours, otherwise ours
+  const effectiveBudget = useMemo(() => {
+    if (!budgetCalculation) return null;
+    if (clientEstimateNum != null && clientEstimateNum > budgetCalculation.estimatedBudget) {
+      return Math.round(clientEstimateNum);
+    }
+    return budgetCalculation.estimatedBudget;
+  }, [budgetCalculation, clientEstimateNum]);
 
   const toggleRole = (roleId: string) => {
     const isSingle = formData.hireType === "single";
@@ -453,7 +470,7 @@ export default function CreateProjectPage() {
         return;
       }
     } else if (step === 3) {
-      if (!budgetCalculation) {
+      if (!effectiveBudget) {
         setError("Unable to calculate budget. Please check your inputs.");
         return;
       }
@@ -485,14 +502,7 @@ export default function CreateProjectPage() {
       }
       const endDate = derivedEndDate;
 
-      const platformEstimate = budgetCalculation.estimatedBudget;
-      const clientEstimate = formData.clientEstimatedBudget
-        ? parseFloat(formData.clientEstimatedBudget.replace(/[^0-9.]/g, ""))
-        : NaN;
-      const totalAmount =
-        !isNaN(clientEstimate) && clientEstimate > platformEstimate
-          ? Math.round(clientEstimate)
-          : platformEstimate;
+      const totalAmount = effectiveBudget ?? budgetCalculation.estimatedBudget;
       const platformFee = platformFeePct ?? 25;
 
       const durationMonths = getDurationMonths(formData.projectDuration);
@@ -1012,13 +1022,13 @@ export default function CreateProjectPage() {
                 />
               </div>
 
-              {/* Client's own budget estimate */}
+              {/* Client's own budget estimate — entered BEFORE we show our estimate */}
               <div>
                 <Label htmlFor="clientEstimatedBudget" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
                   Your Budget Estimate <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
                 </Label>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  If you have a budget in mind, enter it here in USD. We'll use whichever amount is higher.
+                  Enter your estimated budget for this project in USD.
                 </p>
                 <div className="mt-2 relative">
                   <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">$</span>
@@ -1035,28 +1045,40 @@ export default function CreateProjectPage() {
                 </div>
               </div>
 
-              {/* Budget Preview - only shown when roles / seats are selected (price depends on categories) */}
-              {(formData.hireType === "team"
-                ? !formData.teamSlots.some((s) => s.roleId)
-                : formData.selectedRoles.length === 0) ? (
+              {/* Budget preview — only shown after client has entered their budget estimate */}
+              {clientEstimateNum == null ? (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5">
                   <p className="text-sm text-muted-foreground">
-                    {formData.hireType === "team"
-                      ? "Fill at least one seat above to preview pricing. Base rates vary by role."
-                      : "Select a role above to see the estimated price. Base rates vary by role."}
+                    Enter your estimated budget above to see a pricing summary.
                   </p>
                 </div>
-              ) : !formData.startDate || !formData.projectDuration ? (
-                <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5">
-                  <p className="text-sm text-muted-foreground">
-                    Select a start date and duration above to see your estimated budget.
-                  </p>
-                </div>
-              ) : budgetCalculation ? (
+              ) : !budgetCalculation ? (
+                !(formData.hireType === "team"
+                  ? formData.teamSlots.some((s) => s.roleId)
+                  : formData.selectedRoles.length > 0) ? (
+                  <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5">
+                    <p className="text-sm text-muted-foreground">
+                      {formData.hireType === "team"
+                        ? "Fill at least one seat above to see pricing."
+                        : "Select a role above to see pricing."}
+                    </p>
+                  </div>
+                ) : !formData.startDate || !formData.projectDuration ? (
+                  <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5">
+                    <p className="text-sm text-muted-foreground">
+                      Select a start date and duration to see your budget summary.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-200">
+                    Unable to calculate budget. Please check your role, date, and duration selections.
+                  </div>
+                )
+              ) : effectiveBudget ? (
                 (() => {
+                  const usingClientBudget = clientEstimateNum > budgetCalculation.estimatedBudget;
                   const durMonths = getDurationMonths(formData.projectDuration);
-                  const estimatedMonthlyTotal =
-                    durMonths > 0 ? budgetCalculation.estimatedBudget / durMonths : 0;
+                  const effectiveMonthly = durMonths > 0 ? effectiveBudget / durMonths : 0;
                   return (
                     <div className="rounded-xl border border-primary/20 bg-gradient-to-b from-primary/5 to-transparent shadow-sm overflow-hidden">
                       {/* Header */}
@@ -1064,42 +1086,45 @@ export default function CreateProjectPage() {
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estimated total</span>
                           <span className="text-2xl font-bold text-primary tabular-nums">
-                            {formatBudget(budgetCalculation.estimatedBudget)}
+                            {formatBudget(effectiveBudget)}
                           </span>
                         </div>
-                        <div className="mt-2 flex items-center gap-2">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
                             {formatDurationDisplay(formData.projectDuration)} engagement
                           </span>
+                          {usingClientBudget && (
+                            <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-950/40 px-2.5 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
+                              Using your estimate
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       {/* Monthly breakdown */}
                       <div className="border-t border-border/60 bg-background/50 px-5 py-4">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-                          {formData.hireType === "team"
-                            ? "Estimated monthly by role"
-                            : "Estimated monthly"}
+                          {formData.hireType === "team" ? "Monthly by role" : "Monthly breakdown"}
                         </p>
                         {formData.hireType === "team" && budgetCalculation.breakdown?.teamMembers && budgetCalculation.breakdown.teamMembers.length > 0 ? (
                           <div className="space-y-3">
                             {budgetCalculation.breakdown.teamMembers.map((m) => (
-                                <div
-                                  key={`${m.role}-${m.category}`}
-                                  className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3"
-                                >
-                                  <div>
-                                    <span className="font-medium text-foreground">{m.roleDisplayName}</span>
-                                    <span className="text-muted-foreground"> — {m.category}</span>
-                                    {m.count > 1 && (
-                                      <span className="ml-1.5 text-xs text-muted-foreground">×{m.count}</span>
-                                    )}
-                                  </div>
-                                  <div className="text-right">
-                                    <span className="font-semibold tabular-nums text-foreground">{formatBudget(m.monthlyPerPerson)}</span>
-                                    <span className="text-xs text-muted-foreground">/mo</span>
-                                  </div>
+                              <div
+                                key={`${m.role}-${m.category}`}
+                                className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3"
+                              >
+                                <div>
+                                  <span className="font-medium text-foreground">{m.roleDisplayName}</span>
+                                  <span className="text-muted-foreground"> — {m.category}</span>
+                                  {m.count > 1 && (
+                                    <span className="ml-1.5 text-xs text-muted-foreground">×{m.count}</span>
+                                  )}
                                 </div>
+                                <div className="text-right">
+                                  <span className="font-semibold tabular-nums text-foreground">{formatBudget(m.monthlyPerPerson)}</span>
+                                  <span className="text-xs text-muted-foreground">/mo</span>
+                                </div>
+                              </div>
                             ))}
                             <p className="text-xs text-muted-foreground pt-1">
                               {formData.roleType === "part_time" ? "Part-time (20 hrs/week)." : "Full-time (40 hrs/week)."}
@@ -1109,7 +1134,7 @@ export default function CreateProjectPage() {
                           <div className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3">
                             <span className="text-sm text-muted-foreground">Average per month</span>
                             <span className="text-lg font-semibold tabular-nums text-foreground">
-                              {formatBudget(estimatedMonthlyTotal)}
+                              {formatBudget(effectiveMonthly)}
                               <span className="text-sm font-normal text-muted-foreground">/mo</span>
                             </span>
                           </div>
@@ -1128,11 +1153,7 @@ export default function CreateProjectPage() {
                     </div>
                   );
                 })()
-              ) : (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 text-sm text-amber-800 dark:text-amber-200">
-                  Unable to calculate budget. Please ensure you have selected a valid start date and duration, then try again.
-                </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -1141,13 +1162,13 @@ export default function CreateProjectPage() {
             <div className="space-y-8">
               <div>
                 <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Payment</Label>
-                {budgetCalculation ? (
+                {budgetCalculation && effectiveBudget ? (
                   <div className="mt-3 space-y-4">
                     <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total amount</span>
                         <span className="text-2xl font-bold text-primary tabular-nums">
-                          {formatBudget(budgetCalculation.estimatedBudget)}
+                          {formatBudget(effectiveBudget)}
                         </span>
                       </div>
                       <p className="mt-2 text-sm text-muted-foreground">
@@ -1194,7 +1215,7 @@ export default function CreateProjectPage() {
                         <SelectContent>
                           {Array.from({ length: getDurationMonths(formData.projectDuration) }, (_, i) => i + 1).map((n) => {
                             const durMonths = getDurationMonths(formData.projectDuration);
-                            const perMonth = budgetCalculation.estimatedBudget / durMonths;
+                            const perMonth = effectiveBudget! / durMonths;
                             return (
                               <SelectItem key={n} value={String(n)}>
                                 {n} month{n > 1 ? "s" : ""} — {formatBudget(perMonth * n)}
@@ -1250,7 +1271,7 @@ export default function CreateProjectPage() {
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={isSubmitting || !budgetCalculation}>
+          <Button onClick={handleSubmit} disabled={isSubmitting || !effectiveBudget}>
             {isSubmitting ? "Creating..." : "Hire Talents"}
           </Button>
         )}
