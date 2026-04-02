@@ -365,14 +365,14 @@ export default function UserDetailPage() {
                 </Button>
               ) : null}
               <Button size="sm" variant="outline" className="gap-1.5" asChild>
-                <Link href={`/dashboard/users?search=${encodeURIComponent(profileData.email)}`}>
+                <Link href={`/dashboard/users/${profileData._id}/projects`}>
                   <Briefcase className="h-3.5 w-3.5" />
                   View Projects
                 </Link>
               </Button>
               {isFreelancer && (
                 <Button size="sm" variant="outline" className="gap-1.5" asChild>
-                  <Link href={`/dashboard/kyc-review`}>
+                  <Link href={`/dashboard/users/${profileData._id}/kyc`}>
                     <ShieldCheck className="h-3.5 w-3.5" />
                     KYC Review
                   </Link>

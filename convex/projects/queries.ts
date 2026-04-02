@@ -569,3 +569,71 @@ export const getProjectsNeedingPaymentFollowUpInternal = internalQuery({
     return result;
   },
 });
+
+/**
+ * Get all projects associated with a specific user (as client OR freelancer).
+ * Admin/moderator only.
+ */
+export const getProjectsForUser = query({
+  args: {
+    targetUserId: v.id("users"),
+    adminUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInQuery(ctx, args.adminUserId);
+    if (!admin || (admin.role !== "admin" && admin.role !== "moderator")) {
+      return null;
+    }
+
+    // Fetch as client
+    const asClient = await ctx.db
+      .query("projects")
+      .withIndex("by_client", (q) => q.eq("clientId", args.targetUserId))
+      .order("desc")
+      .collect();
+
+    // Fetch as matched freelancer (single)
+    const asFreelancer = await ctx.db
+      .query("projects")
+      .withIndex("by_freelancer", (q) =>
+        q.eq("matchedFreelancerId", args.targetUserId)
+      )
+      .order("desc")
+      .collect();
+
+    // Merge, deduplicate by _id
+    const seen = new Set<string>();
+    const merged = [];
+    for (const p of [...asClient, ...asFreelancer]) {
+      if (!seen.has(p._id)) {
+        seen.add(p._id);
+        merged.push(p);
+      }
+    }
+
+    // Sort by createdAt desc
+    merged.sort((a, b) => b.createdAt - a.createdAt);
+
+    // Enrich with names
+    const enriched = await Promise.all(
+      merged.map(async (project) => {
+        const client = await ctx.db.get(project.clientId);
+        const freelancer = project.matchedFreelancerId
+          ? await ctx.db.get(project.matchedFreelancerId)
+          : null;
+        return {
+          ...project,
+          client: client
+            ? { _id: client._id, name: client.name, email: client.email }
+            : null,
+          freelancer: freelancer
+            ? { _id: freelancer._id, name: freelancer.name, email: freelancer.email }
+            : null,
+          userRole: project.clientId === args.targetUserId ? "client" : "freelancer",
+        };
+      })
+    );
+
+    return enriched;
+  },
+});
