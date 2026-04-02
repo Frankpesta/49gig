@@ -1,4 +1,3 @@
-"use client";
 
 import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";

@@ -88,16 +88,16 @@ const DURATION_DAYS: Record<string, number> = {
   "60": 1825,
 };
 
-/** Duration discount: 3% for 3 months, 5% for 6+ months */
+/** Duration discount: 1% for 3 months, 2% for 6 months, 3% for 12+ months */
 const DURATION_DISCOUNT: Record<string, number> = {
-  "3": 0.97,
-  "6": 0.95,
-  "12+": 0.95,
-  "12": 0.95,
-  "24": 0.95,
-  "36": 0.95,
-  "48": 0.95,
-  "60": 0.95,
+  "3": 0.99,
+  "6": 0.98,
+  "12+": 0.97,
+  "12": 0.97,
+  "24": 0.97,
+  "36": 0.97,
+  "48": 0.97,
+  "60": 0.97,
 };
 
 /** Format duration for display (e.g. "3 months", "2 years") */
@@ -185,6 +185,7 @@ export default function CreateProjectPage() {
     specialRequirements: "",
     monthsToFund: 1, // Number of months to pay for now (must be at least 1)
     teamSlots: [] as TeamSlotIntake[],
+    clientEstimatedBudget: "" as string, // client's own budget estimate (optional)
   });
 
   // Derive endDate from startDate + projectDuration (use local date to match calendar)
@@ -484,7 +485,14 @@ export default function CreateProjectPage() {
       }
       const endDate = derivedEndDate;
 
-      const totalAmount = budgetCalculation.estimatedBudget;
+      const platformEstimate = budgetCalculation.estimatedBudget;
+      const clientEstimate = formData.clientEstimatedBudget
+        ? parseFloat(formData.clientEstimatedBudget.replace(/[^0-9.]/g, ""))
+        : NaN;
+      const totalAmount =
+        !isNaN(clientEstimate) && clientEstimate > platformEstimate
+          ? Math.round(clientEstimate)
+          : platformEstimate;
       const platformFee = platformFeePct ?? 25;
 
       const durationMonths = getDurationMonths(formData.projectDuration);
@@ -1004,6 +1012,29 @@ export default function CreateProjectPage() {
                 />
               </div>
 
+              {/* Client's own budget estimate */}
+              <div>
+                <Label htmlFor="clientEstimatedBudget" className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Your Budget Estimate <span className="normal-case text-muted-foreground/60 font-normal">(optional)</span>
+                </Label>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  If you have a budget in mind, enter it here in USD. We'll use whichever amount is higher.
+                </p>
+                <div className="mt-2 relative">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">$</span>
+                  <Input
+                    id="clientEstimatedBudget"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="e.g. 5000"
+                    value={formData.clientEstimatedBudget}
+                    onChange={(e) => setFormData({ ...formData, clientEstimatedBudget: e.target.value })}
+                    className="pl-7 h-11"
+                  />
+                </div>
+              </div>
+
               {/* Budget Preview - only shown when roles / seats are selected (price depends on categories) */}
               {(formData.hireType === "team"
                 ? !formData.teamSlots.some((s) => s.roleId)
@@ -1088,10 +1119,10 @@ export default function CreateProjectPage() {
                       {/* Footer note */}
                       <div className="px-5 py-3 bg-muted/20 border-t border-border/40">
                         <p className="text-xs text-muted-foreground">
-                          Total you pay. {formData.projectDuration === "3" && "3% discount for 3-month commitment."}
-                          {formData.projectDuration === "6" && "5% discount for 6-month commitment."}
-                          {["12", "24", "36", "48", "60"].includes(formData.projectDuration) &&
-                            `5% discount for ${formatDurationDisplay(formData.projectDuration)} commitment.`}
+                          Total you pay. {formData.projectDuration === "3" && "1% discount applied for 3-month commitment."}
+                          {formData.projectDuration === "6" && "2% discount applied for 6-month commitment."}
+                          {["12", "12+", "24", "36", "48", "60"].includes(formData.projectDuration) &&
+                            `3% discount applied for ${formatDurationDisplay(formData.projectDuration)} commitment.`}
                         </p>
                       </div>
                     </div>

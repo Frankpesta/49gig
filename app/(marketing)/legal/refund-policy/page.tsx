@@ -1,4 +1,3 @@
-"use client";
 
 import { PageHero } from "@/components/marketing/page-hero";
 import { RefreshCw, CheckCircle2, XCircle, Clock } from "lucide-react";

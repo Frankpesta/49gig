@@ -18,11 +18,18 @@ import {
   Loader2,
   Clock,
   Banknote,
+  CheckCircle2,
+  XCircle,
+  Mail,
+  Bitcoin,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
-import { Doc } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
+import { formatDistanceToNow } from "date-fns";
 
 const TYPE_LABELS: Record<string, string> = {
   credit: "Credit",
@@ -35,10 +42,16 @@ export default function WalletPage() {
   const { trackEvent } = useAnalytics();
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [paypalEmail, setPaypalEmail] = useState("");
+  const [paypalAmount, setPaypalAmount] = useState("");
+  const [paypalSubmitting, setPaypalSubmitting] = useState(false);
   const [cryptoNetwork, setCryptoNetwork] = useState("");
   const [cryptoAddress, setCryptoAddress] = useState("");
   const [cryptoAmount, setCryptoAmount] = useState("");
   const [cryptoSubmitting, setCryptoSubmitting] = useState(false);
+  const [adminActionId, setAdminActionId] = useState<Id<"clientReferralPayoutRequests"> | null>(null);
+  const [adminNote, setAdminNote] = useState("");
+  const [adminActioning, setAdminActioning] = useState(false);
 
   const wallet = useQuery(api.wallets.queries.getMyWallet, user?._id ? { userId: user._id } : "skip");
   const walletStats = useQuery(api.wallets.queries.getWalletStats, user?._id ? { userId: user._id } : "skip");
@@ -49,7 +62,18 @@ export default function WalletPage() {
     api.wallets.queries.getClientReferralCashBalanceCents,
     user?._id && user.role === "client" ? { userId: user._id } : "skip"
   );
+  const requestPaypalPayout = useMutation(api.referrals.mutations.requestClientReferralPaypalPayout);
   const requestCryptoPayout = useMutation(api.referrals.mutations.requestClientReferralCryptoPayout);
+  const myPayoutRequests = useQuery(
+    api.referrals.queries.getMyPayoutRequests,
+    user?._id && user.role === "client" ? { userId: user._id } : "skip"
+  );
+  const adminPayoutRequests = useQuery(
+    api.referrals.queries.getClientPayoutRequests,
+    user?.role === "admin" || user?.role === "moderator" ? {} : "skip"
+  );
+  const markCompleted = useMutation(api.referrals.mutations.markClientPayoutCompleted);
+  const rejectPayout = useMutation(api.referrals.mutations.rejectClientPayout);
   const [isReconciling, setIsReconciling] = useState(false);
 
   const handleWithdraw = async () => {
@@ -139,14 +163,18 @@ export default function WalletPage() {
         toast.error("Amount exceeds withdrawable referral balance");
         return;
       }
+      if (!cryptoNetwork.trim()) {
+        toast.error("Enter the crypto network (e.g. Bitcoin, Ethereum, USDT-TRC20)");
+        return;
+      }
+      if (!cryptoAddress.trim()) {
+        toast.error("Enter your wallet address");
+        return;
+      }
       setCryptoSubmitting(true);
       try {
-        await requestCryptoPayout({
-          amountCents,
-          cryptoNetwork,
-          cryptoAddress,
-        });
-        toast.success("Request submitted. Our team will process your crypto payout and may contact you if needed.");
+        await requestCryptoPayout({ amountCents, cryptoNetwork: cryptoNetwork.trim(), cryptoAddress: cryptoAddress.trim() });
+        toast.success("Crypto payout request submitted. Our team will send funds within 1–3 business days.");
         setCryptoAmount("");
         setCryptoNetwork("");
         setCryptoAddress("");
@@ -157,11 +185,40 @@ export default function WalletPage() {
       }
     };
 
+    const handlePaypalRequest = async () => {
+      if (!user?._id) return;
+      const amount = parseFloat(paypalAmount);
+      if (isNaN(amount) || amount < 1) {
+        toast.error("Enter a valid amount (minimum $1.00)");
+        return;
+      }
+      const amountCents = Math.round(amount * 100);
+      if (amountCents > available) {
+        toast.error("Amount exceeds withdrawable referral balance");
+        return;
+      }
+      if (!paypalEmail.trim()) {
+        toast.error("Enter your PayPal email address");
+        return;
+      }
+      setPaypalSubmitting(true);
+      try {
+        await requestPaypalPayout({ amountCents, paypalEmail: paypalEmail.trim() });
+        toast.success("Payout request submitted. Our team will send funds to your PayPal within 1–3 business days.");
+        setPaypalAmount("");
+        setPaypalEmail("");
+      } catch (err) {
+        toast.error(getUserFriendlyError(err) || "Request failed");
+      } finally {
+        setPaypalSubmitting(false);
+      }
+    };
+
     return (
       <div className="space-y-6 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
           title="Wallet"
-          description="Referral rewards (after the first monthly payment is approved on a referred hire) appear here. Withdraw to your bank or request a crypto payout."
+          description="Referral rewards appear here after the first monthly payment is approved on a referred hire. Withdraw to your bank, PayPal, or crypto."
           icon={Wallet}
         />
         <Card className="rounded-xl overflow-hidden">
@@ -208,26 +265,80 @@ export default function WalletPage() {
 
         <Card className="rounded-xl overflow-hidden">
           <CardHeader>
-            <CardTitle>Request crypto payout</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-primary" />
+              Request PayPal payout
+            </CardTitle>
             <CardDescription>
-              Submit network and address. We review and process manually (similar to P2P escrow flows).
+              Submit your PayPal email. Our team will manually send the funds within 1–3 business days.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 max-w-lg">
             <div className="space-y-2">
               <Label>Amount (USD)</Label>
-              <Input
-                type="number"
-                min="1"
-                step="0.01"
-                value={cryptoAmount}
-                onChange={(e) => setCryptoAmount(e.target.value)}
-              />
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">$</span>
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={paypalAmount}
+                  onChange={(e) => setPaypalAmount(e.target.value)}
+                  className="pl-7"
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label>Network</Label>
+              <Label>PayPal email address</Label>
               <Input
-                placeholder="e.g. USDT TRC20, ERC20, BTC"
+                type="email"
+                placeholder="you@example.com"
+                value={paypalEmail}
+                onChange={(e) => setPaypalEmail(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={handlePaypalRequest}
+              disabled={paypalSubmitting || available < 100}
+              className="gap-2"
+            >
+              {paypalSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowUpFromLine className="h-4 w-4" /> Submit request</>}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl overflow-hidden">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Bitcoin className="h-5 w-5 text-primary" />
+              Request crypto payout
+            </CardTitle>
+            <CardDescription>
+              Submit your wallet address. Our team will manually send the funds within 1–3 business days.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 max-w-lg">
+            <div className="space-y-2">
+              <Label>Amount (USD)</Label>
+              <div className="relative">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted-foreground text-sm">$</span>
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={cryptoAmount}
+                  onChange={(e) => setCryptoAmount(e.target.value)}
+                  className="pl-7"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Crypto network</Label>
+              <Input
+                type="text"
+                placeholder="e.g. Bitcoin, Ethereum, USDT-TRC20"
                 value={cryptoNetwork}
                 onChange={(e) => setCryptoNetwork(e.target.value)}
               />
@@ -235,15 +346,208 @@ export default function WalletPage() {
             <div className="space-y-2">
               <Label>Wallet address</Label>
               <Input
+                type="text"
+                placeholder="Your wallet address"
                 value={cryptoAddress}
                 onChange={(e) => setCryptoAddress(e.target.value)}
               />
             </div>
-            <Button onClick={handleCryptoRequest} disabled={cryptoSubmitting || available < 100}>
-              {cryptoSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Submit request"}
+            <Button
+              onClick={handleCryptoRequest}
+              disabled={cryptoSubmitting || available < 100}
+              className="gap-2"
+            >
+              {cryptoSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowUpFromLine className="h-4 w-4" /> Submit request</>}
             </Button>
           </CardContent>
         </Card>
+
+        {/* Payout request history */}
+        {myPayoutRequests && myPayoutRequests.length > 0 && (
+          <Card className="rounded-xl overflow-hidden">
+            <CardHeader>
+              <CardTitle>Payout request history</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {myPayoutRequests.map((r: { _id: Id<"clientReferralPayoutRequests">; amountCents: number; paypalEmail?: string; cryptoNetwork?: string; cryptoAddress?: string; method?: string; createdAt: number; adminNote?: string; status: string }) => (
+                  <div key={r._id} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {formatDollars(r.amountCents)} → {r.method === "crypto" ? `${r.cryptoNetwork}: ${r.cryptoAddress?.slice(0, 12)}…` : r.paypalEmail}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{formatDistanceToNow(r.createdAt, { addSuffix: true })}</p>
+                      {r.adminNote && <p className="text-xs text-muted-foreground mt-1">Note: {r.adminNote}</p>}
+                    </div>
+                    <Badge variant={r.status === "completed" ? "default" : r.status === "rejected" ? "destructive" : "secondary"}>
+                      {r.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  type PayoutRequest = { _id: Id<"clientReferralPayoutRequests">; amountCents: number; method?: string; paypalEmail?: string; cryptoNetwork?: string; cryptoAddress?: string; createdAt: number; adminNote?: string; status: string; clientName?: string; clientEmail?: string };
+
+  if (user.role === "admin" || user.role === "moderator") {
+    const pendingRequests = (adminPayoutRequests ?? [] as PayoutRequest[]).filter((r: PayoutRequest) => r.status === "pending" || r.status === "processing");
+    const completedRequests = (adminPayoutRequests ?? [] as PayoutRequest[]).filter((r: PayoutRequest) => r.status === "completed" || r.status === "rejected");
+
+    const handleMarkCompleted = async (requestId: Id<"clientReferralPayoutRequests">) => {
+      setAdminActioning(true);
+      try {
+        await markCompleted({ requestId, adminNote: adminNote.trim() || undefined });
+        toast.success("Marked as paid. Client balance updated.");
+        setAdminActionId(null);
+        setAdminNote("");
+      } catch (err) {
+        toast.error(getUserFriendlyError(err) || "Action failed");
+      } finally {
+        setAdminActioning(false);
+      }
+    };
+
+    const handleReject = async (requestId: Id<"clientReferralPayoutRequests">) => {
+      setAdminActioning(true);
+      try {
+        await rejectPayout({ requestId, adminNote: adminNote.trim() || undefined });
+        toast.success("Request rejected.");
+        setAdminActionId(null);
+        setAdminNote("");
+      } catch (err) {
+        toast.error(getUserFriendlyError(err) || "Action failed");
+      } finally {
+        setAdminActioning(false);
+      }
+    };
+
+    return (
+      <div className="space-y-6 animate-in fade-in-50 duration-300">
+        <DashboardPageHeader
+          title="Referral Payout Requests"
+          description="Review and manually disburse client referral earnings via PayPal."
+          icon={Wallet}
+        />
+
+        {/* Pending */}
+        <Card className="rounded-xl overflow-hidden">
+          <CardHeader>
+            <CardTitle>Pending requests ({pendingRequests.length})</CardTitle>
+            <CardDescription>Send payment via PayPal, then mark as paid here to update the client's balance.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {adminPayoutRequests === undefined ? (
+              <Skeleton className="h-20 w-full" />
+            ) : pendingRequests.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No pending requests.</p>
+            ) : (
+              <div className="space-y-4">
+                {pendingRequests.map((r: PayoutRequest) => (
+                  <div key={r._id} className="rounded-lg border border-border/60 bg-muted/10 p-4 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-lg">{formatDollars(r.amountCents)}</p>
+                        <p className="text-sm text-muted-foreground">{r.clientName} · {r.clientEmail}</p>
+                        <div className="flex items-center gap-2 text-sm">
+                          {r.method === "crypto" ? (
+                            <>
+                              <Bitcoin className="h-3.5 w-3.5 text-primary" />
+                              <span className="font-medium">Crypto ({r.cryptoNetwork}):</span>
+                              <span className="text-primary font-mono text-xs break-all">{r.cryptoAddress}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="h-3.5 w-3.5 text-primary" />
+                              <span className="font-medium">PayPal:</span>
+                              <span className="text-primary">{r.paypalEmail}</span>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{formatDistanceToNow(r.createdAt, { addSuffix: true })}</p>
+                      </div>
+                      <Badge variant="secondary">{r.status}</Badge>
+                    </div>
+
+                    {adminActionId === r._id ? (
+                      <div className="space-y-2 pt-2 border-t border-border/40">
+                        <Label className="text-xs">Note to client (optional)</Label>
+                        <Textarea
+                          placeholder="e.g. Payment sent, check your PayPal"
+                          value={adminNote}
+                          onChange={(e) => setAdminNote(e.target.value)}
+                          rows={2}
+                          className="resize-none text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => handleMarkCompleted(r._id)}
+                            disabled={adminActioning}
+                          >
+                            {adminActioning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                            Mark as paid
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="gap-1.5"
+                            onClick={() => handleReject(r._id)}
+                            disabled={adminActioning}
+                          >
+                            {adminActioning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
+                            Reject
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => { setAdminActionId(null); setAdminNote(""); }}>
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setAdminActionId(r._id)}
+                      >
+                        Review & action
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* History */}
+        {completedRequests.length > 0 && (
+          <Card className="rounded-xl overflow-hidden">
+            <CardHeader>
+              <CardTitle>Processed requests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {completedRequests.map((r: PayoutRequest) => (
+                  <div key={r._id} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/10 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {r.clientName} — {formatDollars(r.amountCents)} → {r.method === "crypto" ? `${r.cryptoNetwork}: ${r.cryptoAddress?.slice(0, 16)}…` : r.paypalEmail}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{formatDistanceToNow(r.createdAt, { addSuffix: true })}</p>
+                      {r.adminNote && <p className="text-xs text-muted-foreground">Note: {r.adminNote}</p>}
+                    </div>
+                    <Badge variant={r.status === "completed" ? "default" : "destructive"}>{r.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }

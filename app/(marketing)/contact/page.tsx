@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAction } from "convex/react";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -71,7 +72,7 @@ export default function ContactPage() {
       setTimeout(() => setIsSubmitted(false), 5000);
     } catch (error) {
       console.error("Failed to submit:", error);
-      setIsSubmitted(false);
+      toast.error("Failed to send your message. Please try again or email us directly at support@49gig.com");
     } finally {
       setIsSubmitting(false);
     }

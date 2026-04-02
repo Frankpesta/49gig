@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Send,
@@ -398,13 +398,14 @@ export default function ChatDetailPage() {
             >
               <Paperclip className="h-5 w-5" />
             </Button>
-            <Input
-              placeholder="Message…"
+            <Textarea
+              placeholder="Message… (Shift+Enter for new line)"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}
               disabled={isSending}
-              className="min-h-11 flex-1 rounded-2xl border-border/80 bg-background px-4 py-2.5 text-base"
+              rows={1}
+              className="min-h-11 max-h-40 flex-1 resize-none rounded-2xl border-border/80 bg-background px-4 py-2.5 text-base leading-relaxed overflow-y-auto"
             />
             <Button
               size="icon"
@@ -421,7 +422,7 @@ export default function ChatDetailPage() {
             </Button>
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            Images, PDFs, documents (max 10MB). Enter to send, Shift+Enter for a new line is not supported — use attachments for long text.
+            Images, PDFs, documents (max 10MB). Enter to send · Shift+Enter for new line.
           </p>
         </div>
       </div>

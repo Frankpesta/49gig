@@ -283,13 +283,25 @@ export const sendDisputeChatMessage = mutation({
     disputeId: v.id("disputes"),
     body: v.string(),
     userId: v.optional(v.id("users")),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          fileId: v.id("_storage"),
+          fileName: v.string(),
+          fileSize: v.number(),
+          mimeType: v.string(),
+        })
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUserInMutation(ctx, args.userId);
     if (!user) throw new Error("Not authenticated");
 
     const text = args.body.trim();
-    if (!text) throw new Error("Message cannot be empty");
+    if (!text && (!args.attachments || args.attachments.length === 0)) {
+      throw new Error("Message or attachment required");
+    }
 
     const dispute = await ctx.db.get(args.disputeId);
     if (!dispute) throw new Error("Dispute not found");
@@ -317,15 +329,37 @@ export const sendDisputeChatMessage = mutation({
     else if (isFreelancer) authorRole = "freelancer";
     else authorRole = "client";
 
+    // Resolve attachment download URLs from storage
+    const attachments = args.attachments?.length
+      ? await Promise.all(
+          args.attachments.map(async (att) => {
+            const url = (await ctx.storage.getUrl(att.fileId)) ?? "";
+            return { ...att, url };
+          })
+        )
+      : undefined;
+
     await ctx.db.insert("disputeMessages", {
       disputeId: args.disputeId,
       authorId: user._id,
+      authorName: user.name,
       authorRole,
-      body: text,
+      body: text || "📎 Attachment",
+      attachments: attachments?.length ? attachments : undefined,
       createdAt: Date.now(),
     });
 
     return { success: true };
+  },
+});
+
+/** Generate a Convex storage upload URL for dispute file attachments. */
+export const generateDisputeUploadUrl = mutation({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    return await ctx.storage.generateUploadUrl();
   },
 });
 

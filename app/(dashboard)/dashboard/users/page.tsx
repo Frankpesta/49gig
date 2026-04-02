@@ -63,6 +63,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import Link from "next/link";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
@@ -477,9 +478,12 @@ export default function UsersPage() {
                             type="button"
                             variant="secondary"
                             size="sm"
-                            onClick={() => setProfileUserId(u._id)}
+                            asChild
                           >
-                            View profile
+                            <Link href={`/dashboard/users/${u._id}`}>
+                              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                              View details
+                            </Link>
                           </Button>
                         <Dialog>
                           <DialogTrigger asChild>
@@ -664,7 +668,7 @@ export default function UsersPage() {
                                                   <p className="text-muted-foreground">No assessments</p>
                                                 ) : (
                                                   <ul className="text-muted-foreground space-y-0.5">
-                                                    {vr.skillAssessments.map((a) => (
+                                                    {vr.skillAssessments.map((a: { skillId: string; skillName: string; score: number }) => (
                                                       <li key={a.skillId}>
                                                         {a.skillName}: {a.score}%
                                                       </li>
@@ -688,7 +692,7 @@ export default function UsersPage() {
                                               <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs space-y-1">
                                                 <p className="font-medium text-amber-900 dark:text-amber-100">Flags</p>
                                                 <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
-                                                  {vr.fraudFlags.map((f, i) => (
+                                                  {vr.fraudFlags.map((f: { severity: string; description: string }, i: number) => (
                                                     <li key={i}>
                                                       [{f.severity}] {f.description}
                                                     </li>
