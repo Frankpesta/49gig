@@ -56,7 +56,7 @@ export default function DisputeDetailPage() {
   );
 
   const project = useQuery(
-    (api as any)["projects/queries"].getProject,
+    api.projects.queries.getProject,
     dispute && isAuthenticated && user?._id
       ? { projectId: dispute.projectId, userId: user._id }
       : "skip"
@@ -86,7 +86,7 @@ export default function DisputeDetailPage() {
     );
   }
 
-  if (dispute === undefined || project === undefined) {
+  if (dispute === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
