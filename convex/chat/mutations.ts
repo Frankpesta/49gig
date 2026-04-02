@@ -291,7 +291,10 @@ export const markAsRead = mutation({
 
     // Check authorization
     const isParticipant = chat.participants.includes(user._id);
-    if (!isParticipant) {
+    const isAdminOrModerator =
+      user.role === "admin" || user.role === "moderator";
+
+    if (!isParticipant && !isAdminOrModerator) {
       throw new Error("Unauthorized");
     }
 

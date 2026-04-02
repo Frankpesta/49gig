@@ -1,6 +1,21 @@
 import { v } from "convex/values";
-import { query, internalQuery } from "../_generated/server";
+import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { getCurrentUser } from "../auth";
+import { Doc } from "../_generated/dataModel";
+
+async function getCurrentUserInQuery(
+  ctx: QueryCtx,
+  userId?: string
+): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId as Doc<"users">["_id"]);
+    if (!user || user.status !== "active") return null;
+    return user;
+  }
+  const user = await getCurrentUser(ctx);
+  if (!user || user.status !== "active") return null;
+  return user;
+}
 
 /**
  * Internal: Get enquiry by ID (for actions).
@@ -17,11 +32,12 @@ export const getEnquiryByIdInternal = internalQuery({
  */
 export const getContactEnquiries = query({
   args: {
+    userId: v.optional(v.id("users")),
     status: v.optional(v.union(v.literal("new"), v.literal("replied"), v.literal("closed"))),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    const user = await getCurrentUserInQuery(ctx, args.userId);
     if (!user || (user.role !== "admin" && user.role !== "moderator")) {
       return [];
     }

@@ -1,6 +1,21 @@
 import { v } from "convex/values";
-import { mutation } from "../_generated/server";
+import { mutation, MutationCtx } from "../_generated/server";
 import { getCurrentUser } from "../auth";
+import { Doc } from "../_generated/dataModel";
+
+async function getCurrentUserInMutation(
+  ctx: MutationCtx,
+  userId?: string
+): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId as Doc<"users">["_id"]);
+    if (!user || user.status !== "active") return null;
+    return user;
+  }
+  const user = await getCurrentUser(ctx);
+  if (!user || user.status !== "active") return null;
+  return user;
+}
 
 /**
  * Create a contact enquiry from the public contact form.
@@ -38,9 +53,10 @@ export const replyToContactEnquiry = mutation({
   args: {
     enquiryId: v.id("contactEnquiries"),
     replyMessage: v.string(),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    const user = await getCurrentUserInMutation(ctx, args.userId);
     if (!user || (user.role !== "admin" && user.role !== "moderator")) {
       throw new Error("Only admins and moderators can reply to contact enquiries.");
     }

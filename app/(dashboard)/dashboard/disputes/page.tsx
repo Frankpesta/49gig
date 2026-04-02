@@ -342,6 +342,7 @@ export default function DisputesPage() {
                                   await assignModerator({
                                     disputeId: dispute._id,
                                     moderatorId: user._id,
+                                    userId: user._id,
                                   });
                                   toast.success("Dispute assigned to you.");
                                 } catch (e) {

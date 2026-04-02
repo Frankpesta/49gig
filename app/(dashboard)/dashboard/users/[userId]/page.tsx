@@ -145,9 +145,13 @@ export default function UserDetailPage() {
     isAuthenticated && currentUser?._id ? { userId: userId as Id<"users"> } : "skip"
   );
 
+  // Only fetch vetting data when the target user is confirmed to be a freelancer
   const vettingData = useQuery(
     api.vetting.queries.getVerificationResults,
-    isAuthenticated && currentUser?._id && (currentUser.role === "admin" || currentUser.role === "moderator")
+    isAuthenticated &&
+      currentUser?._id &&
+      (currentUser.role === "admin" || currentUser.role === "moderator") &&
+      profileData?.role === "freelancer"
       ? { freelancerId: userId as Id<"users">, adminUserId: currentUser._id }
       : "skip"
   );
