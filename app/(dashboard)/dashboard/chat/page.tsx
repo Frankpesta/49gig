@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
-import { MessageSquare, Search, Plus, Users, Headphones, Sparkles } from "lucide-react";
+import { MessageSquare, Search, Plus, Users, Sparkles, Headphones } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -115,13 +115,6 @@ export default function ChatPage() {
       : "skip"
   );
 
-  const supportChatsForAdmin = useQuery(
-    api.chat.queries.getSupportChatsForAdmin,
-    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
-      ? { userId: user._id }
-      : "skip"
-  );
-
   const unreadCount = useQuery(
     api.chat.queries.getUnreadCount,
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
@@ -157,12 +150,21 @@ export default function ChatPage() {
         }
         icon={MessageSquare}
         actions={
-          <Button asChild className="w-full shrink-0 rounded-xl sm:w-auto">
-            <Link href="/dashboard/chat/support" className="flex items-center justify-center">
-              <Plus className="mr-2 h-4 w-4" />
-              New Support Chat
-            </Link>
-          </Button>
+          isAdminOrModerator ? (
+            <Button asChild variant="outline" className="w-full shrink-0 rounded-xl sm:w-auto">
+              <Link href="/dashboard/support-inbox" className="flex items-center justify-center">
+                <Headphones className="mr-2 h-4 w-4" />
+                Support Inbox
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild className="w-full shrink-0 rounded-xl sm:w-auto">
+              <Link href="/dashboard/chat/support" className="flex items-center justify-center">
+                <Plus className="mr-2 h-4 w-4" />
+                New Support Chat
+              </Link>
+            </Button>
+          )
         }
       />
 
@@ -219,14 +221,12 @@ export default function ChatPage() {
                   chats={projectChatsForAdmin ?? []}
                   searchQuery={searchQuery}
                 />
-                <div className="sticky top-0 z-10 flex items-center gap-2 bg-muted/50 px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  <Headphones className="h-4 w-4 shrink-0" />
-                  Support Chats
+                <div className="px-4 py-3 text-center">
+                  <Link href="/dashboard/support-inbox" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                    <Headphones className="h-3.5 w-3.5" />
+                    View support chats in Support Inbox
+                  </Link>
                 </div>
-                <ChatListSection
-                  chats={supportChatsForAdmin ?? []}
-                  searchQuery={searchQuery}
-                />
               </div>
             ) : (
               <div className="max-h-[calc(100vh-320px)] overflow-y-auto">

@@ -31,6 +31,13 @@ export const metadata: Metadata = {
   description: "A curated freelance marketplace inspired by Andela",
 };
 
+// Viewport configuration for optimal rendering
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#07122B",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,6 +45,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to external image CDNs for faster image loading */}
+        <link rel="preconnect" href="https://images.unsplash.com" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
       <body
         className={`${plusJakarta.variable} ${heroSerif.variable} font-sans antialiased bg-background text-foreground`}
       >

@@ -1,4 +1,3 @@
-"use client";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHero } from "@/components/marketing/page-hero";

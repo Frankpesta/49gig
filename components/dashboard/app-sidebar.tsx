@@ -232,41 +232,43 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      {/* Bottom CTA Card - Reference style */}
-      <SidebarFooter className="border-t border-sidebar-border/70 p-3 mt-auto">
-        <div className="rounded-xl bg-primary p-4 text-primary-foreground shadow-lg">
-          {!isCollapsed ? (
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/20">
-                <HelpCircle className="h-5 w-5" />
+      {/* Bottom CTA Card - only shown to clients and freelancers */}
+      {user?.role !== "admin" && user?.role !== "moderator" && (
+        <SidebarFooter className="border-t border-sidebar-border/70 p-3 mt-auto">
+          <div className="rounded-xl bg-primary p-4 text-primary-foreground shadow-lg">
+            {!isCollapsed ? (
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-foreground/20">
+                  <HelpCircle className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <p className="text-sm font-semibold">Need Help?</p>
+                  <p className="text-xs text-primary-foreground/80 leading-snug">
+                    Get support from our team or browse our help center.
+                  </p>
+                  <Button
+                    asChild
+                    size="sm"
+                    className="mt-2 w-full rounded-lg bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                  >
+                    <Link href="/dashboard/support" onClick={closeMobileSidebar}>
+                      Get Support
+                    </Link>
+                  </Button>
+                </div>
               </div>
-              <div className="min-w-0 flex-1 space-y-1">
-                <p className="text-sm font-semibold">Need Help?</p>
-                <p className="text-xs text-primary-foreground/80 leading-snug">
-                  Get support from our team or browse our help center.
-                </p>
-                <Button
-                  asChild
-                  size="sm"
-                  className="mt-2 w-full rounded-lg bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                >
+            ) : (
+              <div className="flex justify-center">
+                <Button asChild size="icon" variant="ghost" className="rounded-lg text-primary-foreground hover:bg-primary-foreground/20 size-9">
                   <Link href="/dashboard/support" onClick={closeMobileSidebar}>
-                    Get Support
+                    <HelpCircle className="h-5 w-5" />
                   </Link>
                 </Button>
               </div>
-            </div>
-          ) : (
-            <div className="flex justify-center">
-              <Button asChild size="icon" variant="ghost" className="rounded-lg text-primary-foreground hover:bg-primary-foreground/20 size-9">
-                <Link href="/dashboard/support" onClick={closeMobileSidebar}>
-                  <HelpCircle className="h-5 w-5" />
-                </Link>
-              </Button>
-            </div>
-          )}
-        </div>
-      </SidebarFooter>
+            )}
+          </div>
+        </SidebarFooter>
+      )}
       <SidebarRail />
     </Sidebar>
   );

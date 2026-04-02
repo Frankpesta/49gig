@@ -27,6 +27,7 @@ import {
   BookOpen,
   ShieldCheck,
   Gift,
+  Headphones,
 } from "lucide-react";
 import type { UserRole } from "@/stores/authStore";
 
@@ -108,13 +109,14 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Wallet (freelancers: earnings; clients: referral cash withdrawals)
+  // Wallet (freelancers: earnings; clients: referral cash withdrawals; admin: payout management)
   {
     title: "Wallet",
+    staffTitle: "Payout Requests",
     url: "/dashboard/wallet",
     icon: Wallet,
     section: "menu",
-    roles: ["freelancer", "client"],
+    roles: ["freelancer", "client", "admin", "moderator"],
   },
 
   // Referrals (share link; clients earn hiring credit, freelancers wallet balance)
@@ -178,6 +180,15 @@ export const navigationItems: NavItem[] = [
     icon: DollarSign,
     section: "menu",
     roles: ["admin"],
+  },
+
+  // Admin & Moderator: Support Inbox (all support chats)
+  {
+    title: "Support Inbox",
+    url: "/dashboard/support-inbox",
+    icon: Headphones,
+    section: "menu",
+    roles: ["admin", "moderator"],
   },
 
   // Admin & Moderator: Blog

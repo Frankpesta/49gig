@@ -17,9 +17,14 @@ import {
   Plus,
   CheckCircle2,
   XCircle,
+  Paperclip,
+  Send,
+  Loader2,
+  Download,
+  Image as ImageIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { AddEvidenceDialog } from "./add-evidence-dialog";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,8 +40,13 @@ export default function DisputeDetailPage() {
   const [isAddingEvidence, setIsAddingEvidence] = useState(false);
   const [disputeChatText, setDisputeChatText] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<Array<{ fileId: Id<"_storage">; fileName: string; fileSize: number; mimeType: string }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const addEvidenceMutation = useMutation(api.disputes.mutations.addEvidence);
   const sendDisputeChatMessage = useMutation(api.disputes.mutations.sendDisputeChatMessage);
+  const generateUploadUrl = useMutation(api.disputes.mutations.generateDisputeUploadUrl);
 
   const dispute = useQuery(
     api.disputes.queries.getDispute,
@@ -144,20 +154,64 @@ export default function DisputeDetailPage() {
     (user.role === "client" || user.role === "freelancer" || isModerator) &&
     (dispute.status === "open" || dispute.status === "under_review");
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [disputeMessages]);
+
   const handleSendDisputeChat = async () => {
-    if (!user?._id || !disputeChatText.trim()) return;
+    if (!user?._id || (!disputeChatText.trim() && pendingFiles.length === 0)) return;
     setSendingChat(true);
     try {
       await sendDisputeChatMessage({
         disputeId: dispute._id,
-        body: disputeChatText,
+        body: disputeChatText.trim(),
         userId: user._id,
+        attachments: pendingFiles.length > 0 ? pendingFiles : undefined,
       });
       setDisputeChatText("");
+      setPendingFiles([]);
     } catch (e) {
       toast.error(getUserFriendlyError(e) || "Could not send message");
     } finally {
       setSendingChat(false);
+    }
+  };
+
+  const handleChatKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendDisputeChat();
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length || !user?._id) return;
+    setIsUploading(true);
+    try {
+      const uploaded: typeof pendingFiles = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file.size > 20 * 1024 * 1024) {
+          toast.error(`${file.name} exceeds 20MB limit`);
+          continue;
+        }
+        const uploadUrl = await generateUploadUrl({ userId: user._id });
+        const res = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!res.ok) throw new Error("Upload failed");
+        const { storageId } = await res.json();
+        uploaded.push({ fileId: storageId, fileName: file.name, fileSize: file.size, mimeType: file.type });
+      }
+      setPendingFiles((prev) => [...prev, ...uploaded]);
+    } catch (err) {
+      toast.error("File upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+      e.target.value = "";
     }
   };
 
@@ -221,59 +275,158 @@ export default function DisputeDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Dispute discussion (parties + moderators) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Dispute discussion</CardTitle>
+          {/* Dispute discussion chat */}
+          <Card className="flex flex-col overflow-hidden" style={{ minHeight: 480 }}>
+            <CardHeader className="shrink-0 border-b border-border/60 bg-gradient-to-b from-muted/5 to-transparent">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquare className="h-4 w-4 text-primary" />
+                Dispute Chat
+              </CardTitle>
               <CardDescription>
-                Exchange messages here with the other party. 49GIG staff can review the full thread. Add structured evidence above when you have files or chat links.
+                Exchange messages and share documents with the other party. 49GIG staff review the full thread.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="max-h-[min(420px,50vh)] space-y-3 overflow-y-auto rounded-lg border border-border/60 bg-muted/20 p-3">
-                {disputeMessages === undefined ? (
-                  <p className="text-sm text-muted-foreground">Loading messages…</p>
-                ) : disputeMessages.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No messages yet.</p>
-                ) : (
-                  disputeMessages.map((m: { _id: string; authorId: Id<"users">; authorName: string; authorRole: string; body: string; createdAt: number }) => (
-                    <div
-                      key={m._id}
-                      className={`rounded-lg px-3 py-2 text-sm ${
-                        m.authorRole === "system"
-                          ? "bg-amber-500/10 text-foreground border border-amber-500/20"
-                          : m.authorId === user._id
-                            ? "ml-4 bg-primary text-primary-foreground"
-                            : "mr-4 bg-card border border-border/60"
-                      }`}
-                    >
-                      <div className="text-xs font-medium opacity-80">
-                        {m.authorName} · {m.authorRole.replace("_", " ")} ·{" "}
-                        {new Date(m.createdAt).toLocaleString()}
+
+            {/* Messages */}
+            <CardContent className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0" style={{ maxHeight: 380 }}>
+              {disputeMessages === undefined ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">Loading messages…</p>
+              ) : disputeMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground/40" />
+                  <p className="text-sm text-muted-foreground">No messages yet. Start the discussion.</p>
+                </div>
+              ) : (
+                <>
+                  {disputeMessages.map((m: {
+                    _id: string;
+                    authorId: Id<"users">;
+                    authorName?: string;
+                    authorRole: string;
+                    body: string;
+                    createdAt: number;
+                    attachments?: Array<{ fileId: Id<"_storage">; fileName: string; fileSize: number; mimeType: string; url?: string }>;
+                  }) => {
+                    const isMine = m.authorId === user._id;
+                    const isSystem = m.authorRole === "system";
+                    const isStaffMsg = m.authorRole === "admin" || m.authorRole === "moderator";
+                    return (
+                      <div
+                        key={m._id}
+                        className={`flex ${isMine ? "justify-end" : isSystem ? "justify-center" : "justify-start"}`}
+                      >
+                        {isSystem ? (
+                          <div className="max-w-[80%] rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-center text-xs text-foreground">
+                            {m.body}
+                          </div>
+                        ) : (
+                          <div className={`max-w-[75%] space-y-1 ${isMine ? "items-end" : "items-start"} flex flex-col`}>
+                            <div className={`text-[11px] font-medium px-1 ${isMine ? "text-right text-primary" : "text-muted-foreground"}`}>
+                              {m.authorName ?? m.authorRole}{isStaffMsg ? " (Staff)" : ""} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                            <div
+                              className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
+                                isMine
+                                  ? "bg-primary text-primary-foreground rounded-br-sm"
+                                  : isStaffMsg
+                                    ? "bg-violet-500/10 border border-violet-400/30 text-foreground rounded-bl-sm"
+                                    : "bg-card border border-border/60 text-foreground rounded-bl-sm"
+                              }`}
+                            >
+                              {m.body && m.body !== "📎 Attachment" && (
+                                <p className="whitespace-pre-wrap">{m.body}</p>
+                              )}
+                              {m.attachments && m.attachments.length > 0 && (
+                                <div className={`space-y-2 ${m.body && m.body !== "📎 Attachment" ? "mt-2 pt-2 border-t border-current/20" : ""}`}>
+                                  {m.attachments.map((att, i) => {
+                                    const isImage = att.mimeType.startsWith("image/");
+                                    return (
+                                      <div key={i} className="flex items-center gap-2">
+                                        {isImage ? <ImageIcon className="h-4 w-4 shrink-0 opacity-80" /> : <FileText className="h-4 w-4 shrink-0 opacity-80" />}
+                                        <span className="text-xs truncate flex-1 opacity-90">{att.fileName}</span>
+                                        {att.url && (
+                                          <a href={att.url} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-80 hover:opacity-100">
+                                            <Download className="h-3.5 w-3.5" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
-                    </div>
-                  ))
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </CardContent>
+
+            {/* Composer */}
+            {canPostInDisputeChat && (
+              <div className="shrink-0 border-t border-border/60 p-3 space-y-2 bg-background/80">
+                {/* Pending files preview */}
+                {pendingFiles.length > 0 && (
+                  <div className="flex flex-wrap gap-2 px-1">
+                    {pendingFiles.map((f, i) => (
+                      <div key={i} className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2 py-1 text-xs">
+                        <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
+                        <span className="truncate max-w-[140px]">{f.fileName}</span>
+                        <button type="button" className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => setPendingFiles((p) => p.filter((_, j) => j !== i))}>
+                          <XCircle className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
-              </div>
-              {canPostInDisputeChat && (
-                <div className="space-y-2">
-                  <Textarea
-                    placeholder="Write a message to the other party…"
-                    value={disputeChatText}
-                    onChange={(e) => setDisputeChatText(e.target.value)}
-                    rows={3}
+                <div className="flex items-end gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.zip,.ppt,.pptx"
+                    className="hidden"
+                    onChange={handleFileSelect}
                   />
                   <Button
                     type="button"
-                    onClick={handleSendDisputeChat}
-                    disabled={sendingChat || !disputeChatText.trim()}
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 shrink-0 rounded-full"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading || sendingChat}
+                    title="Attach file or document"
                   >
-                    {sendingChat ? "Sending…" : "Send message"}
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                  </Button>
+                  <Textarea
+                    placeholder="Type a message… (Shift+Enter for new line)"
+                    value={disputeChatText}
+                    onChange={(e) => setDisputeChatText(e.target.value)}
+                    onKeyDown={handleChatKeyDown}
+                    rows={1}
+                    disabled={sendingChat}
+                    className="min-h-10 max-h-32 flex-1 resize-none rounded-2xl border-border/80 bg-background px-4 py-2.5 text-sm leading-relaxed overflow-y-auto"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    className="h-10 w-10 shrink-0 rounded-full"
+                    onClick={handleSendDisputeChat}
+                    disabled={sendingChat || isUploading || (!disputeChatText.trim() && pendingFiles.length === 0)}
+                    aria-label="Send"
+                  >
+                    {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
-              )}
-            </CardContent>
+                <p className="text-[11px] text-muted-foreground px-1">
+                  Images, PDFs, documents up to 20MB. Enter to send · Shift+Enter for new line.
+                </p>
+              </div>
+            )}
           </Card>
 
           {/* Evidence */}

@@ -31,7 +31,7 @@ export function GtmHeadScript() {
   return (
     <Script
       id="gtm-consent-script"
-      strategy="beforeInteractive"
+      strategy="afterInteractive"
       dangerouslySetInnerHTML={{ __html: consentAndGtmScript }}
     />
   );

@@ -17,6 +17,56 @@ async function viewerUser(
   return u as Doc<"users">;
 }
 
+/** Get all pending/processing payout requests (admin/moderator only). */
+export const getClientPayoutRequests = query({
+  args: {
+    status: v.optional(v.union(v.literal("pending"), v.literal("processing"), v.literal("completed"), v.literal("rejected"))),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user || (user.role !== "admin" && user.role !== "moderator")) return [];
+
+    const requests = args.status
+      ? await ctx.db
+          .query("clientReferralPayoutRequests")
+          .withIndex("by_status", (q) => q.eq("status", args.status!))
+          .order("desc")
+          .take(200)
+      : await ctx.db
+          .query("clientReferralPayoutRequests")
+          .order("desc")
+          .take(200);
+
+    // Attach user name/email for display
+    const enriched = await Promise.all(
+      requests.map(async (r) => {
+        const client = await ctx.db.get(r.userId);
+        return {
+          ...r,
+          clientName: client?.name ?? "Unknown",
+          clientEmail: client?.email ?? "",
+        };
+      })
+    );
+    return enriched;
+  },
+});
+
+/** Get the current user's own payout requests. */
+export const getMyPayoutRequests = query({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const userDoc = await viewerUser(ctx, args.userId);
+    if (!userDoc || userDoc.role !== "client") return [];
+
+    return await ctx.db
+      .query("clientReferralPayoutRequests")
+      .withIndex("by_user", (q) => q.eq("userId", userDoc._id))
+      .order("desc")
+      .take(20);
+  },
+});
+
 /** Referral link stats for the signed-in user (any role can refer). */
 export const getMyReferralSummary = query({
   args: { userId: v.optional(v.id("users")) },

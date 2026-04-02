@@ -121,6 +121,14 @@ export const createProject = mutation({
           v.object({
             roleId: v.string(),
             softwareDevFieldId: v.optional(v.string()),
+            experienceLevel: v.optional(
+              v.union(
+                v.literal("junior"),
+                v.literal("mid"),
+                v.literal("senior"),
+                v.literal("expert")
+              )
+            ),
             skills: v.array(v.string()),
           })
         )

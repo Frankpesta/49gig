@@ -5,14 +5,22 @@ import { generateHTML } from "@tiptap/html";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Color } from "@tiptap/extension-color";
 import { cn } from "@/lib/utils";
 import { parseTipTapDocJson } from "@/components/blog/blog-editor";
 
 const extensions = [
   StarterKit,
+  TextStyle,
+  Color,
   Image.configure({ HTMLAttributes: { class: "rounded-lg max-w-full h-auto my-4" } }),
   Link.configure({
-    HTMLAttributes: { class: "text-primary underline hover:no-underline" },
+    HTMLAttributes: {
+      class: "text-primary underline underline-offset-2 hover:opacity-80",
+      target: "_blank",
+      rel: "noopener noreferrer",
+    },
     openOnClick: false,
   }),
 ];
@@ -38,7 +46,7 @@ export function BlogContentRenderer({
   return (
     <div
       className={cn(
-        "max-w-none [&_p]:my-3 [&_p]:leading-relaxed",
+        "max-w-none [&_p]:mt-0 [&_p]:mb-4 [&_p]:leading-relaxed",
         "[&_h1]:text-3xl [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-4",
         "[&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:mt-6 [&_h2]:mb-3",
         "[&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2",

@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import Image from "next/image";
 import { CTAButton } from "@/components/marketing/cta-buttons";
@@ -327,9 +325,9 @@ export default function Home() {
           }} />
         </div>
 
-        {/* Floating Elements */}
-        <div className="absolute top-20 left-10 w-20 h-20 bg-primary/10 rounded-full blur-2xl animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-32 h-32 bg-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+        {/* Decorative Elements (static, no continuous paint) */}
+        <div className="absolute top-20 left-10 w-20 h-20 bg-primary/10 rounded-full blur-2xl" />
+        <div className="absolute bottom-20 right-10 w-32 h-32 bg-secondary/10 rounded-full blur-3xl" />
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionTransition variant="fade" delay={200}>
@@ -357,7 +355,7 @@ export default function Home() {
                   {/* Enhanced Hover Glow Effect */}
                   <div className="absolute inset-0 bg-linear-to-br from-primary/20 to-secondary/20 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl scale-110" />
 
-                  <div className="relative h-full bg-background/90 backdrop-blur-xl border border-border/30 rounded-3xl shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
+                  <div className="relative h-full bg-background border border-border/30 rounded-3xl shadow-xl hover:shadow-2xl hover:shadow-primary/15 transition-all duration-500 hover:scale-105 group-hover:border-primary/30 overflow-hidden">
                     {/* Animated Background */}
                     <div className="absolute inset-0 bg-linear-to-br from-primary/5 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
@@ -369,6 +367,8 @@ export default function Home() {
                         fill
                         className="object-cover transition-all duration-700 group-hover:scale-110"
                         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        priority={index < 3}
+                        loading={index < 3 ? undefined : "lazy"}
                       />
                       <div className="absolute inset-0 bg-linear-to-t from-background/90 via-background/30 to-transparent group-hover:from-primary/10 group-hover:via-primary/5 transition-all duration-500" />
 
@@ -560,7 +560,7 @@ export default function Home() {
 
               <SectionTransition variant="scale" delay={520}>
                 <div className="space-y-4">
-                  <div className="rounded-3xl border border-white/20 bg-white/10 p-5 backdrop-blur-md shadow-2xl">
+                  <div className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-2xl">
                     <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Freelancer performance snapshot</p>
                     <div className="mt-4 grid grid-cols-3 gap-3 text-center">
                       <div className="rounded-xl border border-white/15 bg-black/25 px-3 py-3">
@@ -578,7 +578,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-white/20 bg-black/25 p-5 backdrop-blur-md shadow-xl">
+                  <div className="rounded-3xl border border-white/20 bg-black/25 p-5 shadow-xl">
                     <p className="text-sm font-semibold text-white">How freelancers grow on 49GIG</p>
                     <div className="mt-4 space-y-3">
                       {[

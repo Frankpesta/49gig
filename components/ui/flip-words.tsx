@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface FlipWordsProps {
@@ -11,8 +10,8 @@ interface FlipWordsProps {
 }
 
 /**
- * Flips through words with a crossfade. Uses fixed-width container
- * so no layout shift occurs (fixes iPhone page shake).
+ * Flips through words with a CSS crossfade — no framer-motion dependency.
+ * Uses fixed-width container so no layout shift occurs.
  */
 export function FlipWords({
   words,
@@ -20,16 +19,21 @@ export function FlipWords({
   className,
 }: FlipWordsProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % words.length);
+      setVisible(false);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % words.length);
+        setVisible(true);
+      }, 220);
     }, duration);
     return () => clearInterval(interval);
   }, [words.length, duration]);
 
   const longestWordLength = words.reduce((max, word) => Math.max(max, word.length), 0);
-  const containerWidth = longestWordLength + 2; // +2 for comfortable spacing so all words show fully
+  const containerWidth = longestWordLength + 2;
 
   return (
     <span
@@ -41,18 +45,12 @@ export function FlipWords({
         overflow: "visible",
       }}
     >
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.span
-          key={currentIndex}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
-          className="inline-block whitespace-nowrap"
-        >
-          {words[currentIndex]}
-        </motion.span>
-      </AnimatePresence>
+      <span
+        className="inline-block whitespace-nowrap transition-opacity duration-200 ease-out"
+        style={{ opacity: visible ? 1 : 0 }}
+      >
+        {words[currentIndex]}
+      </span>
     </span>
   );
 }

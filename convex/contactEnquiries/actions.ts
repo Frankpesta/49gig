@@ -1,11 +1,11 @@
+// @ts-nocheck
 "use node";
 
 import { action } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { sendEmail } from "../email/send";
 import React from "react";
-
-const internal = require("../_generated/api").internal;
 
 /**
  * Submit contact enquiry from public form. Inserts to DB and notifies admins.

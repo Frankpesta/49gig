@@ -1050,6 +1050,7 @@ export default defineSchema({
   disputeMessages: defineTable({
     disputeId: v.id("disputes"),
     authorId: v.id("users"),
+    authorName: v.optional(v.string()),
     authorRole: v.union(
       v.literal("client"),
       v.literal("freelancer"),
@@ -1065,6 +1066,7 @@ export default defineSchema({
           fileName: v.string(),
           fileSize: v.number(),
           mimeType: v.string(),
+          url: v.optional(v.string()),
         })
       )
     ),
@@ -1072,14 +1074,15 @@ export default defineSchema({
   })
     .index("by_dispute", ["disputeId", "createdAt"]),
 
-  /** Client referral cash / crypto withdrawal requests (manual or automated processing). */
+  /** Client referral cash withdrawal requests (PayPal or crypto — manually processed by admin). */
   clientReferralPayoutRequests: defineTable({
     userId: v.id("users"),
     amountCents: v.number(),
     currency: v.string(),
-    method: v.union(v.literal("bank"), v.literal("crypto")),
+    method: v.union(v.literal("bank"), v.literal("crypto"), v.literal("paypal")),
     cryptoNetwork: v.optional(v.string()),
     cryptoAddress: v.optional(v.string()),
+    paypalEmail: v.optional(v.string()),
     status: v.union(
       v.literal("pending"),
       v.literal("processing"),
@@ -1087,6 +1090,8 @@ export default defineSchema({
       v.literal("rejected")
     ),
     adminNote: v.optional(v.string()),
+    processedBy: v.optional(v.id("users")),
+    processedAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
