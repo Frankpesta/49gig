@@ -59,6 +59,8 @@ export default function FreelancerOnboardingPage() {
     languagesWritten: [] as string[],
     country: "",
     timezone: "",
+    phoneNumber: "",
+    address: "",
   });
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
@@ -83,6 +85,8 @@ export default function FreelancerOnboardingPage() {
         languagesWritten: user.profile.languagesWritten || [],
         country: user.profile.country || "",
         timezone: user.profile.timezone || "",
+        phoneNumber: (user.profile as any).phoneNumber || "",
+        address: (user.profile as any).address || "",
       });
     }
   }, [user]);
@@ -126,6 +130,16 @@ export default function FreelancerOnboardingPage() {
     e.preventDefault();
     setError("");
 
+    if (!formData.phoneNumber.trim()) {
+      setError("Phone number is required");
+      return;
+    }
+
+    if (!formData.address.trim()) {
+      setError("Address is required");
+      return;
+    }
+
     if (!formData.techField) {
       setError("Please select a tech field");
       return;
@@ -153,6 +167,8 @@ export default function FreelancerOnboardingPage() {
       const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
       await updateProfile({
         profile: {
+          phoneNumber: formData.phoneNumber.trim(),
+          address: formData.address.trim(),
           techField: formData.techField as any,
           experienceLevel: formData.experienceLevel as any,
           skills: formData.skills,
@@ -219,6 +235,53 @@ export default function FreelancerOnboardingPage() {
                   </div>
                 )}
 
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber" className="text-sm font-medium">
+                      Phone Number <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="phoneNumber"
+                      type="tel"
+                      placeholder="+234 800 000 0000"
+                      value={formData.phoneNumber}
+                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      required
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="country" className="text-sm font-medium">
+                      Country (optional)
+                    </Label>
+                    <Input
+                      id="country"
+                      placeholder="e.g. Nigeria, Kenya"
+                      value={formData.country}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="address" className="text-sm font-medium">
+                    Address <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="address"
+                    type="text"
+                    placeholder="e.g. 12 Victoria Island, Lagos, Nigeria"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    required
+                    disabled={isLoading}
+                    className="h-11"
+                  />
+                </div>
+
                 <div className="space-y-3">
                   <Label htmlFor="techField" className="text-sm font-medium">
                     What role do you work in?
@@ -278,37 +341,20 @@ export default function FreelancerOnboardingPage() {
                     </Select>
                   </div>
                 )}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="country" className="text-sm font-medium">
-                      Country (optional)
-                    </Label>
-                    <Input
-                      id="country"
-                      placeholder="e.g. Nigeria, Kenya"
-                      value={formData.country}
-                      onChange={(e) =>
-                        setFormData({ ...formData, country: e.target.value })
-                      }
-                      disabled={isLoading}
-                      className="h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="timezone" className="text-sm font-medium">
-                      Time zone (optional)
-                    </Label>
-                    <Input
-                      id="timezone"
-                      placeholder="e.g. WAT, EAT, UTC+1"
-                      value={formData.timezone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, timezone: e.target.value })
-                      }
-                      disabled={isLoading}
-                      className="h-11"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="timezone" className="text-sm font-medium">
+                    Time zone (optional)
+                  </Label>
+                  <Input
+                    id="timezone"
+                    placeholder="e.g. WAT, EAT, UTC+1"
+                    value={formData.timezone}
+                    onChange={(e) =>
+                      setFormData({ ...formData, timezone: e.target.value })
+                    }
+                    disabled={isLoading}
+                    className="h-11"
+                  />
                 </div>
                 <div className="space-y-3">
                   <Label htmlFor="skills" className="text-sm font-medium">
