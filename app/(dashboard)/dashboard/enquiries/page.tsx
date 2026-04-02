@@ -49,7 +49,7 @@ export default function EnquiriesPage() {
   const sendReplyEmail = useAction(api.contactEnquiries.actions.sendContactEnquiryReplyEmail);
 
   const handleReply = async () => {
-    if (!selectedEnquiry || !replyMessage.trim()) return;
+    if (!selectedEnquiry || !replyMessage.trim() || !user) return;
     setIsReplying(true);
     try {
       await replyMutation({ enquiryId: selectedEnquiry, replyMessage: replyMessage.trim(), userId: user._id });
