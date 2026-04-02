@@ -155,15 +155,6 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "moderator", "admin"],
   },
 
-  // Moderator Dispute Management
-  {
-    title: "Dispute Management",
-    url: "/dashboard/moderator/disputes",
-    icon: AlertCircle,
-    section: "menu",
-    roles: ["moderator", "admin"],
-  },
-
   // Admin & Moderator: User Management
   {
     title: "Users",
