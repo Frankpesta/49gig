@@ -8,6 +8,8 @@ const api = require("../_generated/api") as {
   api: {
     contracts: { actions: { generateAndSendContract: unknown } };
     notifications: { actions: { sendSystemNotification: unknown } };
+    projects: { actions: { sendManualMatchFoundClientEmail: unknown } };
+    wallets: { mutations: { clearPendingRefundsForProject: unknown } };
   };
 };
 
@@ -37,6 +39,11 @@ export const createMatch = internalMutation({
 
     const sendSystemNotification = api.api.notifications.actions
       .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
+    const clearPendingRefundsForProject = api.api.wallets.mutations
+      .clearPendingRefundsForProject as unknown as FunctionReference<
+      "mutation",
+      "internal"
+    >;
 
     const project = await ctx.db.get(args.projectId);
 
@@ -382,6 +389,11 @@ export const respondToMatchAsFreelancer = mutation({
     const now = Date.now();
     const sendSystemNotification = api.api.notifications.actions
       .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
+    const clearPendingRefundsForProject = api.api.wallets.mutations
+      .clearPendingRefundsForProject as unknown as FunctionReference<
+      "mutation",
+      "internal"
+    >;
 
     if (args.response === "accepted") {
       // Finalise match
@@ -399,6 +411,10 @@ export const respondToMatchAsFreelancer = mutation({
       };
       clearReplacementFlowFieldsOnProject(projectPatch);
       await ctx.db.patch(match.projectId, projectPatch as any);
+      await ctx.runMutation(clearPendingRefundsForProject, {
+        userId: project.clientId,
+        projectId: match.projectId,
+      });
 
       // Reject all other pending matches
       const others = await ctx.db
@@ -431,6 +447,13 @@ export const respondToMatchAsFreelancer = mutation({
         message: `Your selected freelancer has accepted the opportunity for "${project.intakeForm.title}". Contract generation is starting.`,
         type: "match",
         data: { matchId: args.matchId, projectId: match.projectId },
+      });
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [project.clientId],
+        title: "Continuation credit applied",
+        message: `Your pending dispute refund hold for "${project.intakeForm.title}" has been applied to continuation with your new freelancer.`,
+        type: "payment",
+        data: { projectId: match.projectId, continuationCreditApplied: true },
       });
 
       // Generate and send contract
@@ -481,8 +504,7 @@ export const respondToMatchAsFreelancer = mutation({
 
 /**
  * Admin manually assigns a freelancer to a project.
- * Bypasses the scoring/vetting filter. Creates a match with a manually-set score of 100
- * and sets clientAction to "accepted" so the freelancer immediately receives an offer to accept.
+ * Bypasses scoring/vetting and creates a pending candidate for the client to review.
  */
 export const adminManualMatch = mutation({
   args: {
@@ -501,6 +523,12 @@ export const adminManualMatch = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Project not found");
+    if (project.status !== "matching") {
+      throw new Error("Manual matching is only allowed while project status is matching.");
+    }
+    if (project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0) {
+      throw new Error("This project already has matched freelancer(s).");
+    }
 
     const freelancer = await ctx.db.get(args.freelancerId);
     if (!freelancer || (freelancer.status !== "active")) {
@@ -513,6 +541,8 @@ export const adminManualMatch = mutation({
     const now = Date.now();
     const sendSystemNotification = api.api.notifications.actions
       .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
+    const sendManualMatchFoundClientEmail = api.api.projects.actions
+      .sendManualMatchFoundClientEmail as unknown as FunctionReference<"action", "internal">;
 
     // Check for existing pending match
     const existing = await ctx.db
@@ -540,16 +570,9 @@ export const adminManualMatch = mutation({
         timezoneCompatibility: 100,
       },
       explanation: `Manually assigned by admin${args.note ? `: ${args.note}` : ""}`,
-      clientAction: "accepted",
       createdAt: now,
       updatedAt: now,
     });
-
-    // Update project status to awaiting freelancer acceptance
-    await ctx.db.patch(args.projectId, {
-      status: "awaiting_freelancer",
-      updatedAt: now,
-    } as any);
 
     // Audit log
     await ctx.db.insert("auditLogs", {
@@ -563,22 +586,17 @@ export const adminManualMatch = mutation({
       createdAt: now,
     });
 
-    // Notify freelancer
-    await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: [args.freelancerId],
-      title: "New hire opportunity",
-      message: `You have been matched with a project by the admin${args.note ? `. Note: ${args.note}` : ""}. Please review and accept or decline.`,
-      type: "match",
-      data: { matchId, projectId: args.projectId },
-    });
-
     // Notify client
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [project.clientId],
-      title: "Freelancer assigned",
-      message: `An admin has manually assigned a freelancer to "${project.intakeForm.title}". Awaiting their acceptance.`,
+      title: "New match added by admin",
+      message: `An admin added a candidate for "${project.intakeForm.title}". Review matches and select who you want to proceed with.`,
       type: "match",
       data: { matchId, projectId: args.projectId },
+    });
+    await ctx.scheduler.runAfter(0, sendManualMatchFoundClientEmail, {
+      projectId: args.projectId,
+      freelancerId: args.freelancerId,
     });
 
     return { matchId };

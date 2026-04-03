@@ -206,6 +206,96 @@ export const sendMatchSuccessEmails = internalAction({
 });
 
 /**
+ * Send client email when admin manually adds a candidate match.
+ * Client still needs to review/select in matches UI.
+ */
+export const sendManualMatchFoundClientEmail = internalAction({
+  args: {
+    projectId: v.id("projects"),
+    freelancerId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.runQuery(
+      internalAny.projects.queries.getProjectInternal,
+      { projectId: args.projectId }
+    );
+    if (!project) return { success: false };
+
+    const client = await ctx.runQuery(
+      internalAny.users.queries.getUserByIdInternal,
+      { userId: project.clientId }
+    );
+    const freelancer = await ctx.runQuery(
+      internalAny.users.queries.getUserByIdInternal,
+      { userId: args.freelancerId }
+    );
+    if (!client?.email) return { success: false };
+
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+    const projectName = project.intakeForm.title;
+
+    await sendEmail({
+      to: client.email,
+      subject: `New match to review: ${projectName}`,
+      react: React.createElement(MatchFoundClientEmail, {
+        name: client.name || "there",
+        freelancerName: freelancer?.name || "a freelancer",
+        projectName,
+        appUrl,
+        logoUrl,
+        date,
+      }),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Send email prompting client to select replacement freelancer(s) after dispute resolution.
+ */
+export const sendSelectReplacementClientEmail = internalAction({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.runQuery(
+      internalAny.projects.queries.getProjectInternal,
+      { projectId: args.projectId }
+    );
+    if (!project) return { success: false };
+
+    const client = await ctx.runQuery(
+      internalAny.users.queries.getUserByIdInternal,
+      { userId: project.clientId }
+    );
+    if (!client?.email) return { success: false };
+
+    const appUrl = getAppUrl();
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
+    const projectName = project.intakeForm.title;
+
+    await sendEmail({
+      to: client.email,
+      subject: `Select new freelancer(s): ${projectName}`,
+      react: React.createElement(MatchFoundClientEmail, {
+        name: client.name || "there",
+        freelancerName: "new freelancer candidates",
+        projectName,
+        appUrl,
+        logoUrl,
+        date,
+      }),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
  * Send unfunded project reminder to client
  */
 export const sendUnfundedProjectReminderEmail = internalAction({

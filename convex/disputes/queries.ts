@@ -236,7 +236,10 @@ export const getDispute = query({
       // Clients see total locked amount (what they paid).
       // Freelancers see only their portion (locked minus platform fee).
       if (viewerIsFreelancer && !isAdminOrModerator) {
-        const platformFeeRate = 0.15; // 15% platform fee
+        const platformFeeRate = Math.max(
+          0,
+          Math.min(1, (project.platformFee ?? 15) / 100)
+        );
         visibleLockedAmount = Math.round(dispute.lockedAmount * (1 - platformFeeRate) * 100) / 100;
       }
     }

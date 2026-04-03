@@ -466,7 +466,13 @@ export const refundPaymentIntent = action({
       throw new Error("Unable to retrieve transaction ID for refund");
     }
 
-    const refundAmount = args.amount < payment.amount ? args.amount : payment.amount;
+    const grossPaid =
+      payment.fundingGrossAmount ??
+      (payment.amount + Math.max(0, payment.platformFee ?? 0));
+    const refundAmount = Math.min(Math.max(0, args.amount), grossPaid);
+    if (refundAmount <= 0) {
+      throw new Error("Refund amount must be greater than zero");
+    }
     const refundData = await flutterwave.createRefund(
       verification.data.id.toString(),
       refundAmount,
@@ -487,15 +493,23 @@ export const refundPaymentIntent = action({
     await ctx.runMutation(internalAny.payments.mutations.createPayment, {
       projectId: args.projectId,
       type: "refund",
-      amount: args.amount,
+      amount: refundAmount,
       currency: payment.currency,
       platformFee: 0,
-      netAmount: args.amount,
+      netAmount: refundAmount,
       flutterwaveTransactionId: payment.flutterwaveTransactionId,
       flutterwaveRefundId: refundData.data.id.toString(),
       flutterwaveCustomerEmail: payment.flutterwaveCustomerEmail,
       userId: clientId,
       status: "refunded",
+    });
+
+    await ctx.runMutation(internalAny.wallets.mutations.creditWallet, {
+      userId: clientId,
+      amountCents: Math.round(refundAmount * 100),
+      currency: payment.currency,
+      description: `Refund credited for project ${args.projectId}`,
+      projectId: args.projectId,
     });
 
     return { success: true, refundId: refundData.data.id.toString() };

@@ -190,15 +190,33 @@ export const releaseDisputeFunds = action({
       disputedIds.length < teamMemberIds.length;
 
     if (decision === "client_favor" && !isPartialTeam) {
-      // Single hire or full team dispute: refund all unreleased escrow to client
-      await ctx.runMutation(
-        internal.monthlyBillingCycles.mutations.finalizeClientWinsDisputeInternal,
-        {
-          projectId: dispute.projectId,
-          disputeId: args.disputeId,
+      // Keep project funds reserved for replacement flow, but reflect a pending client refund
+      // (includes platform fee component so the client sees the full paid amount).
+      const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+      const grossPaidCents = basePayment?.fundingGrossAmount
+        ? Math.round(basePayment.fundingGrossAmount * 100)
+        : Math.round(
+            Math.max(
+              0,
+              (basePayment?.amount ?? 0) + (basePayment?.platformFee ?? 0)
+            ) * 100
+          );
+      const pendingRefundCents = Math.max(escrowCents, grossPaidCents);
+      if (pendingRefundCents > 0) {
+        await ctx.runMutation(internal.wallets.mutations.recordPendingRefund, {
+          userId: project.clientId,
+          amountCents: pendingRefundCents,
           currency,
-        }
-      );
+          description: `Pending dispute refund hold for ${project.intakeForm.title}`,
+          projectId: dispute.projectId,
+        });
+      }
+      if (dispute.monthlyCycleId) {
+        await ctx.runMutation(
+          internal.monthlyBillingCycles.mutations.cancelDisputedMonthlyCycleInternal,
+          { monthlyCycleId: dispute.monthlyCycleId }
+        );
+      }
     } else if (decision === "client_favor" && isPartialTeam) {
       // Partial team dispute: calculate the removed members' portion of escrow
       const totalEscrowCents = Math.round(Math.max(0, (project as any).escrowedAmount ?? 0) * 100);
@@ -225,14 +243,18 @@ export const releaseDisputeFunds = action({
       removedShareCents = Math.min(removedShareCents, totalEscrowCents);
 
       if (removedShareCents > 0) {
+        await ctx.runMutation(internal.wallets.mutations.recordPendingRefund, {
+          userId: project.clientId,
+          amountCents: removedShareCents,
+          currency,
+          description: `Pending dispute refund hold for ${disputedIds.length} removed team member(s) on ${project.intakeForm.title}`,
+          projectId: dispute.projectId,
+        });
+      }
+      if (dispute.monthlyCycleId) {
         await ctx.runMutation(
-          internal.monthlyBillingCycles.mutations.creditClientWalletFromEscrowInternal,
-          {
-            projectId: dispute.projectId,
-            amountCents: removedShareCents,
-            currency,
-            description: `Partial team dispute resolution — refund for ${disputedIds.length} removed member(s)`,
-          }
+          internal.monthlyBillingCycles.mutations.cancelDisputedMonthlyCycleInternal,
+          { monthlyCycleId: dispute.monthlyCycleId }
         );
       }
       // Remaining escrow stays for the continuing team members
@@ -282,6 +304,12 @@ export const releaseDisputeFunds = action({
         );
       }
     } else if (decision === "replacement") {
+      if (dispute.monthlyCycleId) {
+        await ctx.runMutation(
+          internal.monthlyBillingCycles.mutations.cancelDisputedMonthlyCycleInternal,
+          { monthlyCycleId: dispute.monthlyCycleId }
+        );
+      }
       const result = await ctx.runMutation(
         internal.projects.replacement.applyFreelancerReplacementInternal,
         {
@@ -299,6 +327,19 @@ export const releaseDisputeFunds = action({
             projectId: dispute.projectId,
           });
         }
+      }
+    }
+
+    // Ensure replacement candidates are generated immediately for client-favor outcomes.
+    if (decision === "client_favor") {
+      if (project.intakeForm?.hireType === "team") {
+        await ctx.runAction(api.matching.actions.generateTeamMatches, {
+          projectId: dispute.projectId,
+        });
+      } else {
+        await ctx.runAction(api.matching.actions.generateMatches, {
+          projectId: dispute.projectId,
+        });
       }
     }
 

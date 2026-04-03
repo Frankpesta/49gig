@@ -43,6 +43,139 @@ async function getCurrentUserInQuery(
   return userDoc;
 }
 
+export const searchByIdAdmin = query({
+  args: {
+    id: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator")) {
+      return [];
+    }
+
+    const raw = args.id.trim();
+    if (!raw) return [];
+
+    type Row = {
+      kind: string;
+      id: string;
+      title: string;
+      subtitle?: string;
+      href?: string;
+    };
+    const rows: Row[] = [];
+
+    const tryPush = async (
+      table:
+        | "users"
+        | "projects"
+        | "disputes"
+        | "matches"
+        | "payments"
+        | "walletTransactions"
+        | "wallets"
+        | "chats"
+        | "messages"
+        | "notifications"
+        | "monthlyBillingCycles"
+        | "milestones",
+      payload: {
+        kind: string;
+        title: (doc: any) => string;
+        subtitle?: (doc: any) => string | undefined;
+        href?: (id: string) => string;
+      }
+    ) => {
+      const normalizedId = ctx.db.normalizeId(table, raw as any);
+      if (!normalizedId) return;
+      const doc = await ctx.db.get(normalizedId);
+      if (!doc) return;
+      rows.push({
+        kind: payload.kind,
+        id: String(normalizedId),
+        title: payload.title(doc),
+        subtitle: payload.subtitle?.(doc),
+        href: payload.href?.(String(normalizedId)),
+      });
+    };
+
+    await tryPush("users", {
+      kind: "user",
+      title: (doc) => `${doc.name || "Unknown"} (${doc.role})`,
+      subtitle: (doc) => doc.email,
+      href: (id) => `/dashboard/users/${id}`,
+    });
+    await tryPush("projects", {
+      kind: "project",
+      title: (doc) => doc.intakeForm?.title || "Untitled project",
+      subtitle: (doc) => `Status: ${doc.status}`,
+      href: (id) => `/dashboard/projects/${id}`,
+    });
+    await tryPush("disputes", {
+      kind: "dispute",
+      title: (doc) => `Dispute (${doc.status})`,
+      subtitle: (doc) => doc.reason,
+      href: (id) => `/dashboard/disputes/${id}`,
+    });
+    await tryPush("matches", {
+      kind: "match",
+      title: (doc) => `Match (${doc.status})`,
+      subtitle: (doc) => `Score: ${doc.score}`,
+      href: (id) => `/dashboard/match-requests?matchId=${id}`,
+    });
+    await tryPush("payments", {
+      kind: "payment",
+      title: (doc) => `Payment ${doc.type} (${doc.status})`,
+      subtitle: (doc) => `${doc.amount} ${String(doc.currency || "").toUpperCase()}`,
+      href: (id) => `/dashboard/transactions/${id}`,
+    });
+    await tryPush("walletTransactions", {
+      kind: "wallet_transaction",
+      title: (doc) => `Wallet ${doc.type} (${doc.status})`,
+      subtitle: (doc) => doc.description,
+      href: (id) => `/dashboard/transactions/${id}`,
+    });
+    await tryPush("wallets", {
+      kind: "wallet",
+      title: (doc) => `Wallet (${String(doc.currency || "").toUpperCase()})`,
+      subtitle: (doc) => `Balance: ${(doc.balanceCents ?? 0) / 100}`,
+      href: () => `/dashboard/wallet`,
+    });
+    await tryPush("chats", {
+      kind: "chat",
+      title: (doc) => doc.title || "Chat",
+      subtitle: (doc) => `Type: ${doc.type}`,
+      href: (id) => `/dashboard/chat/${id}`,
+    });
+    await tryPush("messages", {
+      kind: "message",
+      title: (doc) => doc.content?.slice(0, 80) || "Message",
+      subtitle: (doc) => `Type: ${doc.contentType}`,
+      href: (id) => `/dashboard/chat?messageId=${id}`,
+    });
+    await tryPush("notifications", {
+      kind: "notification",
+      title: (doc) => doc.title,
+      subtitle: (doc) => doc.message,
+      href: (id) => `/dashboard/notifications?notificationId=${id}`,
+    });
+    await tryPush("monthlyBillingCycles", {
+      kind: "monthly_cycle",
+      title: (doc) => `Monthly cycle #${doc.monthIndex}`,
+      subtitle: (doc) => `Status: ${doc.status}`,
+      href: (id) => `/dashboard/monthly-approvals?cycleId=${id}`,
+    });
+    await tryPush("milestones", {
+      kind: "milestone",
+      title: (doc) => doc.title || "Milestone",
+      subtitle: (doc) => `Status: ${doc.status}`,
+      href: (id) => `/dashboard/projects?milestoneId=${id}`,
+    });
+    return rows;
+  },
+});
+
 export const getDashboardMetrics = query({
   args: {
     userId: v.optional(v.id("users")),

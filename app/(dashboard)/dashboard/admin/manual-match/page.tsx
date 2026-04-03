@@ -54,7 +54,7 @@ export default function AdminManualMatchPage() {
   const { user, isAuthenticated } = useAuth();
 
   const [projectSearch, setProjectSearch] = useState("");
-  const [projectStatusFilter, setProjectStatusFilter] = useState("funded,matching");
+  const [projectStatusFilter, setProjectStatusFilter] = useState("matching");
   const [freelancerSearch, setFreelancerSearch] = useState("");
   const [experienceLevelFilter, setExperienceLevelFilter] = useState("any");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export default function AdminManualMatchPage() {
 
   const adminManualMatch = useMutation(api.matching.mutations.adminManualMatch);
 
-  // Fetch projects suitable for manual matching (funded, matching, awaiting_freelancer)
+  // Fetch projects suitable for manual matching (matching only)
   const allProjects = useQuery(
     (api as any)["projects/queries"].getProjects,
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
@@ -85,6 +85,7 @@ export default function AdminManualMatchPage() {
     const statuses = new Set(projectStatusFilter.split(",").map((s) => s.trim()));
     return (allProjects as any[]).filter((p: any) => {
       if (!statuses.has(p.status)) return false;
+      if (p.matchedFreelancerId || (p.matchedFreelancerIds?.length ?? 0) > 0) return false;
       if (projectSearch) {
         const q = projectSearch.toLowerCase();
         const title = (p.intakeForm?.title ?? "").toLowerCase();
@@ -132,7 +133,7 @@ export default function AdminManualMatchPage() {
         note: adminNote.trim() || undefined,
         userId: user._id,
       });
-      toast.success("Freelancer manually assigned. They will be notified to accept or decline.");
+      toast.success("Candidate added. Client has been notified to review and select this freelancer.");
       setConfirmOpen(false);
       router.push(`/dashboard/projects/${selectedProjectId}`);
     } catch (err: any) {
@@ -181,7 +182,7 @@ export default function AdminManualMatchPage() {
             Manual Matching
           </h1>
           <p className="text-muted-foreground mt-1">
-            Directly assign any active freelancer to a hire. The freelancer will receive an offer to accept or decline.
+            Add a candidate to a matching hire. The client is notified to review and select from matches.
           </p>
         </div>
       </div>
@@ -213,7 +214,7 @@ export default function AdminManualMatchPage() {
               Step 1 — Select Hire
             </CardTitle>
             <CardDescription>
-              Choose the hire to assign a freelancer to. Only funded or matching hires are shown.
+              Choose a hire that is still in matching and has no matched freelancer yet.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -234,11 +235,7 @@ export default function AdminManualMatchPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="funded,matching">Funded &amp; Matching</SelectItem>
-                  <SelectItem value="funded">Funded only</SelectItem>
                   <SelectItem value="matching">Matching only</SelectItem>
-                  <SelectItem value="awaiting_freelancer">Awaiting Freelancer</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -430,7 +427,7 @@ export default function AdminManualMatchPage() {
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  The freelancer will receive an offer notification and must accept before the contract is generated.
+                  The client will receive a match-found notification and can decide whether to select this candidate.
                 </p>
               </div>
               <Button
@@ -454,7 +451,7 @@ export default function AdminManualMatchPage() {
               You are manually assigning{" "}
               <strong>{selectedFreelancer?.name}</strong> to{" "}
               <strong>&ldquo;{selectedProject?.intakeForm?.title}&rdquo;</strong>.
-              This bypasses the normal matching and scoring flow.
+              This creates a candidate match for client review.
             </DialogDescription>
           </DialogHeader>
 
@@ -470,7 +467,7 @@ export default function AdminManualMatchPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status after</span>
-                <span className="font-medium text-orange-600">Awaiting freelancer acceptance</span>
+                <span className="font-medium text-blue-600">Still matching (client reviews candidates)</span>
               </div>
             </div>
 

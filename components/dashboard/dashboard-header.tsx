@@ -29,7 +29,7 @@ export function DashboardHeader() {
     (e: React.FormEvent) => {
       e.preventDefault();
       if (searchQuery.trim()) {
-        router.push(`/dashboard/projects?search=${encodeURIComponent(searchQuery.trim())}`);
+        router.push(`/dashboard/search?q=${encodeURIComponent(searchQuery.trim())}`);
       }
     },
     [searchQuery, router]
@@ -66,7 +66,7 @@ export function DashboardHeader() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Search projects, messages..."
+              placeholder="Search any record by ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-20 h-9 rounded-xl bg-muted/50 border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20"

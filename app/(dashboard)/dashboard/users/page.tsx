@@ -115,11 +115,19 @@ export default function UsersPage() {
 
   const updateUserRole = useMutation(api.users.mutations.updateUserRole);
   const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
+  const updateFreelancerProfileByAdmin = useMutation(
+    (api as any).users.mutations.updateFreelancerProfileByAdmin
+  );
   const adminOverrideVerification = useMutation(
     api.vetting.mutations.adminOverrideFreelancerVerificationAndTests
   );
   const approveVerification = useMutation(api.vetting.mutations.approveVerification);
   const rejectVerification = useMutation(api.vetting.mutations.rejectVerification);
+  const [freelancerSkillsInput, setFreelancerSkillsInput] = useState("");
+  const [freelancerExperienceLevel, setFreelancerExperienceLevel] = useState<
+    "junior" | "mid" | "senior" | "expert"
+  >("junior");
+  const [freelancerTechField, setFreelancerTechField] = useState<string>("other");
 
   const vettingForSelected = useQuery(
     api.vetting.queries.getVerificationResults,
@@ -334,6 +342,35 @@ export default function UsersPage() {
     }
   };
 
+  const handleFreelancerProfileUpdate = async () => {
+    if (!user?._id || !selectedUser || selectedUser.role !== "freelancer") return;
+    const skills = freelancerSkillsInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    setIsUpdating(true);
+    try {
+      await updateFreelancerProfileByAdmin({
+        targetUserId: selectedUser._id,
+        adminUserId: user._id,
+        experienceLevel: freelancerExperienceLevel,
+        techField: freelancerTechField as any,
+        skills,
+      });
+      toast.success("Freelancer profile updated.");
+      setSelectedUser(null);
+    } catch (error) {
+      setErrorDialog({
+        open: true,
+        title: "Profile update failed",
+        message: getUserFriendlyError(error) || "Could not update freelancer profile.",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   if (!isAuthenticated || !user) {
     return <DashboardEmptyState icon={Users} title="Please log in" iconTone="muted" />;
   }
@@ -433,6 +470,8 @@ export default function UsersPage() {
               <TableHead>Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Tech Field</TableHead>
+              <TableHead>Experience</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Verification</TableHead>
               <TableHead>Joined</TableHead>
@@ -442,7 +481,7 @@ export default function UsersPage() {
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                   No users found
                 </TableCell>
               </TableRow>
@@ -455,6 +494,14 @@ export default function UsersPage() {
                         <Badge variant="outline" className="capitalize">
                           {u.role}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground capitalize">
+                        {u.role === "freelancer"
+                          ? (u.profile?.techField ?? "—").replace(/_/g, " ")
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground capitalize">
+                        {u.role === "freelancer" ? u.profile?.experienceLevel ?? "—" : "—"}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -511,7 +558,18 @@ export default function UsersPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setSelectedUser(u)}
+                              onClick={() => {
+                                setSelectedUser(u);
+                                setFreelancerSkillsInput((u.profile?.skills ?? []).join(", "));
+                                setFreelancerExperienceLevel(
+                                  (u.profile?.experienceLevel as
+                                    | "junior"
+                                    | "mid"
+                                    | "senior"
+                                    | "expert") ?? "junior"
+                                );
+                                setFreelancerTechField((u.profile?.techField as string) ?? "other");
+                              }}
                             >
                               Manage
                             </Button>
@@ -585,6 +643,79 @@ export default function UsersPage() {
                                     </p>
                                   )}
                                 </div>
+
+                                {selectedUser.role === "freelancer" && user.role === "admin" && (
+                                  <div className="space-y-3 rounded-lg border border-border/70 bg-muted/20 p-3">
+                                    <p className="text-sm font-medium">Freelancer profile fields</p>
+                                    <div className="space-y-2">
+                                      <Label>Tech field</Label>
+                                      <Select
+                                        value={freelancerTechField}
+                                        onValueChange={setFreelancerTechField}
+                                        disabled={isUpdating}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="development">Development</SelectItem>
+                                          <SelectItem value="data_science">Data Science</SelectItem>
+                                          <SelectItem value="technical_writing">Technical Writing</SelectItem>
+                                          <SelectItem value="design">Design</SelectItem>
+                                          <SelectItem value="software_development">Software Development</SelectItem>
+                                          <SelectItem value="ui_ux_design">UI/UX Design</SelectItem>
+                                          <SelectItem value="data_analytics">Data Analytics</SelectItem>
+                                          <SelectItem value="devops_cloud">DevOps/Cloud</SelectItem>
+                                          <SelectItem value="cybersecurity_it">Cybersecurity/IT</SelectItem>
+                                          <SelectItem value="ai">AI</SelectItem>
+                                          <SelectItem value="machine_learning">Machine Learning</SelectItem>
+                                          <SelectItem value="blockchain">Blockchain</SelectItem>
+                                          <SelectItem value="qa_testing">QA Testing</SelectItem>
+                                          <SelectItem value="other">Other</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Experience level</Label>
+                                      <Select
+                                        value={freelancerExperienceLevel}
+                                        onValueChange={(value) =>
+                                          setFreelancerExperienceLevel(
+                                            value as "junior" | "mid" | "senior" | "expert"
+                                          )
+                                        }
+                                        disabled={isUpdating}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="junior">Junior</SelectItem>
+                                          <SelectItem value="mid">Mid</SelectItem>
+                                          <SelectItem value="senior">Senior</SelectItem>
+                                          <SelectItem value="expert">Expert</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Skills (comma-separated)</Label>
+                                      <Input
+                                        value={freelancerSkillsInput}
+                                        onChange={(e) => setFreelancerSkillsInput(e.target.value)}
+                                        placeholder="React, Node.js, PostgreSQL"
+                                        disabled={isUpdating}
+                                      />
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      onClick={() => void handleFreelancerProfileUpdate()}
+                                      disabled={isUpdating}
+                                    >
+                                      Save freelancer profile
+                                    </Button>
+                                  </div>
+                                )}
 
                                 {selectedUser._id !== user._id &&
                                   selectedUser.status === "active" &&
