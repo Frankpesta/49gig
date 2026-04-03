@@ -1,19 +1,18 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
-import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
-import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
-import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
-import { FileText, Plus, Pencil, Trash2, Eye, Loader2, Send } from "lucide-react";
-import { useState } from "react";
-import { Id } from "@/convex/_generated/dataModel";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,9 +23,25 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useMutation } from "convex/react";
+import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
+import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
+import { FileText, Plus, Pencil, Trash2, Eye, Loader2, Send } from "lucide-react";
+import { useState } from "react";
+import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+
+type BlogPost = {
+  _id: Id<"blogPosts">;
+  title: string;
+  slug: string;
+  status: string;
+  createdAt: number;
+  updatedAt: number;
+};
 
 export default function DashboardBlogPage() {
   const { user, isAuthenticated } = useAuth();
@@ -90,15 +105,18 @@ export default function DashboardBlogPage() {
     );
   }
 
+  const publishedCount = (posts ?? []).filter((p: BlogPost) => p.status === "published").length;
+  const draftCount = (posts ?? []).filter((p: BlogPost) => p.status === "draft").length;
+
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <DashboardPageHeader
           title="Blog"
           description="Create and manage blog posts for the marketing site."
           icon={FileText}
         />
-        <Button asChild>
+        <Button asChild className="shrink-0">
           <Link href="/dashboard/blog/new" className="gap-2">
             <Plus className="h-4 w-4" />
             New post
@@ -121,78 +139,119 @@ export default function DashboardBlogPage() {
           }
         />
       ) : (
-        <div className="grid gap-4">
-          {posts.map((post: { _id: Id<"blogPosts">; title: string; slug: string; status: string; createdAt: number; updatedAt: number }) => (
-            <Card key={post._id} className="overflow-hidden">
-              <CardHeader className="pb-2">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-lg">{post.title}</CardTitle>
-                    <CardDescription>
-                      /blog/{post.slug} · {formatDistanceToNow(post.updatedAt, { addSuffix: true })}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={post.status === "published" ? "default" : "secondary"}>
-                      {post.status}
-                    </Badge>
-                    {post.status === "draft" && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={publishingId === post._id}
-                        onClick={() => void handlePublishDraft(post._id)}
-                      >
-                        {publishingId === post._id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <Send className="h-3.5 w-3.5" />
+        <>
+          {/* Stats */}
+          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+            <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+              <span className="font-semibold text-foreground">{posts.length}</span> total
+            </span>
+            <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+              <span className="font-semibold text-green-600">{publishedCount}</span> published
+            </span>
+            <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+              <span className="font-semibold text-orange-500">{draftCount}</span> drafts
+            </span>
+          </div>
+
+          {/* Table */}
+          <div className="rounded-xl border border-border/60 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead>Title</TableHead>
+                  <TableHead className="w-[120px]">Status</TableHead>
+                  <TableHead className="w-[160px]">Last updated</TableHead>
+                  <TableHead className="w-[130px] text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(posts as BlogPost[]).map((post) => (
+                  <TableRow key={post._id} className="hover:bg-muted/20">
+                    <TableCell>
+                      <p className="font-medium text-sm">{post.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">/blog/{post.slug}</p>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={post.status === "published" ? "default" : "secondary"} className="capitalize">
+                        {post.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatDistanceToNow(post.updatedAt, { addSuffix: true })}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        {post.status === "draft" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                            title="Publish"
+                            disabled={publishingId === post._id}
+                            onClick={() => void handlePublishDraft(post._id)}
+                          >
+                            {publishingId === post._id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
                         )}
-                        Publish
-                      </Button>
-                    )}
-                    {post.status === "published" && (
-                      <Button variant="ghost" size="icon" asChild title="View on site">
-                        <Link href={`/blog/${post.slug}`} target="_blank" rel="noopener">
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/dashboard/blog/${post._id}/edit`}>
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeleteId(post._id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
+                        {post.status === "published" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            title="View on site"
+                            asChild
+                          >
+                            <Link href={`/blog/${post.slug}`} target="_blank" rel="noopener">
+                              <Eye className="h-3.5 w-3.5" />
+                            </Link>
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          title="Edit"
+                          asChild
+                        >
+                          <Link href={`/dashboard/blog/${post._id}/edit`}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Delete"
+                          onClick={() => setDeleteId(post._id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       <AlertDialog open={!!deleteId} onOpenChange={() => !isDeleting && setDeleteId(null)}>
         <AlertDialogContent>
-          <AlertDialogTitle>Delete post?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will permanently delete the post and all its comments and likes.
-          </AlertDialogDescription>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the post and all its comments and likes. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                handleDelete();
-              }}
+              onClick={(e) => { e.preventDefault(); void handleDelete(); }}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

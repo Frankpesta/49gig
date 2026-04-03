@@ -246,24 +246,15 @@ export default function DisputesPage() {
       </DashboardFilterBar>
 
       {/* Table */}
-      <Card className="rounded-xl overflow-hidden">
-        <CardHeader>
-          <CardTitle>
-            {statusFilter
-              ? statusFilter.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) + " Disputes"
-              : "All Disputes"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {disputes.length === 0 ? (
-            <DashboardEmptyState
-              icon={Scale}
-              title="No disputes found"
-              iconTone="muted"
-              className="border-0 bg-transparent py-8 shadow-none"
-            />
-          ) : (
-            <DataTable>
+      {disputes.length === 0 ? (
+        <DashboardEmptyState
+          icon={Scale}
+          title="No disputes found"
+          iconTone="muted"
+          className="py-10"
+        />
+      ) : (
+        <DataTable>
               <DataTableHeader>
                 <DataTableHead>Dispute</DataTableHead>
                 <DataTableHead className="w-[120px]">Type</DataTableHead>
@@ -381,17 +372,15 @@ export default function DisputesPage() {
                 ))}
               </DataTableBody>
             </DataTable>
-          )}
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={disputes.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-            itemName="disputes"
-          />
-        </CardContent>
-      </Card>
+      )}
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={disputes.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        itemName="disputes"
+      />
     </div>
   );
 }
