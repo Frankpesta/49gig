@@ -4,6 +4,11 @@ import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { clearReplacementFlowFieldsOnProject } from "../projects/replacement";
 import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
+import {
+  isTeamProject,
+  openTeamRoleLabelsForProject,
+  projectEligibleForAdminManualMatch,
+} from "../projects/manualMatchEligibility";
 
 const api = require("../_generated/api") as {
   api: {
@@ -526,25 +531,9 @@ export const adminManualMatch = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Project not found");
-    if (project.status !== "matching") {
-      throw new Error("Manual matching is only allowed while project status is matching.");
-    }
-
-    const isTeam = project.intakeForm.hireType === "team";
-    const hasMatched =
-      !!project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0;
-    const teamStillNeedsMembers =
-      isTeam &&
-      ((project.pendingTeamMemberSlots ?? 0) > 0 ||
-        (project.rolesAwaitingMatch?.length ?? 0) > 0 ||
-        project.awaitingMatch === true);
-
-    if (!isTeam && hasMatched) {
-      throw new Error("This project already has matched freelancer(s).");
-    }
-    if (isTeam && hasMatched && !teamStillNeedsMembers) {
+    if (!(await projectEligibleForAdminManualMatch(ctx, project))) {
       throw new Error(
-        "This team hire is not accepting additional matches (no open slots or not awaiting selection)."
+        "Manual matching is only for hires in matching with no one matched yet (single), or team hires with at least one open role or open headcount slot."
       );
     }
 
@@ -564,14 +553,15 @@ export const adminManualMatch = mutation({
     }
 
     let resolvedTeamRole: string | undefined;
-    if (isTeam) {
+    if (isTeamProject(project)) {
+      const openLabels = await openTeamRoleLabelsForProject(ctx, project);
+      const allLabels = getRoleLabelsForProjectIntake(project.intakeForm);
       const trimmed = args.teamRole?.trim();
       if (trimmed) {
         resolvedTeamRole = trimmed;
-      } else if ((project.rolesAwaitingMatch?.length ?? 0) > 0) {
-        resolvedTeamRole = project.rolesAwaitingMatch![0];
-      } else {
-        const labels = getRoleLabelsForProjectIntake(project.intakeForm);
+      } else if (openLabels.length > 0) {
+        resolvedTeamRole = openLabels[0];
+      } else if (allLabels.length > 0) {
         const projectMatches = await ctx.db
           .query("matches")
           .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -581,22 +571,19 @@ export const adminManualMatch = mutation({
             .filter((m) => m.status === "accepted" && m.teamRole)
             .map((m) => m.teamRole as string)
         );
-        const missing = labels.find((l) => !filledAccepted.has(l));
-        if (!missing) {
-          throw new Error(
-            "Could not determine which team role this candidate is for. Add open roles or pass teamRole explicitly."
-          );
-        }
+        const missing = allLabels.find((l) => !filledAccepted.has(l));
         resolvedTeamRole = missing;
       }
 
-      const waiting = project.rolesAwaitingMatch;
-      if (waiting && waiting.length > 0) {
-        const ok = waiting.some(
-          (r) => r.toLowerCase() === resolvedTeamRole!.toLowerCase()
-        );
-        if (!ok) {
-          throw new Error(`Team role must be one of: ${waiting.join(", ")}`);
+      if (allLabels.length > 0 && openLabels.length > 0) {
+        const chosen = resolvedTeamRole;
+        if (
+          !chosen ||
+          !openLabels.some((r) => r.toLowerCase() === chosen.toLowerCase())
+        ) {
+          throw new Error(
+            `Team role must be one of the open roles: ${openLabels.join(", ")}`
+          );
         }
       }
     }

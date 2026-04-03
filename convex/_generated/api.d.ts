@@ -69,6 +69,7 @@ import type * as platformSettings_queries from "../platformSettings/queries.js";
 import type * as pricing_mutations from "../pricing/mutations.js";
 import type * as pricing_queries from "../pricing/queries.js";
 import type * as projects_actions from "../projects/actions.js";
+import type * as projects_manualMatchEligibility from "../projects/manualMatchEligibility.js";
 import type * as projects_mutations from "../projects/mutations.js";
 import type * as projects_queries from "../projects/queries.js";
 import type * as projects_replacement from "../projects/replacement.js";
@@ -173,6 +174,7 @@ declare const fullApi: ApiFromModules<{
   "pricing/mutations": typeof pricing_mutations;
   "pricing/queries": typeof pricing_queries;
   "projects/actions": typeof projects_actions;
+  "projects/manualMatchEligibility": typeof projects_manualMatchEligibility;
   "projects/mutations": typeof projects_mutations;
   "projects/queries": typeof projects_queries;
   "projects/replacement": typeof projects_replacement;
