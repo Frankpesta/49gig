@@ -37,6 +37,8 @@ export default function ResolveDisputePage() {
       | "",
     resolutionAmount: "",
     notes: "",
+    clientMessage: "",
+    freelancerMessage: "",
   });
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,6 +81,8 @@ export default function ResolveDisputePage() {
           ? parseFloat(formData.resolutionAmount) * 100
           : undefined,
         notes: formData.notes,
+        clientMessage: formData.clientMessage.trim() || undefined,
+        freelancerMessage: formData.freelancerMessage.trim() || undefined,
         userId: user._id,
       });
 
@@ -246,20 +250,48 @@ export default function ResolveDisputePage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Resolution Notes *</Label>
+              <Label htmlFor="notes">Internal Resolution Notes *</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) =>
                   setFormData({ ...formData, notes: e.target.value })
                 }
-                placeholder="Provide detailed explanation of your decision..."
-                rows={8}
+                placeholder="Full explanation of your decision (staff use, included in dispute record)..."
+                rows={6}
                 required
               />
               <p className="text-sm text-muted-foreground">
-                This explanation will be visible to both parties and included in the dispute record.
+                This is your full internal ruling. It is included in the dispute record and visible to the winning party.
               </p>
+            </div>
+
+            <div className="rounded-lg border border-border/60 p-4 space-y-4">
+              <p className="text-sm font-medium">Personalized party messages <span className="text-muted-foreground font-normal">(optional — auto-generated if left blank)</span></p>
+              <div className="space-y-2">
+                <Label htmlFor="clientMessage">Message to client</Label>
+                <Textarea
+                  id="clientMessage"
+                  value={formData.clientMessage}
+                  onChange={(e) =>
+                    setFormData({ ...formData, clientMessage: e.target.value })
+                  }
+                  placeholder="Leave blank to auto-generate based on the decision…"
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="freelancerMessage">Message to freelancer</Label>
+                <Textarea
+                  id="freelancerMessage"
+                  value={formData.freelancerMessage}
+                  onChange={(e) =>
+                    setFormData({ ...formData, freelancerMessage: e.target.value })
+                  }
+                  placeholder="Leave blank to auto-generate based on the decision…"
+                  rows={3}
+                />
+              </div>
             </div>
 
             <div className="rounded-lg bg-muted p-4 space-y-2">

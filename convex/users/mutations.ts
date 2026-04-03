@@ -449,6 +449,8 @@ export const updateUserStatus = mutation({
     adminUserId: v.optional(v.id("users")),
     /** Shown only in admin tools; stored when suspending */
     suspensionReason: v.optional(v.string()),
+    /** Unix timestamp (ms) when the suspension ends; omitted = permanent */
+    suspendedUntil: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const admin = await getCurrentUserInMutation(ctx, args.adminUserId);
@@ -509,6 +511,7 @@ export const updateUserStatus = mutation({
               suspendedBy: admin._id,
               suspensionReason:
                 args.suspensionReason?.trim() || targetUser.suspensionReason,
+              suspendedUntil: args.suspendedUntil ?? undefined,
             }
           : {}),
       });

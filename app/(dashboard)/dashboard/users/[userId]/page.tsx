@@ -146,6 +146,7 @@ export default function UserDetailPage() {
   const [newRole, setNewRole] = useState("");
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
+  const [suspendDuration, setSuspendDuration] = useState("permanent");
   const [isActioning, setIsActioning] = useState(false);
 
   const profileData = useQuery(
@@ -228,6 +229,19 @@ export default function UserDetailPage() {
     }
   };
 
+  const getSuspendedUntil = (duration: string): number | undefined => {
+    const now = Date.now();
+    const map: Record<string, number> = {
+      "1week": 7 * 24 * 60 * 60 * 1000,
+      "2weeks": 14 * 24 * 60 * 60 * 1000,
+      "1month": 30 * 24 * 60 * 60 * 1000,
+      "3months": 90 * 24 * 60 * 60 * 1000,
+      "6months": 180 * 24 * 60 * 60 * 1000,
+      "1year": 365 * 24 * 60 * 60 * 1000,
+    };
+    return map[duration] ? now + map[duration] : undefined;
+  };
+
   const handleSuspend = async () => {
     if (!currentUser?._id) return;
     setIsActioning(true);
@@ -237,10 +251,12 @@ export default function UserDetailPage() {
         newStatus: "suspended",
         adminUserId: currentUser._id,
         suspensionReason: suspendReason.trim() || undefined,
+        suspendedUntil: getSuspendedUntil(suspendDuration),
       });
       toast.success("User suspended");
       setSuspendDialogOpen(false);
       setSuspendReason("");
+      setSuspendDuration("permanent");
     } catch (err) {
       toast.error(getUserFriendlyError(err) || "Failed to suspend user");
     } finally {
@@ -601,7 +617,10 @@ export default function UserDetailPage() {
       </AlertDialog>
 
       {/* Suspend dialog */}
-      <AlertDialog open={suspendDialogOpen} onOpenChange={setSuspendDialogOpen}>
+      <AlertDialog open={suspendDialogOpen} onOpenChange={(open) => {
+        setSuspendDialogOpen(open);
+        if (!open) { setSuspendReason(""); setSuspendDuration("permanent"); }
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Suspend user</AlertDialogTitle>
@@ -609,15 +628,34 @@ export default function UserDetailPage() {
               This will prevent <strong>{profileData.name}</strong> from logging in. Provide a reason for the record.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-2 py-2">
-            <Label>Reason (optional)</Label>
-            <Textarea
-              placeholder="e.g. Policy violation, fraud, etc."
-              value={suspendReason}
-              onChange={(e) => setSuspendReason(e.target.value)}
-              rows={3}
-              className="resize-none"
-            />
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Suspension duration</Label>
+              <Select value={suspendDuration} onValueChange={setSuspendDuration}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1week">1 week</SelectItem>
+                  <SelectItem value="2weeks">2 weeks</SelectItem>
+                  <SelectItem value="1month">1 month</SelectItem>
+                  <SelectItem value="3months">3 months</SelectItem>
+                  <SelectItem value="6months">6 months</SelectItem>
+                  <SelectItem value="1year">1 year</SelectItem>
+                  <SelectItem value="permanent">Permanent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Reason (optional)</Label>
+              <Textarea
+                placeholder="e.g. Policy violation, fraud, etc."
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isActioning}>Cancel</AlertDialogCancel>
