@@ -74,6 +74,8 @@ export const initiateDispute = mutation({
         })
       )
     ),
+    // Partial team dispute: which freelancers are being disputed (team hires only)
+    disputedFreelancerIds: v.optional(v.array(v.id("users"))),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -196,6 +198,22 @@ export const initiateDispute = mutation({
     // All unreleased escrow is frozen while a dispute is open (same currency units as project.escrowedAmount: dollars).
     const lockedAmount = Math.max(0, project.escrowedAmount ?? 0);
 
+    // Validate partial team dispute: all specified freelancers must be on the project
+    const teamMemberIds = project.matchedFreelancerIds ?? [];
+    if (args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0) {
+      if (!isClient) {
+        throw new Error("Only clients can initiate partial team disputes.");
+      }
+      if (teamMemberIds.length === 0) {
+        throw new Error("Partial team disputes are only available for team hires.");
+      }
+      for (const fid of args.disputedFreelancerIds) {
+        if (!teamMemberIds.includes(fid)) {
+          throw new Error(`Freelancer ${fid} is not a matched member of this project.`);
+        }
+      }
+    }
+
     // Create dispute
     const disputeId = await ctx.db.insert("disputes", {
       projectId,
@@ -209,6 +227,10 @@ export const initiateDispute = mutation({
       evidence: args.evidence || [],
       status: "open",
       lockedAmount,
+      disputedFreelancerIds:
+        args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0
+          ? args.disputedFreelancerIds
+          : undefined,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -598,12 +620,123 @@ export const resolveDispute = mutation({
     await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
       disputeId: args.disputeId,
     });
-    const notifyUserIds = [project.clientId, project.matchedFreelancerId].filter(
-      Boolean
-    ) as Doc<"users">["_id"][];
-    if (notifyUserIds.length > 0) {
+
+    const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
+
+    // Determine which freelancers to suspend/remove based on dispute type
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      const isTeamProject = (project.matchedFreelancerIds?.length ?? 0) > 0;
+      const isPartialTeam =
+        isTeamProject &&
+        dispute.disputedFreelancerIds &&
+        dispute.disputedFreelancerIds.length > 0 &&
+        dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
+
+      if (isPartialTeam && dispute.disputedFreelancerIds) {
+        // Partial team dispute: only suspend + remove specified freelancers
+        // Keep remaining team members, project goes back to matching for open roles
+        const remainingIds = (project.matchedFreelancerIds ?? []).filter(
+          (id) => !dispute.disputedFreelancerIds!.includes(id)
+        );
+
+        for (const fid of dispute.disputedFreelancerIds) {
+          await ctx.db.patch(fid, {
+            status: "suspended",
+            suspendedAt: now,
+            suspendedBy: user._id,
+            suspendedUntil: now + SIX_MONTHS_MS,
+            suspensionReason: `Suspended following partial team dispute resolution (ID: ${args.disputeId}) — subpar performance.`,
+            updatedAt: now,
+          } as any);
+          await ctx.scheduler.runAfter(0, sendSystemNotification, {
+            userIds: [fid],
+            title: "Account suspended",
+            message: "Your account has been suspended for 6 months due to a dispute resolution finding. You will receive an email with details.",
+            type: "system",
+            data: { disputeId: args.disputeId },
+          });
+        }
+
+        // Update project: remove disputed members, keep remaining, go to matching for open slots
+        await ctx.db.patch(dispute.projectId, {
+          matchedFreelancerIds: remainingIds,
+          status: "matching",
+          updatedAt: now,
+        } as any);
+      } else {
+        // Single hire or full team dispute: suspend the main matched freelancer
+        const freelancerToSuspend =
+          isTeamProject ? undefined : project.matchedFreelancerId;
+
+        if (freelancerToSuspend) {
+          await ctx.db.patch(freelancerToSuspend, {
+            status: "suspended",
+            suspendedAt: now,
+            suspendedBy: user._id,
+            suspendedUntil: now + SIX_MONTHS_MS,
+            suspensionReason: `Suspended following dispute resolution (ID: ${args.disputeId}) — subpar performance.`,
+            updatedAt: now,
+          } as any);
+          await ctx.scheduler.runAfter(0, sendSystemNotification, {
+            userIds: [freelancerToSuspend],
+            title: "Account suspended",
+            message: "Your account has been suspended for 6 months due to a dispute resolution finding. You will receive an email with details.",
+            type: "system",
+            data: { disputeId: args.disputeId },
+          });
+        }
+
+        // For full team disputes, suspend all matched freelancers
+        if (isTeamProject && project.matchedFreelancerIds && project.matchedFreelancerIds.length > 0) {
+          const freelancersToSuspend = dispute.disputedFreelancerIds?.length
+            ? dispute.disputedFreelancerIds
+            : project.matchedFreelancerIds;
+          for (const fid of freelancersToSuspend) {
+            await ctx.db.patch(fid, {
+              status: "suspended",
+              suspendedAt: now,
+              suspendedBy: user._id,
+              suspendedUntil: now + SIX_MONTHS_MS,
+              suspensionReason: `Suspended following full team dispute resolution (ID: ${args.disputeId}) — subpar performance.`,
+              updatedAt: now,
+            } as any);
+            await ctx.scheduler.runAfter(0, sendSystemNotification, {
+              userIds: [fid],
+              title: "Account suspended",
+              message: "Your account has been suspended for 6 months due to a dispute resolution finding. You will receive an email with details.",
+              type: "system",
+              data: { disputeId: args.disputeId },
+            });
+          }
+        }
+
+        // Remove freelancer(s) from project
+        if (isTeamProject) {
+          await ctx.db.patch(dispute.projectId, {
+            matchedFreelancerIds: [],
+            updatedAt: now,
+          } as any);
+        } else {
+          await ctx.db.patch(dispute.projectId, {
+            matchedFreelancerId: undefined,
+            updatedAt: now,
+          } as any);
+        }
+      }
+    }
+
+    // Notify all parties about resolution
+    const allPartyIds = [
+      project.clientId,
+      project.matchedFreelancerId,
+      ...(project.matchedFreelancerIds ?? []),
+    ].filter(Boolean) as Doc<"users">["_id"][];
+    const uniquePartyIds = Array.from(new Set(allPartyIds.map(String))).map(
+      (id) => id as Doc<"users">["_id"]
+    );
+    if (uniquePartyIds.length > 0) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: notifyUserIds,
+        userIds: uniquePartyIds,
         title: "Dispute resolved",
         message: `The dispute for ${project.intakeForm.title} has been resolved.`,
         type: "dispute",

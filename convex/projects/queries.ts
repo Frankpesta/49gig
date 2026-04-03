@@ -637,3 +637,40 @@ export const getProjectsForUser = query({
     return enriched;
   },
 });
+
+/**
+ * Get the matched team members (with names) for a project.
+ * Used in the dispute creation form so the client can choose which members to dispute.
+ */
+export const getProjectTeamMembers = query({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) return [];
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return [];
+
+    // Only clients on this project or admins/moderators can call this
+    const isClient = project.clientId === user._id;
+    const isAdminOrMod = user.role === "admin" || user.role === "moderator";
+    if (!isClient && !isAdminOrMod) return [];
+
+    const ids: string[] = project.matchedFreelancerIds ?? [];
+    if (ids.length === 0) return [];
+
+    return Promise.all(
+      ids.map(async (id) => {
+        const u = await ctx.db.get(id as any);
+        return {
+          _id: id,
+          name: (u as any)?.name ?? "Unknown",
+          role: (u as any)?.role ?? "freelancer",
+        };
+      })
+    );
+  },
+});

@@ -91,14 +91,29 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function InfoRow({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: React.ComponentType<{ className?: string }> }) {
+function InfoRow({ label, value, icon: Icon, truncate }: { label: string; value?: string | null; icon?: React.ComponentType<{ className?: string }>; truncate?: boolean }) {
   if (!value) return null;
+  const displayValue = truncate && value.length > 16
+    ? `${value.slice(0, 8)}...${value.slice(-4)}`
+    : value;
   return (
     <div className="flex items-start gap-3 py-2.5">
       {Icon && <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />}
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-        <p className="text-sm font-medium text-foreground mt-0.5 break-all">{value}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          <p className="text-sm font-medium text-foreground break-all font-mono">{displayValue}</p>
+          {truncate && (
+            <button
+              type="button"
+              title="Copy full ID"
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => { navigator.clipboard.writeText(value); }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -199,7 +214,7 @@ export default function UserDetailPage() {
     setIsActioning(true);
     try {
       await updateUserRole({
-        targetUserId: profileData._id,
+        userId: profileData._id,
         newRole: newRole as "client" | "freelancer" | "moderator" | "admin",
         adminUserId: currentUser._id,
       });
@@ -218,10 +233,10 @@ export default function UserDetailPage() {
     setIsActioning(true);
     try {
       await updateUserStatus({
-        targetUserId: profileData._id,
+        userId: profileData._id,
         newStatus: "suspended",
         adminUserId: currentUser._id,
-        reason: suspendReason.trim() || undefined,
+        suspensionReason: suspendReason.trim() || undefined,
       });
       toast.success("User suspended");
       setSuspendDialogOpen(false);
@@ -238,7 +253,7 @@ export default function UserDetailPage() {
     setIsActioning(true);
     try {
       await updateUserStatus({
-        targetUserId: profileData._id,
+        userId: profileData._id,
         newStatus: "active",
         adminUserId: currentUser._id,
       });
@@ -301,7 +316,7 @@ export default function UserDetailPage() {
               <CardTitle className="text-sm font-semibold">Identity</CardTitle>
             </CardHeader>
             <CardContent className="space-y-0 divide-y divide-border/40">
-              <InfoRow label="User ID" value={profileData._id} icon={Shield} />
+              <InfoRow label="User ID" value={profileData._id} icon={Shield} truncate />
               <InfoRow label="Phone" value={profileData.profile?.phoneNumber} icon={Phone} />
               <InfoRow label="Address" value={(profileData.profile as any)?.address} icon={MapPin} />
               <InfoRow
@@ -484,8 +499,8 @@ export default function UserDetailPage() {
                       {vettingData.vettingResult.englishProficiency && (
                         <ScoreBar
                           label="English Proficiency"
-                          score={vettingData.vettingResult.englishProficiency.score}
-                          max={vettingData.vettingResult.englishProficiency.maxScore ?? 100}
+                          score={vettingData.vettingResult.englishProficiency.overallScore ?? 0}
+                          max={100}
                         />
                       )}
                       {vettingData.vettingResult.skillAssessments?.map((sa: { skillName: string; score: number; maxScore?: number }, i: number) => (

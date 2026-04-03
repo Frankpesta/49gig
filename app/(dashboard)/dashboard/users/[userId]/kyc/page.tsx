@@ -317,7 +317,7 @@ export default function UserKycPage() {
           </Card>
 
           {/* Rejection history */}
-          {((kycData.idRejectionReasons?.length ?? 0) > 0 || (kycData.addressRejectionReasons?.length ?? 0) > 0) && (
+          {((kycData.idRejectionCount ?? 0) > 0 || (kycData.addressRejectionCount ?? 0) > 0) && (
             <Card className="rounded-xl overflow-hidden border-amber-200 dark:border-amber-800">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2">
@@ -326,28 +326,24 @@ export default function UserKycPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {(kycData.idRejectionReasons?.length ?? 0) > 0 && (
+                {(kycData.idRejectionCount ?? 0) > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">ID rejections ({kycData.idRejectionReasons?.length ?? 0}/2)</p>
-                    <ul className="space-y-1">
-                      {kycData.idRejectionReasons?.map((r: string, i: number) => (
-                        <li key={i} className="text-sm text-foreground flex items-start gap-1.5">
-                          <span className="text-muted-foreground mt-0.5">•</span> {r}
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">ID rejections ({kycData.idRejectionCount ?? 0}/2)</p>
+                    {kycData.idRejectionReason && (
+                      <p className="text-sm text-foreground flex items-start gap-1.5">
+                        <span className="text-muted-foreground mt-0.5">•</span> {kycData.idRejectionReason}
+                      </p>
+                    )}
                   </div>
                 )}
-                {(kycData.addressRejectionReasons?.length ?? 0) > 0 && (
+                {(kycData.addressRejectionCount ?? 0) > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Address rejections ({kycData.addressRejectionReasons?.length ?? 0}/2)</p>
-                    <ul className="space-y-1">
-                      {kycData.addressRejectionReasons?.map((r: string, i: number) => (
-                        <li key={i} className="text-sm text-foreground flex items-start gap-1.5">
-                          <span className="text-muted-foreground mt-0.5">•</span> {r}
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Address rejections ({kycData.addressRejectionCount ?? 0}/2)</p>
+                    {kycData.addressRejectionReason && (
+                      <p className="text-sm text-foreground flex items-start gap-1.5">
+                        <span className="text-muted-foreground mt-0.5">•</span> {kycData.addressRejectionReason}
+                      </p>
+                    )}
                   </div>
                 )}
               </CardContent>

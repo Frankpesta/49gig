@@ -78,3 +78,23 @@ export const replyToContactEnquiry = mutation({
     return { success: true, enquiryEmail: enquiry.email };
   },
 });
+
+/**
+ * Hard-delete a contact enquiry. Admin/moderator only.
+ */
+export const deleteContactEnquiry = mutation({
+  args: {
+    enquiryId: v.id("contactEnquiries"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator")) {
+      throw new Error("Only admins and moderators can delete enquiries.");
+    }
+    const enquiry = await ctx.db.get(args.enquiryId);
+    if (!enquiry) throw new Error("Enquiry not found.");
+    await ctx.db.delete(args.enquiryId);
+    return { success: true };
+  },
+});

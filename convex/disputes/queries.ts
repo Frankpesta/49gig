@@ -43,19 +43,46 @@ export const getDisputes = query({
       return [];
     }
 
+    const enrichDisputes = async (rawDisputes: Doc<"disputes">[]) => {
+      return Promise.all(
+        rawDisputes.map(async (d) => {
+          const project = await ctx.db.get(d.projectId);
+          const initiator = await ctx.db.get(d.initiatorId);
+          // Respondent is the other party on the project
+          let respondentName: string | null = null;
+          if (project) {
+            const otherUserId =
+              initiator?._id === project.clientId
+                ? project.matchedFreelancerId
+                : project.clientId;
+            if (otherUserId) {
+              const respondent = await ctx.db.get(otherUserId);
+              respondentName = respondent?.name ?? null;
+            }
+          }
+          return {
+            ...d,
+            projectTitle: project?.intakeForm?.title ?? null,
+            initiatorName: initiator?.name ?? null,
+            respondentName,
+          };
+        })
+      );
+    };
+
     // Admins and moderators see all disputes
     if (user.role === "admin" || user.role === "moderator") {
+      let raw;
       if (args.status) {
-        return await ctx.db
+        raw = await ctx.db
           .query("disputes")
           .withIndex("by_status", (q) => q.eq("status", args.status!))
           .order("desc")
           .collect();
+      } else {
+        raw = await ctx.db.query("disputes").order("desc").collect();
       }
-      return await ctx.db
-        .query("disputes")
-        .order("desc")
-        .collect();
+      return enrichDisputes(raw);
     }
 
     // Get user's projects (as client or matched freelancer)
@@ -90,7 +117,8 @@ export const getDisputes = query({
       ? allDisputes.filter((d) => d.status === args.status)
       : allDisputes;
 
-    return filtered.sort((a, b) => b.createdAt - a.createdAt);
+    const sorted = filtered.sort((a, b) => b.createdAt - a.createdAt);
+    return enrichDisputes(sorted);
   },
 });
 
@@ -170,7 +198,55 @@ export const getDispute = query({
       return null;
     }
 
-    return dispute;
+    // Enrich evidence with file URLs
+    const enrichedEvidence = await Promise.all(
+      dispute.evidence.map(async (e) => {
+        if (e.type === "file" && e.fileId) {
+          const url = await ctx.storage.getUrl(e.fileId);
+          return { ...e, fileUrl: url };
+        }
+        return { ...e, fileUrl: null };
+      })
+    );
+
+    // Task 9: Role-based visibility of resolution notes and locked amount
+    let visibleResolution = dispute.resolution;
+    let visibleLockedAmount = dispute.lockedAmount;
+
+    if (dispute.resolution && !isAdminOrModerator) {
+      const { decision } = dispute.resolution;
+      // Determine if the viewer is the "winner"
+      const viewerIsClient = isClient;
+      const viewerIsFreelancer = isFreelancer;
+      const clientWon = decision === "client_favor";
+      const freelancerWon = decision === "freelancer_favor";
+      const isWinner =
+        (viewerIsClient && clientWon) ||
+        (viewerIsFreelancer && freelancerWon) ||
+        decision === "partial"; // Both parties see partial notes
+
+      if (!isWinner) {
+        // Loser sees a generic message; no admin notes revealed
+        visibleResolution = {
+          ...dispute.resolution,
+          notes: "This dispute was resolved. The outcome was not in your favour.",
+        };
+      }
+
+      // Clients see total locked amount (what they paid).
+      // Freelancers see only their portion (locked minus platform fee).
+      if (viewerIsFreelancer && !isAdminOrModerator) {
+        const platformFeeRate = 0.15; // 15% platform fee
+        visibleLockedAmount = Math.round(dispute.lockedAmount * (1 - platformFeeRate) * 100) / 100;
+      }
+    }
+
+    return {
+      ...dispute,
+      evidence: enrichedEvidence,
+      resolution: visibleResolution,
+      lockedAmount: visibleLockedAmount,
+    };
   },
 });
 

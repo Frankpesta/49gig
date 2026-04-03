@@ -265,66 +265,68 @@ export default function DisputesPage() {
           ) : (
             <DataTable>
               <DataTableHeader>
-                <DataTableHead>ID</DataTableHead>
-                {!isStaff && (
-                  <DataTableHead>
-                    {user.role === "client" ? "Hire" : "Project"}
-                  </DataTableHead>
-                )}
-                <DataTableHead>Type</DataTableHead>
-                <DataTableHead>Status</DataTableHead>
-                <DataTableHead>Initiator</DataTableHead>
-                {isStaff && <DataTableHead>Assigned</DataTableHead>}
-                <DataTableHead>Locked</DataTableHead>
-                <DataTableHead>Date</DataTableHead>
-                <DataTableHead className="text-right">Actions</DataTableHead>
+                <DataTableHead>Dispute</DataTableHead>
+                <DataTableHead className="w-[120px]">Type</DataTableHead>
+                <DataTableHead className="w-[110px]">Status</DataTableHead>
+                <DataTableHead>Parties</DataTableHead>
+                {isStaff && <DataTableHead className="w-[100px]">Assigned</DataTableHead>}
+                <DataTableHead className="w-[100px]">Locked</DataTableHead>
+                <DataTableHead className="w-[100px]">Date</DataTableHead>
+                <DataTableHead className="w-[120px] text-right">Actions</DataTableHead>
               </DataTableHeader>
               <DataTableBody>
-                {paginatedDisputes.map((dispute: Doc<"disputes">) => (
+                {paginatedDisputes.map((dispute: any) => (
                   <DataTableRow key={dispute._id}>
-                    <DataTableCell className="font-mono text-xs">
-                      {dispute._id.slice(-8)}
+                    <DataTableCell>
+                      <div className="space-y-0.5">
+                        {dispute.projectTitle && (
+                          <p className="font-medium text-sm truncate max-w-[200px]">{dispute.projectTitle}</p>
+                        )}
+                        {dispute.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 max-w-[240px]">{dispute.description}</p>
+                        )}
+                        <p className="text-[10px] font-mono text-muted-foreground/60">#{dispute._id.slice(-8)}</p>
+                      </div>
                     </DataTableCell>
-                    {!isStaff && (
-                      <DataTableCell>
-                        <Link
-                          href={`/dashboard/projects/${dispute.projectId}`}
-                          className="text-primary hover:underline"
-                        >
-                          View {user.role === "client" ? "hire" : "project"}
-                        </Link>
-                      </DataTableCell>
-                    )}
-                    <DataTableCell>{getTypeLabel(dispute.type)}</DataTableCell>
+                    <DataTableCell className="text-xs">{getTypeLabel(dispute.type)}</DataTableCell>
                     <DataTableCell>{getStatusBadge(dispute.status)}</DataTableCell>
-                    <DataTableCell className="capitalize">
-                      {dispute.initiatorRole}
+                    <DataTableCell>
+                      <div className="space-y-0.5 text-xs">
+                        {dispute.initiatorName ? (
+                          <div><span className="text-muted-foreground capitalize">{dispute.initiatorRole}: </span><span className="font-medium">{dispute.initiatorName}</span></div>
+                        ) : (
+                          <div className="text-muted-foreground capitalize">{dispute.initiatorRole}</div>
+                        )}
+                        {dispute.respondentName && (
+                          <div><span className="text-muted-foreground">vs: </span><span className="font-medium">{dispute.respondentName}</span></div>
+                        )}
+                      </div>
                     </DataTableCell>
                     {isStaff && (
                       <DataTableCell>
                         {dispute.assignedModeratorId ? (
-                          <Badge variant="outline">
+                          <Badge variant="outline" className="text-xs">
                             <User className="mr-1 h-3 w-3" />
                             Assigned
                           </Badge>
                         ) : (
-                          <Badge variant="secondary">Unassigned</Badge>
+                          <Badge variant="secondary" className="text-xs">Unassigned</Badge>
                         )}
                       </DataTableCell>
                     )}
-                    <DataTableCell>
+                    <DataTableCell className="text-xs">
                       ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                     </DataTableCell>
-                    <DataTableCell>
+                    <DataTableCell className="text-xs whitespace-nowrap">
                       {new Date(dispute.createdAt).toLocaleDateString()}
                     </DataTableCell>
                     <DataTableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         <Button
                           variant="outline"
                           size="sm"
                           asChild
-                          className="rounded-lg"
+                          className="rounded-lg h-7 text-xs"
                         >
                           <Link href={`/dashboard/disputes/${dispute._id}`}>
                             View
@@ -335,7 +337,7 @@ export default function DisputesPage() {
                           !dispute.assignedModeratorId && (
                             <Button
                               size="sm"
-                              className="rounded-lg"
+                              className="rounded-lg h-7 text-xs"
                               onClick={async () => {
                                 if (!user?._id) return;
                                 try {
@@ -352,7 +354,7 @@ export default function DisputesPage() {
                                 }
                               }}
                             >
-                              Assign to me
+                              Assign
                             </Button>
                           )}
                         {isStaff &&
@@ -363,7 +365,7 @@ export default function DisputesPage() {
                             <Button
                               size="sm"
                               variant="default"
-                              className="rounded-lg"
+                              className="rounded-lg h-7 text-xs"
                               onClick={() =>
                                 router.push(
                                   `/dashboard/disputes/${dispute._id}/resolve`

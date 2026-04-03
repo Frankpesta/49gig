@@ -129,6 +129,8 @@ export default defineSchema({
     /** Set when status becomes suspended (cleared when reactivated) */
     suspendedAt: v.optional(v.number()),
     suspendedBy: v.optional(v.id("users")),
+    /** Timestamp when suspension lifts automatically (e.g. 6-month bans). Null = indefinite. */
+    suspendedUntil: v.optional(v.number()),
     /** Internal note for admins/moderators (not shown to the user) */
     suspensionReason: v.optional(v.string()),
 
@@ -398,6 +400,7 @@ export default defineSchema({
       v.literal("pending_funding"),
       v.literal("funded"),
       v.literal("matching"),
+      v.literal("awaiting_freelancer"), // Client selected; waiting for freelancer to accept
       v.literal("matched"),
       v.literal("in_progress"),
       v.literal("completed"),
@@ -811,6 +814,13 @@ export default defineSchema({
     ),
     clientActionAt: v.optional(v.number()),
 
+    // Freelancer acceptance (after client selects, before contract signing)
+    freelancerAction: v.optional(
+      v.union(v.literal("accepted"), v.literal("rejected"))
+    ),
+    freelancerActionAt: v.optional(v.number()),
+    freelancerRejectionReason: v.optional(v.string()),
+
     // Audit
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -961,6 +971,10 @@ export default defineSchema({
     milestoneId: v.optional(v.id("milestones")),
     // Monthly billing cycle (for monthly payment disputes)
     monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
+
+    // Partial team dispute: IDs of specific freelancers being disputed (team hires only)
+    // When set, only these freelancers are suspended/removed on client-favor resolution
+    disputedFreelancerIds: v.optional(v.array(v.id("users"))),
 
     // Initiator
     initiatorId: v.id("users"),
