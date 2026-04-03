@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { Input } from "@/components/ui/input";
@@ -396,38 +396,43 @@ export default function UsersPage() {
           </div>
       </DashboardFilterBar>
 
+      {/* Stats */}
+      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+        <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+          <span className="font-semibold text-foreground">{filteredUsers.length}</span> users
+        </span>
+        <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+          <span className="font-semibold text-green-600">{usersList.filter((u: Doc<"users">) => u.status === "active").length}</span> active
+        </span>
+        <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+          <span className="font-semibold text-orange-600">{usersList.filter((u: Doc<"users">) => u.status === "suspended").length}</span> suspended
+        </span>
+      </div>
+
       {/* Users Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Users ({filteredUsers.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Verification</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
-                      No users found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedUsers.map((u: Doc<"users">) => (
-                    <TableRow key={u._id}>
+      <div className="rounded-xl border border-border/60 overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/30 hover:bg-muted/30">
+              <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Verification</TableHead>
+              <TableHead>Joined</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredUsers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                  No users found
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedUsers.map((u: Doc<"users">) => (
+                <TableRow key={u._id} className="hover:bg-muted/20">
                       <TableCell className="font-medium">{u.name ?? "—"}</TableCell>
                       <TableCell>{u.email ?? "—"}</TableCell>
                       <TableCell>
@@ -781,19 +786,17 @@ export default function UsersPage() {
                     </TableRow>
                   ))
                 )}
-              </TableBody>
-            </Table>
-          </div>
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredUsers.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-            itemName="users"
-          />
-        </CardContent>
-      </Card>
+          </TableBody>
+        </Table>
+      </div>
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filteredUsers.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        itemName="users"
+      />
 
       <Dialog
         open={profileUserId !== null}

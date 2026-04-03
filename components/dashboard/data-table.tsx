@@ -18,7 +18,7 @@ interface DataTableProps {
 
 export function DataTable({ children, className }: DataTableProps) {
   return (
-    <div className={cn("rounded-xl border border-border/60 overflow-hidden bg-card", className)}>
+    <div className={cn("rounded-xl border border-border/60 overflow-hidden", className)}>
       <div className="overflow-x-auto">
         <Table>{children}</Table>
       </div>
@@ -74,7 +74,7 @@ export function DataTableRow({
   return (
     <TableRow
       className={cn(
-        "border-b border-border/40 transition-colors hover:bg-muted/40",
+        "border-b border-border/40 transition-colors hover:bg-muted/20",
         onClick && "cursor-pointer",
         className
       )}
