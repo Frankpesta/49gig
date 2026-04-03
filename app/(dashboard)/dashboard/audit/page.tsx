@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -144,42 +143,38 @@ export default function AuditLogsPage() {
           </div>
       </DashboardFilterBar>
 
+      {/* Stats */}
+      <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+        <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+          <span className="font-semibold text-foreground">{filteredLogs.length}</span> logs
+        </span>
+      </div>
+
       {/* Audit Logs Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Audit Logs ({filteredLogs.length})
-          </CardTitle>
-          <CardDescription>
-            Complete audit trail of all system actions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Actor</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLogs.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      No audit logs found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedLogs.map((log: EnrichedAuditLog) => {
-                    const Icon = ACTION_TYPE_ICONS[log.actionType] || FileText;
-                    return (
-                      <TableRow key={log._id}>
+      <div className="rounded-xl border border-border/60 overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/30 hover:bg-muted/30">
+              <TableHead>Timestamp</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Actor</TableHead>
+              <TableHead>Target</TableHead>
+              <TableHead>Details</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredLogs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
+                  No audit logs found
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedLogs.map((log: EnrichedAuditLog) => {
+                const Icon = ACTION_TYPE_ICONS[log.actionType] || FileText;
+                return (
+                  <TableRow key={log._id} className="hover:bg-muted/20">
                         <TableCell className="text-sm text-muted-foreground">
                           {formatDistanceToNow(new Date(log.createdAt), {
                             addSuffix: true,
@@ -239,19 +234,17 @@ export default function AuditLogsPage() {
                     );
                   })
                 )}
-              </TableBody>
-            </Table>
-          </div>
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={filteredLogs.length}
-            itemsPerPage={itemsPerPage}
-            onPageChange={setCurrentPage}
-            itemName="audit logs"
-          />
-        </CardContent>
-      </Card>
+          </TableBody>
+        </Table>
+      </div>
+      <TablePagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filteredLogs.length}
+        itemsPerPage={itemsPerPage}
+        onPageChange={setCurrentPage}
+        itemName="audit logs"
+      />
     </div>
   );
 }
