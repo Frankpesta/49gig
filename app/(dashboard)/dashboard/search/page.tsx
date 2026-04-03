@@ -11,6 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+type SearchRow = {
+  kind: string;
+  id: string;
+  title: string;
+  subtitle?: string;
+  href?: string;
+};
+
 export default function DashboardSearchPage() {
   const params = useSearchParams();
   const q = (params.get("q") || "").trim();
@@ -50,7 +58,7 @@ export default function DashboardSearchPage() {
             </p>
           )}
 
-          {results?.map((row) => (
+          {(results as SearchRow[] | undefined)?.map((row) => (
             <div
               key={`${row.kind}-${row.id}`}
               className="rounded-lg border border-border/60 bg-muted/20 p-3"

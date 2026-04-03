@@ -257,8 +257,6 @@ export const initiateDispute = mutation({
       >;
     const releaseDisputeFunds =
       api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
-    const sendSelectReplacementClientEmail = api.api.projects.actions
-      .sendSelectReplacementClientEmail as unknown as FunctionReference<"action", "internal">;
     
     // Create audit log
     await ctx.db.insert("auditLogs", {
@@ -589,6 +587,11 @@ export const resolveDispute = mutation({
       >;
     const releaseDisputeFunds =
       api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
+    const sendSelectReplacementClientEmail = api.api.projects.actions
+      .sendSelectReplacementClientEmail as unknown as FunctionReference<
+      "action",
+      "internal"
+    >;
 
     // Build personalized messages for each party if not explicitly provided
     const decisionClientMsg = args.clientMessage?.trim() ||

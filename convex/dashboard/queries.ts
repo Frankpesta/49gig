@@ -66,8 +66,20 @@ export const searchByIdAdmin = query({
     };
     const rows: Row[] = [];
 
-    const tryPush = async <T extends string>(
-      table: T,
+    const tryPush = async (
+      table:
+        | "users"
+        | "projects"
+        | "disputes"
+        | "matches"
+        | "payments"
+        | "walletTransactions"
+        | "wallets"
+        | "chats"
+        | "messages"
+        | "notifications"
+        | "monthlyBillingCycles"
+        | "milestones",
       payload: {
         kind: string;
         title: (doc: any) => string;
@@ -160,13 +172,6 @@ export const searchByIdAdmin = query({
       subtitle: (doc) => `Status: ${doc.status}`,
       href: (id) => `/dashboard/projects?milestoneId=${id}`,
     });
-    await tryPush("contracts", {
-      kind: "contract",
-      title: () => "Contract",
-      subtitle: (doc) => `Status: ${doc.status}`,
-      href: (id) => `/dashboard/projects?contractId=${id}`,
-    });
-
     return rows;
   },
 });

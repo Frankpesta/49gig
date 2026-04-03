@@ -389,6 +389,11 @@ export const respondToMatchAsFreelancer = mutation({
     const now = Date.now();
     const sendSystemNotification = api.api.notifications.actions
       .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
+    const clearPendingRefundsForProject = api.api.wallets.mutations
+      .clearPendingRefundsForProject as unknown as FunctionReference<
+      "mutation",
+      "internal"
+    >;
 
     if (args.response === "accepted") {
       // Finalise match
