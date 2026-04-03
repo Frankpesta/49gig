@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TablePagination } from "@/components/ui/table-pagination";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
@@ -368,37 +368,32 @@ export default function TransactionsPage() {
       </DashboardFilterBar>
 
       {/* Transactions List */}
-      <Card className="rounded-xl overflow-hidden">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <CardTitle>Transaction History</CardTitle>
-              <CardDescription>
-                {filteredAndSortedTransactions.length} transaction
-                {filteredAndSortedTransactions.length !== 1 ? "s" : ""} found
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-1 rounded-lg border border-border/60 p-1 bg-muted/30">
-              <Button
-                variant={viewMode === "table" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 rounded-md"
-                onClick={() => setViewMode("table")}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === "cards" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-8 rounded-md"
-                onClick={() => setViewMode("cards")}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+          <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+            <span className="font-semibold text-foreground">{filteredAndSortedTransactions.length}</span> transaction{filteredAndSortedTransactions.length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-border/60 p-1 bg-muted/30 self-start sm:self-auto">
+          <Button
+            variant={viewMode === "table" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8 rounded-md"
+            onClick={() => setViewMode("table")}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === "cards" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8 rounded-md"
+            onClick={() => setViewMode("cards")}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      <div>
           {transactions === undefined ? (
             <div className="space-y-2">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -539,8 +534,7 @@ export default function TransactionsPage() {
               />
             </div>
           )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }
