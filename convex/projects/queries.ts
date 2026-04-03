@@ -2,6 +2,11 @@ import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import {
+  openTeamRoleLabelsForProject,
+  projectEligibleForAdminManualMatch,
+  isTeamProject,
+} from "./manualMatchEligibility";
 
 /**
  * Helper function to get current user in queries
@@ -171,6 +176,69 @@ export const getProjects = query({
     );
 
     return enrichedProjects;
+  },
+});
+
+/**
+ * Admins: all hires in `matching` where manual adding a candidate is still meaningful —
+ * solo with no matched freelancer, or team with at least one role/slot not yet accepted.
+ * Ignores funding and whether automated matching found candidates.
+ */
+export const listManualMatchProjectsAdmin = query({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "admin") {
+      throw new Error("Only admins can list manual match projects");
+    }
+
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_status", (q) => q.eq("status", "matching"))
+      .order("desc")
+      .collect();
+
+    const eligible: Doc<"projects">[] = [];
+    for (const project of projects) {
+      if (await projectEligibleForAdminManualMatch(ctx, project)) {
+        eligible.push(project);
+      }
+    }
+
+    const enriched = await Promise.all(
+      eligible.map(async (project) => {
+        const client = await ctx.db.get(project.clientId);
+        const freelancer = project.matchedFreelancerId
+          ? await ctx.db.get(project.matchedFreelancerId)
+          : null;
+        const manualMatchOpenTeamRoles = isTeamProject(project)
+          ? await openTeamRoleLabelsForProject(ctx, project)
+          : [];
+        return {
+          ...project,
+          manualMatchOpenTeamRoles,
+          client: client
+            ? {
+                _id: client._id,
+                name: client.name,
+                email: client.email,
+              }
+            : null,
+          freelancer: freelancer
+            ? {
+                _id: freelancer._id,
+                name: freelancer.name,
+                email: freelancer.email,
+              }
+            : null,
+        };
+      })
+    );
+
+    return enriched;
   },
 });
 

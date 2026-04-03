@@ -42,26 +42,17 @@ import {
   AlertCircle,
   ChevronRight,
   Users,
-  Filter,
   ArrowLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 
-function projectIsListableForManualMatch(p: any): boolean {
-  if (p.status !== "matching") return false;
-  const isTeam = p.intakeForm?.hireType === "team";
-  const hasMatched =
-    !!p.matchedFreelancerId || (p.matchedFreelancerIds?.length ?? 0) > 0;
-  const teamStillNeedsMembers =
-    isTeam &&
-    ((p.pendingTeamMemberSlots ?? 0) > 0 ||
-      (p.rolesAwaitingMatch?.length ?? 0) > 0 ||
-      p.awaitingMatch === true);
-  if (!isTeam && hasMatched) return false;
-  if (isTeam && hasMatched && !teamStillNeedsMembers) return false;
-  return true;
+/** Open role labels from server (accepted-match basis); fallback to project.rolesAwaitingMatch. */
+function teamRoleOptionsForManualMatch(p: any): string[] {
+  const fromServer = (p.manualMatchOpenTeamRoles as string[] | undefined) ?? [];
+  if (fromServer.length > 0) return fromServer;
+  return (p.rolesAwaitingMatch as string[] | undefined) ?? [];
 }
 
 export default function AdminManualMatchPage() {
@@ -69,7 +60,6 @@ export default function AdminManualMatchPage() {
   const { user, isAuthenticated } = useAuth();
 
   const [projectSearch, setProjectSearch] = useState("");
-  const [projectStatusFilter, setProjectStatusFilter] = useState("matching");
   const [freelancerSearch, setFreelancerSearch] = useState("");
   const [experienceLevelFilter, setExperienceLevelFilter] = useState("any");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -82,9 +72,8 @@ export default function AdminManualMatchPage() {
 
   const adminManualMatch = useMutation(api.matching.mutations.adminManualMatch);
 
-  // Fetch projects suitable for manual matching (matching only)
   const allProjects = useQuery(
-    (api as any)["projects/queries"].getProjects,
+    api.projects.queries.listManualMatchProjectsAdmin,
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
 
@@ -96,13 +85,9 @@ export default function AdminManualMatchPage() {
       : "skip"
   );
 
-  // Filter projects by status and search (includes partial team hires still in "matching")
   const matchableProjects = useMemo(() => {
     if (!allProjects) return [];
-    const statuses = new Set(projectStatusFilter.split(",").map((s) => s.trim()));
     return (allProjects as any[]).filter((p: any) => {
-      if (!statuses.has(p.status)) return false;
-      if (!projectIsListableForManualMatch(p)) return false;
       if (projectSearch) {
         const q = projectSearch.toLowerCase();
         const title = (p.intakeForm?.title ?? "").toLowerCase();
@@ -110,7 +95,7 @@ export default function AdminManualMatchPage() {
       }
       return true;
     });
-  }, [allProjects, projectStatusFilter, projectSearch]);
+  }, [allProjects, projectSearch]);
 
   useEffect(() => {
     if (!selectedProjectId || !allProjects) {
@@ -122,7 +107,7 @@ export default function AdminManualMatchPage() {
       setTeamRoleForMatch("");
       return;
     }
-    const roles = (p.rolesAwaitingMatch as string[] | undefined) ?? [];
+    const roles = teamRoleOptionsForManualMatch(p);
     setTeamRoleForMatch(roles[0] ?? "");
   }, [selectedProjectId, allProjects]);
 
@@ -179,7 +164,7 @@ export default function AdminManualMatchPage() {
 
   if (!isAuthenticated || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center px-4">
         <p className="text-muted-foreground">Please log in</p>
       </div>
     );
@@ -187,9 +172,9 @@ export default function AdminManualMatchPage() {
 
   if (user.role !== "admin") {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card>
-          <CardContent className="p-8 text-center">
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 sm:p-8 text-center">
             <AlertCircle className="mx-auto h-8 w-8 text-destructive mb-3" />
             <p className="text-muted-foreground">Only admins can access manual matching.</p>
             <Button asChild className="mt-4">
@@ -202,85 +187,103 @@ export default function AdminManualMatchPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl py-8 space-y-8">
+    <div className="container mx-auto max-w-7xl space-y-6 px-4 py-4 sm:space-y-8 sm:px-6 sm:py-8">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-4">
+        <Button variant="ghost" size="icon" className="shrink-0 self-start" asChild>
+          <Link href="/dashboard" aria-label="Back to dashboard">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <UserSearch className="h-7 w-7 text-primary" />
-            Manual Matching
+        <div className="min-w-0 flex-1">
+          <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight sm:text-3xl">
+            <UserSearch className="h-6 w-6 shrink-0 text-primary sm:h-7 sm:w-7" />
+            <span>Manual Matching</span>
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="mt-1 text-pretty text-sm text-muted-foreground sm:text-base">
             Add a candidate to a matching hire. The client is notified to review and select from matches.
           </p>
         </div>
       </div>
 
-      {/* Step indicators */}
-      <div className="flex items-center gap-3 text-sm">
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-medium transition-colors ${!selectedProjectId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-          <span className="w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold">1</span>
-          Select Hire
+      {/* Steps: stacked on phones, row from sm — no horizontal page scroll */}
+      <div
+        className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 md:gap-3"
+        aria-label="Assignment steps"
+      >
+        <div
+          className={`flex w-full items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition-colors sm:w-auto sm:text-sm ${
+            !selectedProjectId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+          }`}
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold sm:h-5 sm:w-5 sm:text-xs">
+            1
+          </span>
+          <span className="min-w-0 flex-1 sm:flex-none">Select hire</span>
         </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-medium transition-colors ${selectedProjectId && !selectedFreelancerId ? "bg-primary text-primary-foreground" : selectedProjectId && selectedFreelancerId ? "bg-muted text-muted-foreground" : "bg-muted/50 text-muted-foreground/50"}`}>
-          <span className="w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold">2</span>
-          Select Freelancer
+        <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground sm:block" aria-hidden />
+        <div
+          className={`flex w-full items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition-colors sm:w-auto sm:text-sm ${
+            selectedProjectId && !selectedFreelancerId
+              ? "bg-primary text-primary-foreground"
+              : selectedProjectId && selectedFreelancerId
+                ? "bg-muted text-muted-foreground"
+                : "bg-muted/50 text-muted-foreground/50"
+          }`}
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold sm:h-5 sm:w-5 sm:text-xs">
+            2
+          </span>
+          <span className="min-w-0 flex-1 sm:flex-none">Select freelancer</span>
         </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-        <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full font-medium transition-colors ${selectedProjectId && selectedFreelancerId ? "bg-primary text-primary-foreground" : "bg-muted/50 text-muted-foreground/50"}`}>
-          <span className="w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold">3</span>
-          Confirm &amp; Assign
+        <ChevronRight className="hidden h-4 w-4 shrink-0 text-muted-foreground sm:block" aria-hidden />
+        <div
+          className={`flex w-full items-center gap-2 rounded-full px-3 py-2 text-xs font-medium transition-colors sm:w-auto sm:text-sm ${
+            selectedProjectId && selectedFreelancerId
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted/50 text-muted-foreground/50"
+          }`}
+        >
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-bold sm:h-5 sm:w-5 sm:text-xs">
+            3
+          </span>
+          <span className="min-w-0 flex-1 sm:flex-none">Confirm &amp; assign</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
         {/* Left: Project selection */}
         <Card className={selectedProjectId ? "ring-2 ring-primary/30" : ""}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
-              Step 1 — Select Hire
+            <CardTitle className="flex min-w-0 items-center gap-2 text-base leading-snug">
+              <Briefcase className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0">Step 1 — Select hire</span>
             </CardTitle>
-            <CardDescription>
-              Hires in matching: solo (no one matched yet) or team hires with open slots (partial team).
+            <CardDescription className="text-pretty">
+              Hires in status matching: single hires with no matched freelancer yet, and team hires with at least one
+              open role (no accepted match for that slot) or open headcount when roles are not defined on intake.
+              Funding and whether the matcher found candidates do not affect this list.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Filters */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search hire title..."
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                  className="pl-8 h-9"
-                />
-              </div>
-              <Select value={projectStatusFilter} onValueChange={setProjectStatusFilter}>
-                <SelectTrigger className="w-40 h-9">
-                  <Filter className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="matching">Matching only</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search hire title..."
+                value={projectSearch}
+                onChange={(e) => setProjectSearch(e.target.value)}
+                className="pl-8 h-9"
+              />
             </div>
 
             {/* Project list */}
-            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+            <div className="max-h-[50vh] space-y-2 overflow-y-auto overflow-x-hidden pr-1 sm:max-h-96">
               {allProjects === undefined ? (
                 <p className="text-sm text-muted-foreground text-center py-6">Loading hires…</p>
               ) : matchableProjects.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-6">
-                  No hires match the current filters.
+                  No eligible hires match your search.
                 </p>
               ) : (
                 matchableProjects.map((p: any) => (
@@ -308,11 +311,12 @@ export default function AdminManualMatchPage() {
                             {p.intakeForm?.hireType === "team" ? "Team" : "Single"}
                           </Badge>
                           {p.intakeForm?.hireType === "team" &&
-                            (p.matchedFreelancerIds?.length ?? 0) > 0 && (
+                            (p.manualMatchOpenTeamRoles as string[] | undefined)?.length ? (
                               <Badge variant="outline" className="text-xs py-0 border-amber-400 text-amber-700">
-                                Partial team ({p.pendingTeamMemberSlots ?? "?"} open)
+                                {(p.manualMatchOpenTeamRoles as string[]).length} team role
+                                {(p.manualMatchOpenTeamRoles as string[]).length === 1 ? "" : "s"} open
                               </Badge>
-                            )}
+                            ) : null}
                           <Badge
                             variant="outline"
                             className={`text-xs py-0 capitalize ${
@@ -346,9 +350,9 @@ export default function AdminManualMatchPage() {
         {/* Right: Freelancer selection */}
         <Card className={selectedFreelancerId ? "ring-2 ring-primary/30" : selectedProjectId ? "" : "opacity-50 pointer-events-none"}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              Step 2 — Select Freelancer
+            <CardTitle className="flex min-w-0 items-center gap-2 text-base leading-snug">
+              <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0">Step 2 — Select freelancer</span>
             </CardTitle>
             <CardDescription>
               Search all active freelancers. Admin override — scoring and vetting requirements are bypassed.
@@ -356,19 +360,19 @@ export default function AdminManualMatchPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Filters */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search name, email, skills..."
                   value={freelancerSearch}
                   onChange={(e) => setFreelancerSearch(e.target.value)}
-                  className="pl-8 h-9"
+                  className="h-9 pl-8"
                 />
               </div>
               <Select value={experienceLevelFilter} onValueChange={setExperienceLevelFilter}>
-                <SelectTrigger className="w-40 h-9">
-                  <Star className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
+                <SelectTrigger className="h-9 w-full sm:w-40">
+                  <Star className="mr-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -382,7 +386,7 @@ export default function AdminManualMatchPage() {
             </div>
 
             {/* Freelancer list */}
-            <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+            <div className="max-h-[50vh] space-y-2 overflow-y-auto overflow-x-hidden pr-1 sm:max-h-96">
               {allFreelancers === undefined ? (
                 <p className="text-sm text-muted-foreground text-center py-6">Loading freelancers…</p>
               ) : filteredFreelancers.length === 0 ? (
@@ -453,29 +457,31 @@ export default function AdminManualMatchPage() {
       {/* Confirmation section */}
       {selectedProjectId && selectedFreelancerId && (
         <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-4 flex-wrap">
-              <div className="flex-1 min-w-0 space-y-3">
-                <h3 className="font-semibold text-sm">Ready to assign</h3>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground truncate">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <div className="min-w-0 flex-1 space-y-3">
+                <h3 className="text-sm font-semibold">Ready to assign</h3>
+                <div className="flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2">
+                  <span className="font-medium wrap-break-word text-foreground">
                     {selectedProject?.intakeForm?.title ?? "Hire"}
                   </span>
-                  <span>←</span>
-                  <span className="font-medium text-foreground truncate">
+                  <span className="hidden sm:inline" aria-hidden>
+                    ←
+                  </span>
+                  <span className="font-medium wrap-break-word text-foreground">
                     {selectedFreelancer?.name ?? "Freelancer"}
                   </span>
                 </div>
                 {selectedProject?.intakeForm?.hireType === "team" && (
-                  <div className="space-y-1.5 max-w-md">
+                  <div className="max-w-full space-y-1.5 sm:max-w-md">
                     <Label className="text-xs">Team role for this candidate</Label>
-                    {(selectedProject.rolesAwaitingMatch?.length ?? 0) > 0 ? (
+                    {teamRoleOptionsForManualMatch(selectedProject).length > 0 ? (
                       <Select value={teamRoleForMatch} onValueChange={setTeamRoleForMatch}>
                         <SelectTrigger className="h-9">
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(selectedProject.rolesAwaitingMatch as string[]).map((r) => (
+                          {teamRoleOptionsForManualMatch(selectedProject).map((r) => (
                             <SelectItem key={r} value={r}>
                               {r}
                             </SelectItem>
@@ -484,21 +490,21 @@ export default function AdminManualMatchPage() {
                       </Select>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        Open role will be inferred automatically from unfilled slots.
+                        Open role will be inferred from intake (no labeled slots on file, or headcount-only team).
                       </p>
                     )}
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">
+                <p className="text-pretty text-xs text-muted-foreground">
                   The client will receive a match-found notification and can decide whether to select this candidate.
                 </p>
               </div>
               <Button
-                className="shrink-0"
+                className="h-11 w-full shrink-0 sm:h-10 sm:w-auto"
                 onClick={() => setConfirmOpen(true)}
               >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Assign Freelancer
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Assign freelancer
               </Button>
             </div>
           </CardContent>
@@ -507,7 +513,7 @@ export default function AdminManualMatchPage() {
 
       {/* Confirm dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[min(85dvh,48rem)] w-[calc(100vw-2rem)] max-w-lg overflow-y-auto overflow-x-hidden sm:w-full">
           <DialogHeader>
             <DialogTitle>Confirm Manual Assignment</DialogTitle>
             <DialogDescription>
@@ -519,31 +525,37 @@ export default function AdminManualMatchPage() {
           </DialogHeader>
 
           <div className="space-y-3">
-            <div className="rounded-xl border border-border/60 bg-muted/10 p-4 text-sm space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Hire</span>
-                <span className="font-medium truncate ml-2">{selectedProject?.intakeForm?.title}</span>
+            <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-4 text-sm">
+              <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
+                <span className="shrink-0 text-muted-foreground">Hire</span>
+                <span className="wrap-break-word font-medium sm:min-w-0 sm:text-right">
+                  {selectedProject?.intakeForm?.title}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Freelancer</span>
-                <span className="font-medium">{selectedFreelancer?.name}</span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
+                <span className="shrink-0 text-muted-foreground">Freelancer</span>
+                <span className="wrap-break-word font-medium sm:min-w-0 sm:text-right">
+                  {selectedFreelancer?.name}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status after</span>
-                <span className="font-medium text-blue-600">Still matching (client reviews candidates)</span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:justify-between sm:gap-4">
+                <span className="shrink-0 text-muted-foreground">Status after</span>
+                <span className="wrap-break-word font-medium text-blue-600 sm:min-w-0 sm:max-w-[65%] sm:text-right">
+                  Still matching (client reviews candidates)
+                </span>
               </div>
             </div>
 
             {selectedProject?.intakeForm?.hireType === "team" && (
               <div className="space-y-1.5">
                 <Label className="text-sm">Team role</Label>
-                {(selectedProject.rolesAwaitingMatch?.length ?? 0) > 0 ? (
+                {teamRoleOptionsForManualMatch(selectedProject).length > 0 ? (
                   <Select value={teamRoleForMatch} onValueChange={setTeamRoleForMatch}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(selectedProject.rolesAwaitingMatch as string[]).map((r) => (
+                      {teamRoleOptionsForManualMatch(selectedProject).map((r) => (
                         <SelectItem key={r} value={r}>
                           {r}
                         </SelectItem>
@@ -552,7 +564,7 @@ export default function AdminManualMatchPage() {
                   </Select>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Inferred from open slots if not listed above.
+                    Inferred from intake when there are no per-slot labels yet.
                   </p>
                 )}
               </div>
