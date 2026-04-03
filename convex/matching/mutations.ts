@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { clearReplacementFlowFieldsOnProject } from "../projects/replacement";
+import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
 
 const api = require("../_generated/api") as {
   api: {
@@ -511,6 +512,8 @@ export const adminManualMatch = mutation({
     projectId: v.id("projects"),
     freelancerId: v.id("users"),
     note: v.optional(v.string()),
+    /** For team hires with open slots, which role this candidate fills (label e.g. "Backend developer #1"). */
+    teamRole: v.optional(v.string()),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -526,8 +529,23 @@ export const adminManualMatch = mutation({
     if (project.status !== "matching") {
       throw new Error("Manual matching is only allowed while project status is matching.");
     }
-    if (project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0) {
+
+    const isTeam = project.intakeForm.hireType === "team";
+    const hasMatched =
+      !!project.matchedFreelancerId || (project.matchedFreelancerIds?.length ?? 0) > 0;
+    const teamStillNeedsMembers =
+      isTeam &&
+      ((project.pendingTeamMemberSlots ?? 0) > 0 ||
+        (project.rolesAwaitingMatch?.length ?? 0) > 0 ||
+        project.awaitingMatch === true);
+
+    if (!isTeam && hasMatched) {
       throw new Error("This project already has matched freelancer(s).");
+    }
+    if (isTeam && hasMatched && !teamStillNeedsMembers) {
+      throw new Error(
+        "This team hire is not accepting additional matches (no open slots or not awaiting selection)."
+      );
     }
 
     const freelancer = await ctx.db.get(args.freelancerId);
@@ -538,18 +556,66 @@ export const adminManualMatch = mutation({
       throw new Error("Selected user is not a freelancer");
     }
 
+    if (
+      project.matchedFreelancerId === args.freelancerId ||
+      project.matchedFreelancerIds?.includes(args.freelancerId)
+    ) {
+      throw new Error("This freelancer is already on the hire team.");
+    }
+
+    let resolvedTeamRole: string | undefined;
+    if (isTeam) {
+      const trimmed = args.teamRole?.trim();
+      if (trimmed) {
+        resolvedTeamRole = trimmed;
+      } else if ((project.rolesAwaitingMatch?.length ?? 0) > 0) {
+        resolvedTeamRole = project.rolesAwaitingMatch![0];
+      } else {
+        const labels = getRoleLabelsForProjectIntake(project.intakeForm);
+        const projectMatches = await ctx.db
+          .query("matches")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+          .collect();
+        const filledAccepted = new Set(
+          projectMatches
+            .filter((m) => m.status === "accepted" && m.teamRole)
+            .map((m) => m.teamRole as string)
+        );
+        const missing = labels.find((l) => !filledAccepted.has(l));
+        if (!missing) {
+          throw new Error(
+            "Could not determine which team role this candidate is for. Add open roles or pass teamRole explicitly."
+          );
+        }
+        resolvedTeamRole = missing;
+      }
+
+      const waiting = project.rolesAwaitingMatch;
+      if (waiting && waiting.length > 0) {
+        const ok = waiting.some(
+          (r) => r.toLowerCase() === resolvedTeamRole!.toLowerCase()
+        );
+        if (!ok) {
+          throw new Error(`Team role must be one of: ${waiting.join(", ")}`);
+        }
+      }
+    }
+
     const now = Date.now();
     const sendSystemNotification = api.api.notifications.actions
       .sendSystemNotification as unknown as FunctionReference<"action", "internal">;
     const sendManualMatchFoundClientEmail = api.api.projects.actions
       .sendManualMatchFoundClientEmail as unknown as FunctionReference<"action", "internal">;
 
-    // Check for existing pending match
-    const existing = await ctx.db
+    const sameFreelancerMatches = await ctx.db
       .query("matches")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) => q.eq(q.field("freelancerId"), args.freelancerId))
-      .first();
+      .collect();
+    const existing =
+      resolvedTeamRole !== undefined
+        ? sameFreelancerMatches.find((m) => m.teamRole === resolvedTeamRole)
+        : sameFreelancerMatches.find((m) => m.teamRole === undefined);
     if (existing && (existing.status === "pending" || existing.status === "accepted")) {
       throw new Error("A match already exists for this freelancer on this project.");
     }
@@ -570,6 +636,7 @@ export const adminManualMatch = mutation({
         timezoneCompatibility: 100,
       },
       explanation: `Manually assigned by admin${args.note ? `: ${args.note}` : ""}`,
+      teamRole: resolvedTeamRole,
       createdAt: now,
       updatedAt: now,
     });
@@ -582,7 +649,12 @@ export const adminManualMatch = mutation({
       actorRole: "admin",
       targetType: "match",
       targetId: matchId,
-      details: { projectId: args.projectId, freelancerId: args.freelancerId, note: args.note },
+      details: {
+        projectId: args.projectId,
+        freelancerId: args.freelancerId,
+        note: args.note,
+        teamRole: resolvedTeamRole,
+      },
       createdAt: now,
     });
 

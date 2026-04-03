@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -49,6 +49,21 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 
+function projectIsListableForManualMatch(p: any): boolean {
+  if (p.status !== "matching") return false;
+  const isTeam = p.intakeForm?.hireType === "team";
+  const hasMatched =
+    !!p.matchedFreelancerId || (p.matchedFreelancerIds?.length ?? 0) > 0;
+  const teamStillNeedsMembers =
+    isTeam &&
+    ((p.pendingTeamMemberSlots ?? 0) > 0 ||
+      (p.rolesAwaitingMatch?.length ?? 0) > 0 ||
+      p.awaitingMatch === true);
+  if (!isTeam && hasMatched) return false;
+  if (isTeam && hasMatched && !teamStillNeedsMembers) return false;
+  return true;
+}
+
 export default function AdminManualMatchPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
@@ -62,6 +77,8 @@ export default function AdminManualMatchPage() {
   const [adminNote, setAdminNote] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
+  /** Team hire: which open role this manual candidate fills (must align with rolesAwaitingMatch when set). */
+  const [teamRoleForMatch, setTeamRoleForMatch] = useState("");
 
   const adminManualMatch = useMutation(api.matching.mutations.adminManualMatch);
 
@@ -79,13 +96,13 @@ export default function AdminManualMatchPage() {
       : "skip"
   );
 
-  // Filter projects by status and search
+  // Filter projects by status and search (includes partial team hires still in "matching")
   const matchableProjects = useMemo(() => {
     if (!allProjects) return [];
     const statuses = new Set(projectStatusFilter.split(",").map((s) => s.trim()));
     return (allProjects as any[]).filter((p: any) => {
       if (!statuses.has(p.status)) return false;
-      if (p.matchedFreelancerId || (p.matchedFreelancerIds?.length ?? 0) > 0) return false;
+      if (!projectIsListableForManualMatch(p)) return false;
       if (projectSearch) {
         const q = projectSearch.toLowerCase();
         const title = (p.intakeForm?.title ?? "").toLowerCase();
@@ -94,6 +111,20 @@ export default function AdminManualMatchPage() {
       return true;
     });
   }, [allProjects, projectStatusFilter, projectSearch]);
+
+  useEffect(() => {
+    if (!selectedProjectId || !allProjects) {
+      setTeamRoleForMatch("");
+      return;
+    }
+    const p = (allProjects as any[]).find((x: any) => x._id === selectedProjectId);
+    if (!p || p.intakeForm?.hireType !== "team") {
+      setTeamRoleForMatch("");
+      return;
+    }
+    const roles = (p.rolesAwaitingMatch as string[] | undefined) ?? [];
+    setTeamRoleForMatch(roles[0] ?? "");
+  }, [selectedProjectId, allProjects]);
 
   // Filter freelancers by search and experience level
   const filteredFreelancers = useMemo(() => {
@@ -132,6 +163,9 @@ export default function AdminManualMatchPage() {
         freelancerId: selectedFreelancerId as any,
         note: adminNote.trim() || undefined,
         userId: user._id,
+        ...(selectedProject?.intakeForm?.hireType === "team" && teamRoleForMatch.trim()
+          ? { teamRole: teamRoleForMatch.trim() }
+          : {}),
       });
       toast.success("Candidate added. Client has been notified to review and select this freelancer.");
       setConfirmOpen(false);
@@ -214,7 +248,7 @@ export default function AdminManualMatchPage() {
               Step 1 — Select Hire
             </CardTitle>
             <CardDescription>
-              Choose a hire that is still in matching and has no matched freelancer yet.
+              Hires in matching: solo (no one matched yet) or team hires with open slots (partial team).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -271,8 +305,14 @@ export default function AdminManualMatchPage() {
                         </p>
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <Badge variant="secondary" className="text-xs py-0">
-                            {p.hireType === "team" ? "Team" : "Single"}
+                            {p.intakeForm?.hireType === "team" ? "Team" : "Single"}
                           </Badge>
+                          {p.intakeForm?.hireType === "team" &&
+                            (p.matchedFreelancerIds?.length ?? 0) > 0 && (
+                              <Badge variant="outline" className="text-xs py-0 border-amber-400 text-amber-700">
+                                Partial team ({p.pendingTeamMemberSlots ?? "?"} open)
+                              </Badge>
+                            )}
                           <Badge
                             variant="outline"
                             className={`text-xs py-0 capitalize ${
@@ -415,7 +455,7 @@ export default function AdminManualMatchPage() {
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="p-5">
             <div className="flex items-start gap-4 flex-wrap">
-              <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex-1 min-w-0 space-y-3">
                 <h3 className="font-semibold text-sm">Ready to assign</h3>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   <span className="font-medium text-foreground truncate">
@@ -426,6 +466,29 @@ export default function AdminManualMatchPage() {
                     {selectedFreelancer?.name ?? "Freelancer"}
                   </span>
                 </div>
+                {selectedProject?.intakeForm?.hireType === "team" && (
+                  <div className="space-y-1.5 max-w-md">
+                    <Label className="text-xs">Team role for this candidate</Label>
+                    {(selectedProject.rolesAwaitingMatch?.length ?? 0) > 0 ? (
+                      <Select value={teamRoleForMatch} onValueChange={setTeamRoleForMatch}>
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(selectedProject.rolesAwaitingMatch as string[]).map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Open role will be inferred automatically from unfilled slots.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   The client will receive a match-found notification and can decide whether to select this candidate.
                 </p>
@@ -470,6 +533,30 @@ export default function AdminManualMatchPage() {
                 <span className="font-medium text-blue-600">Still matching (client reviews candidates)</span>
               </div>
             </div>
+
+            {selectedProject?.intakeForm?.hireType === "team" && (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Team role</Label>
+                {(selectedProject.rolesAwaitingMatch?.length ?? 0) > 0 ? (
+                  <Select value={teamRoleForMatch} onValueChange={setTeamRoleForMatch}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(selectedProject.rolesAwaitingMatch as string[]).map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Inferred from open slots if not listed above.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="admin-note" className="text-sm">
