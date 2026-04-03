@@ -514,8 +514,12 @@ export const createOAuthSession = mutation({
 
     if (user.status !== "active") {
       if (user.status === "suspended") {
+        const until = (user as any).suspendedUntil;
+        const untilText = until
+          ? `until ${new Date(until).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`
+          : "indefinitely";
         throw new Error(
-          "Your account has been suspended. You cannot sign in until it is reinstated."
+          `SUSPENDED: Your account has been suspended ${untilText}. You can appeal this suspension by filling out the contact form on our website.`
         );
       }
       throw new Error("This account is not available for sign-in.");

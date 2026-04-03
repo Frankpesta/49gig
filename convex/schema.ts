@@ -1025,8 +1025,14 @@ export default defineSchema({
       v.literal("under_review"),
       v.literal("resolved"),
       v.literal("escalated"),
-      v.literal("closed")
+      v.literal("closed"),
+      v.literal("cancelled")
     ),
+
+    // Cancellation (when initiator withdraws the dispute)
+    cancellationReason: v.optional(v.string()),
+    cancelledAt: v.optional(v.number()),
+    cancelledBy: v.optional(v.id("users")),
 
     // Resolution
     resolution: v.optional(
@@ -1039,6 +1045,8 @@ export default defineSchema({
         ),
         resolutionAmount: v.optional(v.number()),
         notes: v.string(),
+        clientMessage: v.optional(v.string()),
+        freelancerMessage: v.optional(v.string()),
         resolvedBy: v.optional(v.id("users")), // omitted for automated resolution
         resolvedAt: v.number(),
       })

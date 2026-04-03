@@ -30,6 +30,15 @@ import { Doc, Id } from "@/convex/_generated/dataModel";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 export default function DisputeDetailPage() {
   const params = useParams();
@@ -47,6 +56,11 @@ export default function DisputeDetailPage() {
   const addEvidenceMutation = useMutation(api.disputes.mutations.addEvidence);
   const sendDisputeChatMessage = useMutation(api.disputes.mutations.sendDisputeChatMessage);
   const generateUploadUrl = useMutation(api.disputes.mutations.generateDisputeUploadUrl);
+  const cancelDisputeMutation = useMutation(api.disputes.mutations.cancelDispute);
+
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const dispute = useQuery(
     api.disputes.queries.getDispute,
@@ -114,6 +128,10 @@ export default function DisputeDetailPage() {
     );
   }
 
+  const canCancel =
+    dispute.initiatorId === user._id &&
+    (dispute.status === "open" || dispute.status === "under_review");
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       open: "destructive",
@@ -121,6 +139,7 @@ export default function DisputeDetailPage() {
       resolved: "default",
       escalated: "destructive",
       closed: "outline",
+      cancelled: "outline",
     };
     return (
       <Badge variant={variants[status] || "outline"}>
@@ -153,7 +172,11 @@ export default function DisputeDetailPage() {
     (dispute.status === "open" || dispute.status === "under_review");
 
   const isModerator = user.role === "moderator" || user.role === "admin";
-  const canResolve = isModerator && dispute.status !== "resolved" && dispute.status !== "closed";
+  const canResolve =
+    isModerator &&
+    dispute.status !== "resolved" &&
+    dispute.status !== "closed" &&
+    dispute.status !== "cancelled";
 
   const canPostInDisputeChat =
     (user.role === "client" || user.role === "freelancer" || isModerator) &&
@@ -182,6 +205,25 @@ export default function DisputeDetailPage() {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendDisputeChat();
+    }
+  };
+
+  const handleCancelDispute = async () => {
+    if (!user?._id || !cancelReason.trim()) return;
+    setIsCancelling(true);
+    try {
+      await cancelDisputeMutation({
+        disputeId: dispute!._id,
+        reason: cancelReason.trim(),
+        userId: user._id,
+      });
+      toast.success("Dispute cancelled successfully.");
+      setCancelDialogOpen(false);
+      setCancelReason("");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not cancel the dispute.");
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -686,8 +728,96 @@ export default function DisputeDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Cancel dispute (initiator only, while open/under_review) */}
+          {canCancel && (
+            <Card className="border-orange-500/30">
+              <CardHeader>
+                <CardTitle className="text-base">Withdraw Dispute</CardTitle>
+                <CardDescription>
+                  If you and the other party have resolved the issue, you can cancel this dispute.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  className="w-full border-orange-500/40 text-orange-600 hover:bg-orange-500/10 hover:text-orange-700"
+                  onClick={() => setCancelDialogOpen(true)}
+                >
+                  Cancel this dispute
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Cancelled state info */}
+          {dispute.status === "cancelled" && (
+            <Card className="border-muted">
+              <CardHeader>
+                <CardTitle className="text-base text-muted-foreground">Dispute Cancelled</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p className="text-muted-foreground">{dispute.cancellationReason}</p>
+                {dispute.cancelledAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Cancelled {new Date(dispute.cancelledAt).toLocaleDateString()}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* Cancel dispute dialog */}
+      <Dialog
+        open={cancelDialogOpen}
+        onOpenChange={(open) => {
+          setCancelDialogOpen(open);
+          if (!open) setCancelReason("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel this dispute?</DialogTitle>
+            <DialogDescription>
+              This will withdraw the dispute and restore the project to active status.
+              The other party will be notified. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="cancel-reason">Reason for cancellation <span className="text-destructive">*</span></Label>
+            <Textarea
+              id="cancel-reason"
+              placeholder="e.g. We resolved the issue directly and no longer need the dispute."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">This reason will be shared with the other party.</p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCancelDialogOpen(false)}
+              disabled={isCancelling}
+            >
+              Keep dispute open
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleCancelDispute()}
+              disabled={isCancelling || !cancelReason.trim()}
+            >
+              {isCancelling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Cancel dispute
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

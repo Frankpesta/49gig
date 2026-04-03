@@ -90,6 +90,7 @@ export default function UsersPage() {
   const [profileUserId, setProfileUserId] = useState<Id<"users"> | null>(null);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [suspendReason, setSuspendReason] = useState("");
+  const [suspendDuration, setSuspendDuration] = useState("permanent");
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReviewNotes, setRejectReviewNotes] = useState("");
   const [vettingActionLoading, setVettingActionLoading] = useState(false);
@@ -194,6 +195,19 @@ export default function UsersPage() {
     }
   };
 
+  const getSuspendedUntil = (duration: string): number | undefined => {
+    const now = Date.now();
+    const map: Record<string, number> = {
+      "1week": 7 * 24 * 60 * 60 * 1000,
+      "2weeks": 14 * 24 * 60 * 60 * 1000,
+      "1month": 30 * 24 * 60 * 60 * 1000,
+      "3months": 90 * 24 * 60 * 60 * 1000,
+      "6months": 180 * 24 * 60 * 60 * 1000,
+      "1year": 365 * 24 * 60 * 60 * 1000,
+    };
+    return map[duration] ? now + map[duration] : undefined;
+  };
+
   const handleConfirmSuspend = async () => {
     if (!user?._id || !selectedUser) return;
     setIsUpdating(true);
@@ -203,10 +217,12 @@ export default function UsersPage() {
         newStatus: "suspended",
         adminUserId: user._id,
         suspensionReason: suspendReason.trim() || undefined,
+        suspendedUntil: getSuspendedUntil(suspendDuration),
       });
       toast.success("Account suspended. All sessions were revoked.");
       setSuspendDialogOpen(false);
       setSuspendReason("");
+      setSuspendDuration("permanent");
       setSelectedUser(null);
     } catch (error) {
       setErrorDialog({
@@ -971,7 +987,7 @@ export default function UsersPage() {
         open={suspendDialogOpen}
         onOpenChange={(open) => {
           setSuspendDialogOpen(open);
-          if (!open) setSuspendReason("");
+          if (!open) { setSuspendReason(""); setSuspendDuration("permanent"); }
         }}
       >
         <DialogContent className="sm:max-w-md">
@@ -982,16 +998,35 @@ export default function UsersPage() {
               reinstated.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="suspend-reason">Internal note (optional)</Label>
-            <Textarea
-              id="suspend-reason"
-              placeholder="Reason for suspension (staff only)"
-              value={suspendReason}
-              onChange={(e) => setSuspendReason(e.target.value)}
-              rows={3}
-              className="resize-none"
-            />
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="suspend-duration">Suspension duration</Label>
+              <Select value={suspendDuration} onValueChange={setSuspendDuration}>
+                <SelectTrigger id="suspend-duration">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1week">1 week</SelectItem>
+                  <SelectItem value="2weeks">2 weeks</SelectItem>
+                  <SelectItem value="1month">1 month</SelectItem>
+                  <SelectItem value="3months">3 months</SelectItem>
+                  <SelectItem value="6months">6 months</SelectItem>
+                  <SelectItem value="1year">1 year</SelectItem>
+                  <SelectItem value="permanent">Permanent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="suspend-reason">Internal note (optional)</Label>
+              <Textarea
+                id="suspend-reason"
+                placeholder="Reason for suspension (staff only)"
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => setSuspendDialogOpen(false)} disabled={isUpdating}>

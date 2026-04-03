@@ -14,7 +14,7 @@ import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { loginFeatures } from "@/components/auth/auth-icons";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Ban, ExternalLink } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -149,9 +149,30 @@ export default function LoginPage() {
         )}
 
         {error && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
+          error.startsWith("SUSPENDED:") ? (
+            <div className="rounded-lg border border-orange-500/30 bg-orange-500/5 px-4 py-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <Ban className="h-5 w-5 text-orange-600 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">Account Suspended</p>
+                  <p className="text-sm text-orange-600/90 dark:text-orange-400/80 leading-relaxed">
+                    {error.replace("SUSPENDED: ", "")}
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/contact"
+                className="flex items-center gap-1.5 text-sm font-medium text-orange-700 dark:text-orange-400 hover:underline"
+              >
+                Go to contact form
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )
         )}
 
         {!requiresTwoFactor ? (
