@@ -28,6 +28,8 @@ import {
   ShieldCheck,
   Gift,
   Headphones,
+  Handshake,
+  UserSearch,
 } from "lucide-react";
 import type { UserRole } from "@/stores/authStore";
 
@@ -97,6 +99,24 @@ export const navigationItems: NavItem[] = [
     icon: Briefcase,
     section: "menu",
     roles: ["client"],
+  },
+
+  // Freelancer: Match Requests (pending client selections awaiting freelancer confirmation)
+  {
+    title: "Match Requests",
+    url: "/dashboard/match-requests",
+    icon: Handshake,
+    section: "menu",
+    roles: ["freelancer"],
+  },
+
+  // Admin: Manual Matching (assign any freelancer to a hire)
+  {
+    title: "Manual Matching",
+    url: "/dashboard/admin/manual-match",
+    icon: UserSearch,
+    section: "menu",
+    roles: ["admin"],
   },
 
   // Chat (All roles)

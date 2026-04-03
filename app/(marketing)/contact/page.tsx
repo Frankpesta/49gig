@@ -53,7 +53,7 @@ export default function ContactPage() {
     }));
   };
 
-  const submitEnquiry = useAction(api.contactEnquiries.actions.submitContactEnquiry);
+  const submitEnquiry = useAction((api as any).contactEnquiries.actions.submitContactEnquiry);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -477,217 +477,82 @@ export default function ProfilePage() {
                   <Briefcase className="h-5 w-5 text-primary" />
                   Professional Information
                 </CardTitle>
-                <CardDescription>Category, skills, and programming languages (used for matching and verification)</CardDescription>
+                <CardDescription>
+                  Your professional profile is managed by the platform. Contact support to request changes.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="pt-6">
-                <FormSection title="Professional details" description="Used for project matching and client verification.">
-                <FormField label="Tech category" htmlFor="techField">
-                  <Select
-                    value={formData.techField}
-                    onValueChange={(value) =>
-                      setFormData({
-                        ...formData,
-                        techField: value,
-                        skills: [],
-                        softwareDevField: "",
-                      })
-                    }
-                  >
-                    <SelectTrigger className="rounded-lg h-11">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PLATFORM_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
-                {formData.techField === "software_development" && (
-                  <FormField
-                    label="Software focus"
-                    htmlFor="softwareDevField"
-                    description="Pick your primary track (same as when clients hire developers)."
-                  >
-                    <Select
-                      value={formData.softwareDevField || "__none__"}
-                      onValueChange={(value) =>
-                        setFormData({
-                          ...formData,
-                          softwareDevField: value === "__none__" ? "" : value,
-                          skills: [],
-                        })
-                      }
-                    >
-                      <SelectTrigger id="softwareDevField" className="rounded-lg h-11">
-                        <SelectValue placeholder="Select focus area" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Choose…</SelectItem>
-                        {SOFTWARE_DEV_FIELDS.map((f) => (
-                          <SelectItem key={f.id} value={f.id}>
-                            {f.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormField>
-                )}
+              <CardContent className="pt-4 pb-6 space-y-4">
+                {/* Read-only professional details */}
                 {formData.techField && (
-                  <FormField label="Experience level" htmlFor="experienceLevel">
-                    <Select
-                      value={formData.experienceLevel}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, experienceLevel: value })
-                      }
-                    >
-                      <SelectTrigger className="rounded-lg h-11">
-                        <SelectValue placeholder="Select level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="junior">Junior</SelectItem>
-                        <SelectItem value="mid">Mid-Level</SelectItem>
-                        <SelectItem value="senior">Senior</SelectItem>
-                        <SelectItem value="expert">Expert</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormField>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Category</p>
+                      <p className="text-sm font-medium">{PLATFORM_CATEGORIES.find((c) => c.id === formData.techField)?.label ?? formData.techField}</p>
+                    </div>
+                    {formData.experienceLevel && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Experience Level</p>
+                        <p className="text-sm font-medium capitalize">{formData.experienceLevel === "mid" ? "Mid-Level" : formData.experienceLevel}</p>
+                      </div>
+                    )}
+                    {formData.softwareDevField && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Software Focus</p>
+                        <p className="text-sm font-medium">{getSoftwareDevFieldLabel(formData.softwareDevField)}</p>
+                      </div>
+                    )}
+                  </div>
                 )}
-                {freelancerSkillPicker.length > 0 && (
-                  <FormField
-                    label={
-                      formData.techField === "software_development" && formData.softwareDevField
-                        ? `Skills (${getSoftwareDevFieldLabel(formData.softwareDevField)})`
-                        : "Skills (from category)"
-                    }
-                    description="Select skills that match your expertise."
-                  >
-                    <div className="flex flex-wrap gap-2">
-                      {freelancerSkillPicker.map((skill) => (
-                        <Button
-                          key={skill}
-                          type="button"
-                          variant={formData.skills.includes(skill) ? "default" : "outline"}
-                          size="sm"
-                          className="rounded-full"
-                          onClick={() => {
-                            if (formData.skills.includes(skill)) {
-                              removeSkill(skill);
-                            } else {
-                              setFormData({
-                                ...formData,
-                                skills: [...formData.skills, skill],
-                              });
-                            }
-                        }}
-                      >
-                        {skill}
-                      </Button>
-                    ))}
-                  </div>
-                </FormField>
-                )}
-                <FormField label="Programming languages" description="Languages you're proficient in.">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 border border-border/60 rounded-lg">
-                    {PROGRAMMING_LANGUAGES.map((lang) => (
-                      <label
-                        key={lang}
-                        className="flex items-center gap-2 cursor-pointer hover:bg-muted/50 p-2 rounded text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={formData.languagesWritten.includes(lang)}
-                          onChange={() => {
-                            const next = formData.languagesWritten.includes(lang)
-                              ? formData.languagesWritten.filter((l) => l !== lang)
-                              : [...formData.languagesWritten, lang];
-                            setFormData({ ...formData, languagesWritten: next });
-                          }}
-                          className="rounded border-border"
-                        />
-                        {lang}
-                      </label>
-                    ))}
-                  </div>
-                </FormField>
-                <FormField label="About you" htmlFor="bio" description="Share a short overview of your experience and focus.">
-                  <Textarea
-                    id="bio"
-                    value={formData.bio}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    placeholder="Share a short overview of your experience and focus..."
-                    rows={4}
-                    className="rounded-lg"
-                  />
-                </FormField>
-                <FormField label="Additional skills" htmlFor="skills" description="Add custom skills not in the category list.">
-                  <div className="flex gap-2">
-                    <Input
-                      id="skills"
-                      value={newSkill}
-                      onChange={(e) => setNewSkill(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addSkill();
-                        }
-                      }}
-                      placeholder="Add a skill"
-                      className="rounded-lg h-11"
-                    />
-                    <Button type="button" onClick={addSkill} variant="outline" className="rounded-lg">
-                      Add
-                    </Button>
-                  </div>
-                  {formData.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {formData.skills.map((skill: string) => (
-                        <Badge key={skill} variant="secondary" className="gap-2">
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => removeSkill(skill)}
-                            className="ml-1 hover:text-destructive"
-                          >
-                            ×
-                          </button>
-                        </Badge>
+                {formData.skills.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Skills</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {formData.skills.map((skill) => (
+                        <Badge key={skill} variant="secondary" className="text-xs">{skill}</Badge>
                       ))}
                     </div>
-                  )}
-                </FormField>
-                <FormField label="Availability" htmlFor="availability">
-                  <Select
-                    value={formData.availability}
-                    onValueChange={(value: "available" | "busy" | "unavailable") =>
-                      setFormData({ ...formData, availability: value })
-                    }
-                  >
-                    <SelectTrigger className="rounded-lg h-11 max-w-md">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="available">Available</SelectItem>
-                      <SelectItem value="busy">Busy</SelectItem>
-                      <SelectItem value="unavailable">Unavailable</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormField>
-                <FormField label="Portfolio URL" htmlFor="portfolioUrl" description="Link to your portfolio or website.">
-                  <Input
-                    id="portfolioUrl"
-                    type="url"
-                    value={formData.portfolioUrl}
-                    onChange={(e) =>
-                      setFormData({ ...formData, portfolioUrl: e.target.value })
-                    }
-                    placeholder="https://yourportfolio.com"
-                    className="rounded-lg h-11"
-                  />
-                </FormField>
-              </FormSection>
+                  </div>
+                )}
+                {formData.languagesWritten.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Programming Languages</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {formData.languagesWritten.map((lang) => (
+                        <Badge key={lang} variant="outline" className="text-xs">{lang}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Availability and Portfolio are still editable */}
+                <div className="pt-2 border-t border-border/40 space-y-4">
+                  <FormField label="Availability" htmlFor="availability">
+                    <Select
+                      value={formData.availability}
+                      onValueChange={(value: "available" | "busy" | "unavailable") =>
+                        setFormData({ ...formData, availability: value })
+                      }
+                    >
+                      <SelectTrigger className="rounded-lg h-11 max-w-md">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="busy">Busy</SelectItem>
+                        <SelectItem value="unavailable">Unavailable</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                  <FormField label="Portfolio URL" htmlFor="portfolioUrl" description="Link to your portfolio or website.">
+                    <Input
+                      id="portfolioUrl"
+                      type="url"
+                      value={formData.portfolioUrl}
+                      onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
+                      placeholder="https://yourportfolio.com"
+                      className="rounded-lg h-11"
+                    />
+                  </FormField>
+                </div>
               </CardContent>
             </Card>
           </>

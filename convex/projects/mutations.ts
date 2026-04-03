@@ -545,6 +545,7 @@ export const updateProjectStatus = mutation({
       pending_funding: "Pending funding",
       funded: "Funded",
       matching: "Matching in progress",
+      awaiting_freelancer: "Awaiting freelancer",
       matched: "Matched",
       in_progress: "In progress",
       completed: "Completed",

@@ -279,3 +279,40 @@ export const getFreelancerMatches = query({
   },
 });
 
+
+/**
+ * Get matches awaiting freelancer response (client selected, freelancer hasn't acted yet).
+ */
+export const getPendingFreelancerMatches = query({
+  args: { userId: v.optional(v.id("users")) },
+  handler: async (ctx, args) => {
+    if (!args.userId) return [];
+    const user = await ctx.db.get(args.userId);
+    if (!user || user.status !== "active" || user.role !== "freelancer") return [];
+
+    const allMatches = await ctx.db
+      .query("matches")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.userId!))
+      .collect();
+
+    const pendingSelection = allMatches.filter(
+      (m: any) => m.clientAction === "accepted" && !m.freelancerAction
+    );
+
+    return Promise.all(
+      pendingSelection.map(async (match: any) => {
+        const rawProject = await ctx.db.get(match.projectId);
+        const project = rawProject as any;
+        const client = project ? await ctx.db.get(project.clientId) : null;
+        return {
+          ...match,
+          projectTitle: project?.intakeForm?.title ?? null,
+          projectDescription: project?.intakeForm?.description ?? null,
+          clientName: (client as any)?.name ?? null,
+          projectDuration: project?.intakeForm?.projectDuration ?? null,
+          totalAmount: project?.totalAmount ?? null,
+        };
+      })
+    );
+  },
+});

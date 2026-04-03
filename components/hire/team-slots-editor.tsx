@@ -224,26 +224,22 @@ export function TeamSlotsEditor({
                   {slot.roleId && (
                     <div className="space-y-2">
                       <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Experience for this seat
+                        Experience level <span className="text-destructive">*</span>
                       </Label>
                       <Select
-                        value={slot.experienceLevel ?? "__default__"}
+                        value={slot.experienceLevel ?? ""}
                         onValueChange={(v) =>
                           onSlotsChange(
                             updateSlot(slots, index, {
-                              experienceLevel:
-                                v === "__default__" ? undefined : (v as TeamSlotIntake["experienceLevel"]),
+                              experienceLevel: v as TeamSlotIntake["experienceLevel"],
                             })
                           )
                         }
                       >
                         <SelectTrigger className="h-11 rounded-xl border-border/70 bg-background">
-                          <SelectValue placeholder="Use project default" />
+                          <SelectValue placeholder="Select level…" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__default__">
-                            Same as project default
-                          </SelectItem>
                           <SelectItem value="junior">Junior</SelectItem>
                           <SelectItem value="mid">Mid-Level</SelectItem>
                           <SelectItem value="senior">Senior</SelectItem>

@@ -17,11 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, UploadCloud, X, Loader2, FileText } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChatEvidenceSelector } from "@/components/disputes/chat-evidence-selector";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 
 export default function NewDisputePage() {
   const router = useRouter();
@@ -51,7 +53,13 @@ export default function NewDisputePage() {
     reason: "",
     description: "",
   });
+  // For team hires: which specific freelancers are being disputed ("all" = entire team)
+  const [disputeScope, setDisputeScope] = useState<"all" | "partial">("all");
+  const [disputedFreelancerIds, setDisputedFreelancerIds] = useState<string[]>([]);
   const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<{ storageId: string; name: string; size: number }[]>([]);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [disputeClockMs, setDisputeClockMs] = useState(() => Date.now());
@@ -82,6 +90,13 @@ export default function NewDisputePage() {
     formData.projectId ? { projectId: formData.projectId as any } : "skip"
   );
 
+  const projectTeamMembers = useQuery(
+    api.projects.queries.getProjectTeamMembers,
+    formData.projectId && isAuthenticated && user?._id && user.role === "client"
+      ? { projectId: formData.projectId as any, userId: user._id }
+      : "skip"
+  );
+
   const pendingCycles = (monthlyCycles ?? []).filter(
     (c: Doc<"monthlyBillingCycles">) =>
       c.status === "pending" && c.monthEndDate <= disputeClockMs
@@ -101,7 +116,48 @@ export default function NewDisputePage() {
     }
   }, [monthlyCycles, formData.monthlyCycleId, disputeClockMs]);
 
+  // Resolved team member details for partial team selection
+  const [teamMembers, setTeamMembers] = useState<{ id: string; name: string; role?: string }[]>([]);
+  useEffect(() => {
+    if (!project || !user?._id) { setTeamMembers([]); return; }
+    const ids: string[] = (project as any).matchedFreelancerIds ?? [];
+    if (ids.length === 0) { setTeamMembers([]); return; }
+    // Reset scope when project changes
+    setDisputeScope("all");
+    setDisputedFreelancerIds([]);
+  }, [project?._id]);
+
   const initiateDispute = useMutation(api.disputes.mutations.initiateDispute);
+  const generateUploadUrl = useMutation(api.disputes.mutations.generateDisputeUploadUrl);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length || !user?._id) return;
+    setIsUploadingFile(true);
+    try {
+      for (const file of files) {
+        if (file.size > 20 * 1024 * 1024) {
+          toast.error(`${file.name} exceeds 20MB limit`);
+          continue;
+        }
+        const url = await generateUploadUrl({ userId: user._id });
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!res.ok) { toast.error(`Failed to upload ${file.name}`); continue; }
+        const { storageId } = await res.json();
+        setUploadedFiles((prev) => [...prev, { storageId, name: file.name, size: file.size }]);
+      }
+      toast.success("File(s) uploaded successfully");
+    } catch {
+      toast.error("File upload failed");
+    } finally {
+      setIsUploadingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +165,13 @@ export default function NewDisputePage() {
 
     if (!formData.projectId || !formData.type || !formData.reason || !formData.description) {
       setError("Please fill in all required fields");
+      return;
+    }
+
+    // Validate partial team selection
+    const isTeamProject = ((project as any)?.matchedFreelancerIds?.length ?? 0) > 0;
+    if (user?.role === "client" && isTeamProject && disputeScope === "partial" && disputedFreelancerIds.length === 0) {
+      setError("Please select at least one team member to dispute.");
       return;
     }
 
@@ -120,12 +183,25 @@ export default function NewDisputePage() {
     setIsSubmitting(true);
 
     try {
-      // Prepare evidence from selected messages
-      const evidence = selectedMessages.map((msgId: string) => ({
-        type: "message" as const,
-        messageId: msgId as any,
-        description: "Chat message evidence",
-      }));
+      // Prepare evidence from selected messages and uploaded files
+      const evidence = [
+        ...selectedMessages.map((msgId: string) => ({
+          type: "message" as const,
+          messageId: msgId as any,
+          description: "Chat message evidence",
+        })),
+        ...uploadedFiles.map((f) => ({
+          type: "file" as const,
+          fileId: f.storageId as any,
+          description: f.name,
+        })),
+      ];
+
+      const isTeamProject = ((project as any)?.matchedFreelancerIds?.length ?? 0) > 0;
+      const partialIds =
+        isTeamProject && disputeScope === "partial" && disputedFreelancerIds.length > 0
+          ? (disputedFreelancerIds as any[])
+          : undefined;
 
       const disputeId = await initiateDispute({
         projectId: formData.projectId as any,
@@ -134,6 +210,7 @@ export default function NewDisputePage() {
         reason: formData.reason,
         description: formData.description,
         evidence: evidence.length > 0 ? evidence : undefined,
+        disputedFreelancerIds: partialIds,
         userId: user._id,
       });
 
@@ -235,6 +312,63 @@ export default function NewDisputePage() {
                 </p>
               )}
             </div>
+
+            {/* Team member selection: only for clients on team hires */}
+            {user?.role === "client" && formData.projectId && (projectTeamMembers?.length ?? 0) > 0 && (
+              <div className="space-y-3">
+                <Label>Team Members to Dispute *</Label>
+                <p className="text-xs text-muted-foreground">
+                  This is a team hire. Choose whether you are disputing the entire team or specific members.
+                </p>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="disputeScope"
+                      value="all"
+                      checked={disputeScope === "all"}
+                      onChange={() => { setDisputeScope("all"); setDisputedFreelancerIds([]); }}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm font-medium">Entire team</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="disputeScope"
+                      value="partial"
+                      checked={disputeScope === "partial"}
+                      onChange={() => setDisputeScope("partial")}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm font-medium">Specific member(s)</span>
+                  </label>
+                </div>
+                {disputeScope === "partial" && (
+                  <div className="rounded-lg border border-border/60 bg-muted/10 p-4 space-y-2">
+                    {(projectTeamMembers as { _id: string; name: string; role: string }[]).map((member) => (
+                      <label key={member._id} className="flex items-center gap-3 cursor-pointer py-1">
+                        <Checkbox
+                          checked={disputedFreelancerIds.includes(member._id)}
+                          onCheckedChange={(checked) => {
+                            setDisputedFreelancerIds((prev) =>
+                              checked
+                                ? [...prev, member._id]
+                                : prev.filter((id) => id !== member._id)
+                            );
+                          }}
+                        />
+                        <span className="text-sm font-medium">{member.name}</span>
+                        <span className="text-xs text-muted-foreground capitalize">{member.role}</span>
+                      </label>
+                    ))}
+                    {disputedFreelancerIds.length === 0 && (
+                      <p className="text-xs text-destructive mt-1">Select at least one team member to dispute.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {formData.projectId && pendingCycles.length > 0 && (
               <div className="space-y-2">
@@ -355,6 +489,70 @@ export default function NewDisputePage() {
                 />
               </div>
             )}
+
+            {/* Supporting file uploads */}
+            <div className="space-y-3">
+              <Label className="flex items-center gap-1.5">
+                Supporting Files <span className="text-muted-foreground font-normal text-xs">(optional · max 20 MB each)</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Upload documents, screenshots, or other files that support your claim. These will be visible to the assigned moderator and the other party.
+              </p>
+              <div
+                className="rounded-xl border-2 border-dashed border-border/60 bg-muted/10 px-6 py-5 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const dt = new DataTransfer();
+                  Array.from(e.dataTransfer.files).forEach((f) => dt.items.add(f));
+                  if (fileInputRef.current) {
+                    fileInputRef.current.files = dt.files;
+                    fileInputRef.current.dispatchEvent(new Event("change", { bubbles: true }));
+                  }
+                }}
+              >
+                {isUploadingFile ? (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Uploading...
+                  </div>
+                ) : (
+                  <>
+                    <UploadCloud className="mx-auto h-6 w-6 text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">Click or drag files here to upload</p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">PDF, images, documents accepted</p>
+                  </>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  {uploadedFiles.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{f.name}</p>
+                        <p className="text-xs text-muted-foreground">{(f.size / 1024).toFixed(0)} KB</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                        onClick={() => setUploadedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={isSubmitting} className="flex-1">

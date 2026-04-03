@@ -224,9 +224,22 @@ export const getProjectChatsForAdmin = query({
       .order("desc")
       .collect();
 
-    return chats.sort(
-      (a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
+    const enriched = await Promise.all(
+      chats.map(async (chat) => {
+        const participantDetails = await Promise.all(
+          chat.participants.map(async (uid) => {
+            const u = await ctx.db.get(uid);
+            return u ? { _id: u._id, name: u.name, role: u.role } : null;
+          })
+        );
+        const filtered = participantDetails.filter(Boolean);
+        const client = filtered.find((p) => p?.role === "client");
+        const freelancer = filtered.find((p) => p?.role === "freelancer");
+        return { ...chat, clientName: client?.name ?? null, freelancerName: freelancer?.name ?? null };
+      })
     );
+
+    return enriched.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
   },
 });
 
@@ -251,16 +264,27 @@ export const getSupportChatsForAdmin = query({
       return [];
     }
 
-    const chats = await ctx.db
+    const allStatuses = await ctx.db
       .query("chats")
       .withIndex("by_type", (q) => q.eq("type", "support"))
-      .filter((q) => q.eq(q.field("status"), "active"))
       .order("desc")
       .collect();
 
-    return chats.sort(
-      (a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
+    const enriched = await Promise.all(
+      allStatuses.map(async (chat) => {
+        const openerDetails = chat.participants[0]
+          ? await ctx.db.get(chat.participants[0])
+          : null;
+        return {
+          ...chat,
+          openerName: openerDetails?.name ?? null,
+          openerRole: openerDetails?.role ?? null,
+          openerEmail: openerDetails?.email ?? null,
+        };
+      })
     );
+
+    return enriched.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
   },
 });
 

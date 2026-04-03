@@ -181,7 +181,16 @@ export const releaseDisputeFunds = action({
     );
     const currency = (basePayment?.currency || project.currency || "usd").toLowerCase();
 
-    if (decision === "client_favor") {
+    // Determine if this is a partial team dispute (some freelancers disputed, not all)
+    const teamMemberIds: string[] = (project as any).matchedFreelancerIds ?? [];
+    const disputedIds: string[] = (dispute as any).disputedFreelancerIds ?? [];
+    const isPartialTeam =
+      teamMemberIds.length > 0 &&
+      disputedIds.length > 0 &&
+      disputedIds.length < teamMemberIds.length;
+
+    if (decision === "client_favor" && !isPartialTeam) {
+      // Single hire or full team dispute: refund all unreleased escrow to client
       await ctx.runMutation(
         internal.monthlyBillingCycles.mutations.finalizeClientWinsDisputeInternal,
         {
@@ -190,7 +199,46 @@ export const releaseDisputeFunds = action({
           currency,
         }
       );
-    } else if (decision === "freelancer_favor") {
+    } else if (decision === "client_favor" && isPartialTeam) {
+      // Partial team dispute: calculate the removed members' portion of escrow
+      const totalEscrowCents = Math.round(Math.max(0, (project as any).escrowedAmount ?? 0) * 100);
+      const teamBudgetBreakdown: Record<string, number> = (project as any).teamBudgetBreakdown ?? {};
+      let removedShareCents = 0;
+
+      if (Object.keys(teamBudgetBreakdown).length > 0) {
+        // Use per-role breakdown to calculate the removed members' share
+        const totalBreakdownCents = Object.values(teamBudgetBreakdown).reduce((a, b) => a + b, 0);
+        for (const fid of disputedIds) {
+          // Find corresponding slot for this freelancer by matching order (teamBudgetBreakdown keys are roleIds)
+          // Fallback: divide equally
+          const share = totalBreakdownCents > 0
+            ? Math.round((totalEscrowCents / teamMemberIds.length))
+            : Math.round(totalEscrowCents / teamMemberIds.length);
+          removedShareCents += share;
+        }
+      } else {
+        // Equal share per member
+        removedShareCents = Math.round((totalEscrowCents / Math.max(1, teamMemberIds.length)) * disputedIds.length);
+      }
+
+      // Clamp to available escrow
+      removedShareCents = Math.min(removedShareCents, totalEscrowCents);
+
+      if (removedShareCents > 0) {
+        await ctx.runMutation(
+          internal.monthlyBillingCycles.mutations.creditClientWalletFromEscrowInternal,
+          {
+            projectId: dispute.projectId,
+            amountCents: removedShareCents,
+            currency,
+            description: `Partial team dispute resolution — refund for ${disputedIds.length} removed member(s)`,
+          }
+        );
+      }
+      // Remaining escrow stays for the continuing team members
+    } // end partial team client_favor
+    
+    if (decision === "freelancer_favor") {
       // Unblock work only — escrow stays until normal monthly approval / auto-release.
       if (dispute.monthlyCycleId) {
         await ctx.runMutation(

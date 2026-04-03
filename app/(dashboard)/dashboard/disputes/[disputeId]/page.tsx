@@ -499,10 +499,12 @@ export default function DisputeDetailPage() {
                         )}
                         {evidence.fileId && (
                           <a
-                            href="#"
+                            href={(evidence as any).fileUrl ?? "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="text-xs text-primary hover:underline mt-1 block"
                           >
-                            Download File
+                            {(evidence as any).fileUrl ? "Download / View File" : "File (URL unavailable)"}
                           </a>
                         )}
                       </div>
