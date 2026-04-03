@@ -249,7 +249,11 @@ export const getWalletStats = query({
         .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
         .collect();
       const credits = allTx
-        .filter((t) => t.type === "credit" && t.status === "completed")
+        .filter(
+          (t) =>
+            (t.type === "credit" || t.type === "refund") &&
+            t.status === "completed"
+        )
         .reduce((s, t) => s + t.amountCents, 0);
       const debits = allTx
         .filter((t) => t.type === "debit" && t.status === "completed")
@@ -294,43 +298,59 @@ export const getWalletStats = query({
       if (fromPayments > 0) availableCents = fromPayments;
     }
 
-    // Pending: sum of freelancer's share from monthly cycles awaiting client approval
-    const singleProjects = await ctx.db
-      .query("projects")
-      .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", userId))
-      .collect();
-
-    const allProjects = await ctx.db
-      .query("projects")
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("status"), "in_progress"),
-          q.eq(q.field("status"), "matched"),
-          q.eq(q.field("status"), "funded")
-        )
-      )
-      .collect();
-    const teamProjects = allProjects.filter(
-      (p) => p.matchedFreelancerIds?.includes(userId)
-    );
-
-    const myProjects = [...singleProjects];
-    for (const p of teamProjects) {
-      if (!singleProjects.some((sp) => sp._id === p._id)) myProjects.push(p);
-    }
-
     let pendingCents = 0;
-    for (const project of myProjects) {
-      const freelancerCount = project.matchedFreelancerId
-        ? 1
-        : (project.matchedFreelancerIds?.length ?? 1);
-      const cycles = await ctx.db
-        .query("monthlyBillingCycles")
-        .withIndex("by_project", (q) => q.eq("projectId", project._id))
-        .filter((q) => q.eq(q.field("status"), "pending"))
+    if (user.role === "client") {
+      if (wallet) {
+        const pendingRefunds = await ctx.db
+          .query("walletTransactions")
+          .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+          .filter((q) =>
+            q.and(
+              q.eq(q.field("type"), "refund"),
+              q.eq(q.field("status"), "pending")
+            )
+          )
+          .collect();
+        pendingCents = pendingRefunds.reduce((sum, t) => sum + t.amountCents, 0);
+      }
+    } else {
+      // Pending: sum of freelancer's share from monthly cycles awaiting client approval
+      const singleProjects = await ctx.db
+        .query("projects")
+        .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", userId))
         .collect();
-      for (const c of cycles) {
-        pendingCents += Math.floor(c.amountCents / freelancerCount);
+
+      const allProjects = await ctx.db
+        .query("projects")
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "in_progress"),
+            q.eq(q.field("status"), "matched"),
+            q.eq(q.field("status"), "funded")
+          )
+        )
+        .collect();
+      const teamProjects = allProjects.filter(
+        (p) => p.matchedFreelancerIds?.includes(userId)
+      );
+
+      const myProjects = [...singleProjects];
+      for (const p of teamProjects) {
+        if (!singleProjects.some((sp) => sp._id === p._id)) myProjects.push(p);
+      }
+
+      for (const project of myProjects) {
+        const freelancerCount = project.matchedFreelancerId
+          ? 1
+          : (project.matchedFreelancerIds?.length ?? 1);
+        const cycles = await ctx.db
+          .query("monthlyBillingCycles")
+          .withIndex("by_project", (q) => q.eq("projectId", project._id))
+          .filter((q) => q.eq(q.field("status"), "pending"))
+          .collect();
+        for (const c of cycles) {
+          pendingCents += Math.floor(c.amountCents / freelancerCount);
+        }
       }
     }
 

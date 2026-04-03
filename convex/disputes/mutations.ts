@@ -8,6 +8,7 @@ const api = require("../_generated/api") as {
   api: {
     notifications: { actions: { sendSystemNotification: unknown } };
     disputes: { actions: { releaseDisputeFunds: unknown } };
+    projects: { actions: { sendSelectReplacementClientEmail: unknown } };
   };
 };
 
@@ -256,6 +257,8 @@ export const initiateDispute = mutation({
       >;
     const releaseDisputeFunds =
       api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
+    const sendSelectReplacementClientEmail = api.api.projects.actions
+      .sendSelectReplacementClientEmail as unknown as FunctionReference<"action", "internal">;
     
     // Create audit log
     await ctx.db.insert("auditLogs", {
@@ -590,7 +593,7 @@ export const resolveDispute = mutation({
     // Build personalized messages for each party if not explicitly provided
     const decisionClientMsg = args.clientMessage?.trim() ||
       (args.decision === "client_favor"
-        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. ${args.notes}`
+        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. Your funds are reserved for this hire and you can select replacement freelancer(s) to continue.`
         : args.decision === "freelancer_favor"
         ? `The dispute for "${project.intakeForm.title}" was not resolved in your favor. The freelancer's position was upheld.`
         : args.decision === "partial"
@@ -627,7 +630,7 @@ export const resolveDispute = mutation({
     if (args.decision === "replacement") {
       newProjectStatus = "matching";
     } else if (args.decision === "client_favor") {
-      newProjectStatus = "cancelled";
+      newProjectStatus = "matching";
     } else if (args.decision === "partial") {
       newProjectStatus = "in_progress";
     } else {
@@ -687,6 +690,11 @@ export const resolveDispute = mutation({
       type: "dispute",
       data: { disputeId: args.disputeId, projectId: dispute.projectId },
     });
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      await ctx.scheduler.runAfter(0, sendSelectReplacementClientEmail, {
+        projectId: dispute.projectId,
+      });
+    }
 
     const freelancerIds = [
       project.matchedFreelancerId,
@@ -775,7 +783,7 @@ export const resolveDisputeInternal = internalMutation({
     if (args.decision === "replacement") {
       newProjectStatus = "matching";
     } else if (args.decision === "client_favor") {
-      newProjectStatus = "cancelled";
+      newProjectStatus = "matching";
     } else if (args.decision === "partial") {
       newProjectStatus = "in_progress";
     } else {

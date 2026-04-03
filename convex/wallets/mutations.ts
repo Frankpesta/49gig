@@ -159,3 +159,119 @@ export const debitWallet = internalMutation({
     return { walletId: wallet._id, newBalanceCents: newBalance };
   },
 });
+
+/**
+ * Record a pending refund credit (does not increase available balance yet).
+ */
+export const recordPendingRefund = internalMutation({
+  args: {
+    userId: v.id("users"),
+    amountCents: v.number(),
+    currency: v.string(),
+    description: v.string(),
+    projectId: v.optional(v.id("projects")),
+    paymentId: v.optional(v.id("payments")),
+  },
+  handler: async (ctx, args) => {
+    if (args.amountCents <= 0) return { success: true };
+    let wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+
+    if (!wallet) {
+      const walletId = await ctx.db.insert("wallets", {
+        userId: args.userId,
+        balanceCents: 0,
+        currency: args.currency,
+        updatedAt: Date.now(),
+      });
+      wallet = (await ctx.db.get(walletId))!;
+    }
+
+    await ctx.db.insert("walletTransactions", {
+      walletId: wallet._id,
+      userId: args.userId,
+      type: "refund",
+      amountCents: args.amountCents,
+      currency: args.currency,
+      description: args.description,
+      projectId: args.projectId,
+      paymentId: args.paymentId,
+      status: "pending",
+      createdAt: Date.now(),
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "pending_refund_recorded",
+      actionType: "system",
+      actorId: args.userId,
+      actorRole: "system",
+      targetType: "wallet_transaction",
+      targetId: wallet._id,
+      details: {
+        projectId: args.projectId,
+        amountCents: args.amountCents,
+        currency: args.currency,
+        description: args.description,
+      },
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Mark pending refund holds for a project as consumed when client continues with replacement.
+ */
+export const clearPendingRefundsForProject = internalMutation({
+  args: {
+    userId: v.id("users"),
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    if (!wallet) return { cleared: 0 };
+
+    const pending = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("projectId"), args.projectId),
+          q.eq(q.field("type"), "refund"),
+          q.eq(q.field("status"), "pending")
+        )
+      )
+      .collect();
+
+    let cleared = 0;
+    for (const tx of pending) {
+      await ctx.db.patch(tx._id, {
+        status: "failed",
+        description: `${tx.description} (consumed as project continuation credit)`,
+      });
+      await ctx.db.insert("auditLogs", {
+        action: "pending_refund_consumed",
+        actionType: "system",
+        actorId: args.userId,
+        actorRole: "system",
+        targetType: "wallet_transaction",
+        targetId: tx._id,
+        details: {
+          projectId: args.projectId,
+          amountCents: tx.amountCents,
+          currency: tx.currency,
+        },
+        createdAt: Date.now(),
+      });
+      cleared += 1;
+    }
+
+    return { cleared };
+  },
+});

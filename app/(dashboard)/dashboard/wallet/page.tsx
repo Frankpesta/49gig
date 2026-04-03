@@ -125,7 +125,9 @@ export default function WalletPage() {
   const formatDollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   if (user.role === "client") {
-    const available = referralCash?.cents ?? 0;
+    const referralWithdrawable = referralCash?.cents ?? 0;
+    const walletAvailable = walletStats?.availableCents ?? 0;
+    const walletPending = walletStats?.pendingCents ?? 0;
 
     const handleClientBankWithdraw = async () => {
       if (!user?._id) return;
@@ -135,8 +137,8 @@ export default function WalletPage() {
         return;
       }
       const amountCents = Math.round(amount * 100);
-      if (amountCents > available) {
-        toast.error("Amount exceeds withdrawable referral balance");
+      if (amountCents > referralWithdrawable) {
+        toast.error("Amount exceeds withdrawable balance");
         return;
       }
       setIsWithdrawing(true);
@@ -159,8 +161,8 @@ export default function WalletPage() {
         return;
       }
       const amountCents = Math.round(amount * 100);
-      if (amountCents > available) {
-        toast.error("Amount exceeds withdrawable referral balance");
+      if (amountCents > referralWithdrawable) {
+        toast.error("Amount exceeds withdrawable balance");
         return;
       }
       if (!cryptoNetwork.trim()) {
@@ -193,8 +195,8 @@ export default function WalletPage() {
         return;
       }
       const amountCents = Math.round(amount * 100);
-      if (amountCents > available) {
-        toast.error("Amount exceeds withdrawable referral balance");
+      if (amountCents > referralWithdrawable) {
+        toast.error("Amount exceeds withdrawable balance");
         return;
       }
       if (!paypalEmail.trim()) {
@@ -218,21 +220,53 @@ export default function WalletPage() {
       <div className="space-y-6 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
           title="Wallet"
-          description="Referral rewards appear here after the first monthly payment is approved on a referred hire. Withdraw to your bank, PayPal, or crypto."
+          description="Track your wallet funds, credits, and project refund holds in one place."
           icon={Wallet}
         />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="rounded-xl overflow-hidden">
+            <CardHeader>
+              <CardTitle>Total wallet balance</CardTitle>
+              <CardDescription>
+                Includes available wallet funds and completed credits.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {walletStats === undefined ? (
+                <Skeleton className="h-10 w-32" />
+              ) : (
+                <p className="text-3xl font-bold">{formatDollars(walletAvailable)}</p>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="rounded-xl overflow-hidden">
+            <CardHeader>
+              <CardTitle>Pending refund credit</CardTitle>
+              <CardDescription>
+                Held for ongoing hires or replacement flow.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {walletStats === undefined ? (
+                <Skeleton className="h-10 w-32" />
+              ) : (
+                <p className="text-3xl font-bold">{formatDollars(walletPending)}</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
         <Card className="rounded-xl overflow-hidden">
           <CardHeader>
-            <CardTitle>Withdrawable referral balance</CardTitle>
+            <CardTitle>Withdrawable balance</CardTitle>
             <CardDescription>
-              Separate from hiring credits used at checkout. Link a bank account under Settings (same as freelancers) to withdraw via bank.
+              Link a bank account under Settings to withdraw available wallet cash via bank.
             </CardDescription>
           </CardHeader>
           <CardContent>
             {referralCash === undefined ? (
               <Skeleton className="h-10 w-32" />
             ) : (
-              <p className="text-3xl font-bold">{formatDollars(available)}</p>
+              <p className="text-3xl font-bold">{formatDollars(referralWithdrawable)}</p>
             )}
           </CardContent>
         </Card>
@@ -256,7 +290,7 @@ export default function WalletPage() {
             </div>
             <Button
               onClick={handleClientBankWithdraw}
-              disabled={isWithdrawing || available < 100}
+              disabled={isWithdrawing || referralWithdrawable < 100}
             >
               {isWithdrawing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Withdraw"}
             </Button>
@@ -300,7 +334,7 @@ export default function WalletPage() {
             </div>
             <Button
               onClick={handlePaypalRequest}
-              disabled={paypalSubmitting || available < 100}
+              disabled={paypalSubmitting || referralWithdrawable < 100}
               className="gap-2"
             >
               {paypalSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowUpFromLine className="h-4 w-4" /> Submit request</>}
@@ -354,7 +388,7 @@ export default function WalletPage() {
             </div>
             <Button
               onClick={handleCryptoRequest}
-              disabled={cryptoSubmitting || available < 100}
+              disabled={cryptoSubmitting || referralWithdrawable < 100}
               className="gap-2"
             >
               {cryptoSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowUpFromLine className="h-4 w-4" /> Submit request</>}
@@ -723,19 +757,34 @@ export default function WalletPage() {
                   className="flex items-center justify-between py-3 border-b border-border/60 last:border-0"
                 >
                   <div>
-                    <div className="font-medium">{tx.description}</div>
+                    <div className="font-medium flex items-center gap-2 flex-wrap">
+                      <span>{tx.description}</span>
+                      <Badge
+                        variant={
+                          tx.status === "completed"
+                            ? "default"
+                            : tx.status === "pending"
+                            ? "secondary"
+                            : "outline"
+                        }
+                      >
+                        {tx.status}
+                      </Badge>
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {new Date(tx.createdAt).toLocaleString()} • {TYPE_LABELS[tx.type] ?? tx.type}
                     </div>
                   </div>
                   <div
                     className={`font-semibold ${
-                      tx.type === "credit" || tx.type === "refund"
+                      (tx.type === "credit" || tx.type === "refund") && tx.status === "completed"
                         ? "text-green-600"
+                        : tx.type === "refund" && tx.status === "pending"
+                        ? "text-amber-600"
                         : "text-red-600"
                     }`}
                   >
-                    {tx.type === "debit" ? "-" : "+"}
+                    {tx.type === "debit" ? "-" : tx.status === "pending" ? "~" : "+"}
                     ${(tx.amountCents / 100).toFixed(2)}
                   </div>
                 </div>

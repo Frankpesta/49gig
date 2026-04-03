@@ -575,3 +575,100 @@ export const updateUserStatus = mutation({
   },
 });
 
+/**
+ * Admin-only: update freelancer profile fields used for matching.
+ */
+export const updateFreelancerProfileByAdmin = mutation({
+  args: {
+    targetUserId: v.id("users"),
+    adminUserId: v.optional(v.id("users")),
+    techField: v.optional(
+      v.union(
+        v.literal("development"),
+        v.literal("data_science"),
+        v.literal("technical_writing"),
+        v.literal("design"),
+        v.literal("other"),
+        v.literal("software_development"),
+        v.literal("ui_ux_design"),
+        v.literal("data_analytics"),
+        v.literal("devops_cloud"),
+        v.literal("cybersecurity_it"),
+        v.literal("ai"),
+        v.literal("machine_learning"),
+        v.literal("blockchain"),
+        v.literal("qa_testing")
+      )
+    ),
+    experienceLevel: v.optional(
+      v.union(
+        v.literal("junior"),
+        v.literal("mid"),
+        v.literal("senior"),
+        v.literal("expert")
+      )
+    ),
+    skills: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInMutation(ctx, args.adminUserId);
+    if (!admin) {
+      throw new Error("Not authenticated");
+    }
+    if (admin.role !== "admin") {
+      throw new Error("Only admins can update freelancer profile fields");
+    }
+
+    const target = await ctx.db.get(args.targetUserId);
+    if (!target) {
+      throw new Error("User not found");
+    }
+    if (target.role !== "freelancer") {
+      throw new Error("Only freelancer profiles can be updated here");
+    }
+
+    const cleanedSkills =
+      args.skills === undefined
+        ? undefined
+        : Array.from(
+            new Set(
+              args.skills
+                .map((skill) => skill.trim())
+                .filter((skill) => skill.length > 0)
+            )
+          );
+
+    const updatedProfile = {
+      ...target.profile,
+      ...(args.techField !== undefined ? { techField: args.techField } : {}),
+      ...(args.experienceLevel !== undefined
+        ? { experienceLevel: args.experienceLevel }
+        : {}),
+      ...(cleanedSkills !== undefined ? { skills: cleanedSkills } : {}),
+    };
+
+    const now = Date.now();
+    await ctx.db.patch(args.targetUserId, {
+      profile: updatedProfile,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "admin_updated_freelancer_profile",
+      actionType: "admin",
+      actorId: admin._id,
+      actorRole: admin.role,
+      targetType: "user",
+      targetId: args.targetUserId,
+      details: {
+        techField: args.techField,
+        experienceLevel: args.experienceLevel,
+        skillsCount: cleanedSkills?.length,
+      },
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+

@@ -187,6 +187,20 @@ export const clearMonthlyCycleDisputeInternal = internalMutation({
   },
 });
 
+/** Cancel a specific disputed monthly cycle after client-favor/replacement outcome. */
+export const cancelDisputedMonthlyCycleInternal = internalMutation({
+  args: { monthlyCycleId: v.id("monthlyBillingCycles") },
+  handler: async (ctx, args) => {
+    const c = await ctx.db.get(args.monthlyCycleId);
+    if (!c) return;
+    await ctx.db.patch(args.monthlyCycleId, {
+      status: "cancelled",
+      disputeId: undefined,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 /**
  * Approve a monthly billing cycle (client action).
  * Credits freelancer(s) wallet(s) and updates cycle status.

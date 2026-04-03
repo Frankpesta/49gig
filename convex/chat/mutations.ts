@@ -475,6 +475,12 @@ export const createSupportChat = mutation({
     if (!user) {
       throw new Error("Not authenticated");
     }
+    const now = Date.now();
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
 
     // Create support chat
     const chatId = await ctx.db.insert("chats", {
@@ -483,8 +489,8 @@ export const createSupportChat = mutation({
       supportRequestId: `support_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       title: args.subject,
       status: "active",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     });
 
     // Create initial message
@@ -508,15 +514,15 @@ export const createSupportChat = mutation({
       isPinned: false,
       isDeleted: false,
       readBy: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     });
 
     // Update chat metadata
     await ctx.db.patch(chatId, {
-      lastMessageAt: Date.now(),
+      lastMessageAt: now,
       lastMessagePreview: args.initialMessage.substring(0, 100),
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     // Create audit log
@@ -527,8 +533,24 @@ export const createSupportChat = mutation({
       actorRole: user.role,
       targetType: "chat",
       targetId: chatId,
-      createdAt: Date.now(),
+      createdAt: now,
     });
+
+    const admins = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "admin"))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+    const adminIds = admins.map((admin) => admin._id);
+    if (adminIds.length > 0) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: adminIds,
+        title: "New support request",
+        message: `${user.name} opened a support request: "${args.subject}".`,
+        type: "support",
+        data: { chatId, requesterId: user._id },
+      });
+    }
 
     return chatId;
   },
