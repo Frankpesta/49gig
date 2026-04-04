@@ -180,9 +180,8 @@ export const getProjects = query({
 });
 
 /**
- * Admins: all hires in `matching` where manual adding a candidate is still meaningful —
- * solo with no matched freelancer, or team with at least one role/slot not yet accepted.
- * Ignores funding and whether automated matching found candidates.
+ * Admins: hires in the matching pipeline — `awaitingMatch` (draft through funded) or status `matching`,
+ * where manual adding a candidate is still meaningful (solo: nobody matched; team: open role/headcount).
  */
 export const listManualMatchProjectsAdmin = query({
   args: { userId: v.optional(v.id("users")) },
@@ -195,14 +194,38 @@ export const listManualMatchProjectsAdmin = query({
       throw new Error("Only admins can list manual match projects");
     }
 
-    const projects = await ctx.db
+    const awaitingRows = await ctx.db
       .query("projects")
-      .withIndex("by_status", (q) => q.eq("status", "matching"))
-      .order("desc")
+      .withIndex("by_awaiting_match", (q) => q.eq("awaitingMatch", true))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "draft"),
+          q.eq(q.field("status"), "pending_funding"),
+          q.eq(q.field("status"), "funded"),
+          q.eq(q.field("status"), "matching")
+        )
+      )
       .collect();
 
+    const matchingRows = await ctx.db
+      .query("projects")
+      .withIndex("by_status", (q) => q.eq("status", "matching"))
+      .collect();
+
+    const byId = new Map<string, Doc<"projects">>();
+    for (const p of awaitingRows) {
+      byId.set(p._id, p);
+    }
+    for (const p of matchingRows) {
+      byId.set(p._id, p);
+    }
+
+    const merged = Array.from(byId.values()).sort(
+      (a, b) => b.updatedAt - a.updatedAt
+    );
+
     const eligible: Doc<"projects">[] = [];
-    for (const project of projects) {
+    for (const project of merged) {
       if (await projectEligibleForAdminManualMatch(ctx, project)) {
         eligible.push(project);
       }
