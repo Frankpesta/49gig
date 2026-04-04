@@ -533,7 +533,7 @@ export const adminManualMatch = mutation({
     if (!project) throw new Error("Project not found");
     if (!(await projectEligibleForAdminManualMatch(ctx, project))) {
       throw new Error(
-        "Manual matching is only for hires in matching with no one matched yet (single), or team hires with at least one open role or open headcount slot."
+        "Manual matching is only for hires with awaitingMatch (draft–funded queue) or status matching, with no one matched yet on single hires, or open team role/headcount on team hires."
       );
     }
 

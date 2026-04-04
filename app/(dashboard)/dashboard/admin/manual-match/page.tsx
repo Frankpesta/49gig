@@ -260,9 +260,9 @@ export default function AdminManualMatchPage() {
               <span className="min-w-0">Step 1 — Select hire</span>
             </CardTitle>
             <CardDescription className="text-pretty">
-              Hires in status matching: single hires with no matched freelancer yet, and team hires with at least one
-              open role (no accepted match for that slot) or open headcount when roles are not defined on intake.
-              Funding and whether the matcher found candidates do not affect this list.
+              Hires with awaitingMatch (including funded, before or after auto-match) or already in status matching.
+              Single: no matched freelancer yet. Team: at least one open role or headcount slot. Automated matcher
+              results do not affect this list.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

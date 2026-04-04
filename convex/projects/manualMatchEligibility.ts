@@ -35,15 +35,43 @@ export async function openTeamRoleLabelsForProject(
   return labels.filter((l) => !filled.has(l));
 }
 
+/** Statuses where matching work can happen (see matching/queries getProjectsAwaitingMatch). */
+export const MANUAL_MATCH_PROJECT_STATUSES = [
+  "draft",
+  "pending_funding",
+  "funded",
+  "matching",
+] as const;
+
+export type ManualMatchProjectStatus = (typeof MANUAL_MATCH_PROJECT_STATUSES)[number];
+
+export function isManualMatchProjectStatus(
+  status: string
+): status is ManualMatchProjectStatus {
+  return (MANUAL_MATCH_PROJECT_STATUSES as readonly string[]).includes(status);
+}
+
 /**
- * Solo: status matching and nobody on the hire yet.
- * Team: status matching and at least one unfilled role (accepted match), or headcount below target when intake has no slot labels.
+ * Listed when the hire is still in the matching pipeline:
+ * - `awaitingMatch` is true (pre- or post-funding queue; same idea as getProjectsAwaitingMatch), or
+ * - status is already `matching` (e.g. partial team) even if the flag was cleared.
+ *
+ * Slot rules: single hire has no one matched yet; team has an open role (no accepted match) or headcount below target.
  */
 export async function projectEligibleForAdminManualMatch(
   ctx: AnyCtx,
   project: Doc<"projects">
 ): Promise<boolean> {
-  if (project.status !== "matching") return false;
+  if (!isManualMatchProjectStatus(project.status)) {
+    return false;
+  }
+
+  const hasAwaitingFlag = project.awaitingMatch === true;
+  const isMatchingStatus = project.status === "matching";
+  if (!hasAwaitingFlag && !isMatchingStatus) {
+    return false;
+  }
+
   if (!isTeamProject(project)) {
     return matchedHeadcount(project) === 0;
   }
