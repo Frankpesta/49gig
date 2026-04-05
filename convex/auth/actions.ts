@@ -3,6 +3,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import React from "react";
+import { assertRecaptchaToken } from "../recaptchaVerify";
 import { sendEmail } from "../email/send";
 import {
   VerificationCodeEmail,
@@ -180,5 +181,56 @@ export const sendTwoFactorCodeEmail = action({
     });
 
     return { success: true };
+  },
+});
+
+/** Forgot-password form on the web — verifies reCAPTCHA then runs the same mutation as before. */
+export const requestPasswordResetWithRecaptcha = action({
+  args: {
+    recaptchaToken: v.string(),
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await assertRecaptchaToken(args.recaptchaToken, { expectedAction: "password_reset" });
+    const { api } = require("../_generated/api") as any;
+    return await ctx.runMutation(api.auth.mutations.requestPasswordReset, {
+      email: args.email,
+    });
+  },
+});
+
+/** Email/password sign-in (first step). 2FA step still uses verifyTwoFactorSignin mutation. */
+export const signinWithRecaptcha = action({
+  args: {
+    recaptchaToken: v.string(),
+    email: v.string(),
+    password: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await assertRecaptchaToken(args.recaptchaToken, { expectedAction: "login" });
+    const { api } = require("../_generated/api") as any;
+    return await ctx.runMutation(api.auth.mutations.signin, {
+      email: args.email,
+      password: args.password,
+    });
+  },
+});
+
+/** Client / freelancer email signup — verifies reCAPTCHA then runs signup mutation. */
+export const signupWithRecaptcha = action({
+  args: {
+    recaptchaToken: v.string(),
+    email: v.string(),
+    password: v.string(),
+    name: v.string(),
+    role: v.union(v.literal("client"), v.literal("freelancer")),
+    profile: v.optional(v.any()),
+    referralCode: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await assertRecaptchaToken(args.recaptchaToken, { expectedAction: "signup" });
+    const { recaptchaToken: _t, ...rest } = args;
+    const { api } = require("../_generated/api") as any;
+    return await ctx.runMutation(api.auth.mutations.signup, rest);
   },
 });

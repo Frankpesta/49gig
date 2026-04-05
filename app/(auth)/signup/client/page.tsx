@@ -6,8 +6,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
+import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
 import { useOAuth } from "@/hooks/use-oauth";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import { clientSignupFeatures } from "@/components/auth/auth-icons";
@@ -35,9 +37,7 @@ export default function ClientSignupPage() {
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const signup = useMutation(
-    (api as any)["auth/mutations"].signup
-  );
+  const signupWithRecaptcha = useAction(api.auth.actions.signupWithRecaptcha);
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
 
   useEffect(() => {
@@ -77,6 +77,11 @@ export default function ClientSignupPage() {
       return;
     }
 
+    if (!isRecaptchaConfigured()) {
+      setError("Sign up is temporarily unavailable. Please try again later.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -84,7 +89,9 @@ export default function ClientSignupPage() {
       const refStored = sessionStorage.getItem("49gig_ref");
       const referralCode = refFromUrl || refStored || undefined;
 
-      const result = await signup({
+      const recaptchaToken = await executeRecaptcha("signup");
+      const result = await signupWithRecaptcha({
+        recaptchaToken,
         email: formData.email,
         password: formData.password,
         name: formData.name,
@@ -325,6 +332,8 @@ export default function ClientSignupPage() {
             />
           </div>
         </div>
+
+        <RecaptchaNotice />
 
         <Button
           type="submit"

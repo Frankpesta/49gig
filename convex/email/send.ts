@@ -14,6 +14,7 @@ export async function sendEmail({
   subject,
   react,
   attachments,
+  replyTo,
 }: {
   to: string | string[];
   subject: string;
@@ -23,6 +24,8 @@ export async function sendEmail({
     content: string;
     contentType?: string;
   }[];
+  /** When set, the enquirer's email client Reply goes to this address (staff inbox). */
+  replyTo?: string | string[];
 }) {
   if (!resend) {
     return { id: "skipped", status: "skipped" };
@@ -38,5 +41,6 @@ export async function sendEmail({
     html,
     text,
     attachments,
+    ...(replyTo ? { replyTo: Array.isArray(replyTo) ? replyTo : [replyTo] } : {}),
   });
 }

@@ -1,17 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/hooks/use-auth";
 import { formatDistanceToNow } from "date-fns";
 import { MessageCircle, Send, Reply, Loader2, Trash2, Pencil } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
+
+export type BlogCommentSubmitPayload = {
+  postId: Id<"blogPosts">;
+  parentId?: Id<"blogComments">;
+  userId?: Id<"users">;
+  authorName?: string;
+  authorEmail?: string;
+  content: string;
+};
 
 function buildCommentTree(
   flat: { _id: Id<"blogComments">; parentId?: Id<"blogComments">; content: string; authorDisplayName: string; createdAt: number; authorId?: Id<"users"> }[]
@@ -41,12 +50,14 @@ function CommentNode({
   currentUserId,
   canDelete,
   depth,
+  submitComment,
 }: {
   postId: Id<"blogPosts">;
   node: { comment: { _id: Id<"blogComments">; content: string; authorDisplayName: string; createdAt: number; authorId?: Id<"users"> }; children: { comment: any; children: any[] }[] };
   currentUserId?: Id<"users">;
   canDelete: (authorId?: Id<"users">) => boolean;
   depth: number;
+  submitComment: (payload: BlogCommentSubmitPayload) => Promise<void>;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -54,7 +65,6 @@ function CommentNode({
   const [editText, setEditText] = useState(node.comment.content);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const addComment = useMutation((api as any).blog.mutations.createComment);
   const updateComment = useMutation((api as any).blog.mutations.updateComment);
   const deleteComment = useMutation((api as any).blog.mutations.deleteComment);
 
@@ -62,7 +72,7 @@ function CommentNode({
     if (!replyText.trim()) return;
     setIsSubmitting(true);
     try {
-      await addComment({
+      await submitComment({
         postId,
         parentId: node.comment._id,
         userId: currentUserId,
@@ -201,6 +211,7 @@ function CommentNode({
               currentUserId={currentUserId}
               canDelete={canDelete}
               depth={depth + 1}
+              submitComment={submitComment}
             />
           ))}
         </div>
@@ -224,10 +235,19 @@ export function BlogComments({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const comments = useQuery((api as any).blog.queries.getCommentsForPost, { postId });
-  const addComment = useMutation((api as any).blog.mutations.createComment);
+  const submitBlogComment = useAction(api.blog.actions.submitBlogComment);
 
   const canDelete = (authorId?: Id<"users">): boolean =>
     Boolean(isAdminOrModerator || (currentUserId && authorId === currentUserId));
+
+  const submitComment = async (payload: BlogCommentSubmitPayload) => {
+    if (!isRecaptchaConfigured()) {
+      toast.error("Comments are temporarily unavailable.");
+      throw new Error("reCAPTCHA not configured");
+    }
+    const recaptchaToken = await executeRecaptcha("blog_comment");
+    await submitBlogComment({ recaptchaToken, ...payload });
+  };
 
   const handleSubmit = async () => {
     if (!content.trim()) {
@@ -240,7 +260,7 @@ export function BlogComments({
     }
     setIsSubmitting(true);
     try {
-      await addComment({
+      await submitComment({
         postId,
         userId: currentUserId,
         authorName: currentUserId ? undefined : authorName.trim(),
@@ -293,6 +313,16 @@ export function BlogComments({
             />
           </div>
         )}
+        <p className="text-xs text-muted-foreground">
+          Protected by Google reCAPTCHA.{" "}
+          <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="underline">
+            Privacy
+          </a>
+          {" · "}
+          <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer" className="underline">
+            Terms
+          </a>
+        </p>
         <Button onClick={handleSubmit} disabled={isSubmitting || !content.trim()} className="gap-2">
           {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Post comment
@@ -311,6 +341,7 @@ export function BlogComments({
               currentUserId={currentUserId}
               canDelete={canDelete}
               depth={0}
+              submitComment={submitComment}
             />
           ))
         )}

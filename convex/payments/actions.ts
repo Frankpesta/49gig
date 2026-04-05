@@ -7,6 +7,93 @@ import * as flutterwave from "./flutterwave";
 const internalAny: any = require("../_generated/api").internal;
 const apiAny: any = require("../_generated/api").api;
 
+/** Max age we treat a Flutterwave tx_ref as "same checkout" before allowing a fresh session. */
+const PRE_FUNDING_IN_FLIGHT_MAX_MS = 60 * 60 * 1000;
+/** If verify API errors, release pending rows older than this so the client is not blocked forever. */
+const PRE_FUNDING_VERIFY_ERROR_RELEASE_MIN_AGE_MS = 15 * 60 * 1000;
+
+type PaymentSummary = {
+  _id: Id<"payments">;
+  status: string;
+  type: string;
+  flutterwaveTransactionId?: string;
+  createdAt: number;
+} | null;
+
+/**
+ * Reconcile the latest pre_funding row with Flutterwave so failed/abandoned attempts
+ * do not leave a perpetual "pending" row that blocks createPaymentIntent.
+ */
+async function refreshLatestPreFundingAgainstFlutterwave(
+  ctx: any,
+  projectId: Id<"projects">
+): Promise<PaymentSummary> {
+  let latest = (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+    projectId,
+  })) as PaymentSummary;
+
+  if (!latest || latest.type !== "pre_funding") return latest;
+  if (latest.status === "succeeded") return latest;
+  if (latest.status !== "pending" && latest.status !== "processing") return latest;
+
+  const txRef = latest.flutterwaveTransactionId;
+  if (!txRef) return latest;
+
+  let verification: Awaited<ReturnType<typeof flutterwave.verifyPayment>>;
+  try {
+    verification = await flutterwave.verifyPayment(txRef);
+  } catch {
+    const age = Date.now() - latest.createdAt;
+    if (age >= PRE_FUNDING_VERIFY_ERROR_RELEASE_MIN_AGE_MS) {
+      await ctx.runMutation(internalAny.payments.mutations.releaseStuckPreFundingPaymentInternal, {
+        paymentId: latest._id,
+        reason:
+          "Could not verify payment with Flutterwave; previous attempt cleared so you can try again.",
+      });
+      return (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+        projectId,
+      })) as PaymentSummary;
+    }
+    return latest;
+  }
+
+  const st = (verification.data.status ?? "").toLowerCase();
+  if (st === "successful" || st === "succeeded") {
+    await ctx.runMutation(internalAny.payments.mutations.handlePaymentSuccess, {
+      transactionId: txRef,
+      eventId: String(verification.data.id ?? txRef),
+      data: verification.data,
+    });
+    return (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+      projectId,
+    })) as PaymentSummary;
+  }
+
+  if (st === "pending") {
+    const age = Date.now() - latest.createdAt;
+    if (age >= PRE_FUNDING_IN_FLIGHT_MAX_MS) {
+      await ctx.runMutation(internalAny.payments.mutations.releaseStuckPreFundingPaymentInternal, {
+        paymentId: latest._id,
+        reason: "Checkout timed out. You can start a new payment.",
+      });
+      return (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+        projectId,
+      })) as PaymentSummary;
+    }
+    return latest;
+  }
+
+  await ctx.runMutation(internalAny.payments.mutations.handlePaymentFailure, {
+    transactionId: txRef,
+    eventId: String(verification.data.id ?? "create-payment-intent-verify"),
+    errorMessage:
+      verification.data.processor_response || `Payment status: ${verification.data.status}`,
+  });
+  return (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+    projectId,
+  })) as PaymentSummary;
+}
+
 /**
  * Initialize a Flutterwave payment for project pre-funding
  * Returns payment link that user will be redirected to
@@ -47,36 +134,38 @@ export const createPaymentIntent = action({
       throw new Error("Project is not in a state that allows payment");
     }
 
-    // Check if payment already exists
-    const existingPayment = await ctx.runQuery(
-      internalAny.payments.queries.getPaymentByProject,
-      {
-        projectId: args.projectId,
-      }
-    );
+    let latestPreFunding = (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+      projectId: args.projectId,
+    })) as PaymentSummary;
 
-    if (existingPayment) {
-      if (existingPayment.status === "succeeded") {
-        throw new Error("Project is already funded");
+    if (latestPreFunding?.status === "succeeded") {
+      throw new Error("Project is already funded");
+    }
+
+    latestPreFunding = await refreshLatestPreFundingAgainstFlutterwave(ctx, args.projectId);
+
+    if (latestPreFunding?.status === "succeeded") {
+      throw new Error("Project is already funded");
+    }
+
+    if (
+      latestPreFunding?.flutterwaveTransactionId &&
+      (latestPreFunding.status === "pending" || latestPreFunding.status === "processing")
+    ) {
+      const paymentAge = Date.now() - latestPreFunding.createdAt;
+      if (paymentAge < PRE_FUNDING_IN_FLIGHT_MAX_MS) {
+        throw new Error(
+          "A payment is already being processed for this project. Complete or cancel it on the payment page, or wait a few minutes and try again."
+        );
       }
-      
-      // If there's a pending payment with a transaction reference, return its payment link
-      if (existingPayment.flutterwaveTransactionId && 
-          (existingPayment.status === "pending" || existingPayment.status === "processing")) {
-        // For Flutterwave, we'd need to reconstruct the payment link or retrieve it
-        // Since we store tx_ref, we can regenerate the link or return existing
-        // For now, we'll create a new payment if the old one is stale
-        const now = Date.now();
-        const paymentAge = now - existingPayment.createdAt;
-        // If payment is less than 1 hour old, don't create duplicate
-        if (paymentAge < 60 * 60 * 1000) {
-          throw new Error("A payment is already being processed for this project. Please wait or contact support.");
-        }
-      }
-      
-      if (existingPayment.status === "pending" && !existingPayment.flutterwaveTransactionId) {
-        throw new Error("A payment is already being processed for this project. Please wait or contact support.");
-      }
+      await ctx.runMutation(internalAny.payments.mutations.releaseStuckPreFundingPaymentInternal, {
+        paymentId: latestPreFunding._id,
+        reason: "Previous checkout expired. Starting a new payment session.",
+      });
+    }
+
+    if (latestPreFunding?.status === "pending" && !latestPreFunding.flutterwaveTransactionId) {
+      throw new Error("A payment is already being processed for this project. Please wait or contact support.");
     }
 
     // Generate unique transaction reference
@@ -303,7 +392,17 @@ export const verifyPayment = action({
     const isSuccess =
       verification.data.status === "successful" || verification.data.status === "succeeded";
     if (!isSuccess) {
-      throw new Error(`Payment verification failed: ${verification.data.status}`);
+      await ctx.runMutation(internalAny.payments.mutations.handlePaymentFailure, {
+        transactionId: args.txRef,
+        eventId: verification.data.id?.toString() ?? "verify-callback-failed",
+        errorMessage:
+          verification.data.processor_response ||
+          `Payment verification failed: ${verification.data.status}`,
+      });
+      throw new Error(
+        verification.data.processor_response ||
+          `Payment was not successful (${verification.data.status}). You can try again.`
+      );
     }
 
     // Find payment record

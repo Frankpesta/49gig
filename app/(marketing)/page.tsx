@@ -217,7 +217,7 @@ export default function Home() {
                   variant="secondary"
                   className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/50 bg-transparent px-6 text-sm text-foreground hover:bg-primary/5 sm:w-auto"
                 >
-                  Apply as Freelancer
+                  Apply as a Freelancer
                   <ArrowRight className="h-4 w-4" />
                 </CTAButton>
               </div>

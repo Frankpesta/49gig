@@ -13,10 +13,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
+import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
+import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
 
 const authCardClass =
   "rounded-xl border border-border/60 bg-card shadow-lg";
@@ -26,17 +28,20 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const requestPasswordReset = useMutation(
-    (api as any)["auth/mutations"].requestPasswordReset
-  );
+  const requestPasswordReset = useAction(api.auth.actions.requestPasswordResetWithRecaptcha);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!isRecaptchaConfigured()) {
+      setError("Password reset is temporarily unavailable. Please try again later.");
+      return;
+    }
     setIsLoading(true);
 
     try {
-      const result = await requestPasswordReset({ email });
+      const recaptchaToken = await executeRecaptcha("password_reset");
+      const result = await requestPasswordReset({ email, recaptchaToken });
 
       if (result.success) {
         setSuccess(true);
@@ -116,6 +121,7 @@ export default function ForgotPasswordPage() {
                 className="h-11 rounded-lg"
               />
             </div>
+            <RecaptchaNotice />
             <Button
               type="submit"
               className="w-full h-11 rounded-lg text-sm font-medium disabled:opacity-90"

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, MutationCtx } from "../_generated/server";
 import { getCurrentUser } from "../auth";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 
 async function getCurrentUserInMutation(
   ctx: MutationCtx,
@@ -76,6 +76,60 @@ export const replyToContactEnquiry = mutation({
     });
 
     return { success: true, enquiryEmail: enquiry.email };
+  },
+});
+
+/**
+ * Assign a contact enquiry to a moderator. Admin only.
+ * The moderator is notified by email (scheduled action).
+ */
+export const assignContactEnquiryToModerator = mutation({
+  args: {
+    enquiryId: v.id("contactEnquiries"),
+    moderatorId: v.id("users"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user || user.role !== "admin") {
+      throw new Error("Only admins can assign enquiries to moderators.");
+    }
+
+    const enquiry = await ctx.db.get(args.enquiryId);
+    if (!enquiry) {
+      throw new Error("Enquiry not found.");
+    }
+
+    const moderator = await ctx.db.get(args.moderatorId);
+    if (!moderator || moderator.status !== "active" || moderator.role !== "moderator") {
+      throw new Error("Assignee must be an active moderator.");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.enquiryId, {
+      assignedModeratorId: args.moderatorId,
+      assignedAt: now,
+      updatedAt: now,
+    });
+
+    const { internal: internalApi } = require("../_generated/api") as {
+      internal: {
+        contactEnquiries: {
+          actions: { sendContactEnquiryAssignmentEmailInternal: unknown };
+        };
+      };
+    };
+    await (
+      ctx.scheduler.runAfter as (
+        delayMs: number,
+        fn: unknown,
+        fnArgs: { enquiryId: Id<"contactEnquiries"> }
+      ) => Promise<unknown>
+    )(0, internalApi.contactEnquiries.actions.sendContactEnquiryAssignmentEmailInternal, {
+      enquiryId: args.enquiryId,
+    });
+
+    return { success: true };
   },
 });
 

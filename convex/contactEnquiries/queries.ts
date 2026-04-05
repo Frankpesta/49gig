@@ -42,11 +42,25 @@ export const getContactEnquiries = query({
       return [];
     }
 
+    const limit = args.limit ?? 100;
+
+    // Admins see all enquiries; moderators only see items assigned to them by an admin.
+    if (user.role === "moderator") {
+      let q = ctx.db
+        .query("contactEnquiries")
+        .withIndex("by_assigned_moderator_created", (q) =>
+          q.eq("assignedModeratorId", user._id)
+        );
+      if (args.status) {
+        q = q.filter((q) => q.eq(q.field("status"), args.status));
+      }
+      return await q.order("desc").take(limit);
+    }
+
     let q = ctx.db.query("contactEnquiries").withIndex("by_created");
     if (args.status) {
       q = q.filter((q) => q.eq(q.field("status"), args.status));
     }
-    const enquiries = await q.order("desc").take(args.limit ?? 100);
-    return enquiries;
+    return await q.order("desc").take(limit);
   },
 });

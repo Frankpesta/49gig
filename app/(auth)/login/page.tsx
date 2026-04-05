@@ -6,8 +6,10 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
+import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
 import { useSessionRotation } from "@/hooks/use-session";
 import { useOAuth } from "@/hooks/use-oauth";
 import { getUserFriendlyError } from "@/lib/error-handling";
@@ -27,7 +29,7 @@ export default function LoginPage() {
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const signin = useMutation((api as any)["auth/mutations"].signin);
+  const signinWithRecaptchaAction = useAction(api.auth.actions.signinWithRecaptcha);
   const verifyTwoFactorSignin = useMutation((api as any)["auth/mutations"].verifyTwoFactorSignin);
   const { setRefreshToken } = useSessionRotation();
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
@@ -62,7 +64,14 @@ export default function LoginPage() {
         return;
       }
 
-      const result = await signin({
+      if (!isRecaptchaConfigured()) {
+        setError("Sign-in is temporarily unavailable. Please try again later.");
+        setIsLoading(false);
+        return;
+      }
+      const recaptchaToken = await executeRecaptcha("login");
+      const result = await signinWithRecaptchaAction({
+        recaptchaToken,
         email,
         password,
       });
@@ -234,6 +243,8 @@ export default function LoginPage() {
             <p className="text-xs text-muted-foreground">We sent a 6-digit code to your email.</p>
           </div>
         )}
+
+        {!requiresTwoFactor && <RecaptchaNotice />}
 
         <Button type="submit" className="w-full h-11 rounded-lg text-sm font-semibold" disabled={isLoading}>
           {isLoading ? (
