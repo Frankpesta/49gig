@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAction } from "convex/react";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { toast } from "sonner";
+import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,9 +58,15 @@ export default function ContactPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isRecaptchaConfigured()) {
+      toast.error("This form is not configured. Please email support@49gig.com.");
+      return;
+    }
     setIsSubmitting(true);
     try {
+      const recaptchaToken = await executeRecaptcha("contact");
       await submitEnquiry({
+        recaptchaToken,
         name: formData.name.trim(),
         email: formData.email.trim(),
         subject: formData.subject.trim(),
@@ -286,6 +293,28 @@ export default function ContactPage() {
                             className="resize-none rounded-lg"
                           />
                         </div>
+
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          This site is protected by reCAPTCHA and the Google{" "}
+                          <a
+                            href="https://policies.google.com/privacy"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-foreground"
+                          >
+                            Privacy Policy
+                          </a>{" "}
+                          and{" "}
+                          <a
+                            href="https://policies.google.com/terms"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-foreground"
+                          >
+                            Terms of Service
+                          </a>{" "}
+                          apply.
+                        </p>
 
                         <Button
                           type="submit"

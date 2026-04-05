@@ -1283,6 +1283,9 @@ export default defineSchema({
       v.literal("replied"),
       v.literal("closed")
     ),
+    /** Set when an admin assigns the enquiry to a moderator (moderators only see their assigned rows). */
+    assignedModeratorId: v.optional(v.id("users")),
+    assignedAt: v.optional(v.number()),
     repliedAt: v.optional(v.number()),
     repliedBy: v.optional(v.id("users")),
     replyMessage: v.optional(v.string()),
@@ -1290,7 +1293,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_status", ["status"])
-    .index("by_created", ["createdAt"]),
+    .index("by_created", ["createdAt"])
+    .index("by_assigned_moderator_created", ["assignedModeratorId", "createdAt"]),
 
   // Platform pricing: base hourly rates per talent category (admin-editable)
   pricingConfig: defineTable({

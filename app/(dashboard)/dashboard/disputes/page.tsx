@@ -3,7 +3,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
-import { Doc } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TablePagination } from "@/components/ui/table-pagination";
@@ -31,6 +31,15 @@ import {
   Clock,
   User,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -58,6 +67,8 @@ export default function DisputesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(undefined);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
+  const [assignDisputeId, setAssignDisputeId] = useState<Id<"disputes"> | null>(null);
+  const [assignModeratorPick, setAssignModeratorPick] = useState<string>("");
 
   const isStaff =
     user?.role === "admin" || user?.role === "moderator";
@@ -66,6 +77,13 @@ export default function DisputesPage() {
     api.disputes.queries.getDisputes,
     isAuthenticated && user?._id
       ? { userId: user._id, status: statusFilter }
+      : "skip"
+  );
+
+  const moderatorsForAssign = useQuery(
+    api.users.queries.getAllUsersAdmin,
+    isAuthenticated && user?.role === "admin" && user?._id
+      ? { role: "moderator", status: "active", userId: user._id }
       : "skip"
   );
 
@@ -137,6 +155,16 @@ export default function DisputesPage() {
   const escalatedCount = disputes.filter(
     (d: Doc<"disputes">) => d.status === "escalated"
   ).length;
+
+  type EnrichedDisputeRow = Doc<"disputes"> & {
+    projectTitle?: string | null;
+    initiatorName?: string | null;
+    respondentName?: string | null;
+  };
+  const assignTargetDispute =
+    assignDisputeId && disputes
+      ? (disputes as EnrichedDisputeRow[]).find((d) => d._id === assignDisputeId)
+      : null;
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
@@ -325,7 +353,20 @@ export default function DisputesPage() {
                         </Button>
                         {isStaff &&
                           dispute.status === "open" &&
-                          !dispute.assignedModeratorId && (
+                          !dispute.assignedModeratorId &&
+                          (user.role === "admin" ? (
+                            <Button
+                              size="sm"
+                              className="rounded-lg h-7 text-xs"
+                              onClick={() => {
+                                setAssignDisputeId(dispute._id);
+                                const first = moderatorsForAssign?.[0]?._id;
+                                setAssignModeratorPick(first ? String(first) : "");
+                              }}
+                            >
+                              Assign…
+                            </Button>
+                          ) : (
                             <Button
                               size="sm"
                               className="rounded-lg h-7 text-xs"
@@ -345,9 +386,9 @@ export default function DisputesPage() {
                                 }
                               }}
                             >
-                              Assign
+                              Assign to me
                             </Button>
-                          )}
+                          ))}
                         {isStaff &&
                           dispute.status !== "resolved" &&
                           dispute.status !== "closed" &&
@@ -381,6 +422,89 @@ export default function DisputesPage() {
         onPageChange={setCurrentPage}
         itemName="disputes"
       />
+
+      <Dialog
+        open={!!assignDisputeId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAssignDisputeId(null);
+            setAssignModeratorPick("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign dispute</DialogTitle>
+            <DialogDescription>
+              Choose a moderator to own this case. They will receive an in-app notification.
+              {assignTargetDispute?.projectTitle
+                ? ` Hire: ${assignTargetDispute.projectTitle}`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          {moderatorsForAssign === undefined ? (
+            <p className="text-sm text-muted-foreground py-4">Loading moderators…</p>
+          ) : moderatorsForAssign.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No active moderators found.</p>
+          ) : (
+            <div className="space-y-2 py-2">
+              <Label htmlFor="assign-mod">Moderator</Label>
+              <Select
+                value={assignModeratorPick}
+                onValueChange={setAssignModeratorPick}
+              >
+                <SelectTrigger id="assign-mod" className="w-full">
+                  <SelectValue placeholder="Select a moderator" />
+                </SelectTrigger>
+                <SelectContent>
+                  {moderatorsForAssign.map((m: { _id: string; name: string; email: string }) => (
+                    <SelectItem key={m._id} value={m._id}>
+                      {m.name} ({m.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAssignDisputeId(null);
+                setAssignModeratorPick("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                !assignDisputeId ||
+                !assignModeratorPick ||
+                !user?._id ||
+                moderatorsForAssign === undefined ||
+                moderatorsForAssign.length === 0
+              }
+              onClick={async () => {
+                if (!assignDisputeId || !assignModeratorPick || !user?._id) return;
+                try {
+                  await assignModerator({
+                    disputeId: assignDisputeId,
+                    moderatorId: assignModeratorPick as Id<"users">,
+                    userId: user._id,
+                  });
+                  toast.success("Dispute assigned.");
+                  setAssignDisputeId(null);
+                  setAssignModeratorPick("");
+                } catch (e) {
+                  toast.error(getUserFriendlyError(e) || "Could not assign");
+                }
+              }}
+            >
+              Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

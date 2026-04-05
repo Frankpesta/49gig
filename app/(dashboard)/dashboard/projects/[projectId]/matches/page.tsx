@@ -101,11 +101,14 @@ function FreelancerProfileContent({
   onProceed,
   onClose,
   isTeam,
+  freezeSelection,
 }: {
   profile: FreelancerPublicProfile;
   onProceed: () => void;
   onClose: () => void;
   isTeam: boolean;
+  /** When true, only close — client has already locked a choice before funding. */
+  freezeSelection?: boolean;
 }) {
   const p = data.profile;
   const primaryRole = getPrimaryRoleLabel(p?.techField, p?.primaryRole);
@@ -205,12 +208,20 @@ function FreelancerProfileContent({
       </div>
 
       <DialogFooter className="flex-col gap-2 sm:flex-row pt-4 border-t border-border/60">
-        <Button variant="outline" className="w-full sm:w-auto" onClick={onClose}>
-          See alternatives
-        </Button>
-        <Button className="w-full sm:w-auto" onClick={onProceed}>
-          Proceed with this talent
-        </Button>
+        {freezeSelection ? (
+          <Button className="w-full sm:w-auto" onClick={onClose}>
+            Close
+          </Button>
+        ) : (
+          <>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={onClose}>
+              See alternatives
+            </Button>
+            <Button className="w-full sm:w-auto" onClick={onProceed}>
+              Proceed with this talent
+            </Button>
+          </>
+        )}
       </DialogFooter>
     </>
   );
@@ -253,6 +264,8 @@ function MatchCard({
   onSelect,
   onViewProfile,
   isTeam,
+  selectionLocked,
+  continuePaymentHref,
 }: {
   match: EnrichedMatch;
   rank: number;
@@ -260,6 +273,9 @@ function MatchCard({
   onSelect: () => void;
   onViewProfile: () => void;
   isTeam?: boolean;
+  /** Pre-funding: choice is saved — show continue to payment instead of changing selection. */
+  selectionLocked?: boolean;
+  continuePaymentHref?: string;
 }) {
   const f = match.freelancer;
   const isVetted = match.vettingStatus === "approved";
@@ -334,17 +350,89 @@ function MatchCard({
             <User className="mr-1.5 h-4 w-4" />
             View profile
           </Button>
-          <Button
-            size="sm"
-            className="flex-1 rounded-lg"
-            onClick={onSelect}
-            variant={isSelected ? "secondary" : "default"}
-          >
-            {isSelected ? "Selected" : "Select"}
-          </Button>
+          {selectionLocked && continuePaymentHref ? (
+            <Button size="sm" className="flex-1 rounded-lg" asChild>
+              <Link href={continuePaymentHref}>Continue to payment</Link>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="flex-1 rounded-lg"
+              onClick={onSelect}
+              variant={isSelected ? "secondary" : "default"}
+            >
+              {isSelected ? "Selected" : "Select"}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function LockedSelectionProfileCard({
+  projectId,
+  freelancerId,
+  userId,
+  rank,
+  teamRole,
+  onViewProfile,
+  continuePaymentHref,
+}: {
+  projectId: Id<"projects">;
+  freelancerId: Id<"users">;
+  userId: Id<"users">;
+  rank: number;
+  teamRole?: string;
+  onViewProfile: () => void;
+  continuePaymentHref: string;
+}) {
+  const profile = useQuery(
+    (api as any)["matching/queries"].getFreelancerPublicProfile,
+    { projectId, freelancerId, userId }
+  ) as FreelancerPublicProfile | null | undefined;
+  if (profile === undefined) {
+    return <Skeleton className="h-64 rounded-xl" />;
+  }
+  if (profile === null) {
+    return (
+      <Card className="rounded-xl border-border/60">
+        <CardContent className="py-6 text-center text-sm text-muted-foreground">
+          Selected freelancer profile could not be loaded. You can still continue to payment from your hire.
+        </CardContent>
+      </Card>
+    );
+  }
+  const syntheticMatch: EnrichedMatch = {
+    _id: `orphan-${freelancerId}` as Id<"matches">,
+    projectId,
+    freelancerId,
+    score: 0,
+    confidence: "high",
+    teamRole,
+    explanation: "",
+    status: "pending",
+    vettingScore: profile.vettingScore,
+    vettingStatus: profile.vettingStatus,
+    freelancer: {
+      _id: freelancerId,
+      displayName: profile.displayName,
+      profile: profile.profile,
+      resumeBio: profile.resumeBio,
+      verificationStatus: profile.verificationStatus,
+    },
+  };
+  return (
+    <MatchCard
+      match={syntheticMatch}
+      rank={rank}
+      isSelected={true}
+      onSelect={() => {}}
+      onViewProfile={onViewProfile}
+      isTeam={!!teamRole}
+      selectionLocked
+      continuePaymentHref={continuePaymentHref}
+    />
   );
 }
 
@@ -352,6 +440,7 @@ export default function ProjectMatchesPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const isClient = user?.role === "client";
   const { trackEvent } = useAnalytics();
   const projectId = isValidConvexId(params.projectId)
     ? (params.projectId as Id<"projects">)
@@ -363,7 +452,7 @@ export default function ProjectMatchesPage() {
   );
   const matches = useQuery(
     (api as any)["matching/queries"].getMatches,
-    user?._id && projectId ? { projectId, userId: user._id, status: "pending" } : "skip"
+    user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
   const [viewingFreelancerId, setViewingFreelancerId] = useState<Id<"users"> | null>(null);
   const publicProfile = useQuery(
@@ -415,9 +504,40 @@ export default function ProjectMatchesPage() {
 
   const isTeam = project?.intakeForm?.hireType === "team";
   const isFreelancerReplacementFlow = Boolean(project?.replacementMatchingAt);
-  const pendingMatches = (matches ?? []).filter(
-    (m: EnrichedMatch) => m.status === "pending"
-  );
+
+  const preFundingSelectedIds: Id<"users">[] =
+    project && (project.status === "draft" || project.status === "pending_funding")
+      ? isTeam
+        ? [...(project.selectedFreelancerIds ?? [])]
+        : project.selectedFreelancerId
+          ? [project.selectedFreelancerId]
+          : []
+      : [];
+
+  const hasPreFundingSelection =
+    Boolean(isClient && preFundingSelectedIds.length > 0);
+
+  const matchesList = (matches ?? []) as EnrichedMatch[];
+
+  const pendingMatches = matchesList.filter((m) => m.status === "pending");
+
+  const lockedSelectionMatches =
+    hasPreFundingSelection
+      ? matchesList.filter(
+          (m) =>
+            preFundingSelectedIds.includes(m.freelancerId) &&
+            (m.status === "pending" || m.status === "accepted")
+        )
+      : [];
+
+  const orphanedPreFundingSelectionIds = hasPreFundingSelection
+    ? preFundingSelectedIds.filter(
+        (id) => !lockedSelectionMatches.some((m) => m.freelancerId === id)
+      )
+    : [];
+
+  const continuePaymentHref =
+    projectId ? `/dashboard/projects/${projectId}/payment` : "#";
 
   // Group by teamRole for team projects; also get all expected roles for "no availability" display
   const matchesByRoleMap = isTeam && project
@@ -467,7 +587,7 @@ export default function ProjectMatchesPage() {
   const hasUnavailableSingleSlot =
     !isTeam && !matchingRunning && pendingMatches.length === 0;
   const showMatchingPolicyNote =
-    hasUnavailableTeamRole || hasUnavailableSingleSlot;
+    !hasPreFundingSelection && (hasUnavailableTeamRole || hasUnavailableSingleSlot);
 
   // Reset "attempted" and availability when project changes so a new project can trigger matching
   useEffect(() => {
@@ -486,6 +606,12 @@ export default function ProjectMatchesPage() {
       (project.status !== "draft" && project.status !== "pending_funding")
     )
       return;
+    if (
+      project.selectedFreelancerId ||
+      (project.selectedFreelancerIds && project.selectedFreelancerIds.length > 0)
+    ) {
+      return;
+    }
     // Wait for matches query to resolve; undefined = still loading
     if (matches === undefined) return;
     if (matches.length > 0) return; // already have matches
@@ -754,7 +880,6 @@ export default function ProjectMatchesPage() {
   ]);
 
   if (!user) return null;
-  const isClient = user.role === "client";
   if (!projectId) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -839,25 +964,85 @@ export default function ProjectMatchesPage() {
         </Link>
         <div className="min-w-0">
           <h1 className="text-xl font-bold sm:text-2xl">
-            {isFreelancerReplacementFlow
-              ? "Select a replacement"
-              : isFundedMatchingContinuation
-                ? "Complete your team"
-                : "Matched freelancers"}
+            {hasPreFundingSelection
+              ? "Your selected talent"
+              : isFreelancerReplacementFlow
+                ? "Select a replacement"
+                : isFundedMatchingContinuation
+                  ? "Complete your team"
+                  : "Matched freelancers"}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isFreelancerReplacementFlow
-              ? isTeam
-                ? "Fill each open role with a new freelancer. Your escrow is unchanged — you’ll sign an updated contract after selection."
-                : "Pick a new freelancer for this hire. Funds stay in escrow until you approve monthly payouts as usual."
-              : isFundedMatchingContinuation
-                ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s) from the suggestions below.`
-                : isTeam
-                  ? "Select one or more freelancers per role, then proceed."
-                  : "We've matched you with top talent. Select one to continue."}
+            {hasPreFundingSelection
+              ? project.clientContractSignedAt
+                ? "You’ve signed the agreement with your choice below. When you’re ready, continue to payment to fund the hire — your selection stays on file."
+                : "You’ve already chosen who to hire below. Continue to payment when you’re ready, or open your hire to review the contract."
+              : isFreelancerReplacementFlow
+                ? isTeam
+                  ? "Fill each open role with a new freelancer. Your escrow is unchanged — you’ll sign an updated contract after selection."
+                  : "Pick a new freelancer for this hire. Funds stay in escrow until you approve monthly payouts as usual."
+                : isFundedMatchingContinuation
+                  ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s) from the suggestions below.`
+                  : isTeam
+                    ? "Select one or more freelancers per role, then proceed."
+                    : "We've matched you with top talent. Select one to continue."}
           </p>
         </div>
       </div>
+
+      {hasPreFundingSelection && projectId && user?._id && (
+        <div className="space-y-4">
+          <Card className="rounded-xl border-primary/25 bg-primary/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Who you’re hiring</CardTitle>
+              <CardDescription>
+                These are the freelancer(s) you selected. You won’t be asked to run matching again for this hire until
+                payment completes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {lockedSelectionMatches.map((m, i) => (
+                  <MatchCard
+                    key={m._id}
+                    match={m}
+                    rank={i + 1}
+                    isSelected={true}
+                    onSelect={() => {}}
+                    onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
+                    isTeam={isTeam}
+                    selectionLocked
+                    continuePaymentHref={continuePaymentHref}
+                  />
+                ))}
+                {orphanedPreFundingSelectionIds.map((fid, i) => (
+                  <LockedSelectionProfileCard
+                    key={fid}
+                    projectId={projectId}
+                    freelancerId={fid}
+                    userId={user._id}
+                    rank={lockedSelectionMatches.length + i + 1}
+                    teamRole={undefined}
+                    onViewProfile={() => setViewingFreelancerId(fid)}
+                    continuePaymentHref={continuePaymentHref}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild className="rounded-lg">
+                  <Link href={continuePaymentHref}>Continue to payment</Link>
+                </Button>
+                <Button variant="outline" asChild className="rounded-lg">
+                  <Link href={`/dashboard/projects/${projectId}/contract`}>View contract</Link>
+                </Button>
+                <Button variant="outline" asChild className="rounded-lg">
+                  <Link href={`/dashboard/projects/${projectId}`}>Back to hire</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {showMatchingPolicyNote && (
         <Card className="rounded-xl border-amber-500/30 bg-amber-500/5">
@@ -884,7 +1069,7 @@ export default function ProjectMatchesPage() {
         </Card>
       )}
 
-      {matchingRunning && (
+      {matchingRunning && !hasPreFundingSelection && (
         <Card className="rounded-xl border-primary/30 bg-primary/5">
           <CardContent className="flex items-center gap-3 py-6 px-4 sm:px-6">
             <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
@@ -919,7 +1104,11 @@ export default function ProjectMatchesPage() {
           </Card>
         )}
 
-      {!matchingRunning && pendingMatches.length === 0 && !(isTeam && allRoleLabels.length > 0) && !isFreelancerReplacementFlow && (
+      {!matchingRunning &&
+        pendingMatches.length === 0 &&
+        !(isTeam && allRoleLabels.length > 0) &&
+        !isFreelancerReplacementFlow &&
+        !hasPreFundingSelection && (
         <Card className="rounded-xl border-border/60">
           <CardContent className="py-12 px-4 sm:px-8 text-center space-y-4">
             {matchingAvailability ? (
@@ -961,7 +1150,7 @@ export default function ProjectMatchesPage() {
         </Card>
       )}
 
-      {!isTeam && singleList.length > 0 && (
+      {!hasPreFundingSelection && !isTeam && singleList.length > 0 && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {singleList.map((m: EnrichedMatch, i: number) => (
@@ -990,7 +1179,7 @@ export default function ProjectMatchesPage() {
         </div>
       )}
 
-      {isTeam && allRoleLabels.length > 0 && (
+      {!hasPreFundingSelection && isTeam && allRoleLabels.length > 0 && (
         <div className="space-y-6 sm:space-y-8">
           {allRoleLabels.map((roleLabel) => {
             const roleMatches = matchesByRoleMap.get(roleLabel) ?? [];
@@ -1146,6 +1335,7 @@ export default function ProjectMatchesPage() {
               }}
               onClose={() => setViewingFreelancerId(null)}
               isTeam={!!isTeam}
+              freezeSelection={hasPreFundingSelection}
             />
           )}
         </DialogContent>

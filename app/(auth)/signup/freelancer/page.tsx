@@ -13,8 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
+import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
 import { useOAuth } from "@/hooks/use-oauth";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import {
@@ -54,9 +56,7 @@ export default function FreelancerSignupPage() {
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const signup = useMutation(
-    (api as any)["auth/mutations"].signup
-  );
+  const signupWithRecaptcha = useAction(api.auth.actions.signupWithRecaptcha);
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
 
   const categorySkills =
@@ -136,10 +136,17 @@ export default function FreelancerSignupPage() {
       return;
     }
 
+    if (!isRecaptchaConfigured()) {
+      setError("Sign up is temporarily unavailable. Please try again later.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const result = await signup({
+      const recaptchaToken = await executeRecaptcha("signup");
+      const result = await signupWithRecaptcha({
+        recaptchaToken,
         email: formData.email,
         password: formData.password,
         name: formData.name,
@@ -500,6 +507,8 @@ export default function FreelancerSignupPage() {
                       </div>
                     </div>
                   </div>
+
+        <RecaptchaNotice />
 
         <Button
           type="submit"

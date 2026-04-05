@@ -73,6 +73,7 @@ import type * as projects_manualMatchEligibility from "../projects/manualMatchEl
 import type * as projects_mutations from "../projects/mutations.js";
 import type * as projects_queries from "../projects/queries.js";
 import type * as projects_replacement from "../projects/replacement.js";
+import type * as recaptchaVerify from "../recaptchaVerify.js";
 import type * as referrals_helpers from "../referrals/helpers.js";
 import type * as referrals_internalMutations from "../referrals/internalMutations.js";
 import type * as referrals_mutations from "../referrals/mutations.js";
@@ -178,6 +179,7 @@ declare const fullApi: ApiFromModules<{
   "projects/mutations": typeof projects_mutations;
   "projects/queries": typeof projects_queries;
   "projects/replacement": typeof projects_replacement;
+  recaptchaVerify: typeof recaptchaVerify;
   "referrals/helpers": typeof referrals_helpers;
   "referrals/internalMutations": typeof referrals_internalMutations;
   "referrals/mutations": typeof referrals_mutations;

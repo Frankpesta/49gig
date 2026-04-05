@@ -482,6 +482,11 @@ export const assignModerator = mutation({
       throw new Error("Unauthorized");
     }
 
+    // Moderators may only claim a dispute for themselves; admins may assign to any moderator/admin.
+    if (user.role === "moderator" && args.moderatorId !== user._id) {
+      throw new Error("Moderators can only assign disputes to themselves.");
+    }
+
     const dispute = await ctx.db.get(args.disputeId);
     if (!dispute) {
       throw new Error("Dispute not found");

@@ -39,6 +39,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function DisputeDetailPage() {
   const params = useParams();
@@ -91,6 +98,16 @@ export default function DisputeDetailPage() {
       ? { disputeId: dispute._id, userId: user._id }
       : "skip"
   );
+
+  const assignModeratorMutation = useMutation(api.disputes.mutations.assignModerator);
+  const moderatorsForAssign = useQuery(
+    api.users.queries.getAllUsersAdmin,
+    user?.role === "admin" && user?._id && dispute
+      ? { role: "moderator", status: "active", userId: user._id }
+      : "skip"
+  );
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assignModeratorPick, setAssignModeratorPick] = useState<string>("");
 
   // Must be declared before any early returns — Rules of Hooks
   useEffect(() => {
@@ -172,6 +189,12 @@ export default function DisputeDetailPage() {
     (dispute.status === "open" || dispute.status === "under_review");
 
   const isModerator = user.role === "moderator" || user.role === "admin";
+  const canClaimOrAssignDispute =
+    isModerator &&
+    dispute.status === "open" &&
+    !dispute.assignedModeratorId;
+  const canAdminPickModerator = user.role === "admin" && canClaimOrAssignDispute;
+  const canModeratorSelfAssign = user.role === "moderator" && canClaimOrAssignDispute;
   const canResolve =
     isModerator &&
     dispute.status !== "resolved" &&
@@ -665,6 +688,42 @@ export default function DisputeDetailPage() {
                     </p>
                   </div>
                 )}
+                {canAdminPickModerator && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => {
+                      setAssignDialogOpen(true);
+                      const first = moderatorsForAssign?.[0]?._id;
+                      setAssignModeratorPick(first ? String(first) : "");
+                    }}
+                  >
+                    Assign to moderator…
+                  </Button>
+                )}
+                {canModeratorSelfAssign && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={async () => {
+                      if (!user?._id) return;
+                      try {
+                        await assignModeratorMutation({
+                          disputeId: dispute._id,
+                          moderatorId: user._id,
+                          userId: user._id,
+                        });
+                        toast.success("Dispute assigned to you.");
+                      } catch (e) {
+                        toast.error(getUserFriendlyError(e) || "Could not assign");
+                      }
+                    }}
+                  >
+                    Assign to me
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
@@ -768,6 +827,83 @@ export default function DisputeDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Admin: assign to moderator */}
+      <Dialog
+        open={assignDialogOpen}
+        onOpenChange={(open) => {
+          setAssignDialogOpen(open);
+          if (!open) setAssignModeratorPick("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign to moderator</DialogTitle>
+            <DialogDescription>
+              Select who should own this dispute. They receive an in-app notification.
+            </DialogDescription>
+          </DialogHeader>
+          {moderatorsForAssign === undefined ? (
+            <p className="text-sm text-muted-foreground py-4">Loading moderators…</p>
+          ) : moderatorsForAssign.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No active moderators found.</p>
+          ) : (
+            <div className="space-y-2 py-2">
+              <Label htmlFor="detail-assign-mod">Moderator</Label>
+              <Select value={assignModeratorPick} onValueChange={setAssignModeratorPick}>
+                <SelectTrigger id="detail-assign-mod" className="w-full">
+                  <SelectValue placeholder="Select a moderator" />
+                </SelectTrigger>
+                <SelectContent>
+                  {moderatorsForAssign.map((m: { _id: string; name: string; email: string }) => (
+                    <SelectItem key={m._id} value={m._id}>
+                      {m.name} ({m.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setAssignDialogOpen(false);
+                setAssignModeratorPick("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={
+                !assignModeratorPick ||
+                !user?._id ||
+                moderatorsForAssign === undefined ||
+                moderatorsForAssign.length === 0
+              }
+              onClick={async () => {
+                if (!assignModeratorPick || !user?._id) return;
+                try {
+                  await assignModeratorMutation({
+                    disputeId: dispute._id,
+                    moderatorId: assignModeratorPick as Id<"users">,
+                    userId: user._id,
+                  });
+                  toast.success("Dispute assigned.");
+                  setAssignDialogOpen(false);
+                  setAssignModeratorPick("");
+                } catch (e) {
+                  toast.error(getUserFriendlyError(e) || "Could not assign");
+                }
+              }}
+            >
+              Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel dispute dialog */}
       <Dialog

@@ -116,7 +116,16 @@ export const getFreelancerPublicProfile = query({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) => q.eq(q.field("freelancerId"), args.freelancerId))
       .first();
-    if (!match) return null;
+
+    const isPreFundingSelected =
+      (project.status === "draft" || project.status === "pending_funding") &&
+      (project.selectedFreelancerId === args.freelancerId ||
+        (project.selectedFreelancerIds &&
+          project.selectedFreelancerIds.includes(args.freelancerId)));
+
+    if (!match && !isPreFundingSelected) {
+      return null;
+    }
 
     const freelancer = await ctx.db.get(args.freelancerId);
     if (!freelancer || freelancer.role !== "freelancer") return null;
@@ -136,12 +145,16 @@ export const getFreelancerPublicProfile = query({
         ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / ratingCount) * 10) / 10
         : 0;
 
+    const vettingScore = Math.round(
+      vettingResult?.overallScore ?? match?.scoringBreakdown.vettingScore ?? 0
+    );
+
     return {
       displayName: toDisplayName(freelancer.name),
       profile: freelancer.profile,
       resumeBio: freelancer.resumeBio,
       verificationStatus: freelancer.verificationStatus,
-      vettingScore: Math.round(vettingResult?.overallScore ?? match.scoringBreakdown.vettingScore ?? 0),
+      vettingScore,
       vettingStatus: vettingResult?.status ?? null,
       averageRating,
       reviewCount: ratingCount,
