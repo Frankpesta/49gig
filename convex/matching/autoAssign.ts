@@ -190,7 +190,7 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
     } else {
       matchIds = await ctx.runAction(apiAny.matching.actions.generateMatches, {
         projectId,
-        limit: 5,
+        limit: 10,
       });
     }
 

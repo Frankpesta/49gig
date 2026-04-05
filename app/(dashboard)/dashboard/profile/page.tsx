@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormField, FormSection } from "@/components/forms/form-field";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, User, Building2, Briefcase, FileText, Star } from "lucide-react";
+import { Loader2, Save, User, Building2, Briefcase, FileText, Star, Phone, ShieldCheck } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import {
   Select,
@@ -35,6 +35,11 @@ import { PROFILE_TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { ProfileCard } from "@/components/profile/profile-card";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import {
+  requiresBehanceUrl,
+  requiresGithubUrl,
+  requiresProfessionalLink,
+} from "@/lib/freelancer-profile-links";
 
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2MB
 
@@ -65,12 +70,22 @@ export default function ProfilePage() {
     availability: "available" as "available" | "busy" | "unavailable",
     timezone: "",
     portfolioUrl: "",
+    githubUrl: "",
+    behanceUrl: "",
+    linkedinUrl: "",
   });
   const [newSkill, setNewSkill] = useState("");
+  const [phoneE164Input, setPhoneE164Input] = useState("");
+  const [smsCodeInput, setSmsCodeInput] = useState("");
+  const [phoneVerifyBusy, setPhoneVerifyBusy] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isProfileCardEditMode, setIsProfileCardEditMode] = useState(false);
 
   const updateProfile = useMutation(api.users.mutations.updateProfile);
+  const startPhoneVerification = useAction(api.phoneVerification.actions.startPhoneVerification);
+  const confirmPhoneVerificationCode = useAction(
+    api.phoneVerification.actions.confirmPhoneVerificationCode
+  );
   const generateProfileImageUploadUrl = useMutation(api.users.mutations.generateProfileImageUploadUrl);
   const setProfileImageFromStorageId = useMutation(api.users.mutations.setProfileImageFromStorageId);
   const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
@@ -116,6 +131,9 @@ export default function ProfilePage() {
         availability: source.profile?.availability || "available",
         timezone: source.profile?.timezone || "",
         portfolioUrl: source.profile?.portfolioUrl || "",
+        githubUrl: source.profile?.githubUrl || "",
+        behanceUrl: source.profile?.behanceUrl || "",
+        linkedinUrl: source.profile?.linkedinUrl || "",
       });
     }
   }, [displayUser, user]);
@@ -132,6 +150,26 @@ export default function ProfilePage() {
     ) {
       toast.error("Please select your software focus (e.g. frontend, full-stack).");
       return;
+    }
+
+    if (targetUser.role === "freelancer") {
+      const tf = formData.techField || undefined;
+      if (requiresGithubUrl(tf) && !formData.githubUrl.trim()) {
+        toast.error("GitHub profile URL is required for your category.");
+        return;
+      }
+      if (requiresBehanceUrl(tf) && !formData.behanceUrl.trim()) {
+        toast.error("Behance profile URL is required for design roles.");
+        return;
+      }
+      if (
+        requiresProfessionalLink(tf) &&
+        !formData.linkedinUrl.trim() &&
+        !formData.portfolioUrl.trim()
+      ) {
+        toast.error("Add a LinkedIn URL or a portfolio / website URL for your category.");
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -160,6 +198,13 @@ export default function ProfilePage() {
           availability: formData.availability,
           timezone: formData.timezone || undefined,
           portfolioUrl: formData.portfolioUrl || undefined,
+          ...(isFreelancerProfile
+            ? {
+                githubUrl: formData.githubUrl || undefined,
+                behanceUrl: formData.behanceUrl || undefined,
+                linkedinUrl: formData.linkedinUrl || undefined,
+              }
+            : {}),
         },
         userId: targetUser._id,
         sessionToken: sessionToken || undefined,
@@ -235,6 +280,60 @@ export default function ProfilePage() {
     });
   };
 
+  const handleSendPhoneCode = async () => {
+    const targetUser = displayUser ?? user;
+    const tok = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
+    if (!targetUser?._id || !tok) {
+      toast.error("Sign out and sign in again to verify your phone.");
+      return;
+    }
+    if (!phoneE164Input.trim()) {
+      toast.error("Enter your number with country code (e.g. +234…).");
+      return;
+    }
+    setPhoneVerifyBusy(true);
+    try {
+      await startPhoneVerification({
+        userId: targetUser._id,
+        sessionToken: tok,
+        phoneE164: phoneE164Input.trim(),
+      });
+      toast.success("Verification code sent. Check your SMS.");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not send SMS.");
+    } finally {
+      setPhoneVerifyBusy(false);
+    }
+  };
+
+  const handleConfirmPhoneCode = async () => {
+    const targetUser = displayUser ?? user;
+    const tok = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
+    if (!targetUser?._id || !tok) {
+      toast.error("Sign out and sign in again to verify your phone.");
+      return;
+    }
+    if (!smsCodeInput.trim()) {
+      toast.error("Enter the code from your SMS.");
+      return;
+    }
+    setPhoneVerifyBusy(true);
+    try {
+      await confirmPhoneVerificationCode({
+        userId: targetUser._id,
+        sessionToken: tok,
+        phoneE164: phoneE164Input.trim(),
+        code: smsCodeInput.trim(),
+      });
+      toast.success("Phone number verified");
+      setSmsCodeInput("");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Verification failed.");
+    } finally {
+      setPhoneVerifyBusy(false);
+    }
+  };
+
   if (!isAuthenticated || !user) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
@@ -245,6 +344,15 @@ export default function ProfilePage() {
 
   const isClient = effectiveUser?.role === "client";
   const isFreelancer = effectiveUser?.role === "freelancer";
+
+  const sessionTokenForPhone =
+    typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
+  const githubRequired =
+    isFreelancer && requiresGithubUrl(formData.techField || undefined);
+  const behanceRequired =
+    isFreelancer && requiresBehanceUrl(formData.techField || undefined);
+  const professionalLinkRequired =
+    isFreelancer && requiresProfessionalLink(formData.techField || undefined);
 
   const freelancerSkillPicker =
     isFreelancer && formData.techField === "software_development"
@@ -337,6 +445,93 @@ export default function ProfilePage() {
             </FormField>
           </CardContent>
         </Card>
+
+        {isFreelancer && (
+          <Card className="rounded-xl overflow-hidden border-border/60">
+            <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent py-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Phone className="h-5 w-5 text-primary" />
+                Phone verification
+              </CardTitle>
+              <CardDescription>
+                Required to appear in project matching. Works the same whether you signed up with Google or email—we
+                never take your number from Google; you verify it here with SMS.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2 pb-6 space-y-4">
+              {!sessionTokenForPhone && (
+                <p className="text-sm text-amber-700 dark:text-amber-400/90">
+                  Your session does not include a device token. Sign out and sign back in, then try again.
+                </p>
+              )}
+              {effectiveUser?.phoneVerifiedAt != null ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm">
+                  <ShieldCheck className="h-5 w-5 text-emerald-600 shrink-0" />
+                  <span>
+                    Verified:{" "}
+                    <span className="font-medium">
+                      {effectiveUser.phoneE164 ?? effectiveUser.profile?.phoneNumber ?? "—"}
+                    </span>
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <FormField
+                    label="Mobile number (E.164)"
+                    htmlFor="phoneE164"
+                    description="Include country code, e.g. +2348012345678. No spaces."
+                  >
+                    <Input
+                      id="phoneE164"
+                      type="tel"
+                      autoComplete="tel"
+                      value={phoneE164Input}
+                      onChange={(e) => setPhoneE164Input(e.target.value)}
+                      placeholder="+2348012345678"
+                      className="rounded-lg h-11 max-w-md"
+                      disabled={!sessionTokenForPhone || phoneVerifyBusy}
+                    />
+                  </FormField>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!sessionTokenForPhone || phoneVerifyBusy}
+                      onClick={handleSendPhoneCode}
+                    >
+                      {phoneVerifyBusy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Send code"
+                      )}
+                    </Button>
+                  </div>
+                  <FormField label="SMS code" htmlFor="smsCode" description="Enter the digits Twilio sent you.">
+                    <div className="flex flex-wrap gap-2 items-end max-w-md">
+                      <Input
+                        id="smsCode"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        value={smsCodeInput}
+                        onChange={(e) => setSmsCodeInput(e.target.value)}
+                        placeholder="123456"
+                        className="rounded-lg h-11 flex-1 min-w-[8rem]"
+                        disabled={!sessionTokenForPhone || phoneVerifyBusy}
+                      />
+                      <Button
+                        type="button"
+                        disabled={!sessionTokenForPhone || phoneVerifyBusy}
+                        onClick={handleConfirmPhoneCode}
+                      >
+                        Verify
+                      </Button>
+                    </div>
+                  </FormField>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Client-Specific Fields */}
         {isClient && (
@@ -542,16 +737,82 @@ export default function ProfilePage() {
                       </SelectContent>
                     </Select>
                   </FormField>
-                  <FormField label="Portfolio URL" htmlFor="portfolioUrl" description="Link to your portfolio or website.">
-                    <Input
-                      id="portfolioUrl"
-                      type="url"
-                      value={formData.portfolioUrl}
-                      onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
-                      placeholder="https://yourportfolio.com"
-                      className="rounded-lg h-11"
-                    />
-                  </FormField>
+                  {githubRequired && (
+                    <FormField
+                      label="GitHub profile URL"
+                      htmlFor="githubUrl"
+                      required
+                      description="Link to your GitHub profile or org (github.com). Required for engineering and related categories."
+                    >
+                      <Input
+                        id="githubUrl"
+                        type="url"
+                        value={formData.githubUrl}
+                        onChange={(e) => setFormData({ ...formData, githubUrl: e.target.value })}
+                        placeholder="https://github.com/yourusername"
+                        className="rounded-lg h-11"
+                        required
+                      />
+                    </FormField>
+                  )}
+                  {behanceRequired && (
+                    <FormField
+                      label="Behance profile URL"
+                      htmlFor="behanceUrl"
+                      required
+                      description="Your Behance portfolio (behance.net). Required for design roles."
+                    >
+                      <Input
+                        id="behanceUrl"
+                        type="url"
+                        value={formData.behanceUrl}
+                        onChange={(e) => setFormData({ ...formData, behanceUrl: e.target.value })}
+                        placeholder="https://www.behance.net/yourprofile"
+                        className="rounded-lg h-11"
+                        required
+                      />
+                    </FormField>
+                  )}
+                  {formData.techField && (
+                    <>
+                      <FormField
+                        label="LinkedIn URL"
+                        htmlFor="linkedinUrl"
+                        description={
+                          professionalLinkRequired
+                            ? "Profile or company page on linkedin.com. Add this or a portfolio URL below (at least one required)."
+                            : "Optional. Complements GitHub or Behance for clients reviewing your background."
+                        }
+                      >
+                        <Input
+                          id="linkedinUrl"
+                          type="url"
+                          value={formData.linkedinUrl}
+                          onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
+                          placeholder="https://www.linkedin.com/in/yourprofile"
+                          className="rounded-lg h-11"
+                        />
+                      </FormField>
+                      <FormField
+                        label="Portfolio / website URL"
+                        htmlFor="portfolioUrl"
+                        description={
+                          professionalLinkRequired
+                            ? "Your site or portfolio, unless you already added LinkedIn above (at least one required)."
+                            : "Optional personal site or portfolio."
+                        }
+                      >
+                        <Input
+                          id="portfolioUrl"
+                          type="url"
+                          value={formData.portfolioUrl}
+                          onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
+                          placeholder="https://yourportfolio.com"
+                          className="rounded-lg h-11"
+                        />
+                      </FormField>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

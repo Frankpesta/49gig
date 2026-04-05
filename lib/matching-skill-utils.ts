@@ -11,6 +11,7 @@ import {
   isLegacyCategoryLabel,
   SOFTWARE_DEV_FIELDS,
 } from "./platform-skills";
+import { freelancerHasPhoneAndLinksForMatching } from "./freelancer-profile-links";
 
 function isSoftwareDevSubFieldId(value: string): boolean {
   return SOFTWARE_DEV_FIELDS.some((f) => f.id === value);
@@ -132,10 +133,23 @@ export function calculateSkillOverlapPercent(
  * and declared techField must align with the hire category when set.
  */
 export function isFreelancerEligibleForProjectMatch(
-  freelancer: { profile?: { skills?: string[]; techField?: string } },
+  freelancer: {
+    phoneVerifiedAt?: number;
+    profile?: {
+      skills?: string[];
+      techField?: string;
+      githubUrl?: string;
+      behanceUrl?: string;
+      linkedinUrl?: string;
+      portfolioUrl?: string;
+    };
+  },
   normalizedRequired: string[],
   projectRoleId: string
 ): boolean {
+  if (!freelancerHasPhoneAndLinksForMatching(freelancer)) {
+    return false;
+  }
   if (normalizedRequired.length > 0) {
     if (
       !freelancerMatchesAtLeastOneRequiredSkill(

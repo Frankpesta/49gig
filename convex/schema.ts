@@ -81,6 +81,12 @@ export default defineSchema({
         ),
         timezone: v.optional(v.string()),
         portfolioUrl: v.optional(v.string()),
+        /** Code / engineering categories: required on profile + for matching */
+        githubUrl: v.optional(v.string()),
+        /** Design categories: required on profile + for matching */
+        behanceUrl: v.optional(v.string()),
+        /** Optional for all; required with or instead of portfolio for non-code, non-design roles */
+        linkedinUrl: v.optional(v.string()),
         // Profile photo (e.g. from OAuth); do not use portfolioUrl for this
         imageUrl: v.optional(v.string()),
         // Freelancer: human-readable role title (e.g. "Senior Backend Engineer")
@@ -158,6 +164,10 @@ export default defineSchema({
       )
     ),
     kycApprovedAt: v.optional(v.number()),
+
+    /** Freelancer: E.164 after successful SMS verification (Twilio Verify) */
+    phoneE164: v.optional(v.string()),
+    phoneVerifiedAt: v.optional(v.number()),
 
     // Flutterwave
     flutterwaveCustomerEmail: v.optional(v.string()), // Flutterwave uses email as customer identifier
@@ -305,6 +315,7 @@ export default defineSchema({
       ),
       projectDuration: v.optional(
         v.union(
+          v.literal("1"),
           v.literal("3"),
           v.literal("6"),
           v.literal("12+"),

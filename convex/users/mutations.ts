@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
+import { applyFreelancerProfileLinkRules } from "../../lib/freelancer-profile-links";
 
 const api = require("../_generated/api") as {
   api: {
@@ -190,6 +191,10 @@ export const updateProfile = mutation({
       ...args.profile,
     };
 
+    if (user.role === "freelancer") {
+      applyFreelancerProfileLinkRules(updatedProfile);
+    }
+
     updates.profile = updatedProfile;
 
     await ctx.db.patch(user._id, updates);
@@ -209,6 +214,32 @@ export const updateProfile = mutation({
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Called from Twilio Verify action after successful SMS code check.
+ */
+export const setFreelancerVerifiedPhoneInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    phoneE164: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user || user.role !== "freelancer" || user.status !== "active") {
+      throw new Error("User not found");
+    }
+    const now = Date.now();
+    await ctx.db.patch(args.userId, {
+      phoneE164: args.phoneE164,
+      phoneVerifiedAt: now,
+      profile: {
+        ...user.profile,
+        phoneNumber: args.phoneE164,
+      },
+      updatedAt: now,
+    });
   },
 });
 

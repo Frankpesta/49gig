@@ -1,7 +1,7 @@
 import { mutation, internalMutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { resolveTargetTeamSize } from "../../lib/budget-calculator";
 import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
@@ -79,6 +79,7 @@ export const createProject = mutation({
       ),
       projectDuration: v.optional(
         v.union(
+          v.literal("1"),
           v.literal("3"),
           v.literal("6"),
           v.literal("12+"),
@@ -605,6 +606,229 @@ export const deleteDraftProject = mutation({
     for (const c of calls) {
       await ctx.db.delete(c._id);
     }
+
+    await ctx.db.delete(args.projectId);
+    return args.projectId;
+  },
+});
+
+function userIdsTouchingProjectEscrow(project: Doc<"projects">): Id<"users">[] {
+  const ids: Id<"users">[] = [project.clientId];
+  if (project.matchedFreelancerId) {
+    ids.push(project.matchedFreelancerId);
+  }
+  for (const id of project.matchedFreelancerIds ?? []) {
+    if (!ids.some((x) => x === id)) ids.push(id);
+  }
+  return ids;
+}
+
+async function assertNoPendingRefundForProject(
+  ctx: MutationCtx,
+  projectId: Doc<"projects">["_id"],
+  userIds: Id<"users">[]
+) {
+  for (const userId of userIds) {
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (!wallet) continue;
+    const pending = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("projectId"), projectId),
+          q.eq(q.field("type"), "refund"),
+          q.eq(q.field("status"), "pending")
+        )
+      )
+      .first();
+    if (pending) {
+      throw new Error(
+        "Cannot delete hire while a pending refund is recorded for this project. Clear or complete the refund first."
+      );
+    }
+  }
+}
+
+/**
+ * Permanently delete a hire and related rows. **Admin only.**
+ * Blocked when escrow remains, a dispute is open, payments are in flight, or a pending refund is tied to this project.
+ */
+export const adminDeleteProject = mutation({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "admin") {
+      throw new Error("Only admins can delete hires this way");
+    }
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    const openDispute = await ctx.db
+      .query("disputes")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "open"),
+          q.eq(q.field("status"), "under_review")
+        )
+      )
+      .first();
+    if (openDispute) {
+      throw new Error(
+        "Cannot delete hire while a dispute is open or under review. Resolve or cancel the dispute first."
+      );
+    }
+
+    if ((project.escrowedAmount ?? 0) > 0) {
+      throw new Error(
+        "Cannot delete hire while escrow balance remains. Refund or release funds first (escrow must be zero)."
+      );
+    }
+
+    const payments = await ctx.db
+      .query("payments")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const p of payments) {
+      if (p.status === "pending" || p.status === "processing") {
+        throw new Error(
+          "Cannot delete hire while a payment is pending or processing. Wait for it to finish or cancel it first."
+        );
+      }
+    }
+
+    const walletUsers = userIdsTouchingProjectEscrow(project);
+    await assertNoPendingRefundForProject(ctx, args.projectId, walletUsers);
+
+    const accruals = await ctx.db
+      .query("referralAccruals")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const a of accruals) {
+      await ctx.db.delete(a._id);
+    }
+
+    const disputes = await ctx.db
+      .query("disputes")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const d of disputes) {
+      const msgs = await ctx.db
+        .query("disputeMessages")
+        .withIndex("by_dispute", (q) => q.eq("disputeId", d._id))
+        .collect();
+      for (const m of msgs) {
+        await ctx.db.delete(m._id);
+      }
+      await ctx.db.delete(d._id);
+    }
+
+    const reviews = await ctx.db
+      .query("reviews")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const r of reviews) {
+      await ctx.db.delete(r._id);
+    }
+
+    const cycles = await ctx.db
+      .query("monthlyBillingCycles")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const c of cycles) {
+      await ctx.db.delete(c._id);
+    }
+
+    const milestones = await ctx.db
+      .query("milestones")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const m of milestones) {
+      await ctx.db.delete(m._id);
+    }
+
+    const matches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const m of matches) {
+      await ctx.db.delete(m._id);
+    }
+
+    const calls = await ctx.db
+      .query("scheduledCalls")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const c of calls) {
+      await ctx.db.delete(c._id);
+    }
+
+    const chats = await ctx.db
+      .query("chats")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const chat of chats) {
+      const chatMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
+        .collect();
+      for (const msg of chatMessages) {
+        await ctx.db.delete(msg._id);
+      }
+      await ctx.db.delete(chat._id);
+    }
+
+    for (const uid of walletUsers) {
+      const wallet = await ctx.db
+        .query("wallets")
+        .withIndex("by_user", (q) => q.eq("userId", uid))
+        .first();
+      if (!wallet) continue;
+      const txs = await ctx.db
+        .query("walletTransactions")
+        .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+        .filter((q) => q.eq(q.field("projectId"), args.projectId))
+        .collect();
+      for (const tx of txs) {
+        await ctx.db.patch(tx._id, { projectId: undefined, monthlyCycleId: undefined });
+      }
+    }
+
+    for (const p of payments) {
+      await ctx.db.patch(p._id, {
+        projectId: undefined,
+        milestoneId: undefined,
+        monthlyCycleId: undefined,
+      });
+    }
+
+    await ctx.db.insert("auditLogs", {
+      action: "project_admin_deleted",
+      actionType: "admin",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "project",
+      targetId: args.projectId,
+      details: {
+        title: project.intakeForm.title,
+        clientId: project.clientId,
+        priorStatus: project.status,
+      },
+      createdAt: Date.now(),
+    });
 
     await ctx.db.delete(args.projectId);
     return args.projectId;

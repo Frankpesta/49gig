@@ -12,14 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, CheckCircle2, XCircle, ExternalLink, Info } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
@@ -55,7 +47,6 @@ export default function PaymentPage() {
 
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [txRef, setTxRef] = useState<string | null>(null);
-  const [monthsToFund, setMonthsToFund] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -63,21 +54,13 @@ export default function PaymentPage() {
 
   const maxReferralApplyCents = useMemo(() => {
     if (!project || hiringBalance === undefined) return 0;
-    const dm = getDurationMonths(project.intakeForm?.projectDuration);
-    const perM = dm > 0 ? project.totalAmount / dm : 0;
-    const grossCents = Math.round(perM * monthsToFund * 100);
+    const grossCents = Math.round(project.totalAmount * 100);
     return Math.min(hiringBalance.cents ?? 0, grossCents);
-  }, [project, hiringBalance, monthsToFund]);
+  }, [project, hiringBalance]);
 
   useEffect(() => {
     setReferralApplyCents(maxReferralApplyCents);
   }, [maxReferralApplyCents]);
-
-  useEffect(() => {
-    if (project?.fundUpfrontMonths != null && project.fundUpfrontMonths >= 1) {
-      setMonthsToFund(Math.max(1, Math.floor(project.fundUpfrontMonths)));
-    }
-  }, [project?.fundUpfrontMonths]);
 
   useEffect(() => {
     if (!user || user.role !== "client") {
@@ -123,12 +106,11 @@ export default function PaymentPage() {
       setError(null);
 
       const durMonths = getDurationMonths(project.intakeForm?.projectDuration);
-      const perMonth = project.totalAmount / durMonths;
-      const amountToPay = perMonth * monthsToFund;
+      const amountToPay = project.totalAmount;
 
       await updateProject({
         projectId: projectId as any,
-        fundUpfrontMonths: monthsToFund,
+        fundUpfrontMonths: durMonths,
         userId: user._id,
       });
 
@@ -215,8 +197,8 @@ export default function PaymentPage() {
   }
 
   const durMonths = getDurationMonths(project.intakeForm?.projectDuration);
-  const perMonth = project.totalAmount / durMonths;
-  const amountToPay = perMonth * monthsToFund;
+  const perMonth = durMonths > 0 ? project.totalAmount / durMonths : 0;
+  const amountToPay = project.totalAmount;
 
   return (
     <div className="space-y-6">
@@ -255,29 +237,20 @@ export default function PaymentPage() {
             <CardTitle>Payment Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Months to fund</Label>
-              <p className="text-sm text-muted-foreground">
-                You can choose the total engagement duration and fund all months upfront, or pay one month at a time. All funds are securely held in escrow by 49GIG and released to the freelancer or team monthly as salary. You pay upfront and we hold in escrow.
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-2">
+              <p className="text-sm font-medium text-foreground">Full hire total</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                You pay the entire amount now; it stays in escrow. Each month, after you review and approve
+                that period&apos;s work, the corresponding share is released to the freelancer (or
+                auto-releases after the review window). About{" "}
+                <span className="font-medium text-foreground tabular-nums">
+                  {perMonth.toFixed(2)} {project.currency.toUpperCase()}
+                </span>{" "}
+                per month on average over {durMonths} month{durMonths !== 1 ? "s" : ""}.
               </p>
-              <Select
-                value={String(monthsToFund)}
-                onValueChange={(v) => setMonthsToFund(parseInt(v, 10))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select months" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: durMonths }, (_, i) => i + 1).map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n} month{n > 1 ? "s" : ""} — {(perMonth * n).toFixed(2)} {project.currency.toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
             <div className="flex justify-between text-lg font-bold">
-              <span>Funding total</span>
+              <span>Amount due</span>
               <span>
                 {amountToPay.toFixed(2)} {project.currency.toUpperCase()}
               </span>
@@ -321,7 +294,7 @@ export default function PaymentPage() {
               </div>
             )}
             <p className="text-sm text-muted-foreground">
-              Once payment is successful, the matched freelancer(s) will see their share in their pending balance in the wallet.
+              After payment succeeds, matching continues and monthly payouts still flow only when you approve each month&apos;s work.
             </p>
           </CardContent>
         </Card>

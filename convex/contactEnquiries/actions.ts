@@ -23,9 +23,10 @@ export const submitContactEnquiry = action({
   handler: async (ctx, args) => {
     await assertRecaptchaToken(args.recaptchaToken, { expectedAction: "contact" });
 
+    const { recaptchaToken: _t, ...enquiry } = args;
     const enquiryId = await ctx.runMutation(
       internal.contactEnquiries.internalMutations.createContactEnquiryInternal,
-      args
+      enquiry
     );
 
     const admins = await ctx.runQuery(

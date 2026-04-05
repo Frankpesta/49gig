@@ -612,7 +612,8 @@ export const adminManualMatch = mutation({
       projectId: args.projectId,
       freelancerId: args.freelancerId,
       status: "pending",
-      score: 100,
+      /** Above algorithm scores so this candidate sorts first for the client (no admin label in UI). */
+      score: 1000,
       confidence: "high",
       scoringBreakdown: {
         skillOverlap: 100,
