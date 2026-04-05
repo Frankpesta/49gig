@@ -140,7 +140,9 @@ export function AdminCharts({
       <Card className="overflow-hidden">
         <CardHeader className="border-b">
           <CardTitle>Revenue trend</CardTitle>
-          <CardDescription>Platform fees collected per month</CardDescription>
+          <CardDescription>
+            Net platform fees per month (successful charges minus est. refund clawback)
+          </CardDescription>
         </CardHeader>
         <CardContent className="h-[280px] pt-6">
           <ResponsiveContainer width="100%" height="100%">

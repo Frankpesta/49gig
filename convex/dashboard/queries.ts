@@ -2,6 +2,10 @@ import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import {
+  estimatedPlatformFeeClawbackOnRefund,
+  platformFeeRecognizedOnPayment,
+} from "../platformRevenue";
 
 const ACTIVE_PROJECT_STATUSES = new Set([
   "pending_funding",
@@ -478,13 +482,48 @@ export const getDashboardMetrics = query({
     const activeClients = clients.filter((u) => u.status === "active").length;
     const activeFreelancers = freelancers.filter((u) => u.status === "active").length;
 
-    const payments = await ctx.db
-      .query("payments")
-      .withIndex("by_status", (q) => q.eq("status", "succeeded"))
-      .collect();
-    const revenue = payments
-      .filter((payment) => payment.type === "platform_fee")
-      .reduce((sum, payment) => sum + payment.amount, 0);
+    const allPayments = await ctx.db.query("payments").collect();
+    const projectById = new Map(projects.map((p) => [String(p._id), p]));
+
+    const monthStartMs = Date.UTC(
+      new Date(now).getUTCFullYear(),
+      new Date(now).getUTCMonth(),
+      1,
+      0,
+      0,
+      0,
+      0
+    );
+
+    let recognizedMtd = 0;
+    let clawbackMtd = 0;
+    let recognizedAllTime = 0;
+    let clawbackAllTime = 0;
+
+    for (const payment of allPayments) {
+      const rec = platformFeeRecognizedOnPayment(payment);
+      if (rec > 0) {
+        recognizedAllTime += rec;
+        if (payment.createdAt >= monthStartMs) {
+          recognizedMtd += rec;
+        }
+      }
+    }
+
+    for (const payment of allPayments) {
+      if (payment.type !== "refund" || payment.status !== "refunded") continue;
+      const proj = payment.projectId ? projectById.get(String(payment.projectId)) : undefined;
+      const pct = proj?.platformFee ?? 25;
+      const claw = estimatedPlatformFeeClawbackOnRefund(payment, pct);
+      if (claw <= 0) continue;
+      clawbackAllTime += claw;
+      if (payment.createdAt >= monthStartMs) {
+        clawbackMtd += claw;
+      }
+    }
+
+    const revenue = Math.max(0, recognizedMtd - clawbackMtd);
+    const revenueAllTime = Math.max(0, recognizedAllTime - clawbackAllTime);
 
     const disputes = await ctx.db
       .query("disputes")
@@ -496,10 +535,11 @@ export const getDashboardMetrics = query({
       .query("payments")
       .withIndex("by_status", (q) => q.eq("status", "failed"))
       .collect();
-    const totalProcessed = payments.length + failedPayments.length;
+    const succeededCount = allPayments.filter((p) => p.status === "succeeded").length;
+    const totalProcessed = succeededCount + failedPayments.length;
     const systemHealth =
       totalProcessed > 0
-        ? Math.round((payments.length / totalProcessed) * 100)
+        ? Math.round((succeededCount / totalProcessed) * 100)
         : 100;
 
     return {
@@ -508,7 +548,14 @@ export const getDashboardMetrics = query({
         totalProjects,
         activeClients,
         activeFreelancers,
+        /** Net platform fees for the current UTC calendar month (charges minus est. refund clawback). */
         revenue,
+        /** Net platform fees all time. */
+        revenueAllTime,
+        /** Gross fees recognized MTD (before refund adjustment). */
+        platformFeesRecognizedMtd: recognizedMtd,
+        /** Estimated fee clawback from refunds MTD. */
+        platformFeeRefundAdjustmentMtd: clawbackMtd,
         openDisputes,
         systemHealth,
       },

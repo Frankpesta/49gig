@@ -61,11 +61,8 @@ export const getContractForProject = query({
     const isMatchedFreelancer =
       project.matchedFreelancerId === user._id ||
       (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
-    const isSelectedFreelancer =
-      project.selectedFreelancerId === user._id ||
-      (project.selectedFreelancerIds && project.selectedFreelancerIds.includes(user._id));
 
-    if (!isClient && !isMatchedFreelancer && !isSelectedFreelancer) return null;
+    if (!isClient && !isMatchedFreelancer) return null;
 
     const client = await ctx.db.get(project.clientId);
     const effectiveDate = new Date().toLocaleDateString("en-US", {
@@ -97,7 +94,7 @@ export const getContractForProject = query({
           (s) => s.freelancerId === user._id
         ) ?? false;
     const canViewAsClient = isClient;
-    const canViewAsFreelancer = isMatchedFreelancer || isSelectedFreelancer;
+    const canViewAsFreelancer = isMatchedFreelancer;
 
     if (canViewAsClient) {
       return {

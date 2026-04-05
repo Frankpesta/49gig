@@ -91,6 +91,41 @@ export default function ContractPage() {
     (project.matchedFreelancerIds && project.matchedFreelancerIds.length > 0);
   const canViewContract =
     isClient && (hasSelected || hasMatched);
+  const isFreelancer = user.role === "freelancer" && !isClient;
+  const isMatchedFreelancer =
+    project.matchedFreelancerId === user._id ||
+    (project.matchedFreelancerIds?.includes(user._id) ?? false);
+  const isSelectedNotYetMatched =
+    isFreelancer &&
+    !isMatchedFreelancer &&
+    (project.selectedFreelancerId === user._id ||
+      (project.selectedFreelancerIds?.includes(user._id) ?? false));
+
+  if (isSelectedNotYetMatched) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold">Confirm the match first</h3>
+            <p className="mb-4 text-center text-sm text-muted-foreground max-w-md">
+              The client has selected you, but the agreement is only available after you accept
+              the opportunity from your match requests. You can review hire details on the hire
+              page while you decide.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button asChild>
+                <Link href="/dashboard/match-requests">Match requests</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href={`/dashboard/projects/${projectId}`}>Hire details</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (
     isClient &&
@@ -116,7 +151,7 @@ export default function ContractPage() {
     );
   }
 
-  if (!canViewContract) {
+  if (!canViewContract && isClient) {
     return (
       <div className="space-y-6">
         <Card>
@@ -130,6 +165,25 @@ export default function ContractPage() {
               <Link href={`/dashboard/projects/${projectId}/matches`}>
                 Go to Matches
               </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!canViewContract) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
+            <h3 className="mb-2 text-lg font-semibold">Contract not available</h3>
+            <p className="mb-4 text-center text-sm text-muted-foreground">
+              You don&apos;t have access to this contract yet.
+            </p>
+            <Button asChild>
+              <Link href="/dashboard/projects">Back to hires</Link>
             </Button>
           </CardContent>
         </Card>
