@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Revenue
+                Platform fees (net)
               </CardTitle>
               <div className="relative">
                 <div className="absolute inset-0 bg-green-500/10 rounded-full blur-xl group-hover:bg-green-500/20 transition-colors duration-300" />
@@ -131,13 +131,19 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mb-1">
-              ${analytics.payments.totalAmount.toFixed(2)}
+              ${analytics.payments.totalPlatformFeesNet.toFixed(2)}
             </div>
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <span>{analytics.payments.succeeded} succeeded</span>
+              <span>{analytics.payments.succeeded} succeeded charges</span>
               <span>•</span>
-              <span>${analytics.payments.totalPlatformFees.toFixed(2)} fees</span>
+              <span>${analytics.payments.totalAmount.toFixed(2)} card volume</span>
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Gross fees ${analytics.payments.totalPlatformFees.toFixed(2)}
+              {analytics.payments.totalPlatformFeeRefundClawback > 0
+                ? ` · Est. refund clawback −$${analytics.payments.totalPlatformFeeRefundClawback.toFixed(2)}`
+                : null}
+            </p>
           </CardContent>
         </Card>
 

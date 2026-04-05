@@ -262,9 +262,10 @@ export default function DashboardPage() {
         },
         {
           title: "Revenue",
-          subtitle: "This month",
+          subtitle: "This month (UTC)",
           value: formatCurrency(dashboardMetrics?.metrics?.revenue ?? 0),
-          description: "Platform earnings",
+          description:
+            "Net platform fees from hire payments, minus estimated clawback on client refunds.",
           icon: DollarSign,
           variant: "default" as const,
           trend: { value: 5, label: "30d", isPositive: true },

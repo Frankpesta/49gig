@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,24 @@ export function ProjectContractView({ projectId, userId }: ProjectContractViewPr
   }
 
   if (contractData === null) {
-    return null;
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+          <p className="mb-4 text-sm text-muted-foreground max-w-md">
+            This agreement isn&apos;t available yet. If you were just selected, accept the match from
+            Match requests first — then the contract will appear here.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild variant="default">
+              <Link href="/dashboard/match-requests">Match requests</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/projects/${projectId}`}>Hire details</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const handleSign = async () => {

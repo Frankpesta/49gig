@@ -1356,10 +1356,10 @@ export const autoCreateMilestonesInternal = internalMutation({
 });
 
 /**
- * Internal: accept client's pre-funding selection and set matched freelancer(s).
- * Called after payment success so the selected freelancer(s) become assigned.
- * Sets project status to "matched" (or "matching" when a team hire still needs more members),
- * then schedules milestone creation and contract generation when fully matched.
+ * Internal: apply client's selection after successful payment.
+ * Records `clientAction: "accepted"` on each chosen match (rows stay pending until the
+ * freelancer responds). Project moves to `awaiting_freelancer` (or stays `matching` for
+ * partial teams) instead of `matched`; contract generation runs only after confirmations.
  */
 export const acceptSelectedMatchInternal = internalMutation({
   args: {
@@ -1372,14 +1372,11 @@ export const acceptSelectedMatchInternal = internalMutation({
     const selectedId = project.selectedFreelancerId;
     const selectedIds = project.selectedFreelancerIds;
     const now = Date.now();
-    const acceptedMatchIds: Doc<"matches">["_id"][] = [];
 
     const allMatches = await ctx.db
       .query("matches")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
-
-    let shouldKickOffMatchedFlow = false;
 
     if (selectedId) {
       const match = allMatches.find(
@@ -1387,32 +1384,29 @@ export const acceptSelectedMatchInternal = internalMutation({
       );
       if (match) {
         await ctx.db.patch(match._id, {
-          status: "accepted",
           clientAction: "accepted",
           clientActionAt: now,
           updatedAt: now,
         });
-        acceptedMatchIds.push(match._id);
       }
-      // Always set matched and status to "matched" when client pre-selected - freelancer must be able to sign contract
-      const singleMatchedPatch: Record<string, unknown> = {
-        matchedFreelancerId: selectedId,
-        status: "matched",
-        matchedAt: now,
+      const singleAwaitPatch: Record<string, unknown> = {
+        matchedFreelancerId: undefined,
+        matchedFreelancerIds: undefined,
+        matchedAt: undefined,
+        status: "awaiting_freelancer",
         updatedAt: now,
         awaitingMatch: undefined,
         awaitingMatchSince: undefined,
         rolesAwaitingMatch: undefined,
       };
-      clearReplacementFlowFieldsOnProject(singleMatchedPatch);
-      await ctx.db.patch(args.projectId, singleMatchedPatch as any);
+      clearReplacementFlowFieldsOnProject(singleAwaitPatch);
+      await ctx.db.patch(args.projectId, singleAwaitPatch as any);
       const otherPending = allMatches.filter(
         (m) => m.status === "pending" && m.freelancerId !== selectedId
       );
       for (const m of otherPending) {
         await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
       }
-      shouldKickOffMatchedFlow = true;
     } else if (selectedIds && selectedIds.length > 0) {
       const intake = project.intakeForm;
       const isTeam = intake.hireType === "team";
@@ -1422,33 +1416,31 @@ export const acceptSelectedMatchInternal = internalMutation({
       );
       for (const m of toAccept) {
         await ctx.db.patch(m._id, {
-          status: "accepted",
           clientAction: "accepted",
           clientActionAt: now,
           updatedAt: now,
         });
-        acceptedMatchIds.push(m._id);
       }
 
       if (!isTeam) {
-        const multiMatchedPatch: Record<string, unknown> = {
-          matchedFreelancerIds: selectedIds,
-          status: "matched",
-          matchedAt: now,
+        const multiAwaitPatch: Record<string, unknown> = {
+          matchedFreelancerId: undefined,
+          matchedFreelancerIds: undefined,
+          matchedAt: undefined,
+          status: "awaiting_freelancer",
           updatedAt: now,
           awaitingMatch: undefined,
           awaitingMatchSince: undefined,
           rolesAwaitingMatch: undefined,
         };
-        clearReplacementFlowFieldsOnProject(multiMatchedPatch);
-        await ctx.db.patch(args.projectId, multiMatchedPatch as any);
+        clearReplacementFlowFieldsOnProject(multiAwaitPatch);
+        await ctx.db.patch(args.projectId, multiAwaitPatch as any);
         const otherPending = allMatches.filter(
           (m) => m.status === "pending" && !selectedIds.includes(m.freelancerId)
         );
         for (const m of otherPending) {
           await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
         }
-        shouldKickOffMatchedFlow = true;
       } else {
         const targetHeadcount = resolveTargetTeamSize(
           intake.teamMemberCount,
@@ -1483,8 +1475,6 @@ export const acceptSelectedMatchInternal = internalMutation({
             : [];
 
         const patch: Record<string, unknown> = {
-          matchedFreelancerIds: selectedIds,
-          matchedAt: project.matchedAt ?? now,
           updatedAt: now,
         };
 
@@ -1496,12 +1486,11 @@ export const acceptSelectedMatchInternal = internalMutation({
           patch.rolesAwaitingMatch =
             rolesWaiting.length > 0 ? rolesWaiting : project.rolesAwaitingMatch;
         } else {
-          patch.status = "matched";
+          patch.status = "awaiting_freelancer";
           patch.pendingTeamMemberSlots = undefined;
           patch.awaitingMatch = undefined;
           patch.awaitingMatchSince = undefined;
           patch.rolesAwaitingMatch = undefined;
-          shouldKickOffMatchedFlow = true;
           clearReplacementFlowFieldsOnProject(patch);
         }
 
@@ -1509,31 +1498,6 @@ export const acceptSelectedMatchInternal = internalMutation({
       }
     }
 
-    if (shouldKickOffMatchedFlow) {
-      await ctx.scheduler.runAfter(
-        500,
-        internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
-        {
-          projectId: args.projectId,
-        }
-      );
-
-      await ctx.scheduler.runAfter(
-        0,
-        internalAny.contracts.actions.regenerateContractPdfAndSend,
-        {
-          projectId: args.projectId,
-        }
-      );
-
-      await ctx.scheduler.runAfter(
-        0,
-        internalAny.projects.actions.sendMatchSuccessEmails,
-        {
-          projectId: args.projectId,
-        }
-      );
-    }
   },
 });
 
@@ -1573,18 +1537,20 @@ export const confirmRemainingTeamSelections = mutation({
       throw new Error(`You can add at most ${slots} more team member(s)`);
     }
 
-    const merged = [...(project.matchedFreelancerIds ?? [])];
-    for (const id of args.freelancerIds) {
-      if (merged.includes(id)) {
-        throw new Error("This freelancer is already on the team");
-      }
-    }
-
     const now = Date.now();
     const allMatches = await ctx.db
       .query("matches")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
+
+    for (const id of args.freelancerIds) {
+      if ((project.matchedFreelancerIds ?? []).includes(id)) {
+        throw new Error("This freelancer is already confirmed on the team");
+      }
+      if (allMatches.some((m) => m.freelancerId === id && m.clientAction === "accepted")) {
+        throw new Error("This freelancer is already selected for this hire");
+      }
+    }
 
     const toAccept = allMatches.filter(
       (m) => args.freelancerIds.includes(m.freelancerId) && m.status === "pending"
@@ -1595,7 +1561,6 @@ export const confirmRemainingTeamSelections = mutation({
 
     for (const m of toAccept) {
       await ctx.db.patch(m._id, {
-        status: "accepted",
         clientAction: "accepted",
         clientActionAt: now,
         updatedAt: now,
@@ -1608,25 +1573,31 @@ export const confirmRemainingTeamSelections = mutation({
     for (const m of allMatches) {
       if (m.status !== "pending") continue;
       if (args.freelancerIds.includes(m.freelancerId)) continue;
-      if (merged.includes(m.freelancerId)) continue;
+      if ((project.matchedFreelancerIds ?? []).includes(m.freelancerId)) continue;
       if (!m.teamRole || !newAcceptedRoles.has(m.teamRole)) continue;
       await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
-    }
-
-    for (const id of args.freelancerIds) {
-      merged.push(id);
     }
 
     const targetHeadcount = resolveTargetTeamSize(
       project.intakeForm.teamMemberCount,
       project.intakeForm.teamSize
     );
-    const remaining = targetHeadcount - merged.length;
+
+    const allMatchesAfter = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    const committedCount = allMatchesAfter.filter(
+      (m) => m.clientAction === "accepted"
+    ).length;
+    const remaining = targetHeadcount - committedCount;
+
+    const confirmedOnly = project.matchedFreelancerIds ?? [];
 
     if (remaining <= 0) {
       const teamCompletePatch: Record<string, unknown> = {
-        matchedFreelancerIds: merged,
-        status: "matched",
+        matchedFreelancerIds: confirmedOnly.length > 0 ? confirmedOnly : undefined,
+        status: "awaiting_freelancer",
         pendingTeamMemberSlots: undefined,
         awaitingMatch: undefined,
         awaitingMatchSince: undefined,
@@ -1635,41 +1606,22 @@ export const confirmRemainingTeamSelections = mutation({
       };
       clearReplacementFlowFieldsOnProject(teamCompletePatch);
       await ctx.db.patch(args.projectId, teamCompletePatch as any);
-
-      await ctx.scheduler.runAfter(
-        500,
-        internalAny.monthlyBillingCycles.mutations.processUpfrontReleaseForProjectInternal,
-        { projectId: args.projectId }
-      );
-      await ctx.scheduler.runAfter(
-        0,
-        internalAny.contracts.actions.regenerateContractPdfAndSend,
-        { projectId: args.projectId }
-      );
-      await ctx.scheduler.runAfter(
-        0,
-        internalAny.projects.actions.sendMatchSuccessEmails,
-        { projectId: args.projectId }
-      );
     } else {
       const intake = project.intakeForm;
       const allRoleLabels = getRoleLabelsForProjectIntake(intake);
-      const acceptedRoleLower = new Set<string>();
-      for (const m of allMatches) {
-        if (m.status === "accepted" && merged.includes(m.freelancerId) && m.teamRole) {
-          acceptedRoleLower.add(m.teamRole.toLowerCase());
+      const clientAcceptedRoleLower = new Set<string>();
+      for (const m of allMatchesAfter) {
+        if (m.clientAction === "accepted" && m.teamRole) {
+          clientAcceptedRoleLower.add(m.teamRole.toLowerCase());
         }
-      }
-      for (const m of toAccept) {
-        if (m.teamRole) acceptedRoleLower.add(m.teamRole.toLowerCase());
       }
       const rolesWaiting =
         allRoleLabels.length > 0
-          ? allRoleLabels.filter((l) => !acceptedRoleLower.has(l.toLowerCase()))
+          ? allRoleLabels.filter((l) => !clientAcceptedRoleLower.has(l.toLowerCase()))
           : [];
 
       await ctx.db.patch(args.projectId, {
-        matchedFreelancerIds: merged,
+        matchedFreelancerIds: confirmedOnly.length > 0 ? confirmedOnly : undefined,
         pendingTeamMemberSlots: remaining,
         awaitingMatch: true,
         rolesAwaitingMatch:

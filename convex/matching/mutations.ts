@@ -354,7 +354,9 @@ export const setProjectAwaitingMatch = internalMutation({
 
 /**
  * Freelancer responds to a client selection (accept or reject).
- * - Accept: finalise match, set project to "matched", generate contract.
+ * - Accept: record freelancer confirmation; for single hire (or team roster complete) finalize
+ *   `matched` and generate contract. For team hires still filling slots, stay on `matching` until
+ *   everyone client-selected has accepted and headcount is complete.
  * - Reject: set match to "rejected", revert project to "matching", email client.
  */
 export const respondToMatchAsFreelancer = mutation({
@@ -402,7 +404,6 @@ export const respondToMatchAsFreelancer = mutation({
     >;
 
     if (args.response === "accepted") {
-      // Finalise match
       await ctx.db.patch(args.matchId, {
         status: "accepted",
         freelancerAction: "accepted",
@@ -410,63 +411,188 @@ export const respondToMatchAsFreelancer = mutation({
         updatedAt: now,
       });
 
-      const projectPatch: Record<string, unknown> = {
-        matchedFreelancerId: match.freelancerId,
-        status: "matched",
-        updatedAt: now,
-      };
-      clearReplacementFlowFieldsOnProject(projectPatch);
-      await ctx.db.patch(match.projectId, projectPatch as any);
-      await ctx.runMutation(clearPendingRefundsForProject, {
-        userId: project.clientId,
-        projectId: match.projectId,
-      });
-
-      // Reject all other pending matches
-      const others = await ctx.db
+      const allProjectMatches = await ctx.db
         .query("matches")
         .withIndex("by_project", (q) => q.eq("projectId", match.projectId))
-        .filter((q) =>
-          q.and(q.neq(q.field("status"), "accepted"), q.neq(q.field("_id"), args.matchId))
-        )
         .collect();
-      for (const m of others) {
-        await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+
+      const intake = project.intakeForm;
+      const isTeam = intake.hireType === "team";
+      const clientAcceptedMatches = allProjectMatches.filter(
+        (m) => m.clientAction === "accepted"
+      );
+      const allFreelancerAcceptedOnClientPicks = clientAcceptedMatches.every(
+        (m) => m.freelancerAction === "accepted"
+      );
+
+      const slotsRemain = (project.pendingTeamMemberSlots ?? 0) > 0;
+      const awaitingMoreClientPicks = project.awaitingMatch === true && slotsRemain;
+
+      if (isTeam && clientAcceptedMatches.length > 0) {
+        if (!allFreelancerAcceptedOnClientPicks) {
+          await ctx.db.patch(match.projectId, {
+            status: awaitingMoreClientPicks ? "matching" : "awaiting_freelancer",
+            updatedAt: now,
+          } as any);
+
+          await ctx.db.insert("auditLogs", {
+            action: "match_freelancer_accepted",
+            actionType: "system",
+            actorId: user._id,
+            actorRole: user.role,
+            targetType: "match",
+            targetId: args.matchId,
+            details: { projectId: match.projectId, partialTeam: true },
+            createdAt: now,
+          });
+
+          await ctx.scheduler.runAfter(0, sendSystemNotification, {
+            userIds: [project.clientId],
+            title: "Team member confirmed",
+            message: awaitingMoreClientPicks
+              ? `A freelancer has accepted for "${project.intakeForm.title}". Complete your team when ready.`
+              : `A freelancer on your team has accepted "${project.intakeForm.title}". Waiting for remaining confirmations.`,
+            type: "match",
+            data: { matchId: args.matchId, projectId: match.projectId },
+          });
+
+          return { success: true };
+        }
+
+        if (awaitingMoreClientPicks) {
+          await ctx.db.patch(match.projectId, {
+            status: "matching",
+            updatedAt: now,
+          } as any);
+
+          await ctx.db.insert("auditLogs", {
+            action: "match_freelancer_accepted",
+            actionType: "system",
+            actorId: user._id,
+            actorRole: user.role,
+            targetType: "match",
+            targetId: args.matchId,
+            details: { projectId: match.projectId, awaitingMoreMembers: true },
+            createdAt: now,
+          });
+
+          await ctx.scheduler.runAfter(0, sendSystemNotification, {
+            userIds: [project.clientId],
+            title: "Team selections confirmed",
+            message: `Everyone selected so far has accepted for "${project.intakeForm.title}". Add more team members when you're ready.`,
+            type: "match",
+            data: { matchId: args.matchId, projectId: match.projectId },
+          });
+
+          return { success: true };
+        }
+
+        const mergedIds = [
+          ...new Set(clientAcceptedMatches.map((m) => m.freelancerId)),
+        ];
+        const teamFinalPatch: Record<string, unknown> = {
+          matchedFreelancerIds: mergedIds,
+          status: "matched",
+          matchedAt: project.matchedAt ?? now,
+          updatedAt: now,
+        };
+        clearReplacementFlowFieldsOnProject(teamFinalPatch);
+        await ctx.db.patch(match.projectId, teamFinalPatch as any);
+        await ctx.runMutation(clearPendingRefundsForProject, {
+          userId: project.clientId,
+          projectId: match.projectId,
+        });
+
+        for (const m of allProjectMatches) {
+          if (m._id === args.matchId) continue;
+          if (mergedIds.includes(m.freelancerId)) continue;
+          if (m.status === "rejected") continue;
+          await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+        }
+
+        await ctx.db.insert("auditLogs", {
+          action: "match_freelancer_accepted",
+          actionType: "system",
+          actorId: user._id,
+          actorRole: user.role,
+          targetType: "match",
+          targetId: args.matchId,
+          details: { projectId: match.projectId },
+          createdAt: now,
+        });
+
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: [project.clientId],
+          title: "Freelancer confirmed",
+          message: `Your selected freelancer(s) have accepted the opportunity for "${project.intakeForm.title}". Contract generation is starting.`,
+          type: "match",
+          data: { matchId: args.matchId, projectId: match.projectId },
+        });
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: [project.clientId],
+          title: "Continuation credit applied",
+          message: `Your pending dispute refund hold for "${project.intakeForm.title}" has been applied to continuation with your new freelancer.`,
+          type: "payment",
+          data: { projectId: match.projectId, continuationCreditApplied: true },
+        });
+
+        const generateAndSendContract = api.api.contracts.actions
+          .generateAndSendContract as unknown as FunctionReference<"action">;
+        await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId: args.matchId });
+      } else {
+        const projectPatch: Record<string, unknown> = {
+          matchedFreelancerId: match.freelancerId,
+          status: "matched",
+          updatedAt: now,
+        };
+        clearReplacementFlowFieldsOnProject(projectPatch);
+        await ctx.db.patch(match.projectId, projectPatch as any);
+        await ctx.runMutation(clearPendingRefundsForProject, {
+          userId: project.clientId,
+          projectId: match.projectId,
+        });
+
+        const others = await ctx.db
+          .query("matches")
+          .withIndex("by_project", (q) => q.eq("projectId", match.projectId))
+          .filter((q) =>
+            q.and(q.neq(q.field("status"), "accepted"), q.neq(q.field("_id"), args.matchId))
+          )
+          .collect();
+        for (const m of others) {
+          await ctx.db.patch(m._id, { status: "rejected", updatedAt: now });
+        }
+
+        await ctx.db.insert("auditLogs", {
+          action: "match_freelancer_accepted",
+          actionType: "system",
+          actorId: user._id,
+          actorRole: user.role,
+          targetType: "match",
+          targetId: args.matchId,
+          details: { projectId: match.projectId },
+          createdAt: now,
+        });
+
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: [project.clientId],
+          title: "Freelancer confirmed",
+          message: `Your selected freelancer has accepted the opportunity for "${project.intakeForm.title}". Contract generation is starting.`,
+          type: "match",
+          data: { matchId: args.matchId, projectId: match.projectId },
+        });
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: [project.clientId],
+          title: "Continuation credit applied",
+          message: `Your pending dispute refund hold for "${project.intakeForm.title}" has been applied to continuation with your new freelancer.`,
+          type: "payment",
+          data: { projectId: match.projectId, continuationCreditApplied: true },
+        });
+
+        const generateAndSendContract = api.api.contracts.actions
+          .generateAndSendContract as unknown as FunctionReference<"action">;
+        await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId: args.matchId });
       }
-
-      // Log audit
-      await ctx.db.insert("auditLogs", {
-        action: "match_freelancer_accepted",
-        actionType: "system",
-        actorId: user._id,
-        actorRole: user.role,
-        targetType: "match",
-        targetId: args.matchId,
-        details: { projectId: match.projectId },
-        createdAt: now,
-      });
-
-      // Notify client
-      await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: [project.clientId],
-        title: "Freelancer confirmed",
-        message: `Your selected freelancer has accepted the opportunity for "${project.intakeForm.title}". Contract generation is starting.`,
-        type: "match",
-        data: { matchId: args.matchId, projectId: match.projectId },
-      });
-      await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: [project.clientId],
-        title: "Continuation credit applied",
-        message: `Your pending dispute refund hold for "${project.intakeForm.title}" has been applied to continuation with your new freelancer.`,
-        type: "payment",
-        data: { projectId: match.projectId, continuationCreditApplied: true },
-      });
-
-      // Generate and send contract
-      const generateAndSendContract = api.api.contracts.actions
-        .generateAndSendContract as unknown as FunctionReference<"action">;
-      await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId: args.matchId });
-
     } else {
       // Freelancer rejected — revert project to "matching" for new selection
       await ctx.db.patch(args.matchId, {

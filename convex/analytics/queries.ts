@@ -2,6 +2,10 @@ import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import {
+  estimatedPlatformFeeClawbackOnRefund,
+  platformFeeRecognizedOnPayment,
+} from "../platformRevenue";
 
 /**
  * Get platform analytics (admin only)
@@ -54,6 +58,23 @@ export const getPlatformAnalytics = query({
 
     // Get payment statistics
     const allPayments = await ctx.db.query("payments").collect();
+    const allProjectsForFees = await ctx.db.query("projects").collect();
+    const projectByIdForFees = new Map(
+      allProjectsForFees.map((p) => [String(p._id), p])
+    );
+
+    let platformFeesGross = 0;
+    for (const p of allPayments) {
+      platformFeesGross += platformFeeRecognizedOnPayment(p);
+    }
+
+    let platformFeeRefundClawback = 0;
+    for (const p of allPayments) {
+      if (p.type !== "refund" || p.status !== "refunded") continue;
+      const proj = p.projectId ? projectByIdForFees.get(String(p.projectId)) : undefined;
+      platformFeeRefundClawback += estimatedPlatformFeeClawbackOnRefund(p, proj?.platformFee ?? 25);
+    }
+
     const paymentStats = {
       total: allPayments.length,
       succeeded: allPayments.filter((p) => p.status === "succeeded").length,
@@ -62,9 +83,12 @@ export const getPlatformAnalytics = query({
       totalAmount: allPayments
         .filter((p) => p.status === "succeeded")
         .reduce((sum, p) => sum + p.amount, 0),
-      totalPlatformFees: allPayments
-        .filter((p) => p.status === "succeeded")
-        .reduce((sum, p) => sum + (p.platformFee || 0), 0),
+      /** Gross platform fees on succeeded charges (pre-fund, top-up, milestones, platform_fee rows). */
+      totalPlatformFees: platformFeesGross,
+      /** Estimated fee share of gross refunds to clients (hire fee % × refund amount). */
+      totalPlatformFeeRefundClawback: platformFeeRefundClawback,
+      /** Net platform fee revenue after est. refund clawback. */
+      totalPlatformFeesNet: Math.max(0, platformFeesGross - platformFeeRefundClawback),
     };
 
     // Get verification statistics
@@ -178,18 +202,30 @@ export const getAdminChartData = query({
       };
     });
 
+    const projectById = new Map(allProjects.map((p) => [String(p._id), p]));
+
     const revenueByMonth = months.map((month) => {
-      const monthPayments = allPayments.filter(
+      let recognized = 0;
+      let clawback = 0;
+      for (const p of allPayments) {
+        if (p.createdAt < month.start || p.createdAt >= month.end) continue;
+        recognized += platformFeeRecognizedOnPayment(p);
+        if (p.type === "refund" && p.status === "refunded") {
+          const proj = p.projectId ? projectById.get(String(p.projectId)) : undefined;
+          clawback += estimatedPlatformFeeClawbackOnRefund(p, proj?.platformFee ?? 25);
+        }
+      }
+      const net = Math.max(0, recognized - clawback);
+      const volume = allPayments.filter(
         (p) =>
-          p.status === "succeeded" &&
-          p.type === "platform_fee" &&
           p.createdAt >= month.start &&
-          p.createdAt < month.end
-      );
+          p.createdAt < month.end &&
+          platformFeeRecognizedOnPayment(p) > 0
+      ).length;
       return {
         month: month.label,
-        revenue: monthPayments.reduce((sum, p) => sum + p.amount, 0),
-        volume: monthPayments.length,
+        revenue: net,
+        volume,
       };
     });
 
@@ -201,7 +237,9 @@ export const getAdminChartData = query({
         month: month.label,
         created: monthProjects.length,
       };
-    });    const projectStatusCounts: Record<string, number> = {};
+    });
+
+    const projectStatusCounts: Record<string, number> = {};
     for (const project of allProjects) {
       projectStatusCounts[project.status] =
         (projectStatusCounts[project.status] || 0) + 1;
