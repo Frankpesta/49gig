@@ -142,12 +142,20 @@ export default function ResolveDisputePage() {
     );
   }
 
-  if (dispute.status === "resolved" || dispute.status === "closed") {
+  if (
+    dispute.status === "resolved" ||
+    dispute.status === "closed" ||
+    dispute.status === "cancelled"
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Card>
           <CardContent className="p-8 text-center">
-            <p className="text-muted-foreground">This dispute is already resolved</p>
+            <p className="text-muted-foreground">
+              {dispute.status === "cancelled"
+                ? "This dispute was cancelled and cannot be resolved here."
+                : "This dispute is already resolved"}
+            </p>
             <Button asChild className="mt-4">
               <Link href={`/dashboard/disputes/${disputeId}`}>View Dispute</Link>
             </Button>

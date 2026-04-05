@@ -392,6 +392,7 @@ export default function DisputesPage() {
                         {isStaff &&
                           dispute.status !== "resolved" &&
                           dispute.status !== "closed" &&
+                          dispute.status !== "cancelled" &&
                           (dispute.assignedModeratorId === user._id ||
                             user.role === "admin") && (
                             <Button
