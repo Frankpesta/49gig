@@ -611,22 +611,25 @@ export const handlePaymentCancellation = internalMutation({
 });
 
 /**
- * Mark a pending pre-funding row as failed so the client can create a new Flutterwave session.
- * Used when verify API fails or checkout is stale; avoids notifying like handlePaymentFailure.
+ * Mark a pending Flutterwave checkout row as terminal so the client can start a new session.
+ * Supports initial funding (`pre_funding`) and add-payment (`top_up`).
+ * Used when verify fails, checkout is stale, or the user cancels/abandons — avoids duplicate pending rows blocking `createPaymentIntent`.
  */
 export const releaseStuckPreFundingPaymentInternal = internalMutation({
   args: {
     paymentId: v.id("payments"),
     reason: v.string(),
+    terminalStatus: v.optional(v.union(v.literal("failed"), v.literal("cancelled"))),
   },
   handler: async (ctx, args) => {
     const payment = await ctx.db.get(args.paymentId);
     if (!payment) return;
-    if (payment.type !== "pre_funding") return;
+    if (payment.type !== "pre_funding" && payment.type !== "top_up") return;
     if (payment.status !== "pending" && payment.status !== "processing") return;
     const now = Date.now();
+    const terminal = args.terminalStatus ?? "failed";
     await ctx.db.patch(args.paymentId, {
-      status: "failed",
+      status: terminal,
       errorMessage: args.reason,
       updatedAt: now,
     });

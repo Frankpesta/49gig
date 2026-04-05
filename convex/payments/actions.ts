@@ -12,8 +12,15 @@ const PRE_FUNDING_IN_FLIGHT_MAX_MS = 60 * 60 * 1000;
 /** If verify API errors, release pending rows older than this so the client is not blocked forever. */
 const PRE_FUNDING_VERIFY_ERROR_RELEASE_MIN_AGE_MS = 15 * 60 * 1000;
 
+function flutterwaveVerifyErrorLooksLikeNoTransaction(message: string): boolean {
+  return /not\s*found|does\s*not\s*exist|invalid\s*(transaction|reference)|no\s*transaction|could\s*not\s*find|unknown\s*reference/i.test(
+    message
+  );
+}
+
 type PaymentSummary = {
   _id: Id<"payments">;
+  projectId?: Id<"projects">;
   status: string;
   type: string;
   flutterwaveTransactionId?: string;
@@ -81,6 +88,22 @@ async function refreshLatestPreFundingAgainstFlutterwave(
       })) as PaymentSummary;
     }
     return latest;
+  }
+
+  if (
+    st === "cancelled" ||
+    st === "canceled" ||
+    st === "abandoned" ||
+    st === "closed"
+  ) {
+    await ctx.runMutation(internalAny.payments.mutations.releaseStuckPreFundingPaymentInternal, {
+      paymentId: latest._id,
+      reason: `Checkout was not completed (Flutterwave status: ${verification.data.status}).`,
+      terminalStatus: "cancelled",
+    });
+    return (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+      projectId,
+    })) as PaymentSummary;
   }
 
   await ctx.runMutation(internalAny.payments.mutations.handlePaymentFailure, {
@@ -372,6 +395,62 @@ export const createTopUpPaymentIntent = action({
       paymentId,
       txRef,
     };
+  },
+});
+
+/**
+ * Mark a pending Flutterwave checkout as cancelled when the user leaves or cancels pay,
+ * so `createPaymentIntent` / top-up are not blocked by a stale `pending` row.
+ * Prefer passing `txRef` from the redirect query string when available.
+ */
+export const abandonCheckoutPayment = action({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    txRef: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<{ released: boolean }> => {
+    const project = await ctx.runQuery(internalAny.payments.queries.getProject, {
+      projectId: args.projectId,
+      userId: args.userId,
+    });
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    let payment: PaymentSummary = null;
+    if (args.txRef) {
+      const byTx = (await ctx.runQuery(internalAny.payments.queries.getPaymentByTransactionId, {
+        transactionId: args.txRef,
+      })) as PaymentSummary;
+      if (byTx && byTx.projectId === args.projectId) {
+        payment = byTx;
+      }
+    } else {
+      payment = (await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
+        projectId: args.projectId,
+      })) as PaymentSummary;
+    }
+
+    if (!payment) {
+      return { released: false };
+    }
+    if (payment.type !== "pre_funding" && payment.type !== "top_up") {
+      return { released: false };
+    }
+    if (payment.status !== "pending" && payment.status !== "processing") {
+      return { released: false };
+    }
+    if (args.txRef && payment.flutterwaveTransactionId !== args.txRef) {
+      return { released: false };
+    }
+
+    await ctx.runMutation(internalAny.payments.mutations.releaseStuckPreFundingPaymentInternal, {
+      paymentId: payment._id,
+      reason: "Checkout was cancelled or abandoned before completion.",
+      terminalStatus: "cancelled",
+    });
+    return { released: true };
   },
 });
 

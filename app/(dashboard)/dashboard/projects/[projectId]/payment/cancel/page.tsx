@@ -1,6 +1,9 @@
 "use client";
 
-import { useRouter, useParams } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import {
   Card,
   CardContent,
@@ -10,11 +13,25 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { XCircle } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function PaymentCancelPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.projectId as string;
+  const txRef = searchParams.get("tx_ref") ?? searchParams.get("transaction_id");
+  const { user } = useAuth();
+  const abandonCheckoutPayment = useAction(api.payments.actions.abandonCheckoutPayment);
+
+  useEffect(() => {
+    if (!user?._id || !txRef) return;
+    abandonCheckoutPayment({
+      projectId: projectId as any,
+      userId: user._id,
+      txRef,
+    }).catch(() => {});
+  }, [user?._id, txRef, projectId, abandonCheckoutPayment]);
 
   return (
     <div className="flex min-h-[400px] items-center justify-center">

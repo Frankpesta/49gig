@@ -28,6 +28,7 @@ export default function PaymentCallbackPage() {
   const isTopUp = searchParams.get("type") === "top_up";
 
   const verifyPayment = useAction(api.payments.actions.verifyPayment);
+  const abandonCheckoutPayment = useAction(api.payments.actions.abandonCheckoutPayment);
   const paymentStatus = useQuery(
     api.payments.queries.getPaymentStatus,
     user?._id && projectId
@@ -68,11 +69,21 @@ export default function PaymentCallbackPage() {
       };
 
       verify();
-    } else if (status === "cancelled") {
-      // User cancelled - redirect to cancel page
-      router.push(`/dashboard/projects/${projectId}/payment/cancel`);
+    } else if (status === "cancelled" || status === "failed") {
+      const release = async () => {
+        try {
+          await abandonCheckoutPayment({
+            projectId: projectId as any,
+            userId: user._id,
+            txRef,
+          });
+        } catch {
+          /* non-blocking: refresh on next createPaymentIntent can still clear stale rows */
+        }
+      };
+      void release();
     }
-  }, [txRef, status, user, projectId, verifyPayment, router]);
+  }, [txRef, status, user, projectId, verifyPayment, abandonCheckoutPayment, router]);
 
   const initialFundComplete =
     verificationSuccess ||
@@ -138,7 +149,7 @@ export default function PaymentCallbackPage() {
         paymentStatus?.isPreFundingPaymentSucceeded ||
         paymentStatus?.isProjectPastFunding) &&
       !verificationError;
-  const isCancelled = status === "cancelled";
+  const isCancelled = status === "cancelled" || status === "failed";
   const waitingOnBackend = isTopUp
     ? !verificationSuccess && !paymentStatus?.isLatestTopUpSucceeded
     : !verificationSuccess &&
@@ -172,9 +183,13 @@ export default function PaymentCallbackPage() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100">
                 <XCircle className="h-8 w-8 text-orange-600" />
               </div>
-              <CardTitle className="text-2xl">Payment Cancelled</CardTitle>
+              <CardTitle className="text-2xl">
+                {status === "failed" ? "Payment not completed" : "Payment Cancelled"}
+              </CardTitle>
               <CardDescription>
-                Your payment was cancelled. No charges were made.
+                {status === "failed"
+                  ? "This payment attempt did not go through. You can try again safely."
+                  : "Your payment was cancelled. No charges were made."}
               </CardDescription>
             </>
           ) : verificationError ? (
