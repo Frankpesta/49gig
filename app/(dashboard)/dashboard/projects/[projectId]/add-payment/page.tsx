@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -12,14 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2, DollarSign, ExternalLink } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
@@ -40,7 +32,6 @@ export default function AddPaymentPage() {
     user?._id ? { projectId: projectId as any, userId: user._id } : "skip"
   );
 
-  const [monthsToFund, setMonthsToFund] = useState<number>(1);
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +47,16 @@ export default function AddPaymentPage() {
       router.push(`/dashboard/projects/${projectId}`);
     }
   }, [project, projectId, router]);
+
+  const monthsToFund = useMemo(() => {
+    if (!project) return 1;
+    const dur = getDurationMonths(project.intakeForm?.projectDuration);
+    const lastFunded = project.lastFundedMonthIndex ?? 0;
+    if (lastFunded >= dur) {
+      return Math.max(1, dur);
+    }
+    return Math.max(1, dur - lastFunded);
+  }, [project]);
 
   const handleProceed = async () => {
     if (!project || !user) return;
@@ -111,8 +112,8 @@ export default function AddPaymentPage() {
         </h1>
         <p className="text-muted-foreground">
           {project.status === "cancelled"
-            ? "Add payment for the next month(s) to reactivate this hire."
-            : "Fund the next month(s) to keep your hire active. All funds are held in escrow and released monthly."}
+            ? "Pay the remaining balance for this hire to reactivate it. Funds are held in escrow and released as you approve each month's work."
+            : "Complete the payment below to catch up or extend coverage. Funds stay in escrow; freelancers are paid month by month when you approve their work."}
         </p>
       </div>
 
@@ -127,23 +128,15 @@ export default function AddPaymentPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Months to fund</Label>
-            <Select
-              value={String(monthsToFund)}
-              onValueChange={(v) => setMonthsToFund(parseInt(v, 10))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select months" />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.from({ length: durMonths }, (_, i) => i + 1).map((n) => (
-                  <SelectItem key={n} value={String(n)}>
-                    {n} month{n > 1 ? "s" : ""} — {(perMonth * n).toFixed(2)} {(project.currency || "USD").toUpperCase()}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground leading-relaxed">
+            <p>
+              This checkout covers{" "}
+              <strong className="text-foreground">
+                {monthsToFund} month{monthsToFund !== 1 ? "s" : ""}
+              </strong>{" "}
+              ({(perMonth * monthsToFund).toFixed(2)} {(project.currency || "USD").toUpperCase()}). There is no
+              partial-month picker — we bill the block your hire needs in one step.
+            </p>
           </div>
           <div className="flex justify-between text-lg font-bold">
             <span>Amount to pay</span>

@@ -59,6 +59,7 @@ import { getDurationMonths } from "@/lib/project-duration";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 const PROJECT_DURATIONS = [
+  { value: "1", label: "1 month" },
   { value: "3", label: "3 months" },
   { value: "6", label: "6 months" },
   { value: "12+", label: "1 year +" },
@@ -90,6 +91,7 @@ const DURATION_DAYS: Record<string, number> = {
 
 /** Duration discount: 1% for 3 months, 2% for 6 months, 3% for 12+ months */
 const DURATION_DISCOUNT: Record<string, number> = {
+  "1": 1,
   "3": 0.99,
   "6": 0.98,
   "12+": 0.97,
@@ -183,7 +185,6 @@ export default function CreateProjectPage() {
     experienceLevel: "mid" as ExperienceLevel,
     startDate: "",
     specialRequirements: "",
-    monthsToFund: 1, // Number of months to pay for now (must be at least 1)
     teamSlots: [] as TeamSlotIntake[],
   });
 
@@ -507,7 +508,7 @@ export default function CreateProjectPage() {
           : undefined;
 
       const projectId = await createProject({
-        fundUpfrontMonths: Math.max(1, formData.monthsToFund),
+        fundUpfrontMonths: Math.max(1, durationMonths),
         teamBudgetBreakdown,
         intakeForm: {
           hireType: formData.hireType,
@@ -542,9 +543,11 @@ export default function CreateProjectPage() {
           timeline:
             formData.projectDuration === "12+"
               ? "1 year +"
-              : getDurationMonths(formData.projectDuration) >= 12
-                ? `${getDurationMonths(formData.projectDuration) / 12} year${getDurationMonths(formData.projectDuration) > 12 ? "s" : ""}`
-                : `${formData.projectDuration} months`,
+              : getDurationMonths(formData.projectDuration) === 1
+                ? "1 month"
+                : getDurationMonths(formData.projectDuration) >= 12
+                  ? `${getDurationMonths(formData.projectDuration) / 12} year${getDurationMonths(formData.projectDuration) > 12 ? "s" : ""}`
+                  : `${formData.projectDuration} months`,
           category:
             formData.hireType === "team"
               ? primaryCategoryFromTeamSlots(formData.teamSlots)
@@ -921,7 +924,7 @@ export default function CreateProjectPage() {
               <div>
                 <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Duration</Label>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Select the minimum duration for this hire. Longer engagements may receive a reduced monthly rate automatically, rewarding extended commitments.
+                  Choose how long this hire runs (from 1 month up). Longer engagements may receive a lower effective monthly rate through built-in term discounts.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {PROJECT_DURATIONS.map((d) => (
@@ -1100,7 +1103,8 @@ export default function CreateProjectPage() {
                       {/* Footer note */}
                       <div className="px-5 py-3 bg-muted/20 border-t border-border/40">
                         <p className="text-xs text-muted-foreground">
-                          Total you pay. {formData.projectDuration === "3" && "1% discount applied for 3-month commitment."}
+                          Total you pay. {formData.projectDuration === "1" && "No term discount on 1-month engagements."}
+                          {formData.projectDuration === "3" && "1% discount applied for 3-month commitment."}
                           {formData.projectDuration === "6" && "2% discount applied for 6-month commitment."}
                           {["12", "12+", "24", "36", "48", "60"].includes(formData.projectDuration) &&
                             `3% discount applied for ${formatDurationDisplay(formData.projectDuration)} commitment.`}
@@ -1156,32 +1160,14 @@ export default function CreateProjectPage() {
                         </div>
                       </div>
                     )}
-                    <div className="rounded-xl border border-border/60 bg-muted/20 p-5 space-y-3">
-                      <div className="font-medium text-foreground">Months to fund</div>
-                      <p className="text-sm text-muted-foreground">
-                        You can choose the total engagement duration (e.g., 3 months) and fund all months upfront, or pay one month at a time. All funds are securely held in escrow by 49GIG and released to the freelancer or team monthly as salary. At the end of each month, you review and approve the work before the salary is released. If no action is taken within 0–72 hours, the monthly salary will be automatically released. This ensures flexibility, transparency, and protection for both parties. You pay upfront and we hold in escrow.
-                      </p>
-                      <Select
-                        value={String(formData.monthsToFund)}
-                        onValueChange={(v) => setFormData({ ...formData, monthsToFund: parseInt(v, 10) })}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select months" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: getDurationMonths(formData.projectDuration) }, (_, i) => i + 1).map((n) => {
-                            const durMonths = getDurationMonths(formData.projectDuration);
-                            const perMonth = effectiveBudget! / durMonths;
-                            return (
-                              <SelectItem key={n} value={String(n)}>
-                                {n} month{n > 1 ? "s" : ""} — {formatBudget(perMonth * n)}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        The amount for the selected months will be held in escrow. Funds are released to the freelancer(s) each month after you approve that month&apos;s work (or automatically after the review window).
+                    <div className="rounded-xl border border-primary/15 bg-primary/5 p-5 space-y-3">
+                      <div className="font-medium text-foreground">How you pay</div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        You&apos;ll pay the <strong className="text-foreground">full hire total</strong> when you
+                        complete checkout. All of it is held in escrow by 49GIG. Each month, after the billing
+                        period ends, you review and approve work — then that month&apos;s share is released to
+                        the freelancer&apos;s wallet. If you don&apos;t act within the review window, payment can
+                        auto-release so talent isn&apos;t left waiting. Same protection, full funding up front.
                       </p>
                     </div>
                   </div>

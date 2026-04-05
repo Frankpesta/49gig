@@ -139,6 +139,8 @@ export default function ProjectDetailPage() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showAdminDeleteDialog, setShowAdminDeleteDialog] = useState(false);
+  const [isAdminDeleting, setIsAdminDeleting] = useState(false);
 
   // Validate the projectId from URL params
   const isValidId = isValidConvexId(projectIdParam);
@@ -195,6 +197,9 @@ export default function ProjectDetailPage() {
   );
   const deleteDraftProject = useMutation(
     (api as any)["projects/mutations"].deleteDraftProject
+  );
+  const adminDeleteProjectMutation = useMutation(
+    (api as any)["projects/mutations"].adminDeleteProject
   );
 
   // Prefill rating form when existing review loads
@@ -267,6 +272,7 @@ export default function ProjectDetailPage() {
 
   const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
+  const isAdmin = user.role === "admin";
   const isStaff = user.role === "admin" || user.role === "moderator";
   const isClient = user.role === "client" && project.clientId === user._id;
   const pendingMatchesCount =
@@ -397,6 +403,21 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleAdminDeleteProject = async () => {
+    if (!projectId || !user?._id || user.role !== "admin") return;
+    setShowAdminDeleteDialog(false);
+    setIsAdminDeleting(true);
+    try {
+      await adminDeleteProjectMutation({ projectId, userId: user._id });
+      toast.success("Hire permanently removed");
+      router.push("/dashboard/projects");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not delete hire");
+    } finally {
+      setIsAdminDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {isFreelancerReplacementMatching && projectId && (
@@ -405,6 +426,52 @@ export default function ProjectDetailPage() {
           compact
           className="animate-in fade-in slide-in-from-top-2 duration-500"
         />
+      )}
+
+      {isAdmin && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base text-destructive">Admin</CardTitle>
+            <CardDescription>
+              Permanently delete this hire (any status). Blocked if escrow is non-zero, a dispute is open, a payment is
+              in progress, or a pending refund exists for this project.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="destructive"
+              className="min-h-11 w-full touch-manipulation sm:w-auto"
+              onClick={() => setShowAdminDeleteDialog(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete hire (admin)
+            </Button>
+            <AlertDialog open={showAdminDeleteDialog} onOpenChange={setShowAdminDeleteDialog}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this hire as admin?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently removes the hire and related matches, chats, billing cycles, milestones, resolved
+                    disputes, and reviews. Payment history rows stay for audit but are detached from this hire. You
+                    cannot do this while escrow remains, while a dispute is open, or while payments or refunds are still
+                    in flight.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isAdminDeleting}>Cancel</AlertDialogCancel>
+                  <Button variant="destructive" onClick={handleAdminDeleteProject} disabled={isAdminDeleting}>
+                    {isAdminDeleting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    {isAdminDeleting ? "Deleting…" : "Delete permanently"}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
       )}
 
       {/* Header */}

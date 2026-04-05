@@ -29,7 +29,7 @@ export const runPostFundMatchingForProject = internalAction({
       } else {
         await ctx.runAction(apiAny.matching.actions.generateMatches, {
           projectId: args.projectId,
-          limit: 5,
+          limit: 10,
         });
       }
     } catch (e) {

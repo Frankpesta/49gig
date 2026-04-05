@@ -47,12 +47,7 @@ crons.daily(
   internal["cron/kyc"].deleteKycDocumentsOlderThan12Months
 );
 
-// Payment follow-up: remind clients to fund next month, terminate after grace
-crons.daily(
-  "payment follow-up reminders and terminate",
-  { hourUTC: 9, minuteUTC: 0 },
-  internal["cron/paymentFollowUp"].sendPaymentFollowUpRemindersAndTerminate
-);
+// Payment follow-up cron removed: clients fund the full hire upfront; no monthly “add payment” nudges.
 
 // Retry matching for projects awaiting talent (draft, pending_funding, funded, matching)
 crons.interval(

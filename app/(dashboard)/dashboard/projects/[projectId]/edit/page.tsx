@@ -56,6 +56,7 @@ import { getDurationMonths } from "@/lib/project-duration";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 const PROJECT_DURATIONS = [
+  { value: "1", label: "1 month" },
   { value: "3", label: "3 months" },
   { value: "6", label: "6 months" },
   { value: "12+", label: "1 year +" },
@@ -75,6 +76,7 @@ type ProjectDuration =
   | (typeof ENGAGEMENT_YEAR_OPTIONS)[number]["value"];
 
 const DURATION_DAYS: Record<string, number> = {
+  "1": 30,
   "3": 90,
   "6": 180,
   "12+": 365,
@@ -86,6 +88,7 @@ const DURATION_DAYS: Record<string, number> = {
 };
 
 const DURATION_DISCOUNT: Record<string, number> = {
+  "1": 1,
   "3": 0.97,
   "6": 0.95,
   "12+": 0.95,
@@ -461,9 +464,11 @@ export default function EditProjectPage() {
           projectDuration: formData.projectDuration,
           roleType: formData.roleType,
           timeline:
-            getDurationMonths(formData.projectDuration) >= 12
-              ? `${getDurationMonths(formData.projectDuration) / 12} year${getDurationMonths(formData.projectDuration) > 12 ? "s" : ""}`
-              : `${formData.projectDuration} months`,
+            getDurationMonths(formData.projectDuration) === 1
+              ? "1 month"
+              : getDurationMonths(formData.projectDuration) >= 12
+                ? `${getDurationMonths(formData.projectDuration) / 12} year${getDurationMonths(formData.projectDuration) > 12 ? "s" : ""}`
+                : `${formData.projectDuration} months`,
           category:
             formData.hireType === "team"
               ? primaryCategoryFromTeamSlots(formData.teamSlots)

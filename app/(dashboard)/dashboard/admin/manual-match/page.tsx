@@ -47,6 +47,8 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { Checkbox } from "@/components/ui/checkbox";
+import { freelancerRelevantToProjectIntake } from "@/lib/intake-freelancer-relevance";
 
 /** Open role labels from server (accepted-match basis); fallback to project.rolesAwaitingMatch. */
 function teamRoleOptionsForManualMatch(p: any): string[] {
@@ -69,6 +71,8 @@ export default function AdminManualMatchPage() {
   const [isAssigning, setIsAssigning] = useState(false);
   /** Team hire: which open role this manual candidate fills (must align with rolesAwaitingMatch when set). */
   const [teamRoleForMatch, setTeamRoleForMatch] = useState("");
+  /** When enabled (default), only freelancers whose skills/role align with this hire's intake. */
+  const [skillRelevantOnly, setSkillRelevantOnly] = useState(true);
 
   const adminManualMatch = useMutation(api.matching.mutations.adminManualMatch);
 
@@ -111,9 +115,15 @@ export default function AdminManualMatchPage() {
     setTeamRoleForMatch(roles[0] ?? "");
   }, [selectedProjectId, allProjects]);
 
-  // Filter freelancers by search and experience level
+  const selectedProject = useMemo(
+    () => (allProjects as any[] | undefined)?.find((p: any) => p._id === selectedProjectId),
+    [allProjects, selectedProjectId]
+  );
+
+  // Filter freelancers by search, experience level, and (optional) intake relevance
   const filteredFreelancers = useMemo(() => {
     if (!allFreelancers) return [];
+    const intake = selectedProject?.intakeForm;
     return (allFreelancers as any[]).filter((f: any) => {
       if (freelancerSearch) {
         const q = freelancerSearch.toLowerCase();
@@ -125,14 +135,24 @@ export default function AdminManualMatchPage() {
       if (experienceLevelFilter !== "any") {
         if (f.profile?.experienceLevel !== experienceLevelFilter) return false;
       }
+      if (
+        skillRelevantOnly &&
+        selectedProjectId &&
+        intake &&
+        !freelancerRelevantToProjectIntake(f, intake)
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [allFreelancers, freelancerSearch, experienceLevelFilter]);
-
-  const selectedProject = useMemo(
-    () => (allProjects as any[] | undefined)?.find((p: any) => p._id === selectedProjectId),
-    [allProjects, selectedProjectId]
-  );
+  }, [
+    allFreelancers,
+    freelancerSearch,
+    experienceLevelFilter,
+    skillRelevantOnly,
+    selectedProjectId,
+    selectedProject?.intakeForm,
+  ]);
 
   const selectedFreelancer = useMemo(
     () => (allFreelancers as any[] | undefined)?.find((f: any) => f._id === selectedFreelancerId),
@@ -190,7 +210,7 @@ export default function AdminManualMatchPage() {
     <div className="container mx-auto max-w-7xl space-y-6 px-4 py-4 sm:space-y-8 sm:px-6 sm:py-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-4">
-        <Button variant="ghost" size="icon" className="shrink-0 self-start" asChild>
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 touch-manipulation self-start sm:h-10 sm:w-10" asChild>
           <Link href="/dashboard" aria-label="Back to dashboard">
             <ArrowLeft className="h-4 w-4" />
           </Link>
@@ -355,10 +375,25 @@ export default function AdminManualMatchPage() {
               <span className="min-w-0">Step 2 — Select freelancer</span>
             </CardTitle>
             <CardDescription>
-              Search all active freelancers. Admin override — scoring and vetting requirements are bypassed.
+              Prioritize people who match this hire&apos;s skills and roles (toggle below). You can still search the full directory when needed.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+              <Checkbox
+                id="skill-relevant-only"
+                checked={skillRelevantOnly}
+                onCheckedChange={(v) => setSkillRelevantOnly(v === true)}
+                disabled={!selectedProjectId}
+                className="mt-0.5"
+              />
+              <label htmlFor="skill-relevant-only" className="text-sm leading-snug cursor-pointer">
+                <span className="font-medium">Skill &amp; role–aligned freelancers only</span>
+                <span className="block text-muted-foreground text-xs mt-0.5">
+                  Uses the same skill and category rules as automatic matching. Requires a selected hire.
+                </span>
+              </label>
+            </div>
             {/* Filters */}
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative min-w-0 flex-1">
@@ -394,7 +429,11 @@ export default function AdminManualMatchPage() {
                   No freelancers match your search.
                 </p>
               ) : (
-                filteredFreelancers.map((f: any) => (
+                filteredFreelancers.map((f: any) => {
+                  const aligned =
+                    selectedProject?.intakeForm &&
+                    freelancerRelevantToProjectIntake(f, selectedProject.intakeForm);
+                  return (
                   <button
                     key={f._id}
                     type="button"
@@ -421,6 +460,11 @@ export default function AdminManualMatchPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold truncate">{f.name}</p>
+                          {aligned && selectedProjectId ? (
+                            <Badge variant="secondary" className="text-[10px] shrink-0 py-0">
+                              Hire fit
+                            </Badge>
+                          ) : null}
                           {selectedFreelancerId === f._id && (
                             <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
                           )}
@@ -447,7 +491,8 @@ export default function AdminManualMatchPage() {
                       </div>
                     </div>
                   </button>
-                ))
+                );
+                })
               )}
             </div>
           </CardContent>
@@ -500,7 +545,7 @@ export default function AdminManualMatchPage() {
                 </p>
               </div>
               <Button
-                className="h-11 w-full shrink-0 sm:h-10 sm:w-auto"
+                className="h-12 min-h-11 w-full shrink-0 touch-manipulation sm:h-10 sm:min-h-10 sm:w-auto"
                 onClick={() => setConfirmOpen(true)}
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />

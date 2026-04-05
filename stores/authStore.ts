@@ -45,6 +45,9 @@ export interface User {
     availability?: "available" | "busy" | "unavailable";
     timezone?: string;
     portfolioUrl?: string;
+    githubUrl?: string;
+    behanceUrl?: string;
+    linkedinUrl?: string;
     imageUrl?: string;
     primaryRole?: string;
     weeklyHours?: number;
@@ -56,6 +59,9 @@ export interface User {
     inApp: boolean;
   };
   status: "active" | "suspended" | "deleted";
+  /** Freelancer: set after Twilio SMS verification */
+  phoneE164?: string;
+  phoneVerifiedAt?: number;
   createdAt: number;
   updatedAt: number;
 }

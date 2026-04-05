@@ -64,6 +64,8 @@ import type * as payments_actions from "../payments/actions.js";
 import type * as payments_flutterwave from "../payments/flutterwave.js";
 import type * as payments_mutations from "../payments/mutations.js";
 import type * as payments_queries from "../payments/queries.js";
+import type * as phoneVerification_actions from "../phoneVerification/actions.js";
+import type * as phoneVerification_internalQueries from "../phoneVerification/internalQueries.js";
 import type * as platformSettings_mutations from "../platformSettings/mutations.js";
 import type * as platformSettings_queries from "../platformSettings/queries.js";
 import type * as pricing_mutations from "../pricing/mutations.js";
@@ -170,6 +172,8 @@ declare const fullApi: ApiFromModules<{
   "payments/flutterwave": typeof payments_flutterwave;
   "payments/mutations": typeof payments_mutations;
   "payments/queries": typeof payments_queries;
+  "phoneVerification/actions": typeof phoneVerification_actions;
+  "phoneVerification/internalQueries": typeof phoneVerification_internalQueries;
   "platformSettings/mutations": typeof platformSettings_mutations;
   "platformSettings/queries": typeof platformSettings_queries;
   "pricing/mutations": typeof pricing_mutations;

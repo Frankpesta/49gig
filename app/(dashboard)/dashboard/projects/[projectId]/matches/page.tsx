@@ -4,7 +4,7 @@ import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -19,7 +19,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -31,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Video, ChevronDown, Loader2, ShieldCheck, User, RefreshCw } from "lucide-react";
+import { ArrowLeft, Video, Loader2, ShieldCheck, User, RefreshCw } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
@@ -42,7 +41,8 @@ import { PLATFORM_CATEGORIES } from "@/lib/platform-skills";
 import { getRoleLabelsForProjectIntake } from "@/lib/team-slots";
 import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
 
-const PAGE_SIZE = 5;
+/** Max candidates per role / single hire in the client carousel (matches engine persists at most this many). */
+const MATCH_CAROUSEL_CAP = 10;
 const TIME_SLOTS = (() => {
   const slots: string[] = [];
   for (let h = 8; h <= 20; h++) {
@@ -116,32 +116,33 @@ function FreelancerProfileContent({
 
   return (
     <>
-      <DialogHeader className="space-y-4 pb-4 border-b border-border/60">
-        <div className="flex gap-4">
+      <DialogHeader className="space-y-4 pb-4 border-b border-border/60 text-left sm:text-left">
+        <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
           <Avatar className="h-20 w-20 shrink-0 rounded-full border-2 border-primary/20">
             <AvatarImage src={p?.imageUrl} alt={data.displayName} />
             <AvatarFallback className="bg-primary/10 text-primary text-xl font-semibold">
               {data.displayName.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div className="min-w-0 flex-1">
-            <DialogTitle className="text-xl">{data.displayName}</DialogTitle>
-            <p className="text-muted-foreground mt-0.5">{primaryRole}</p>
+          <div className="min-w-0 w-full flex-1 text-center sm:text-left">
+            <DialogTitle className="text-lg sm:text-xl leading-snug wrap-break-word text-pretty pr-1">
+              {data.displayName}
+            </DialogTitle>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base wrap-break-word">{primaryRole}</p>
             {(p?.country || p?.timezone) && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-1 wrap-break-word">
                 {[p.country, p.timezone].filter(Boolean).join(" · ")}
               </p>
             )}
-            <div className="flex flex-wrap gap-2 mt-3">
+            <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
               {skillLevel && (
                 <Badge variant="outline">{skillLevel}</Badge>
               )}
-              <Badge className="gap-1 bg-primary/15 text-primary border-0">
-                <ShieldCheck className="h-3.5 w-3.5" />
-                {data.vettingScore}% Vetted
-              </Badge>
               {data.vettingStatus === "approved" && (
-                <Badge variant="secondary">Fully vetted by 49GIG</Badge>
+                <Badge variant="secondary" className="gap-1">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Fully vetted by 49GIG
+                </Badge>
               )}
             </div>
           </div>
@@ -152,7 +153,7 @@ function FreelancerProfileContent({
         {(data.resumeBio || p?.bio) && (
           <section>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">About</h3>
-            <p className="text-sm leading-relaxed">{data.resumeBio || p?.bio}</p>
+            <p className="wrap-break-word text-sm leading-relaxed text-pretty">{data.resumeBio || p?.bio}</p>
           </section>
         )}
 
@@ -170,30 +171,22 @@ function FreelancerProfileContent({
           </section>
         )}
 
-        <section className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {p?.availability && (
-            <div className="rounded-lg border border-border/60 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Availability</p>
-              <p className="text-sm font-medium mt-0.5 capitalize">{p.availability.replace("_", " ")}</p>
-            </div>
-          )}
-          {p?.weeklyHours != null && (
-            <div className="rounded-lg border border-border/60 p-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Weekly capacity</p>
-              <p className="text-sm font-medium mt-0.5">{p.weeklyHours} hrs/week</p>
-            </div>
-          )}
-          <div className="rounded-lg border border-border/60 p-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Rating</p>
-            <p className="text-sm font-medium mt-0.5">
-              {data.reviewCount > 0 ? (
-                <>{data.averageRating}/5 · {data.reviewCount} completed project{data.reviewCount !== 1 ? "s" : ""}</>
-              ) : (
-                "No reviews yet"
-              )}
-            </p>
-          </div>
-        </section>
+        {(p?.availability || p?.weeklyHours != null) && (
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {p?.availability && (
+              <div className="rounded-lg border border-border/60 p-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Availability</p>
+                <p className="text-sm font-medium mt-0.5 capitalize">{p.availability.replace("_", " ")}</p>
+              </div>
+            )}
+            {p?.weeklyHours != null && (
+              <div className="rounded-lg border border-border/60 p-3">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Weekly capacity</p>
+                <p className="text-sm font-medium mt-0.5">{p.weeklyHours} hrs/week</p>
+              </div>
+            )}
+          </section>
+        )}
 
         {p?.languagesWritten && p.languagesWritten.length > 0 && (
           <section>
@@ -207,22 +200,32 @@ function FreelancerProfileContent({
         </p>
       </div>
 
-      <DialogFooter className="flex-col gap-2 sm:flex-row pt-4 border-t border-border/60">
+      <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:justify-end sm:gap-2">
         {freezeSelection ? (
-          <Button className="w-full sm:w-auto" onClick={onClose}>
+          <Button
+            className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto"
+            onClick={onClose}
+          >
             Close
           </Button>
         ) : (
           <>
-            <Button variant="outline" className="w-full sm:w-auto" onClick={onClose}>
+            <Button
+              variant="outline"
+              className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto"
+              onClick={onClose}
+            >
               See alternatives
             </Button>
-            <Button className="w-full sm:w-auto" onClick={onProceed}>
+            <Button
+              className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto"
+              onClick={onProceed}
+            >
               Proceed with this talent
             </Button>
           </>
         )}
-      </DialogFooter>
+      </div>
     </>
   );
 }
@@ -266,6 +269,7 @@ function MatchCard({
   isTeam,
   selectionLocked,
   continuePaymentHref,
+  primaryCtaLabel,
 }: {
   match: EnrichedMatch;
   rank: number;
@@ -276,6 +280,8 @@ function MatchCard({
   /** Pre-funding: choice is saved — show continue to payment instead of changing selection. */
   selectionLocked?: boolean;
   continuePaymentHref?: string;
+  /** Override the main card button label (e.g. matching carousel). */
+  primaryCtaLabel?: string;
 }) {
   const f = match.freelancer;
   const isVetted = match.vettingStatus === "approved";
@@ -286,31 +292,38 @@ function MatchCard({
 
   return (
     <Card
-      className={`transition-all hover:shadow-md rounded-xl border-border/60 overflow-hidden ${isSelected ? "ring-2 ring-primary border-primary/50 shadow-sm" : ""}`}
+      className={`w-full max-w-full overflow-hidden rounded-xl border-border/60 transition-all hover:shadow-md supports-[hover:hover]:hover:shadow-md ${isSelected ? "ring-2 ring-primary border-primary/50 shadow-sm" : ""}`}
     >
       <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
         <div className="flex gap-3">
-          <Avatar className="h-12 w-12 shrink-0 rounded-full border-2 border-border/60">
+          <Avatar className="h-12 w-12 shrink-0 rounded-full border-2 border-border/60 sm:h-14 sm:w-14">
             <AvatarImage src={f?.profile?.imageUrl} alt={f?.displayName} />
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
               {f?.displayName?.slice(0, 2).toUpperCase() ?? rank.toString()}
             </AvatarFallback>
           </Avatar>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <CardTitle className="text-base sm:text-lg truncate">{f?.displayName ?? "—"}</CardTitle>
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+              <CardTitle className="text-base leading-snug sm:text-lg wrap-break-word text-pretty">
+                {f?.displayName ?? "—"}
+              </CardTitle>
               {isTeam && match.teamRole && (
-                <Badge variant="secondary" className="text-xs">{match.teamRole}</Badge>
+                <Badge
+                  variant="secondary"
+                  className="max-w-full shrink-0 whitespace-normal text-left text-xs leading-snug wrap-break-word"
+                >
+                  {match.teamRole}
+                </Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground mt-0.5">{primaryRole}</p>
+            <p className="mt-0.5 wrap-break-word text-sm text-muted-foreground text-pretty">{primaryRole}</p>
             {(f?.profile?.country || f?.profile?.timezone) && (
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="mt-0.5 wrap-break-word text-xs text-muted-foreground">
                 {[f?.profile?.country, f?.profile?.timezone].filter(Boolean).join(" · ")}
               </p>
             )}
           </div>
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground tabular-nums sm:h-8 sm:w-8">
             {rank}
           </span>
         </div>
@@ -321,47 +334,61 @@ function MatchCard({
             </Badge>
           )}
           {isVetted && (
-            <Badge variant="secondary" className="text-xs">Fully vetted by 49GIG</Badge>
+            <Badge variant="secondary" className="max-w-full whitespace-normal text-xs leading-snug">
+              Fully vetted by 49GIG
+            </Badge>
           )}
           {f?.profile?.availability === "busy" && (
-            <Badge variant="outline" className="text-xs font-normal">
+            <Badge variant="outline" className="max-w-full whitespace-normal text-xs font-normal leading-snug">
               On another hire — still matchable
             </Badge>
           )}
         </div>
       </CardHeader>
       <CardContent className="space-y-3 px-4 pb-4 sm:px-6 sm:pb-6">
-        {f?.profile?.skills && f.profile.skills.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {f.profile.skills.slice(0, 6).map((s) => (
-              <Badge key={s} variant="outline" className="text-xs font-normal">
-                {s}
-              </Badge>
-            ))}
-            {(f.profile.skills.length ?? 0) > 6 && (
-              <Badge variant="outline" className="text-xs font-normal">
-                +{f.profile.skills.length - 6}
-              </Badge>
-            )}
-          </div>
-        )}
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1 rounded-lg" onClick={onViewProfile}>
-            <User className="mr-1.5 h-4 w-4" />
+        <div className="min-h-0">
+          {f?.profile?.skills && f.profile.skills.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {f.profile.skills.slice(0, 6).map((s) => (
+                <Badge key={s} variant="outline" className="wrap-break-word text-xs font-normal">
+                  {s}
+                </Badge>
+              ))}
+              {(f.profile.skills.length ?? 0) > 6 && (
+                <Badge variant="outline" className="text-xs font-normal">
+                  +{f.profile.skills.length - 6}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+          <Button
+            variant="outline"
+            className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:flex-1 rounded-lg text-sm"
+            onClick={onViewProfile}
+          >
+            <User className="mr-2 h-4 w-4 shrink-0" />
             View profile
           </Button>
           {selectionLocked && continuePaymentHref ? (
-            <Button size="sm" className="flex-1 rounded-lg" asChild>
+            <Button
+              className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:flex-1 rounded-lg text-sm"
+              asChild
+            >
               <Link href={continuePaymentHref}>Continue to payment</Link>
             </Button>
           ) : (
             <Button
-              size="sm"
-              className="flex-1 rounded-lg"
+              className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:flex-1 rounded-lg text-sm"
               onClick={onSelect}
               variant={isSelected ? "secondary" : "default"}
             >
-              {isSelected ? "Selected" : "Select"}
+              {primaryCtaLabel
+                ? primaryCtaLabel
+                : isSelected
+                  ? "Selected"
+                  : "Select"}
             </Button>
           )}
         </div>
@@ -388,7 +415,7 @@ function LockedSelectionProfileCard({
   continuePaymentHref: string;
 }) {
   const profile = useQuery(
-    (api as any)["matching/queries"].getFreelancerPublicProfile,
+    (api as any)["matching/queries"].getFreelancerPublicProfile as any,
     { projectId, freelancerId, userId }
   ) as FreelancerPublicProfile | null | undefined;
   if (profile === undefined) {
@@ -460,7 +487,7 @@ export default function ProjectMatchesPage() {
     projectId && user?._id && viewingFreelancerId
       ? { projectId, freelancerId: viewingFreelancerId, userId: user._id }
       : "skip"
-  );
+  ) as FreelancerPublicProfile | null | undefined;
 
   const generateMatchesForDraft = useAction(
     (api as any)["matching/actions"].generateMatchesForDraft
@@ -489,12 +516,23 @@ export default function ProjectMatchesPage() {
     atRequestedLevel: number;
     hasHigherLevelWithSkills: boolean;
   } | null>(null);
-  const [singleVisibleCount, setSingleVisibleCount] = useState(PAGE_SIZE);
   const [selectedSingleId, setSelectedSingleId] = useState<Id<"users"> | null>(
     null
   );
-  const [selectedTeamIds, setSelectedTeamIds] = useState<Set<Id<"users">>>(
-    new Set()
+  /** Team hires: chosen freelancer per seat label (e.g. "Frontend Developer #1"). */
+  const [roleSelections, setRoleSelections] = useState<
+    Partial<Record<string, Id<"users">>>
+  >({});
+  const [singleCarouselIndex, setSingleCarouselIndex] = useState(0);
+  const [singlePoolExhausted, setSinglePoolExhausted] = useState(false);
+  const [roleCarouselIndex, setRoleCarouselIndex] = useState<
+    Record<string, number>
+  >({});
+  const [rolePoolExhausted, setRolePoolExhausted] = useState<
+    Record<string, boolean>
+  >({});
+  const [viewingTeamRoleLabel, setViewingTeamRoleLabel] = useState<string | null>(
+    null
   );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
@@ -555,14 +593,57 @@ export default function ProjectMatchesPage() {
     ? getRoleLabelsForProjectIntake(project.intakeForm)
     : [];
 
+  const sortedSinglePool = useMemo(() => {
+    return [...pendingMatches]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MATCH_CAROUSEL_CAP);
+  }, [pendingMatches]);
+
+  const rolesWithPendingMatches = useMemo(() => {
+    if (!isTeam || allRoleLabels.length === 0) return [];
+    return allRoleLabels.filter(
+      (r) => (matchesByRoleMap.get(r) ?? []).length > 0
+    );
+  }, [isTeam, allRoleLabels, matchesByRoleMap]);
+
+  const sortedTeamPools = useMemo(() => {
+    const map = new Map<string, EnrichedMatch[]>();
+    if (!isTeam) return map;
+    for (const role of allRoleLabels) {
+      const raw = matchesByRoleMap.get(role) ?? [];
+      map.set(
+        role,
+        [...raw].sort((a, b) => b.score - a.score).slice(0, MATCH_CAROUSEL_CAP)
+      );
+    }
+    return map;
+  }, [isTeam, allRoleLabels, matchesByRoleMap]);
+
+  const pendingMatchSig = useMemo(
+    () => pendingMatches.map((m) => m._id).join(","),
+    [pendingMatches]
+  );
+
+  useEffect(() => {
+    setSingleCarouselIndex(0);
+    setSinglePoolExhausted(false);
+    setRoleCarouselIndex({});
+    setRolePoolExhausted({});
+    setRoleSelections({});
+  }, [projectId, pendingMatchSig]);
+
   const isFundedMatchingContinuation =
     project?.status === "matching" &&
     user?.role === "client" &&
     (project.pendingTeamMemberSlots ?? 0) > 0;
 
-  const singleList = !isTeam ? pendingMatches.slice(0, singleVisibleCount) : [];
-  const hasMoreSingle =
-    !isTeam && pendingMatches.length > singleVisibleCount;
+  const selectedTeamFreelancerIds = useMemo(
+    () =>
+      Object.values(roleSelections).filter(
+        (id): id is Id<"users"> => id != null
+      ),
+    [roleSelections]
+  );
 
   /**
    * Roles that still need matches for the policy note.
@@ -707,53 +788,152 @@ export default function ProjectMatchesPage() {
     []
   );
 
-  const handleSelectTeam = useCallback(
-    (freelancerId: Id<"users">) => {
-      setSelectedTeamIds((prev) => {
-        const next = new Set(prev);
-        if (next.has(freelancerId)) {
-          next.delete(freelancerId);
-          return next;
-        }
-        const cap = isFundedMatchingContinuation
-          ? (project?.pendingTeamMemberSlots ?? 0)
-          : null;
-        if (cap != null && cap > 0 && next.size >= cap) {
-          toast.error(`You can select at most ${cap} more team member(s) for this step.`);
-          return prev;
-        }
-        next.add(freelancerId);
-        return next;
-      });
+  const advanceSingleCarousel = useCallback(() => {
+    if (singleCarouselIndex >= sortedSinglePool.length - 1) {
+      setSinglePoolExhausted(true);
+      return;
+    }
+    setSingleCarouselIndex((i) => i + 1);
+  }, [singleCarouselIndex, sortedSinglePool.length]);
+
+  const restartSingleCarousel = useCallback(() => {
+    setSingleCarouselIndex(0);
+    setSinglePoolExhausted(false);
+  }, []);
+
+  const advanceRoleCarousel = useCallback(
+    (roleLabel: string) => {
+      const pool = sortedTeamPools.get(roleLabel) ?? [];
+      const idx = roleCarouselIndex[roleLabel] ?? 0;
+      if (idx >= pool.length - 1) {
+        setRolePoolExhausted((ex) => ({ ...ex, [roleLabel]: true }));
+        return;
+      }
+      setRoleCarouselIndex((prev) => ({
+        ...prev,
+        [roleLabel]: idx + 1,
+      }));
     },
-    [isFundedMatchingContinuation, project?.pendingTeamMemberSlots]
+    [sortedTeamPools, roleCarouselIndex]
+  );
+
+  const restartRoleCarousel = useCallback((roleLabel: string) => {
+    setRoleCarouselIndex((p) => ({ ...p, [roleLabel]: 0 }));
+    setRolePoolExhausted((ex) => ({ ...ex, [roleLabel]: false }));
+  }, []);
+
+  const clearRoleSelection = useCallback((roleLabel: string) => {
+    setRoleSelections((prev) => {
+      const next = { ...prev };
+      delete next[roleLabel];
+      return next;
+    });
+    restartRoleCarousel(roleLabel);
+  }, [restartRoleCarousel]);
+
+  const pickTeamSeat = useCallback(
+    (roleLabel: string, freelancerId: Id<"users">) => {
+      const idUsedElsewhere = Object.entries(roleSelections).some(
+        ([key, id]) => key !== roleLabel && id === freelancerId
+      );
+      if (idUsedElsewhere) {
+        toast.error("Each seat must be a different freelancer.");
+        return;
+      }
+      if (isFundedMatchingContinuation) {
+        const cap = project?.pendingTeamMemberSlots ?? 0;
+        const wouldBe = { ...roleSelections, [roleLabel]: freelancerId };
+        const count = Object.values(wouldBe).filter(Boolean).length;
+        if (cap > 0 && count > cap) {
+          toast.error(`You can select at most ${cap} team member(s) for this step.`);
+          return;
+        }
+      }
+      setRoleSelections((prev) => ({ ...prev, [roleLabel]: freelancerId }));
+      toast.success(`Saved for ${roleLabel}.`);
+    },
+    [
+      isFundedMatchingContinuation,
+      project?.pendingTeamMemberSlots,
+      roleSelections,
+    ]
   );
 
   const handleConfirmTeamSelection = useCallback(() => {
-    if (selectedTeamIds.size === 0) {
-      toast.error("Select at least one freelancer.");
-      return;
+    if (!isTeam) return;
+    if (isFundedMatchingContinuation) {
+      const ids = selectedTeamFreelancerIds;
+      if (ids.length === 0) {
+        toast.error("Select at least one freelancer to add to your team.");
+        return;
+      }
+      const cap = project?.pendingTeamMemberSlots ?? 0;
+      if (cap > 0 && ids.length > cap) {
+        toast.error(`You can add at most ${cap} more team member(s) for this step.`);
+        return;
+      }
+      if (new Set(ids).size !== ids.length) {
+        toast.error("Each seat must be a different freelancer.");
+        return;
+      }
+    } else {
+      const missing = rolesWithPendingMatches.filter((r) => !roleSelections[r]);
+      if (missing.length > 0) {
+        toast.error(
+          `Choose talent for each open seat (${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}).`
+        );
+        return;
+      }
+      const ids = rolesWithPendingMatches.map(
+        (r) => roleSelections[r]!
+      );
+      if (new Set(ids).size !== ids.length) {
+        toast.error("Each seat must be a different freelancer.");
+        return;
+      }
     }
     setDialogOpen(true);
-  }, [selectedTeamIds.size]);
+  }, [
+    isTeam,
+    isFundedMatchingContinuation,
+    selectedTeamFreelancerIds,
+    project?.pendingTeamMemberSlots,
+    rolesWithPendingMatches,
+    roleSelections,
+  ]);
+
+  const teamFreelancerIdsForSubmit = useMemo((): Id<"users">[] => {
+    if (!isTeam) return [];
+    if (isFundedMatchingContinuation) return selectedTeamFreelancerIds;
+    return rolesWithPendingMatches
+      .map((r) => roleSelections[r])
+      .filter((id): id is Id<"users"> => id != null);
+  }, [
+    isTeam,
+    isFundedMatchingContinuation,
+    selectedTeamFreelancerIds,
+    rolesWithPendingMatches,
+    roleSelections,
+  ]);
 
   const handleSkipSession = useCallback(async () => {
     if (!projectId || !user?._id) return;
     setDialogOpen(false);
     try {
       if (project?.status === "matching" && isTeam) {
-        if (selectedTeamIds.size === 0) {
+        const ids = teamFreelancerIdsForSubmit;
+        if (ids.length === 0) {
           toast.error("Select at least one freelancer.");
           return;
         }
         await confirmRemainingTeamSelections({
           projectId,
-          freelancerIds: Array.from(selectedTeamIds),
+          freelancerIds: ids,
           userId: user._id,
         });
         trackEvent("accept_match", {
           project_id: projectId,
-          freelancer_count: selectedTeamIds.size,
+          freelancer_count: ids.length,
         });
         toast.success("Team updated.");
         router.push(`/dashboard/projects/${projectId}`);
@@ -762,7 +942,7 @@ export default function ProjectMatchesPage() {
       if (isTeam) {
         await setSelectedFreelancers({
           projectId,
-          freelancerIds: Array.from(selectedTeamIds),
+          freelancerIds: teamFreelancerIdsForSubmit,
           userId: user._id,
         });
       } else if (selectedSingleId) {
@@ -772,7 +952,10 @@ export default function ProjectMatchesPage() {
           userId: user._id,
         });
       }
-      trackEvent("accept_match", { project_id: projectId, freelancer_count: isTeam ? selectedTeamIds.size : 1 });
+      trackEvent("accept_match", {
+        project_id: projectId,
+        freelancer_count: isTeam ? teamFreelancerIdsForSubmit.length : 1,
+      });
       router.push(`/dashboard/projects/${projectId}/contract`);
     } catch (e) {
       toast.error(getUserFriendlyError(e) || "Failed to save selection");
@@ -782,7 +965,7 @@ export default function ProjectMatchesPage() {
     user?._id,
     isTeam,
     selectedSingleId,
-    selectedTeamIds,
+    teamFreelancerIdsForSubmit,
     project?.status,
     setSelectedFreelancer,
     setSelectedFreelancers,
@@ -810,7 +993,7 @@ export default function ProjectMatchesPage() {
     setScheduling(true);
     try {
       const freelancerIds = isTeam
-        ? Array.from(selectedTeamIds)
+        ? teamFreelancerIdsForSubmit
         : selectedSingleId
           ? [selectedSingleId]
           : [];
@@ -868,7 +1051,7 @@ export default function ProjectMatchesPage() {
     scheduleTimeSlot,
     isTeam,
     selectedSingleId,
-    selectedTeamIds,
+    teamFreelancerIdsForSubmit,
     project?.intakeForm?.title,
     project?.status,
     scheduleOneOnOneSession,
@@ -882,8 +1065,8 @@ export default function ProjectMatchesPage() {
   if (!user) return null;
   if (!projectId) {
     return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <Card className="max-w-md">
+      <div className="flex min-h-[400px] items-center justify-center px-4">
+        <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>{isClient ? "Invalid hire" : "Invalid project"}</CardTitle>
             <CardDescription>
@@ -900,9 +1083,9 @@ export default function ProjectMatchesPage() {
 
   if (project === undefined || matches === undefined) {
     return (
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
         <Skeleton className="h-8 w-48" />
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-48" />
           ))}
@@ -933,8 +1116,8 @@ export default function ProjectMatchesPage() {
 
   if (!canUseMatchesPage) {
     return (
-      <div className="space-y-6">
-        <p className="text-muted-foreground">
+      <div className="mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <p className="text-pretty text-muted-foreground">
           {isClient ? "This hire is no longer in the matching phase." : "This project is no longer in the matching phase."}
         </p>
         <Link href={`/dashboard/projects/${projectId}`}>
@@ -945,7 +1128,7 @@ export default function ProjectMatchesPage() {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-10 sm:space-y-8 sm:px-6 lg:px-8">
       {isClient && isFreelancerReplacementFlow && projectId && (
         <FreelancerReplacementBanner
           projectId={projectId}
@@ -955,15 +1138,20 @@ export default function ProjectMatchesPage() {
 
       <div
         id="replacement-matches-anchor"
-        className="flex items-start gap-3 sm:gap-4 min-w-0 scroll-mt-24"
+        className="flex min-w-0 items-start gap-3 scroll-mt-24 sm:gap-4"
       >
         <Link href={`/dashboard/projects/${projectId}`} className="shrink-0">
-          <Button variant="ghost" size="icon" className="shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 shrink-0 touch-manipulation sm:h-10 sm:w-10"
+            aria-label="Back to hire"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold sm:text-2xl">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-pretty text-xl font-bold tracking-tight sm:text-2xl">
             {hasPreFundingSelection
               ? "Your selected talent"
               : isFreelancerReplacementFlow
@@ -972,7 +1160,7 @@ export default function ProjectMatchesPage() {
                   ? "Complete your team"
                   : "Matched freelancers"}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <p className="mt-1 max-w-3xl text-pretty text-sm leading-relaxed text-muted-foreground sm:mt-1.5 sm:text-[0.9375rem]">
             {hasPreFundingSelection
               ? project.clientContractSignedAt
                 ? "You’ve signed the agreement with your choice below. When you’re ready, continue to payment to fund the hire — your selection stays on file."
@@ -982,10 +1170,10 @@ export default function ProjectMatchesPage() {
                   ? "Fill each open role with a new freelancer. Your escrow is unchanged — you’ll sign an updated contract after selection."
                   : "Pick a new freelancer for this hire. Funds stay in escrow until you approve monthly payouts as usual."
                 : isFundedMatchingContinuation
-                  ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s) from the suggestions below.`
+                  ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s). We show one strong suggestion per seat at a time—you can cycle through up to ${MATCH_CAROUSEL_CAP} per seat.`
                   : isTeam
-                    ? "Select one or more freelancers per role, then proceed."
-                    : "We've matched you with top talent. Select one to continue."}
+                    ? `For each seat we show one top match at a time (up to ${MATCH_CAROUSEL_CAP} per role). Confirm everyone, then continue.`
+                    : `We ranked up to ${MATCH_CAROUSEL_CAP} strong matches—review the top pick first, or explore the shortlist before you continue.`}
           </p>
         </div>
       </div>
@@ -1028,14 +1216,14 @@ export default function ProjectMatchesPage() {
                   />
                 ))}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild className="rounded-lg">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Button asChild className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10">
                   <Link href={continuePaymentHref}>Continue to payment</Link>
                 </Button>
-                <Button variant="outline" asChild className="rounded-lg">
+                <Button variant="outline" asChild className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10">
                   <Link href={`/dashboard/projects/${projectId}/contract`}>View contract</Link>
                 </Button>
-                <Button variant="outline" asChild className="rounded-lg">
+                <Button variant="outline" asChild className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10">
                   <Link href={`/dashboard/projects/${projectId}`}>Back to hire</Link>
                 </Button>
               </div>
@@ -1057,8 +1245,7 @@ export default function ProjectMatchesPage() {
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
-                className="rounded-lg gap-2"
+                className="min-h-11 w-full touch-manipulation gap-2 rounded-lg sm:w-auto sm:min-h-10"
                 onClick={() => void handleRetryReplacementMatches()}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -1094,10 +1281,10 @@ export default function ProjectMatchesPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl gap-2"
+                className="min-h-11 w-full touch-manipulation gap-2 rounded-xl sm:w-auto sm:min-h-10"
                 onClick={() => void handleRetryReplacementMatches()}
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-4 w-4 shrink-0" />
                 Run matching again
               </Button>
             </CardContent>
@@ -1150,57 +1337,111 @@ export default function ProjectMatchesPage() {
         </Card>
       )}
 
-      {!hasPreFundingSelection && !isTeam && singleList.length > 0 && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {singleList.map((m: EnrichedMatch, i: number) => (
-              <MatchCard
-                key={m._id}
-                match={m}
-                rank={i + 1}
-                isSelected={selectedSingleId === m.freelancerId}
-                onSelect={() => handleSelectSingle(m.freelancerId)}
-                onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
-              />
-            ))}
+      {!hasPreFundingSelection && !isTeam && sortedSinglePool.length > 0 && !singlePoolExhausted && (
+        <div className="mx-auto w-full max-w-xl space-y-4">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Suggestion{" "}
+              <span className="font-medium text-foreground">
+                {singleCarouselIndex + 1}
+              </span>{" "}
+              of {sortedSinglePool.length}
+            </p>
+            {matchingRunning && (
+              <span className="text-xs text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Updating matches…
+              </span>
+            )}
           </div>
-          {hasMoreSingle && (
-            <Button
-              variant="outline"
-              className="w-full rounded-lg"
-              onClick={() =>
-                setSingleVisibleCount((c) => Math.min(c + PAGE_SIZE, pendingMatches.length))
-              }
-            >
-              <ChevronDown className="mr-2 h-4 w-4" />
-              Load more ({pendingMatches.length - singleVisibleCount} more)
-            </Button>
-          )}
+          {(() => {
+            const m = sortedSinglePool[singleCarouselIndex]!;
+            return (
+              <>
+                <MatchCard
+                  key={m._id}
+                  match={m}
+                  rank={singleCarouselIndex + 1}
+                  isSelected={selectedSingleId === m.freelancerId}
+                  onSelect={() => handleSelectSingle(m.freelancerId)}
+                  onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
+                  primaryCtaLabel="Proceed with this talent"
+                />
+                <Button
+                  variant="outline"
+                  className="min-h-11 w-full touch-manipulation rounded-lg sm:max-w-md sm:min-h-10"
+                  onClick={advanceSingleCarousel}
+                  disabled={
+                    singleCarouselIndex >= sortedSinglePool.length - 1
+                  }
+                >
+                  Select another talent
+                </Button>
+              </>
+            );
+          })()}
         </div>
       )}
 
+      {!hasPreFundingSelection && !isTeam && singlePoolExhausted && sortedSinglePool.length > 0 && (
+        <Card className="rounded-xl border-amber-500/35 bg-amber-500/5">
+          <CardContent className="py-8 px-4 sm:px-6 space-y-4 text-center">
+            <p className="font-medium text-foreground">
+              You&apos;ve reviewed everyone in this shortlist
+            </p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              We showed up to {MATCH_CAROUSEL_CAP} ranked matches for this hire. If none feel right, you can
+              start again from the top suggestion, edit your hire (skills or experience level), or contact
+              support—we&apos;re happy to help.
+            </p>
+            <div className="mx-auto flex max-w-md flex-col gap-2 sm:max-w-none sm:flex-row sm:flex-wrap sm:justify-center">
+              <Button variant="outline" className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10" onClick={restartSingleCarousel}>
+                Back to top suggestion
+              </Button>
+              {projectId && (
+                <Button variant="outline" className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10" asChild>
+                  <Link href={`/dashboard/projects/${projectId}/edit`}>Edit hire</Link>
+                </Button>
+              )}
+              <Button variant="outline" className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10" asChild>
+                <Link href="/contact">Contact support</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {!hasPreFundingSelection && isTeam && allRoleLabels.length > 0 && (
-        <div className="space-y-6 sm:space-y-8">
+        <div className="space-y-8 sm:space-y-10">
           {allRoleLabels.map((roleLabel) => {
             const roleMatches = matchesByRoleMap.get(roleLabel) ?? [];
+            const pool = sortedTeamPools.get(roleLabel) ?? [];
+            const idx = roleCarouselIndex[roleLabel] ?? 0;
+            const exhausted = rolePoolExhausted[roleLabel] ?? false;
+            const chosenId = roleSelections[roleLabel];
+            const chosenMatch = chosenId
+              ? pool.find((x) => x.freelancerId === chosenId) ??
+                roleMatches.find((x) => x.freelancerId === chosenId)
+              : undefined;
+            const current = pool[idx];
+
             return (
-              <div key={roleLabel} className="space-y-4">
-                <h2 className="text-base font-semibold sm:text-lg">{roleLabel}</h2>
-                {roleMatches.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {roleMatches.slice(0, 5).map((m, i) => (
-                      <MatchCard
-                        key={m._id}
-                        match={m}
-                        rank={i + 1}
-                        isSelected={selectedTeamIds.has(m.freelancerId)}
-                        onSelect={() => handleSelectTeam(m.freelancerId)}
-                        onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
-                        isTeam
-                      />
-                    ))}
-                  </div>
-                ) : (
+              <div key={roleLabel} className="mx-auto w-full max-w-xl space-y-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <h2 className="text-base font-semibold leading-snug wrap-break-word text-pretty sm:text-lg">
+                    {roleLabel}
+                  </h2>
+                  {chosenId && (
+                    <Badge
+                      variant="secondary"
+                      className="w-full max-w-full whitespace-normal text-left text-xs leading-snug sm:w-fit sm:shrink-0"
+                    >
+                      Seat filled — you can change this before continuing
+                    </Badge>
+                  )}
+                </div>
+
+                {roleMatches.length === 0 ? (
                   <Card className="rounded-xl border-dashed border-border/60 bg-muted/20">
                     <CardContent className="py-8 px-4 sm:px-6 text-center">
                       <p className="font-medium text-muted-foreground">
@@ -1218,52 +1459,139 @@ export default function ProjectMatchesPage() {
                       )}
                     </CardContent>
                   </Card>
-                )}
+                ) : chosenId && chosenMatch ? (
+                  <div className="space-y-3">
+                    <MatchCard
+                      match={chosenMatch}
+                      rank={idx + 1}
+                      isSelected
+                      onSelect={() => {}}
+                      onViewProfile={() => {
+                        setViewingTeamRoleLabel(roleLabel);
+                        setViewingFreelancerId(chosenId);
+                      }}
+                      isTeam
+                    />
+                    <Button
+                      variant="outline"
+                      className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10"
+                      onClick={() => clearRoleSelection(roleLabel)}
+                    >
+                      Change selection for this seat
+                    </Button>
+                  </div>
+                ) : exhausted && pool.length > 0 ? (
+                  <Card className="rounded-xl border-amber-500/35 bg-amber-500/5">
+                    <CardContent className="py-8 px-4 sm:px-6 space-y-4 text-center">
+                      <p className="font-medium text-foreground">
+                        You&apos;ve seen all suggestions for {roleLabel}
+                      </p>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                        We can show up to {MATCH_CAROUSEL_CAP} ranked freelancers per seat. Try starting again from the top,
+                        adjust your hire, or reach out—we&apos;ll help you staff this role.
+                      </p>
+                      <div className="mx-auto flex max-w-md flex-col gap-2 sm:max-w-none sm:flex-row sm:flex-wrap sm:justify-center">
+                        <Button
+                          variant="outline"
+                          className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10"
+                          onClick={() => restartRoleCarousel(roleLabel)}
+                        >
+                          Back to top suggestion
+                        </Button>
+                        {projectId && (
+                          <Button variant="outline" className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10" asChild>
+                            <Link href={`/dashboard/projects/${projectId}/edit`}>Edit hire</Link>
+                          </Button>
+                        )}
+                        <Button variant="outline" className="min-h-11 w-full touch-manipulation rounded-lg sm:w-auto sm:min-h-10" asChild>
+                          <Link href="/contact">Contact support</Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : current ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Suggestion{" "}
+                      <span className="font-medium text-foreground">{idx + 1}</span> of{" "}
+                      {pool.length}
+                    </p>
+                    <MatchCard
+                      key={current._id}
+                      match={current}
+                      rank={idx + 1}
+                      isSelected={roleSelections[roleLabel] === current.freelancerId}
+                      onSelect={() => pickTeamSeat(roleLabel, current.freelancerId)}
+                      onViewProfile={() => {
+                        setViewingTeamRoleLabel(roleLabel);
+                        setViewingFreelancerId(current.freelancerId);
+                      }}
+                      isTeam
+                      primaryCtaLabel="Proceed with this talent"
+                    />
+                    <Button
+                      variant="outline"
+                      className="min-h-11 w-full touch-manipulation rounded-lg sm:max-w-md sm:min-h-10"
+                      onClick={() => advanceRoleCarousel(roleLabel)}
+                      disabled={idx >= pool.length - 1}
+                    >
+                      Select another talent
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             );
           })}
           <Button
             onClick={handleConfirmTeamSelection}
-            disabled={selectedTeamIds.size === 0}
-            className="w-full sm:w-auto rounded-lg"
+            disabled={
+              isFundedMatchingContinuation
+                ? selectedTeamFreelancerIds.length === 0
+                : !rolesWithPendingMatches.every((r) => roleSelections[r])
+            }
+            className="mx-auto block min-h-11 w-full max-w-xl touch-manipulation rounded-lg sm:min-h-10 lg:max-w-md"
           >
-            Confirm selection ({selectedTeamIds.size}) & continue
+            {isFundedMatchingContinuation
+              ? `Continue with ${selectedTeamFreelancerIds.length} selected`
+              : `Confirm all ${rolesWithPendingMatches.length} seat(s) & continue`}
           </Button>
         </div>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>One-on-one session (optional)</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="left-4 top-4 max-h-[min(90dvh,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-lg translate-x-0 translate-y-0 gap-4 overflow-y-auto rounded-xl p-4 sm:left-[50%] sm:top-[50%] sm:max-h-[min(90dvh,40rem)] sm:w-full sm:translate-x-[-50%] sm:translate-y-[-50%] sm:p-6">
+          <DialogHeader className="space-y-2 text-left">
+            <DialogTitle className="pr-8 text-lg leading-snug sm:text-xl">
+              One-on-one session (optional)
+            </DialogTitle>
+            <DialogDescription className="text-pretty text-sm leading-relaxed">
               We have carefully vetted our freelancers. If you’d like, you can
               schedule a live one-on-one session with your matched freelancer
               via Google Meet before proceeding to payment.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleSkipSession}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-2">
+            <Button variant="outline" className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" onClick={handleSkipSession}>
               Skip session
             </Button>
-            <Button onClick={handleScheduleSession}>
-              <Video className="mr-2 h-4 w-4" />
+            <Button className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" onClick={handleScheduleSession}>
+              <Video className="mr-2 h-4 w-4 shrink-0" />
               Schedule one-on-one session
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Pick date & time</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="left-4 top-4 max-h-[min(90dvh,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-lg translate-x-0 translate-y-0 gap-4 overflow-y-auto rounded-xl p-4 sm:left-[50%] sm:top-[50%] sm:max-h-[min(90dvh,40rem)] sm:w-full sm:translate-x-[-50%] sm:translate-y-[-50%] sm:p-6">
+          <DialogHeader className="space-y-2 text-left">
+            <DialogTitle className="pr-8 text-lg leading-snug sm:text-xl">Pick date & time</DialogTitle>
+            <DialogDescription className="text-pretty text-sm leading-relaxed">
               Choose when you’d like to meet. We’ll create a Google Meet and
               email the link to you and the freelancer(s).
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-2 sm:py-4">
             <div>
               <label className="mb-2 block text-sm font-medium">Date</label>
               <DatePicker
@@ -1292,26 +1620,35 @@ export default function ProjectMatchesPage() {
               </Select>
             </div>
           </div>
-          <DialogFooter>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-2">
             <Button
               variant="outline"
+              className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto"
               onClick={() => setScheduleDialogOpen(false)}
             >
               Cancel
             </Button>
-            <Button onClick={handleConfirmSchedule} disabled={scheduling}>
+            <Button className="min-h-11 w-full touch-manipulation sm:min-h-10 sm:w-auto" onClick={handleConfirmSchedule} disabled={scheduling}>
               {scheduling ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
               ) : null}
               Schedule & continue to payment
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Full freelancer profile modal (View profile) */}
-      <Dialog open={!!viewingFreelancerId} onOpenChange={(open) => !open && setViewingFreelancerId(null)}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+      <Dialog
+        open={!!viewingFreelancerId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingFreelancerId(null);
+            setViewingTeamRoleLabel(null);
+          }
+        }}
+      >
+        <DialogContent className="left-4 top-4 max-h-[min(90dvh,calc(100dvh-2rem))] w-[calc(100vw-2rem)] max-w-2xl translate-x-0 translate-y-0 gap-0 overflow-x-hidden overflow-y-auto rounded-xl p-4 pt-14 sm:left-[50%] sm:top-[50%] sm:max-h-[min(90dvh,56rem)] sm:w-full sm:translate-x-[-50%] sm:translate-y-[-50%] sm:p-6 sm:pt-6">
           {publicProfile === undefined ? (
             <div className="space-y-4 py-4">
               <Skeleton className="h-24 w-24 rounded-full" />
@@ -1326,14 +1663,20 @@ export default function ProjectMatchesPage() {
               profile={publicProfile}
               onProceed={() => {
                 if (!viewingFreelancerId) return;
+                const fid = viewingFreelancerId;
+                const roleLabel = viewingTeamRoleLabel;
                 setViewingFreelancerId(null);
-                if (isTeam) {
-                  handleSelectTeam(viewingFreelancerId);
+                setViewingTeamRoleLabel(null);
+                if (isTeam && roleLabel) {
+                  pickTeamSeat(roleLabel, fid);
                 } else {
-                  handleSelectSingle(viewingFreelancerId);
+                  handleSelectSingle(fid);
                 }
               }}
-              onClose={() => setViewingFreelancerId(null)}
+              onClose={() => {
+                setViewingFreelancerId(null);
+                setViewingTeamRoleLabel(null);
+              }}
               isTeam={!!isTeam}
               freezeSelection={hasPreFundingSelection}
             />

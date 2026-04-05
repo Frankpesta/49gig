@@ -276,10 +276,10 @@ async function scoreOneFreelancer(
 export const generateMatches = action({
   args: {
     projectId: v.id("projects"),
-    limit: v.optional(v.number()), // Default: 5
+    limit: v.optional(v.number()), // Default: 10
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 5;
+    const limit = args.limit || 10;
 
     // Get project directly from database (internal action, no auth needed)
     const project = await ctx.runQuery(internal.projects.queries.getProjectInternal, {
@@ -805,7 +805,7 @@ export const generateTeamMatches = action({
 
 /**
  * Generate matches for a project in draft or pending_funding (pre-funding).
- * Single: top 20 matches, persisted. Team: top 5 per required-skill group, persisted.
+ * Single: top 10 matches, persisted. Team: top 10 per required-skill group, persisted.
  * Used right after project create so client can see matches before payment.
  */
 export const generateMatchesForDraft = action({
@@ -923,17 +923,17 @@ export const generateMatchesForDraft = action({
       }
 
       scores.sort((a, b) => b.score - a.score);
-      const top20 = scores
+      const top10 = scores
         .filter((m) =>
           normalizedSkills.length > 0
             ? m.breakdown.skillOverlap > 0
             : m.breakdown.skillOverlap >= 45
         )
-        .slice(0, 20);
+        .slice(0, 10);
 
       // Check if we have higher-level freelancers (for availability message when 0 matches)
       let hasHigherLevelWithSkills = false;
-      if (top20.length === 0 && higherLevelFreelancers.length > 0) {
+      if (top10.length === 0 && higherLevelFreelancers.length > 0) {
         for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
           if (
             !isFreelancerEligibleForProjectMatch(
@@ -961,7 +961,7 @@ export const generateMatchesForDraft = action({
         }
       }
 
-      for (const match of top20) {
+      for (const match of top10) {
         const explanation = generateExplanation(
           match.breakdown,
           match.freelancer.name,
@@ -984,7 +984,7 @@ export const generateMatchesForDraft = action({
       }
 
       const availability =
-        top20.length === 0
+        top10.length === 0
           ? { atRequestedLevel: 0, hasHigherLevelWithSkills }
           : null;
       if (matchIds.length === 0) {
@@ -1065,15 +1065,15 @@ export const generateMatchesForDraft = action({
 
       groupScores.sort((a, b) => b.score - a.score);
       // Only show freelancers who: (1) have matching skills, (2) techField aligns with role, (3) experience level matches
-      const top5 = groupScores
+      const top10 = groupScores
         .filter(
           (m) =>
             m.breakdown.skillOverlap > 0 &&
             freelancerMatchesRole(m.freelancer.profile?.techField, group.roleId)
         )
-        .slice(0, 5);
+        .slice(0, 10);
 
-      for (const match of top5) {
+      for (const match of top10) {
         const explanation = generateExplanation(
           match.breakdown,
           match.freelancer.name,

@@ -1,7 +1,7 @@
 /**
  * Helpers for project duration (projectDuration field from intake form).
- * Values: "3", "6", "12+", "12", "24", "36", "48", "60"
- * - "3", "6" = months
+ * Values: "1", "3", "6", "12+", "12", "24", "36", "48", "60"
+ * - "1", "3", "6" = months
  * - "12+" = legacy "1 year+" (treated as 12 months)
  * - "12", "24", "36", "48", "60" = months (1–5 years)
  */
