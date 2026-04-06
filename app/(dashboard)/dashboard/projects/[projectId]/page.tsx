@@ -47,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   getRoleIdForSkill,
   getRoleLabel,
@@ -69,6 +70,11 @@ const STATUS_CONFIG: Record<
   },
   funded: { label: "Funded", variant: "default", icon: CheckCircle2 },
   matching: { label: "Matching", variant: "secondary", icon: Clock },
+  awaiting_freelancer: {
+    label: "Awaiting freelancer",
+    variant: "secondary",
+    icon: Clock,
+  },
   matched: { label: "Matched", variant: "default", icon: CheckCircle2 },
   in_progress: { label: "In Progress", variant: "default", icon: Clock },
   completed: { label: "Completed", variant: "default", icon: CheckCircle2 },
@@ -107,20 +113,19 @@ function isValidConvexId(id: string | string[] | undefined): id is Id<"projects"
   return /^[a-zA-Z][a-zA-Z0-9]*$/.test(id);
 }
 
-/** Advances once per minute so approval UI unlocks when billing period ends (server enforces the same rule). */
+/** Updates every minute so approval UI matches server rule: approve only after monthEndDate. */
 function useBillingPeriodClockMs() {
-  const [clockMs, setClockMs] = useState<number | null>(null);
+  const [clockMs, setClockMs] = useState(() => Date.now());
   useEffect(() => {
     const tick = () => setClockMs(Date.now());
-    tick();
     const id = window.setInterval(tick, 60_000);
     return () => window.clearInterval(id);
   }, []);
   return clockMs;
 }
 
-function isBillingPeriodMature(monthEndDate: number, clockMs: number | null) {
-  return clockMs !== null && monthEndDate <= clockMs;
+function isBillingPeriodMature(monthEndDate: number, clockMs: number) {
+  return monthEndDate <= clockMs;
 }
 
 export default function ProjectDetailPage() {
@@ -155,11 +160,7 @@ export default function ProjectDetailPage() {
   const approveMonthlyCycle = useMutation(
     api.monthlyBillingCycles.mutations.approveMonthlyCycle
   );
-  const ensureMonthlyCycles = useMutation(
-    api.monthlyBillingCycles.mutations.ensureMonthlyCycles
-  );
   const [approvingCycleId, setApprovingCycleId] = useState<Id<"monthlyBillingCycles"> | null>(null);
-  const [isCreatingCycles, setIsCreatingCycles] = useState(false);
   const billingPeriodClockMs = useBillingPeriodClockMs();
 
   const project = useQuery(
@@ -315,6 +316,43 @@ export default function ProjectDetailPage() {
     !project.clientContractSignedAt &&
     (project.status === "draft" || project.status === "pending_funding");
 
+  const terminalOrDispute = ["completed", "cancelled", "disputed"].includes(project.status);
+  const postFundingSelection = !["draft", "pending_funding"].includes(project.status);
+  const clientWaitingFreelancerMatchAcceptance =
+    isClient &&
+    !isFreelancerReplacementMatching &&
+    !terminalOrDispute &&
+    hasSelected &&
+    !hasMatchedFreelancers &&
+    postFundingSelection &&
+    (project.status === "awaiting_freelancer" ||
+      project.status === "matching" ||
+      project.status === "funded");
+
+  const matchedFreelancerIdsForPendingSigs = project.matchedFreelancerId
+    ? [project.matchedFreelancerId]
+    : project.matchedFreelancerIds ?? [];
+  const hasPendingFreelancerContractSignature =
+    matchedFreelancerIdsForPendingSigs.length > 0 &&
+    matchedFreelancerIdsForPendingSigs.some(
+      (fid: Id<"users">) =>
+        !project.freelancerContractSignatures?.some(
+          (s: { freelancerId: Id<"users"> }) => s.freelancerId === fid
+        )
+    );
+  const clientWaitingFreelancerContractSignature =
+    isClient &&
+    !terminalOrDispute &&
+    (project.status === "matched" || project.status === "in_progress") &&
+    !!project.clientContractSignedAt &&
+    hasPendingFreelancerContractSignature;
+
+  const clientContractSignShowsFreelancerNextStep =
+    isClient &&
+    (project.status === "matched" || project.status === "in_progress") &&
+    hasPendingFreelancerContractSignature &&
+    !project.clientContractSignedAt;
+
   if (needContractSign && projectId && user._id && !isStaff) {
     return (
       <div className="space-y-6">
@@ -331,6 +369,17 @@ export default function ProjectDetailPage() {
             </p>
           </div>
         </div>
+        {clientContractSignShowsFreelancerNextStep && (
+          <Alert className="border-sky-500/40 bg-sky-500/8 dark:bg-sky-950/25">
+            <Clock className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+            <AlertTitle className="text-sky-900 dark:text-sky-100">
+              Then your freelancer signs
+            </AlertTitle>
+            <AlertDescription className="text-sky-900/85 dark:text-sky-100/90">
+              After you sign below, your selected freelancer will be asked to sign the same agreement. Work can move forward once both signatures are in place.
+            </AlertDescription>
+          </Alert>
+        )}
         <ProjectContractView projectId={projectId} userId={user._id} />
       </div>
     );
@@ -426,6 +475,48 @@ export default function ProjectDetailPage() {
           compact
           className="animate-in fade-in slide-in-from-top-2 duration-500"
         />
+      )}
+
+      {clientWaitingFreelancerMatchAcceptance && (
+        <Alert className="animate-in fade-in slide-in-from-top-2 duration-500 border-amber-500/45 bg-amber-500/10 dark:bg-amber-950/30">
+          <Clock className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+          <AlertTitle className="text-amber-950 dark:text-amber-100">
+            Waiting for freelancer approval
+          </AlertTitle>
+          <AlertDescription className="text-amber-950/90 dark:text-amber-50/90">
+            <p>
+              Your selected talent has been notified and must accept this hire before the contract can be prepared and
+              signed. You don’t need to do anything else until they confirm.
+            </p>
+            {matchingInProgressForClient &&
+              (project.pendingTeamMemberSlots ?? 0) > 0 &&
+              project.status === "matching" && (
+                <p className="mt-2">
+                  If you&apos;re building a team, you can add remaining roles from{" "}
+                  <Link
+                    href={`/dashboard/projects/${projectId}/matches`}
+                    className="font-medium text-amber-950 underline underline-offset-2 hover:no-underline dark:text-amber-100"
+                  >
+                    Matches
+                  </Link>{" "}
+                  once current selections are confirmed.
+                </p>
+              )}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {clientWaitingFreelancerContractSignature && (
+        <Alert className="animate-in fade-in slide-in-from-top-2 duration-500 border-sky-500/40 bg-sky-500/8 dark:bg-sky-950/25">
+          <FileSignature className="h-4 w-4 text-sky-600 dark:text-sky-400" />
+          <AlertTitle className="text-sky-900 dark:text-sky-100">
+            Waiting for freelancer to sign the agreement
+          </AlertTitle>
+          <AlertDescription className="text-sky-900/85 dark:text-sky-100/90">
+            You&apos;ve signed the contract. Your freelancer still needs to sign before the hire is fully executed and
+            work can proceed under the agreement.
+          </AlertDescription>
+        </Alert>
       )}
 
       {isAdmin && (
@@ -524,14 +615,6 @@ export default function ProjectDetailPage() {
                 <Link href={`/dashboard/projects/${project._id}/payment`}>
                   <DollarSign className="mr-2 h-4 w-4" />
                   {project.status === "draft" ? "Fund Project" : "Complete Payment"}
-                </Link>
-              </Button>
-            )}
-            {(project.status === "in_progress" || project.status === "cancelled") && (
-              <Button variant={project.status === "cancelled" ? "default" : "outline"} asChild>
-                <Link href={`/dashboard/projects/${project._id}/add-payment`}>
-                  <DollarSign className="mr-2 h-4 w-4" />
-                  {project.status === "cancelled" ? "Reactivate by adding payment" : "Add payment"}
                 </Link>
               </Button>
             )}
@@ -816,7 +899,7 @@ export default function ProjectDetailPage() {
                             ${typeof displayAmount === "number" ? displayAmount.toFixed(2) : (cycle.amountCents / 100).toFixed(2)} {cycle.currency.toUpperCase()} • {statusLabel}
                           </div>
                         </div>
-                        {isClient && isPending && matured && (
+                        {isClient && isPending && (
                           <Button
                             size="sm"
                             onClick={async () => {
@@ -830,7 +913,12 @@ export default function ProjectDetailPage() {
                                 setApprovingCycleId(null);
                               }
                             }}
-                            disabled={approvingCycleId === cycle._id}
+                            disabled={!matured || approvingCycleId === cycle._id}
+                            title={
+                              matured
+                                ? undefined
+                                : `Approve becomes available after the billing period ends (${periodEndShort}).`
+                            }
                           >
                             {approvingCycleId === cycle._id ? "Approving…" : "Approve"}
                           </Button>
@@ -850,30 +938,6 @@ export default function ProjectDetailPage() {
                       ? "Monthly billing cycles are created automatically when the project is in progress. You'll approve each month to release payment to the freelancer."
                       : "Monthly billing cycles will appear here once the project is in progress. You'll get paid each month after the client approves."}
                   </p>
-                  {project.status === "in_progress" && isClient && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={isCreatingCycles}
-                      onClick={async () => {
-                        if (!projectId) return;
-                        setIsCreatingCycles(true);
-                        try {
-                          await ensureMonthlyCycles({ projectId, userId: user._id });
-                          toast.success("Monthly cycles created. The page will update shortly.");
-                        } catch (e) {
-                          toast.error(getUserFriendlyError(e) || "Failed to create cycles");
-                        } finally {
-                          setIsCreatingCycles(false);
-                        }
-                      }}
-                    >
-                      {isCreatingCycles ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Create monthly cycles
-                    </Button>
-                  )}
                 </div>
                 )}
                 {isClient && monthlyCycles && monthlyCycles.length > 0 && (

@@ -1,6 +1,32 @@
-import { query } from "../_generated/server";
+import { query, type QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
+import { Doc, Id } from "../_generated/dataModel";
+
+async function attachUnreadCounts<T extends Doc<"chats">>(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  isStaff: boolean,
+  chats: T[]
+): Promise<Array<T & { unreadCount: number }>> {
+  return Promise.all(
+    chats.map(async (chat) => {
+      const messages = await ctx.db
+        .query("messages")
+        .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
+        .order("desc")
+        .take(40);
+      let unreadCount = 0;
+      for (const message of messages) {
+        if (message.senderId === userId) continue;
+        if (message.isDeleted && !isStaff) continue;
+        const isRead = message.readBy.some((r) => r.userId === userId);
+        if (!isRead) unreadCount++;
+      }
+      return { ...chat, unreadCount };
+    })
+  );
+}
 
 /**
  * Get all chats for the current user
@@ -19,18 +45,20 @@ export const getChats = query({
       return [];
     }
 
+    const isStaff = user.role === "admin" || user.role === "moderator";
+
     // Get all chats where user is a participant
     // Note: participants is an array, so we need to filter instead of using index
     const allChats = await ctx.db
       .query("chats")
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
-    
+
     const chats = allChats.filter((chat) => chat.participants.includes(user._id));
 
     // For admins/moderators, also include all chats
-    if (user.role === "admin" || user.role === "moderator") {
-      const allChats = await ctx.db
+    if (isStaff) {
+      const staffChats = await ctx.db
         .query("chats")
         .withIndex("by_type")
         .filter((q) => q.eq(q.field("status"), "active"))
@@ -38,18 +66,20 @@ export const getChats = query({
         .collect();
 
       // Merge and deduplicate
-      const chatMap = new Map();
-      [...chats, ...allChats].forEach((chat) => {
+      const chatMap = new Map<string, Doc<"chats">>();
+      [...chats, ...staffChats].forEach((chat) => {
         chatMap.set(chat._id, chat);
       });
-      return Array.from(chatMap.values()).sort(
+      const sorted = Array.from(chatMap.values()).sort(
         (a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)
       );
+      return attachUnreadCounts(ctx, user._id, true, sorted);
     }
 
-    return chats.sort(
+    const sorted = chats.sort(
       (a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)
     );
+    return attachUnreadCounts(ctx, user._id, false, sorted);
   },
 });
 
@@ -239,7 +269,10 @@ export const getProjectChatsForAdmin = query({
       })
     );
 
-    return enriched.sort((a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0));
+    const sorted = enriched.sort(
+      (a, b) => (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
+    );
+    return attachUnreadCounts(ctx, user._id, true, sorted);
   },
 });
 
@@ -275,11 +308,15 @@ export const getSupportChatsForAdmin = query({
         const openerDetails = chat.participants[0]
           ? await ctx.db.get(chat.participants[0])
           : null;
+        const assignedMod = chat.supportAssignedModeratorId
+          ? await ctx.db.get(chat.supportAssignedModeratorId)
+          : null;
         return {
           ...chat,
           openerName: openerDetails?.name ?? null,
           openerRole: openerDetails?.role ?? null,
           openerEmail: openerDetails?.email ?? null,
+          assignedModeratorName: assignedMod?.name ?? null,
         };
       })
     );

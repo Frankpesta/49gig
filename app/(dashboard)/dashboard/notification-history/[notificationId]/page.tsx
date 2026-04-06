@@ -196,9 +196,13 @@ export default function NotificationDetailPage() {
                   );
                 }
                 if (typeof d.chatId === "string") {
+                  const resolved = (notification as { resolved?: Record<string, string> })
+                    .resolved;
+                  const chatHref =
+                    resolved?.chatOpenHref ?? `/dashboard/chat/${d.chatId}`;
                   actions.push(
                     <Button key="chat" asChild>
-                      <Link href={`/dashboard/chat/${d.chatId}`} className="gap-2">
+                      <Link href={chatHref} className="gap-2">
                         <ExternalLink className="h-4 w-4" />
                         Open chat
                       </Link>

@@ -54,9 +54,9 @@ export const getCyclesByProjectId = query({
 
 /**
  * Get pending cycles awaiting client approval (client dashboard only).
- * Only cycles whose billing period has ended (`monthEndDate <= now`) — same rule as approval & reminders.
- * Pass `clockMs` from the client (e.g. updated every minute) so the list refreshes when a period matures
- * without requiring a database change.
+ * Returns all pending months for in-progress hires so the schedule is visible; clients enable Approve in the
+ * UI only when `monthEndDate <= clockMs`, matching `approveMonthlyCycle` server checks.
+ * Sort: periods that have ended (ready to approve) first, then by month start.
  */
 export const getPendingCyclesForClient = query({
   args: { clockMs: v.optional(v.number()) },
@@ -83,13 +83,16 @@ export const getPendingCyclesForClient = query({
         .filter((q) => q.eq(q.field("status"), "pending"))
         .collect();
       for (const c of cycles) {
-        if (c.monthEndDate <= now) {
-          allCycles.push(c);
-        }
+        allCycles.push(c);
       }
     }
 
-    return allCycles.sort((a, b) => a.monthStartDate - b.monthStartDate);
+    return allCycles.sort((a, b) => {
+      const aReady = a.monthEndDate <= now;
+      const bReady = b.monthEndDate <= now;
+      if (aReady !== bReady) return aReady ? -1 : 1;
+      return a.monthStartDate - b.monthStartDate;
+    });
   },
 });
 

@@ -9,6 +9,7 @@ import {
   openTeamRoleLabelsForProject,
   projectEligibleForAdminManualMatch,
 } from "../projects/manualMatchEligibility";
+import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 
 const api = require("../_generated/api") as {
   api: {
@@ -52,6 +53,13 @@ export const createMatch = internalMutation({
     >;
 
     const project = await ctx.db.get(args.projectId);
+
+    if (
+      project &&
+      isFreelancerPermanentlyExcluded(project, args.freelancerId as string)
+    ) {
+      throw new Error("Freelancer is not eligible for this hire.");
+    }
 
     // Check if match already exists (same project, freelancer, and teamRole if provided)
     const existingList = await ctx.db
@@ -147,6 +155,15 @@ export const acceptMatch = mutation({
     const project = await ctx.db.get(match.projectId);
     if (!project) {
       throw new Error("Project not found");
+    }
+
+    if (
+      (project.clientId === user._id || user.role === "admin") &&
+      isFreelancerPermanentlyExcluded(project, match.freelancerId as string)
+    ) {
+      throw new Error(
+        "This freelancer is no longer available for this hire. Refresh the page to see current matches."
+      );
     }
 
     // Client who owns project, matched freelancer, or admin can accept
@@ -676,6 +693,12 @@ export const adminManualMatch = mutation({
       project.matchedFreelancerIds?.includes(args.freelancerId)
     ) {
       throw new Error("This freelancer is already on the hire team.");
+    }
+
+    if (isFreelancerPermanentlyExcluded(project, args.freelancerId as string)) {
+      throw new Error(
+        "This freelancer was removed from this hire after a dispute and cannot be suggested again."
+      );
     }
 
     let resolvedTeamRole: string | undefined;

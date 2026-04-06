@@ -86,6 +86,10 @@ export const getNotificationById = query({
       if (typeof data.chatId === "string") {
         const chat = await ctx.db.get(data.chatId as Doc<"chats">["_id"]);
         resolved.chatLabel = chat?.title ?? "Conversation";
+        resolved.chatOpenHref =
+          chat?.type === "support"
+            ? `/dashboard/chat/support/${data.chatId}`
+            : `/dashboard/chat/${data.chatId}`;
       }
     }
 
@@ -119,7 +123,24 @@ export const getMyNotifications = query({
       .order("desc")
       .take(limit);
 
-    return notifications;
+    const enriched = await Promise.all(
+      notifications.map(async (n) => {
+        const data = n.data as Record<string, unknown> | undefined;
+        let chatThreadHref: string | undefined;
+        if (data && typeof data.chatId === "string") {
+          const chat = await ctx.db.get(data.chatId as Doc<"chats">["_id"]);
+          if (chat) {
+            chatThreadHref =
+              chat.type === "support"
+                ? `/dashboard/chat/support/${data.chatId}`
+                : `/dashboard/chat/${data.chatId}`;
+          }
+        }
+        return { ...n, chatThreadHref };
+      })
+    );
+
+    return enriched;
   },
 });
 

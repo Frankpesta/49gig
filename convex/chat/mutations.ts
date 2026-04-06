@@ -557,6 +557,70 @@ export const createSupportChat = mutation({
 });
 
 /**
+ * Admin: assign a support chat to a moderator (triage). Adds the moderator to participants if needed.
+ */
+export const assignSupportChatModerator = mutation({
+  args: {
+    chatId: v.id("chats"),
+    moderatorId: v.id("users"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "admin") {
+      throw new Error("Only admins can assign support chats to a moderator");
+    }
+
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) {
+      throw new Error("Chat not found");
+    }
+    if (chat.type !== "support") {
+      throw new Error("Only support chats can be assigned");
+    }
+
+    const moderator = await ctx.db.get(args.moderatorId);
+    if (
+      !moderator ||
+      moderator.status !== "active" ||
+      moderator.role !== "moderator"
+    ) {
+      throw new Error("Select an active moderator");
+    }
+
+    const now = Date.now();
+    const participants = [...chat.participants];
+    if (!participants.includes(args.moderatorId)) {
+      participants.push(args.moderatorId);
+    }
+
+    await ctx.db.patch(args.chatId, {
+      supportAssignedModeratorId: args.moderatorId,
+      participants,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "support_chat_assigned",
+      actionType: "admin",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "chat",
+      targetId: args.chatId,
+      details: {
+        moderatorId: args.moderatorId,
+      },
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
  * Archive a chat
  */
 export const archiveChat = mutation({

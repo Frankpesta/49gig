@@ -40,7 +40,7 @@ export default function SupportChatPage() {
           chat.type === "support" && chat.status === "active"
       );
       if (supportChat) {
-        router.replace(`/dashboard/chat/${supportChat._id}`);
+        router.replace(`/dashboard/chat/support/${supportChat._id}`);
       }
     }
   }, [chats, router]);
@@ -58,7 +58,7 @@ export default function SupportChatPage() {
           : `Support request: ${title.trim()}`,
         userId: user._id,
       });
-      router.push(`/dashboard/chat/${chatId}`);
+      router.push(`/dashboard/chat/support/${chatId}`);
     } catch (error) {
       console.error("Failed to create support chat:", error);
     } finally {

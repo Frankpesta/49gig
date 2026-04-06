@@ -254,6 +254,178 @@ export const logPaymentAudit = internalMutation({
 });
 
 /**
+ * Pre-funding paid entirely from in-platform wallet (no Flutterwave card charge).
+ */
+export const completePreFundingWithWalletOnlyInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.id("users"),
+    fundingGrossAmount: v.number(),
+    currency: v.string(),
+    walletCreditCents: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const user = (await ctx.db.get(args.userId)) as Doc<"users"> | null;
+    if (!user || user.status !== "active" || user.role !== "client") {
+      throw new Error("Only clients can complete funding");
+    }
+    const project = (await ctx.db.get(args.projectId)) as Doc<"projects"> | null;
+    if (!project || project.clientId !== args.userId) {
+      throw new Error("Project not found");
+    }
+    if (project.status !== "draft" && project.status !== "pending_funding") {
+      throw new Error("Project is not in a state that allows payment");
+    }
+
+    const grossCents = Math.round(args.fundingGrossAmount * 100);
+    if (args.walletCreditCents <= 0 || grossCents <= 0) {
+      throw new Error("Invalid amount");
+    }
+    if (args.walletCreditCents !== grossCents) {
+      throw new Error("Wallet funding must cover the full hire total");
+    }
+
+    const inFlight = await ctx.db
+      .query("payments")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("type"), "pre_funding"),
+          q.or(
+            q.eq(q.field("status"), "pending"),
+            q.eq(q.field("status"), "processing"),
+            q.eq(q.field("status"), "succeeded")
+          )
+        )
+      )
+      .first();
+    if (inFlight?.status === "succeeded") {
+      throw new Error("Project is already funded");
+    }
+    if (
+      inFlight &&
+      (inFlight.status === "pending" || inFlight.status === "processing")
+    ) {
+      throw new Error("A payment is already being processed for this project");
+    }
+
+    const spendable = await ctx.runQuery(
+      internalAny.wallets.queries.getClientSpendableWalletCentsInternal,
+      { userId: args.userId, currency: args.currency }
+    );
+    if (spendable < args.walletCreditCents) {
+      throw new Error("Insufficient wallet balance");
+    }
+
+    const defaultPlatformFee =
+      project.platformFee ??
+      (await ctx.runQuery(internalAny.platformSettings.queries.getPlatformFeePercentageInternal, {}));
+    const platformFeeAmount = (args.fundingGrossAmount * defaultPlatformFee) / 100;
+    const netAmount = args.fundingGrossAmount - platformFeeAmount;
+    const currencyLower = args.currency.toLowerCase();
+    const now = Date.now();
+    const txRef = `49gig-wallet-${args.projectId}-${now}`;
+
+    const clientWalletCreditApplied = args.walletCreditCents / 100;
+
+    const paymentId = await ctx.db.insert("payments", {
+      projectId: args.projectId,
+      type: "pre_funding",
+      amount: 0,
+      currency: currencyLower,
+      platformFee: platformFeeAmount,
+      netAmount,
+      fundingGrossAmount: args.fundingGrossAmount,
+      clientWalletCreditApplied,
+      flutterwaveTransactionId: txRef,
+      flutterwaveCustomerEmail: user.email,
+      status: "succeeded",
+      webhookReceived: true,
+      webhookReceivedAt: now,
+      webhookEventId: "wallet-only",
+      createdAt: now,
+      updatedAt: now,
+      processedAt: now,
+    });
+
+    await ctx.runMutation(internalAny.wallets.mutations.debitWallet, {
+      userId: args.userId,
+      amountCents: args.walletCreditCents,
+      currency: currencyLower,
+      description: "Applied to hire funding (wallet balance)",
+      paymentId,
+      category: "hiring_credit",
+    });
+
+    const monthsFunded = Math.max(1, project.fundUpfrontMonths ?? 1);
+    await ctx.db.patch(args.projectId, {
+      status: "funded",
+      escrowedAmount: netAmount,
+      lastFundedMonthIndex: monthsFunded,
+      updatedAt: now,
+    });
+
+    await ctx.scheduler.runAfter(
+      0,
+      internalAny.matching.postFundPipeline.runPostFundMatchingForProject,
+      { projectId: args.projectId }
+    );
+
+    await ctx.db.insert("auditLogs", {
+      action: "project_funded",
+      actionType: "admin",
+      actorId: args.userId,
+      actorRole: "system",
+      targetType: "project",
+      targetId: args.projectId,
+      details: {
+        paymentId,
+        amount: 0,
+        netAmount,
+        fundedWithWalletOnly: true,
+      },
+      createdAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "payment_succeeded",
+      actionType: "admin",
+      actorId: args.userId,
+      actorRole: "system",
+      targetType: "payment",
+      targetId: paymentId,
+      details: {
+        transactionId: txRef,
+        amount: 0,
+        fundedWithWalletOnly: true,
+      },
+      createdAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    const amountLabel = `${args.fundingGrossAmount} ${args.currency.toUpperCase()}`;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.userId],
+      title: "Hire funded from wallet",
+      message: `Your wallet covered ${amountLabel} for ${project.intakeForm.title}.`,
+      type: "payment",
+      data: { paymentId, projectId: args.projectId },
+    });
+
+    await ctx.runMutation(
+      internalAny.referrals.internalMutations.tryCreateReferralAccrualForPreFunding,
+      { paymentId }
+    );
+
+    return { paymentId, txRef };
+  },
+});
+
+/**
  * Handle successful payment (called by webhook handler)
  * Internal mutation
  */
@@ -319,7 +491,7 @@ export const handlePaymentSuccess = internalMutation({
           userId: clientId,
           amountCents: cents,
           currency: payment.currency.toLowerCase(),
-          description: "Applied to hire funding (referral hiring credit)",
+          description: "Applied to hire funding (wallet balance)",
           paymentId: payment._id,
           category: "hiring_credit",
         });
@@ -414,7 +586,11 @@ export const handlePaymentSuccess = internalMutation({
     }
 
     if (project) {
-      const amountLabel = `${payment.amount} ${payment.currency}`;
+      const notifyAmount =
+        payment.type === "pre_funding" && payment.fundingGrossAmount != null
+          ? payment.fundingGrossAmount
+          : payment.amount;
+      const amountLabel = `${notifyAmount} ${payment.currency}`;
       const title =
         payment.type === "top_up" && project.status === "cancelled"
           ? "Payment received — hire reactivated"
