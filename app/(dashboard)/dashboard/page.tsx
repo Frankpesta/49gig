@@ -44,11 +44,9 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [adminRangeDays, setAdminRangeDays] = useState(90);
 
-  if (!user) return null;
-
-  const isClient = user.role === "client";
-  const isFreelancer = user.role === "freelancer";
-  const isAdmin = user.role === "admin";
+  const isClient = user?.role === "client";
+  const isFreelancer = user?.role === "freelancer";
+  const isAdmin = user?.role === "admin";
 
   const dashboardMetrics = useQuery(
     (api as any).dashboard.queries.getDashboardMetrics,
@@ -80,7 +78,7 @@ export default function DashboardPage() {
 
   const adminCharts = useQuery(
     (api as any)["analytics/queries"].getAdminChartData,
-    isAdmin && user?._id ? { userId: user._id, rangeDays: adminRangeDays } : "skip"
+    isAdmin && user?._id ? { userId: user._id, rangeDays: adminRangeDays }       : "skip"
   );
 
   const formatCurrency = (value: number) =>
@@ -127,6 +125,10 @@ export default function DashboardPage() {
       status: (p.status === "completed" ? "completed" : "in_progress") as "in_progress" | "completed" | "pending",
     }));
   }, [projects, isClient]);
+
+  if (!user) {
+    return null;
+  }
 
   const metrics = isClient
     ? [
