@@ -255,6 +255,12 @@ export function ProjectProgressCard({
     { name: "Pending", value: pending, color: "var(--muted-foreground)" },
   ].filter((d) => d.value > 0);
 
+  /** Must match <Pie data=...> — mapping <Cell> from empty `data` while Pie uses a placeholder breaks Recharts. */
+  const pieData =
+    data.length > 0
+      ? data
+      : [{ name: "Empty", value: 1, color: "var(--muted)" }];
+
   return (
     <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <CardHeader className="pb-2">
@@ -272,14 +278,14 @@ export function ProjectProgressCard({
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={data.length ? data : [{ name: "Empty", value: 1, color: "var(--muted)" }]}
+                      data={pieData}
                       dataKey="value"
                       nameKey="name"
                       innerRadius={36}
                       outerRadius={48}
                       paddingAngle={2}
                     >
-                      {data.map((entry, index) => (
+                      {pieData.map((entry, index) => (
                         <Cell key={index} fill={entry.color} />
                       ))}
                     </Pie>
