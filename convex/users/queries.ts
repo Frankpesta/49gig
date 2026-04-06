@@ -1,6 +1,11 @@
 import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
+import { getCurrentUser } from "../auth";
+import {
+  getFreelancerMatchingReadinessIssues,
+  type MatchingReadinessIssue,
+} from "../../lib/freelancer-matching-readiness";
 
 /**
  * Get current user profile (Convex Auth only - requires identity)
@@ -224,6 +229,29 @@ export const getUserProfileForAdmin = query({
 
     const { passwordHash, ...rest } = target;
     return rest;
+  },
+});
+
+/**
+ * Freelancer-facing: concrete reasons the account may be excluded from client matching pools.
+ */
+export const getMyFreelancerMatchingReadiness = query({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    let user: Doc<"users"> | null = null;
+    if (args.userId) {
+      const u = await ctx.db.get(args.userId);
+      if (u && (u as Doc<"users">).status === "active") user = u as Doc<"users">;
+    } else {
+      const u = await getCurrentUser(ctx);
+      if (u && (u as Doc<"users">).status === "active") user = u as Doc<"users">;
+    }
+    if (!user || user.role !== "freelancer") {
+      return { issues: [] as MatchingReadinessIssue[] };
+    }
+    return { issues: getFreelancerMatchingReadinessIssues(user) };
   },
 });
 

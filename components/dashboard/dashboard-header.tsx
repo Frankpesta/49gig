@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NotificationBell } from "@/components/notifications/notification-bell";
+import { FreelancerMatchingStatusChip } from "@/components/dashboard/freelancer-matching-status-chip";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { useAuthStore } from "@/stores/authStore";
 import { Search, User, Settings, LogOut, ChevronDown } from "lucide-react";
@@ -79,6 +80,7 @@ export function DashboardHeader() {
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        <FreelancerMatchingStatusChip />
         <NotificationBell />
         <ThemeToggle />
         <DropdownMenu>

@@ -61,6 +61,9 @@ import {
   CreditCard,
   Loader2,
   UserCheck,
+  Github,
+  Linkedin,
+  ExternalLink,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
@@ -114,6 +117,47 @@ function InfoRow({ label, value, icon: Icon, truncate }: { label: string; value?
             </button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminProfileLinkRow({
+  label,
+  url,
+  icon: Icon,
+}: {
+  label: string;
+  url?: string | null;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  const trimmed = url?.trim();
+  if (!trimmed) {
+    return (
+      <div className="flex items-start gap-3 py-2.5">
+        <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Not set</p>
+        </div>
+      </div>
+    );
+  }
+  const href = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return (
+    <div className="flex items-start gap-3 py-2.5">
+      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline break-all"
+        >
+          {trimmed}
+          <ExternalLink className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        </a>
       </div>
     </div>
   );
@@ -463,7 +507,6 @@ export default function UserDetailPage() {
                   <InfoRow label="Hourly Rate" value={profileData.profile?.hourlyRate ? `$${profileData.profile.hourlyRate}/hr` : null} icon={CreditCard} />
                   <InfoRow label="Timezone" value={profileData.profile?.timezone} icon={Globe} />
                   <InfoRow label="Availability" value={profileData.profile?.availability} icon={Clock} />
-                  <InfoRow label="Portfolio" value={profileData.profile?.portfolioUrl} icon={LinkIcon} />
                   {profileData.profile?.skills && profileData.profile.skills.length > 0 && (
                     <div className="py-2.5">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Skills</p>
@@ -480,6 +523,55 @@ export default function UserDetailPage() {
                       <p className="text-sm text-foreground leading-relaxed">{profileData.profile.bio}</p>
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl overflow-hidden">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4 text-primary" />
+                    Matching profile links
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Same URLs used for client matching eligibility (GitHub / Behance / LinkedIn / site).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-0 divide-y divide-border/40">
+                  <div className="flex items-start gap-3 py-2.5">
+                    <Phone className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        SMS phone verified
+                      </p>
+                      <p className="text-sm font-medium mt-0.5">
+                        {profileData.phoneVerifiedAt != null ? (
+                          <span className="text-green-600 dark:text-green-400">Verified</span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400">Not verified</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <AdminProfileLinkRow
+                    label="GitHub"
+                    url={profileData.profile?.githubUrl}
+                    icon={Github}
+                  />
+                  <AdminProfileLinkRow
+                    label="Behance"
+                    url={profileData.profile?.behanceUrl}
+                    icon={LinkIcon}
+                  />
+                  <AdminProfileLinkRow
+                    label="LinkedIn"
+                    url={profileData.profile?.linkedinUrl}
+                    icon={Linkedin}
+                  />
+                  <AdminProfileLinkRow
+                    label="Portfolio / website"
+                    url={profileData.profile?.portfolioUrl}
+                    icon={Globe}
+                  />
                 </CardContent>
               </Card>
 

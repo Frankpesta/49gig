@@ -93,6 +93,7 @@ async function sendClientFreelancersAvailableEmail(
     projectId: project._id as any,
   });
 
+  const openPath = `/dashboard/projects/${projectId}/matches`;
   await ctx.runAction(internalAny.notifications.actions.sendSystemNotification, {
     userIds: [project.clientId],
     title: isReminder ? "Reminder: matches to review" : "Freelancers available for your hire",
@@ -100,7 +101,7 @@ async function sendClientFreelancersAvailableEmail(
       ? `You still have matches to review for "${project.intakeForm.title}". Open your hire to continue.`
       : `Vetted freelancers are available for "${project.intakeForm.title}". Review matches and select who you’d like.`,
     type: "match",
-    data: { projectId },
+    data: { projectId, openPath },
   });
 
   return true;
@@ -183,21 +184,41 @@ async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
       return newMatches.length;
     }
 
-    let matchIds: string[] = [];
+    const beforeRowsPost = await ctx.runQuery(internalAny.matching.queries.listProjectMatchesInternal, {
+      projectId,
+    });
+    const beforeFreelancersPost = new Set(
+      (beforeRowsPost || [])
+        .filter((m: { status: string }) => m.status === "pending")
+        .map((m: { freelancerId: string }) => m.freelancerId)
+    );
+
     if (project.intakeForm?.hireType === "team") {
-      const res = await ctx.runAction(apiAny.matching.actions.generateTeamMatches, { projectId });
-      matchIds = res?.matchIds ?? [];
+      await ctx.runAction(apiAny.matching.actions.generateTeamMatches, { projectId });
     } else {
-      matchIds = await ctx.runAction(apiAny.matching.actions.generateMatches, {
+      await ctx.runAction(apiAny.matching.actions.generateMatches, {
         projectId,
         limit: 10,
       });
     }
 
-    if (matchIds.length === 0) return 0;
+    const afterRowsPost = await ctx.runQuery(internalAny.matching.queries.listProjectMatchesInternal, {
+      projectId,
+    });
+    const newPendingFreelancers = (afterRowsPost || []).filter(
+      (m: { status: string; freelancerId: string }) =>
+        m.status === "pending" && !beforeFreelancersPost.has(m.freelancerId)
+    );
 
-    await notifyClientForNewMatchSuggestions(ctx, project, projectId, matchIds.length);
-    return matchIds.length;
+    if (newPendingFreelancers.length === 0) return 0;
+
+    await notifyClientForNewMatchSuggestions(
+      ctx,
+      project,
+      projectId,
+      newPendingFreelancers.length
+    );
+    return newPendingFreelancers.length;
   } catch (err) {
     console.error("[autoAssign] tryMatchProject error for", projectId, err);
     return 0;
