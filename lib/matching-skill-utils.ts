@@ -129,10 +129,14 @@ export function calculateSkillOverlapPercent(
 }
 
 /**
- * Hard gate: at least one selected skill must match (when there are normalized skills).
- * When explicit skills are required, techField is used only as a scoring factor — not a hard gate —
- * because many skills (Python, SQL, TypeScript, …) span multiple categories.
- * When there are NO required skills, techField is the only category signal, so we gate on it.
+ * Hard gate: phone/links + techField category + skill match (when skills are specified).
+ *
+ * techField is ALWAYS enforced as a category gate (when set), regardless of whether skills
+ * are present. This prevents cross-category mismatches such as a data analyst matching a
+ * software development slot just because they share a skill like SQL or Python.
+ *
+ * If techField is not set on the freelancer profile we fall through to skill-only matching
+ * so that freelancers who haven't filled their profile yet aren't silently excluded.
  */
 export function isFreelancerEligibleForProjectMatch(
   freelancer: {
@@ -152,21 +156,50 @@ export function isFreelancerEligibleForProjectMatch(
   if (!freelancerHasPhoneAndLinksForMatching(freelancer)) {
     return false;
   }
+
+  // Category gate — always enforced when techField is set.
+  if (!freelancerMatchesRole(freelancer.profile?.techField, projectRoleId)) {
+    return false;
+  }
+
+  // Skill gate — when the slot/project specifies required skills.
   if (normalizedRequired.length > 0) {
-    // Skills are specified — gate on skill match only; techField is a scoring signal, not a hard filter.
-    if (
-      !freelancerMatchesAtLeastOneRequiredSkill(
-        normalizedRequired,
-        freelancer.profile?.skills
-      )
-    ) {
-      return false;
-    }
-  } else {
-    // No required skills — use techField as the category proxy.
-    if (!freelancerMatchesRole(freelancer.profile?.techField, projectRoleId)) {
+    if (!freelancerMatchesAtLeastOneRequiredSkill(normalizedRequired, freelancer.profile?.skills)) {
       return false;
     }
   }
+
   return true;
+}
+
+/**
+ * Sub-field gate for software-development slots.
+ *
+ * `platformRoleIdForTeamRoleKey` maps all software-dev sub-fields (frontend_dev, backend_dev,
+ * mobile_dev, …) to the same parent category id "software_development". This means a backend
+ * developer and a mobile developer both pass the category gate for each other's slots.
+ *
+ * This function uses the canonical per-sub-field skill list to add a second discriminator:
+ * the freelancer must have at least one skill that belongs to the target sub-field's cluster.
+ *
+ * Returns true when:
+ *  - the budgetRoleKey is not a recognised software-dev sub-field (no constraint to apply), OR
+ *  - the sub-field is "fullstack_dev" (can fill any software-dev seat), OR
+ *  - the freelancer has at least one skill from the sub-field's canonical skill list.
+ */
+export function freelancerFitsSubField(
+  freelancerSkills: string[] | undefined,
+  budgetRoleKey: string
+): boolean {
+  // fullstack devs are valid candidates for any software-dev sub-field seat.
+  if (budgetRoleKey === "fullstack_dev") return true;
+
+  const subFieldSkills = getSoftwareDevFieldSkills([budgetRoleKey]);
+  // If no canonical skills are defined for this key it isn't a software-dev sub-field — skip.
+  if (subFieldSkills.length === 0) return true;
+
+  const fs = freelancerSkills ?? [];
+  if (fs.length === 0) return false;
+
+  return fs.some((fl) => subFieldSkills.some((cs) => skillMatches(cs, fl)));
 }
