@@ -574,15 +574,15 @@ export default function UsersPage() {
                               Manage
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
+                          <DialogContent className="flex max-h-[min(90dvh,calc(100dvh-2rem))] flex-col overflow-hidden sm:max-w-lg">
+                            <DialogHeader className="shrink-0">
                               <DialogTitle>Manage User: {selectedUser?.name}</DialogTitle>
                               <DialogDescription>
                                 Update user role and status. Changes are logged in audit logs.
                               </DialogDescription>
                             </DialogHeader>
                             {selectedUser && (
-                              <div className="space-y-4 py-4">
+                              <div className="flex-1 space-y-4 overflow-y-auto py-4 pr-1">
                                 <div className="space-y-2">
                                   <Label>Role</Label>
                                   <Select
@@ -918,7 +918,7 @@ export default function UsersPage() {
                                 )}
                               </div>
                             )}
-                            <DialogFooter>
+                            <DialogFooter className="shrink-0 border-t border-border/60 pt-4">
                               <Button
                                 variant="outline"
                                 onClick={() => setSelectedUser(null)}

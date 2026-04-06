@@ -805,6 +805,11 @@ export default function ProjectMatchesPage() {
     setSingleCarouselIndex((i) => i + 1);
   }, [singleCarouselIndex, sortedSinglePool.length]);
 
+  const goBackSingleCarousel = useCallback(() => {
+    setSingleCarouselIndex((i) => Math.max(0, i - 1));
+    setSinglePoolExhausted(false);
+  }, []);
+
   const restartSingleCarousel = useCallback(() => {
     setSingleCarouselIndex(0);
     setSinglePoolExhausted(false);
@@ -825,6 +830,14 @@ export default function ProjectMatchesPage() {
     },
     [sortedTeamPools, roleCarouselIndex]
   );
+
+  const goBackRoleCarousel = useCallback((roleLabel: string) => {
+    setRoleCarouselIndex((prev) => ({
+      ...prev,
+      [roleLabel]: Math.max(0, (prev[roleLabel] ?? 0) - 1),
+    }));
+    setRolePoolExhausted((ex) => ({ ...ex, [roleLabel]: false }));
+  }, []);
 
   const restartRoleCarousel = useCallback((roleLabel: string) => {
     setRoleCarouselIndex((p) => ({ ...p, [roleLabel]: 0 }));
@@ -1399,16 +1412,25 @@ export default function ProjectMatchesPage() {
                   onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
                   primaryCtaLabel="Proceed with this talent"
                 />
-                <Button
-                  variant="outline"
-                  className="min-h-11 w-full touch-manipulation rounded-lg sm:max-w-md sm:min-h-10"
-                  onClick={advanceSingleCarousel}
-                  disabled={
-                    singleCarouselIndex >= sortedSinglePool.length - 1
-                  }
-                >
-                  Select another talent
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:max-w-md">
+                  {singleCarouselIndex > 0 && (
+                    <Button
+                      variant="ghost"
+                      className="min-h-11 w-full touch-manipulation rounded-lg sm:min-h-10 sm:flex-1"
+                      onClick={goBackSingleCarousel}
+                    >
+                      ← Previous suggestion
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="min-h-11 w-full touch-manipulation rounded-lg sm:min-h-10 sm:flex-1"
+                    onClick={advanceSingleCarousel}
+                    disabled={singleCarouselIndex >= sortedSinglePool.length - 1}
+                  >
+                    Select another talent
+                  </Button>
+                </div>
               </>
             );
           })()}
@@ -1561,14 +1583,25 @@ export default function ProjectMatchesPage() {
                       isTeam
                       primaryCtaLabel="Proceed with this talent"
                     />
-                    <Button
-                      variant="outline"
-                      className="min-h-11 w-full touch-manipulation rounded-lg sm:max-w-md sm:min-h-10"
-                      onClick={() => advanceRoleCarousel(roleLabel)}
-                      disabled={idx >= pool.length - 1}
-                    >
-                      Select another talent
-                    </Button>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:max-w-md">
+                      {idx > 0 && (
+                        <Button
+                          variant="ghost"
+                          className="min-h-11 w-full touch-manipulation rounded-lg sm:min-h-10 sm:flex-1"
+                          onClick={() => goBackRoleCarousel(roleLabel)}
+                        >
+                          ← Previous suggestion
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        className="min-h-11 w-full touch-manipulation rounded-lg sm:min-h-10 sm:flex-1"
+                        onClick={() => advanceRoleCarousel(roleLabel)}
+                        disabled={idx >= pool.length - 1}
+                      >
+                        Select another talent
+                      </Button>
+                    </div>
                   </div>
                 ) : null}
               </div>
