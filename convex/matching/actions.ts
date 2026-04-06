@@ -18,6 +18,8 @@ import {
   calculateSkillOverlapPercent,
   isFreelancerEligibleForProjectMatch,
   platformRoleIdForTeamRoleKey,
+  freelancerMatchesAtLeastOneRequiredSkill,
+  freelancerFitsSubField,
 } from "../../lib/matching-skill-utils";
 import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 
@@ -556,12 +558,9 @@ export const generateTeamMatches = action({
         const spec = slotSpecs[slotIndex];
         if (acceptedBySlot[slotIndex] >= 1) continue;
 
+        // Use only slot-specific skills for per-slot filtering — not merged with project skills.
         const requiredSkills = normalizeRequiredSkillsForMatching({
-          ...intakeForm,
-          requiredSkills: [
-            ...(intakeForm.requiredSkills || []),
-            ...(spec.skills || []),
-          ],
+          requiredSkills: spec.skills ?? [],
         });
 
         const slotCategoryRoleId = platformRoleIdForTeamRoleKey(spec.roleKey);
@@ -587,15 +586,13 @@ export const generateTeamMatches = action({
 
           if (existingMatch) continue;
 
-          if (
-            !isFreelancerEligibleForProjectMatch(
-              freelancer,
-              requiredSkills,
-              slotCategoryRoleId
-            )
-          ) {
+          // Category + skill gate (techField always enforced).
+          if (!isFreelancerEligibleForProjectMatch(freelancer, requiredSkills, slotCategoryRoleId)) {
             continue;
           }
+
+          // Sub-field gate: distinguish frontend/backend/mobile/etc. within software_development.
+          if (!freelancerFitsSubField(freelancer.profile?.skills, spec.roleKey)) continue;
 
           const matchResult = matchFreelancerToRole(
             freelancer,
@@ -1019,6 +1016,11 @@ export const generateMatchesForDraft = action({
 
     const rolesMissing: string[] = [];
 
+    // Unified spec list: each entry drives one seat's matching and post-loop availability check.
+    // Both the slot-based path and the skill-grouping path populate this.
+    type RoleSpec = { skills: string[]; roleId: string; roleLabel: string };
+    const roleSpecs: RoleSpec[] = [];
+
     // When the project uses per-seat teamSlots, derive labels via teamSlotsToMatchSpecs so
     // the stored teamRole exactly matches what getRoleLabelsForProjectIntake returns in the UI.
     const hasSlots =
@@ -1029,17 +1031,16 @@ export const generateMatchesForDraft = action({
       const specs = teamSlotsToMatchSpecs(intakeForm.teamSlots, requestedLevel as any);
 
       for (const spec of specs) {
-        const matchCountBeforeSpec = matchIds.length;
-        // Merge project-level required skills with per-slot skills for scoring.
-        const specSkills = normalizeRequiredSkillsForMatching({
-          requiredSkills: [
-            ...(intakeForm.requiredSkills ?? []),
-            ...(spec.skills ?? []),
-          ],
-        });
-        const effectiveSkills = specSkills.length > 0 ? specSkills : normalizedSkills;
         const specRoleId = platformRoleIdForTeamRoleKey(spec.roleKey);
+        // Use ONLY the slot's own skills — never merge project-level skills here.
+        // Merging would let every freelancer who matches any project-wide skill pass every slot.
+        const slotSkills = normalizeRequiredSkillsForMatching({
+          requiredSkills: spec.skills ?? [],
+        });
 
+        roleSpecs.push({ skills: slotSkills, roleId: specRoleId, roleLabel: spec.teamRoleLabel });
+
+        const matchCountBeforeSpec = matchIds.length;
         const groupScores: Array<{
           freelancer: Doc<"users">;
           score: number;
@@ -1048,13 +1049,20 @@ export const generateMatchesForDraft = action({
 
         for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
           if (isFreelancerPermanentlyExcluded(project, freelancer._id as string)) continue;
-          if (!isFreelancerEligibleForProjectMatch(freelancer, effectiveSkills, specRoleId)) continue;
+
+          // Category + skill eligibility gate (techField always enforced).
+          if (!isFreelancerEligibleForProjectMatch(freelancer, slotSkills, specRoleId)) continue;
+
+          // Sub-field gate: within software_development, discriminate frontend/backend/mobile/etc.
+          // by checking the freelancer has at least one canonical skill for this sub-field.
+          if (!freelancerFitsSubField(freelancer.profile?.skills, spec.roleKey)) continue;
+
           const { score: overallScore, breakdown } = await scoreOneFreelancer(
             ctx,
             freelancer,
             intakeForm,
             vettingScore,
-            { requiredSkillSubset: effectiveSkills.length > 0 ? effectiveSkills : undefined, categoryRoleId: specRoleId }
+            { requiredSkillSubset: slotSkills.length > 0 ? slotSkills : undefined, categoryRoleId: specRoleId }
           );
           groupScores.push({ freelancer, score: overallScore, breakdown });
         }
@@ -1062,9 +1070,7 @@ export const generateMatchesForDraft = action({
         groupScores.sort((a, b) => b.score - a.score);
         const top10 = groupScores
           .filter((m) =>
-            effectiveSkills.length > 0
-              ? m.breakdown.skillOverlap > 0
-              : m.breakdown.skillOverlap >= 45
+            slotSkills.length > 0 ? m.breakdown.skillOverlap > 0 : m.breakdown.skillOverlap >= 45
           )
           .slice(0, 10);
 
@@ -1079,7 +1085,7 @@ export const generateMatchesForDraft = action({
             scoringBreakdown: match.breakdown,
             explanation,
             expiresAt,
-            teamRole: spec.teamRoleLabel, // label consistent with getRoleLabelsForProjectIntake
+            teamRole: spec.teamRoleLabel,
           });
           matchIds.push(matchId);
         }
@@ -1117,6 +1123,8 @@ export const generateMatchesForDraft = action({
             ];
 
       for (const group of groups) {
+        roleSpecs.push({ skills: group.skills, roleId: group.roleId, roleLabel: group.roleLabel });
+
         const matchCountBeforeGroup = matchIds.length;
         const groupScores: Array<{
           freelancer: Doc<"users">;
@@ -1167,31 +1175,17 @@ export const generateMatchesForDraft = action({
     // For team: check if any role had 0 matches and we have higher-level freelancers
     let hasHigherLevelWithSkills = false;
     if (matchIds.length === 0 && higherLevelFreelancers.length > 0) {
-      for (const group of groups) {
+      for (const spec of roleSpecs) {
         for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
-          if (
-            !isFreelancerEligibleForProjectMatch(
-              freelancer,
-              group.skills,
-              group.roleId
-            )
-          ) {
-            continue;
-          }
+          if (!isFreelancerEligibleForProjectMatch(freelancer, spec.skills, spec.roleId)) continue;
           const { breakdown } = await scoreOneFreelancer(
             ctx,
             freelancer,
             intakeForm,
             vettingScore,
-            {
-              requiredSkillSubset: group.skills,
-              categoryRoleId: group.roleId,
-            }
+            { requiredSkillSubset: spec.skills, categoryRoleId: spec.roleId }
           );
-          if (
-            breakdown.skillOverlap > 0 &&
-            freelancerMatchesRole(freelancer.profile?.techField, group.roleId)
-          ) {
+          if (breakdown.skillOverlap > 0 && freelancerMatchesRole(freelancer.profile?.techField, spec.roleId)) {
             hasHigherLevelWithSkills = true;
             break;
           }
@@ -1222,7 +1216,7 @@ export const generateMatchesForDraft = action({
     return {
       matchIds,
       isTeam: true,
-      groupCount: groups.length,
+      groupCount: roleSpecs.length,
       availability,
     };
   },
