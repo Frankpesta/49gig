@@ -606,6 +606,14 @@ export default function ProjectMatchesPage() {
     );
   }, [isTeam, allRoleLabels, matchesByRoleMap]);
 
+  /** Seats the engine could not staff yet — client can still proceed with other roles. */
+  const rolesWithNoMatches = useMemo(() => {
+    if (!isTeam || allRoleLabels.length === 0) return [];
+    return allRoleLabels.filter(
+      (r) => (matchesByRoleMap.get(r) ?? []).length === 0
+    );
+  }, [isTeam, allRoleLabels, matchesByRoleMap]);
+
   const sortedTeamPools = useMemo(() => {
     const map = new Map<string, EnrichedMatch[]>();
     if (!isTeam) return map;
@@ -662,9 +670,10 @@ export default function ProjectMatchesPage() {
     isTeam &&
     !matchingRunning &&
     rolesForAvailabilityNote.length > 0 &&
-    rolesForAvailabilityNote.some(
-      (role: string) => (matchesByRoleMap.get(role) ?? []).length === 0,
-    );
+    rolesForAvailabilityNote.some((role: string) => {
+      const n = matchesByRoleMap.get(role) ?? [];
+      return n.length === 0;
+    });
   const hasUnavailableSingleSlot =
     !isTeam && !matchingRunning && pendingMatches.length === 0;
   const showMatchingPolicyNote =
@@ -880,7 +889,7 @@ export default function ProjectMatchesPage() {
       const missing = rolesWithPendingMatches.filter((r) => !roleSelections[r]);
       if (missing.length > 0) {
         toast.error(
-          `Choose talent for each open seat (${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}).`
+          `Choose talent for each seat that has suggestions (${missing.slice(0, 3).join(", ")}${missing.length > 3 ? "…" : ""}).`
         );
         return;
       }
@@ -1256,6 +1265,29 @@ export default function ProjectMatchesPage() {
         </Card>
       )}
 
+      {!hasPreFundingSelection &&
+        isTeam &&
+        rolesWithPendingMatches.length > 0 &&
+        rolesWithNoMatches.length > 0 &&
+        !isFundedMatchingContinuation && (
+          <Card className="rounded-xl border-sky-500/30 bg-sky-500/5">
+            <CardContent className="py-4 px-4 sm:px-6 text-sm space-y-2">
+              <p className="font-medium text-foreground">
+                You can move forward with the roles we already found
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                Choose talent for each seat below that has suggestions. We&apos;re still looking for:{" "}
+                <span className="font-medium text-foreground">
+                  {rolesWithNoMatches.slice(0, 4).join(", ")}
+                  {rolesWithNoMatches.length > 4 ? "…" : ""}
+                </span>
+                . After you continue, we&apos;ll keep matching those seats and notify you when new people are
+                available.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
       {matchingRunning && !hasPreFundingSelection && (
         <Card className="rounded-xl border-primary/30 bg-primary/5">
           <CardContent className="flex items-center gap-3 py-6 px-4 sm:px-6">
@@ -1547,13 +1579,16 @@ export default function ProjectMatchesPage() {
             disabled={
               isFundedMatchingContinuation
                 ? selectedTeamFreelancerIds.length === 0
-                : !rolesWithPendingMatches.every((r) => roleSelections[r])
+                : rolesWithPendingMatches.length === 0 ||
+                  !rolesWithPendingMatches.every((r) => roleSelections[r])
             }
             className="mx-auto block min-h-11 w-full max-w-xl touch-manipulation rounded-lg sm:min-h-10 lg:max-w-md"
           >
             {isFundedMatchingContinuation
               ? `Continue with ${selectedTeamFreelancerIds.length} selected`
-              : `Confirm all ${rolesWithPendingMatches.length} seat(s) & continue`}
+              : rolesWithNoMatches.length > 0
+                ? `Continue with ${rolesWithPendingMatches.length} filled seat(s)`
+                : `Confirm all ${rolesWithPendingMatches.length} seat(s) & continue`}
           </Button>
         </div>
       )}

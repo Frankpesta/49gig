@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 export function FreelancerMatchingStatusChip() {
   const user = useAuthStore((s) => s.user);
   const readiness = useQuery(
-    // @ts-expect-error TS2589: Convex generated query ref + useQuery inference
     api.users.queries.getMyFreelancerMatchingReadiness,
     user?._id && user.role === "freelancer" ? { userId: user._id } : "skip"
   ) as

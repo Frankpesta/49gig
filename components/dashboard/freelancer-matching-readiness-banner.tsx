@@ -39,7 +39,8 @@ export function FreelancerMatchingReadinessBanner({
 
   if (!issues?.length) return null;
 
-  const primary = issues[0]!;
+  const issueList: MatchingReadinessIssue[] = issues;
+  const primary = issueList[0]!;
 
   return (
     <div
@@ -67,9 +68,9 @@ export function FreelancerMatchingReadinessBanner({
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   {primary.description}
                 </p>
-                {issues.length > 1 && (
+                {issueList.length > 1 && (
                   <p className="text-xs text-muted-foreground pt-1">
-                    {issues.length - 1} more item{issues.length > 2 ? "s" : ""} to fix after this one.
+                    {issueList.length - 1} more item{issueList.length > 2 ? "s" : ""} to fix after this one.
                   </p>
                 )}
               </div>
@@ -86,9 +87,9 @@ export function FreelancerMatchingReadinessBanner({
             </Button>
           </div>
 
-          {issues.length > 1 && (
+          {issueList.length > 1 && (
             <ul className="mt-4 space-y-2 border-t border-border/50 pt-4">
-              {issues.slice(1).map((issue) => (
+              {issueList.slice(1).map((issue: MatchingReadinessIssue) => (
                 <li key={issue.id} className="flex items-start gap-2 text-sm">
                   <AlertCircle className="h-4 w-4 shrink-0 text-muted-foreground mt-0.5" aria-hidden />
                   <span className="text-muted-foreground min-w-0">
