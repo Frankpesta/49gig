@@ -7,74 +7,208 @@ import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
-import { MessageSquare, Search, Plus, Sparkles, Headphones, ExternalLink, Users } from "lucide-react";
+import {
+  MessageSquare,
+  Search,
+  Plus,
+  Sparkles,
+  Headphones,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 
-function formatRelativeTime(ts: number) {
+type ChatWithUnread = Doc<"chats"> & { unreadCount?: number };
+
+type ProjectChatRow = ChatWithUnread & {
+  clientName?: string | null;
+  freelancerName?: string | null;
+};
+
+/** WhatsApp-style time: time today, Yesterday, weekday, or short date */
+function formatChatListTime(ts: number) {
   const d = new Date(ts);
   const now = new Date();
-  const diffMins = Math.floor((now.getTime() - d.getTime()) / 60000);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfMsg = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round(
+    (startOfToday.getTime() - startOfMsg.getTime()) / 86400000
+  );
+  if (diffDays === 0) {
+    return d.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return d.toLocaleDateString(undefined, { weekday: "short" });
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-function ChatRow({ chat, searchQuery }: { chat: Doc<"chats"> & { clientName?: string | null; freelancerName?: string | null }; searchQuery: string }) {
-  if (searchQuery) {
-    const q = searchQuery.toLowerCase();
-    const matches =
-      chat.title?.toLowerCase().includes(q) ||
-      chat.lastMessagePreview?.toLowerCase().includes(q) ||
-      chat.clientName?.toLowerCase().includes(q) ||
-      chat.freelancerName?.toLowerCase().includes(q);
-    if (!matches) return null;
+function avatarInitials(title: string | undefined, chatType: string) {
+  const t = (title || "").replace(/^Project:\s*/i, "").trim();
+  if (!t) {
+    return chatType === "support" ? "S" : chatType === "system" ? "•" : "C";
   }
+  const parts = t.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    const a = parts[0][0] ?? "";
+    const b = parts[1][0] ?? "";
+    return (a + b).toUpperCase().slice(0, 2);
+  }
+  return t.slice(0, 2).toUpperCase();
+}
+
+function avatarTone(chatType: string) {
+  if (chatType === "support")
+    return "bg-teal-500/15 text-teal-700 dark:text-teal-300";
+  if (chatType === "system")
+    return "bg-violet-500/15 text-violet-700 dark:text-violet-300";
+  return "bg-emerald-600/15 text-emerald-800 dark:text-emerald-300";
+}
+
+function UserChatListRow({ chat }: { chat: ChatWithUnread }) {
+  const unread = chat.unreadCount ?? 0;
+  const preview =
+    chat.lastMessagePreview?.trim() || "No messages yet";
+  const href =
+    chat.type === "support"
+      ? `/dashboard/chat/support/${chat._id}`
+      : `/dashboard/chat/${chat._id}`;
+
   return (
-    <TableRow className="hover:bg-muted/20">
-      <TableCell>
-        <p className="font-medium text-sm truncate max-w-[200px]">{chat.title || "Untitled Chat"}</p>
-        {chat.lastMessagePreview && (
-          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{chat.lastMessagePreview}</p>
+    <Link
+      href={href}
+      className={cn(
+        "flex gap-3 px-3 py-3 transition-colors border-b border-border/60",
+        "hover:bg-muted/70 active:bg-muted",
+        unread > 0 && "bg-muted/30"
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+          avatarTone(chat.type)
         )}
-      </TableCell>
-      <TableCell>
-        <div className="space-y-0.5">
-          {chat.clientName && <div className="text-xs"><span className="text-muted-foreground">Client: </span><span className="font-medium">{chat.clientName}</span></div>}
-          {chat.freelancerName && <div className="text-xs"><span className="text-muted-foreground">Freelancer: </span><span className="font-medium">{chat.freelancerName}</span></div>}
-          {!chat.clientName && !chat.freelancerName && <span className="text-xs text-muted-foreground">—</span>}
+      >
+        {avatarInitials(chat.title, chat.type)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3
+            className={cn(
+              "min-w-0 truncate text-[15px] leading-tight",
+              unread > 0 ? "font-semibold" : "font-medium"
+            )}
+          >
+            {chat.title || "Chat"}
+          </h3>
+          {chat.lastMessageAt != null && (
+            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              {formatChatListTime(chat.lastMessageAt)}
+            </span>
+          )}
         </div>
-      </TableCell>
-      <TableCell>
-        <Badge variant="outline" className="text-[10px] capitalize">{chat.status}</Badge>
-      </TableCell>
-      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-        {chat.lastMessageAt ? formatRelativeTime(chat.lastMessageAt) : "—"}
-      </TableCell>
-      <TableCell className="text-right">
-        <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" asChild>
-          <Link href={`/dashboard/chat/${chat._id}`}>
-            <ExternalLink className="h-3 w-3" /> Open
-          </Link>
-        </Button>
-      </TableCell>
-    </TableRow>
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <p
+            className={cn(
+              "min-w-0 flex-1 truncate text-[13px] leading-snug",
+              unread > 0
+                ? "text-foreground/90"
+                : "text-muted-foreground"
+            )}
+          >
+            {chat.type === "support" && (
+              <span className="mr-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                Support
+              </span>
+            )}
+            {preview}
+          </p>
+          {unread > 0 ? (
+            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          ) : null}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function ProjectChatListRow({ chat }: { chat: ProjectChatRow }) {
+  const unread = chat.unreadCount ?? 0;
+  const subtitle = [chat.clientName, chat.freelancerName]
+    .filter(Boolean)
+    .join(" · ");
+  const preview =
+    chat.lastMessagePreview?.trim() ||
+    subtitle ||
+    "No messages yet";
+
+  return (
+    <Link
+      href={`/dashboard/chat/${chat._id}`}
+      className={cn(
+        "flex gap-3 px-3 py-3 transition-colors border-b border-border/60",
+        "hover:bg-muted/70 active:bg-muted",
+        unread > 0 && "bg-muted/30"
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
+          avatarTone("project")
+        )}
+      >
+        {avatarInitials(chat.title, "project")}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <h3
+            className={cn(
+              "min-w-0 truncate text-[15px] leading-tight",
+              unread > 0 ? "font-semibold" : "font-medium"
+            )}
+          >
+            {(chat.title || "Project chat").replace(/^Project:\s*/i, "").trim() ||
+              chat.title ||
+              "Project chat"}
+          </h3>
+          {chat.lastMessageAt != null && (
+            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+              {formatChatListTime(chat.lastMessageAt)}
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <p
+            className={cn(
+              "min-w-0 flex-1 truncate text-[13px] leading-snug",
+              unread > 0
+                ? "text-foreground/90"
+                : "text-muted-foreground"
+            )}
+          >
+            {preview}
+          </p>
+          {unread > 0 ? (
+            <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          ) : null}
+        </div>
+        {subtitle ? (
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
+    </Link>
   );
 }
 
@@ -89,7 +223,9 @@ export default function ChatPage() {
 
   const projectChatsForAdmin = useQuery(
     api.chat.queries.getProjectChatsForAdmin,
-    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
+    isAuthenticated &&
+      user?._id &&
+      (user.role === "admin" || user.role === "moderator")
       ? { userId: user._id }
       : "skip"
   );
@@ -99,27 +235,58 @@ export default function ChatPage() {
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
 
-  const isAdminOrModerator = user?.role === "admin" || user?.role === "moderator";
+  const isAdminOrModerator =
+    user?.role === "admin" || user?.role === "moderator";
+
+  const adminChatsRaw = (projectChatsForAdmin ?? []) as ProjectChatRow[];
+
+  const adminChatsFiltered = useMemo(() => {
+    if (!searchQuery.trim()) return adminChatsRaw;
+    const q = searchQuery.toLowerCase();
+    return adminChatsRaw.filter(
+      (c) =>
+        (c.title?.toLowerCase().includes(q) ?? false) ||
+        (c.lastMessagePreview?.toLowerCase().includes(q) ?? false) ||
+        (c.clientName?.toLowerCase().includes(q) ?? false) ||
+        (c.freelancerName?.toLowerCase().includes(q) ?? false)
+    );
+  }, [adminChatsRaw, searchQuery]);
+
+  const userChatsFiltered = useMemo(() => {
+    const list = (chats ?? []) as ChatWithUnread[];
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.toLowerCase();
+    return list.filter(
+      (c) =>
+        (c.title?.toLowerCase().includes(q) ?? false) ||
+        (c.lastMessagePreview?.toLowerCase().includes(q) ?? false)
+    );
+  }, [chats, searchQuery]);
 
   if (!isAuthenticated || !user) {
-    return <DashboardEmptyState icon={MessageSquare} title="Please log in to view chats" iconTone="muted" />;
+    return (
+      <DashboardEmptyState
+        icon={MessageSquare}
+        title="Please log in to view chats"
+        iconTone="muted"
+      />
+    );
   }
 
   if (chats === undefined) {
     return <DashboardLoadingState label="Loading" />;
   }
 
-  // ── Admin / Moderator view ──────────────────────────────────────
   if (isAdminOrModerator) {
-    const adminChats = (projectChatsForAdmin ?? []) as (Doc<"chats"> & { clientName?: string | null; freelancerName?: string | null })[];
-    const totalProject = adminChats.length;
-    const activeProject = adminChats.filter((c) => c.status === "active").length;
+    const totalProject = adminChatsRaw.length;
+    const activeProject = adminChatsRaw.filter((c) => c.status === "active")
+      .length;
 
     return (
-      <div className="space-y-5 animate-in fade-in-50 duration-300">
+      <div className="space-y-4 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
           title="Project Chats"
-          description="All project conversations between clients and freelancers."
+          description="Conversations between clients and freelancers on hires."
           icon={MessageSquare}
           actions={
             <Button asChild variant="outline" className="shrink-0 rounded-xl">
@@ -131,163 +298,130 @@ export default function ChatPage() {
           }
         />
 
-        {/* Stats — project chats only */}
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Card className="rounded-xl overflow-hidden">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-xl bg-primary/10 p-2.5 text-primary"><Users className="h-4 w-4" /></div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Card className="rounded-xl border-border/60 shadow-none">
+            <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+              <div className="rounded-full bg-primary/10 p-2.5 text-primary">
+                <Users className="h-4 w-4" />
+              </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total Project Chats</p>
-                <p className="text-lg font-semibold">{totalProject}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Total
+                </p>
+                <p className="text-lg font-semibold leading-tight">{totalProject}</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl overflow-hidden">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-xl bg-green-100 dark:bg-green-950/30 p-2.5 text-green-600"><MessageSquare className="h-4 w-4" /></div>
+          <Card className="rounded-xl border-border/60 shadow-none">
+            <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+              <div className="rounded-full bg-emerald-500/15 p-2.5 text-emerald-700 dark:text-emerald-400">
+                <MessageSquare className="h-4 w-4" />
+              </div>
               <div>
-                <p className="text-xs text-muted-foreground">Active</p>
-                <p className="text-lg font-semibold">{activeProject}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Active
+                </p>
+                <p className="text-lg font-semibold leading-tight">{activeProject}</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="rounded-xl overflow-hidden">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="rounded-xl bg-secondary/20 p-2.5 text-secondary-foreground"><Sparkles className="h-4 w-4" /></div>
+          <Card className="rounded-xl border-border/60 shadow-none">
+            <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+              <div className="rounded-full bg-amber-500/15 p-2.5 text-amber-700 dark:text-amber-400">
+                <Sparkles className="h-4 w-4" />
+              </div>
               <div>
-                <p className="text-xs text-muted-foreground">Unread</p>
-                <p className="text-lg font-semibold">{unreadCount ?? 0}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Unread (all)
+                </p>
+                <p className="text-lg font-semibold leading-tight">
+                  {unreadCount ?? 0}
+                </p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-sm">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by project, client, or freelancer..."
+            placeholder="Search by project, client, or freelancer…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-10 rounded-lg"
+            className="h-11 rounded-xl border-border/80 pl-10 shadow-none"
           />
         </div>
 
-        {adminChats.length === 0 ? (
-          <DashboardEmptyState icon={MessageSquare} iconTone="muted" title="No project chats yet" />
+        {projectChatsForAdmin === undefined ? (
+          <DashboardLoadingState label="Loading project chats" />
+        ) : adminChatsRaw.length === 0 ? (
+          <DashboardEmptyState
+            icon={MessageSquare}
+            iconTone="muted"
+            title="No project chats yet"
+          />
+        ) : adminChatsFiltered.length === 0 ? (
+          <DashboardEmptyState
+            icon={MessageSquare}
+            iconTone="muted"
+            title="No matches"
+            description="Try a different search."
+          />
         ) : (
-          <div className="rounded-xl border border-border/60 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead>Project</TableHead>
-                  <TableHead>Parties</TableHead>
-                  <TableHead className="w-[90px]">Status</TableHead>
-                  <TableHead className="w-[110px]">Last Message</TableHead>
-                  <TableHead className="w-[80px] text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {adminChats.map((chat) => (
-                  <ChatRow key={chat._id} chat={chat} searchQuery={searchQuery} />
-                ))}
-              </TableBody>
-            </Table>
+          <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+            {adminChatsFiltered.map((chat) => (
+              <ProjectChatListRow key={chat._id} chat={chat} />
+            ))}
           </div>
         )}
       </div>
     );
   }
 
-  // ── Non-admin view (clients / freelancers) ──────────────────────
-  const filteredChats = (chats ?? []).filter((chat: Doc<"chats">) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      chat.title?.toLowerCase().includes(q) ||
-      chat.lastMessagePreview?.toLowerCase().includes(q)
-    );
-  });
-
   return (
-    <div className="space-y-5 animate-in fade-in-50 duration-300">
+    <div className="space-y-4 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Messages"
-        description="Communicate with clients, freelancers, and support."
+        description="Chats with clients, freelancers, and support."
         icon={MessageSquare}
         actions={
           <Button asChild className="w-full shrink-0 rounded-xl sm:w-auto">
             <Link href="/dashboard/chat/support" className="flex items-center gap-2">
               <Plus className="h-4 w-4" />
-              New Support Chat
+              New support chat
             </Link>
           </Button>
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="rounded-xl overflow-hidden">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-xl bg-primary/10 p-2.5 text-primary"><MessageSquare className="h-4 w-4" /></div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Chats</p>
-              <p className="text-lg font-semibold">{chats.length}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-xl overflow-hidden">
-          <CardContent className="flex items-center gap-3 p-4">
-            <div className="rounded-xl bg-secondary/20 p-2.5 text-secondary-foreground"><Sparkles className="h-4 w-4" /></div>
-            <div>
-              <p className="text-xs text-muted-foreground">Unread</p>
-              <p className="text-lg font-semibold">{unreadCount ?? 0}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="relative max-w-sm">
+      <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          placeholder="Search chats..."
+          placeholder="Search chats…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 h-10 rounded-lg"
+          className="h-11 rounded-xl border-border/80 pl-10 shadow-none"
         />
       </div>
 
-      {filteredChats.length === 0 ? (
-        <DashboardEmptyState icon={MessageSquare} iconTone="muted" title="No chats yet" description={searchQuery ? "No chats match your search" : "Start a support chat to get help"} />
+      {(chats ?? []).length === 0 ? (
+        <DashboardEmptyState
+          icon={MessageSquare}
+          iconTone="muted"
+          title="No chats yet"
+          description="Start a support chat to get help."
+        />
+      ) : userChatsFiltered.length === 0 ? (
+        <DashboardEmptyState
+          icon={MessageSquare}
+          iconTone="muted"
+          title="No matches"
+          description="No chats match your search."
+        />
       ) : (
-        <div className="divide-y divide-border/40 rounded-xl border border-border/60 overflow-hidden">
-          {filteredChats.map((chat: Doc<"chats">) => (
-            <Link
-              key={chat._id}
-              href={`/dashboard/chat/${chat._id}`}
-              className="group flex items-start gap-3 p-4 transition-all hover:bg-primary/5"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <MessageSquare className="h-5 w-5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="min-w-0 truncate font-semibold text-foreground group-hover:text-primary transition-colors">
-                    {chat.title || "Untitled Chat"}
-                  </h3>
-                  {chat.lastMessageAt && (
-                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                      {formatRelativeTime(chat.lastMessageAt)}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <Badge variant="outline" className="shrink-0 text-[10px] font-medium">{chat.type}</Badge>
-                  {chat.lastMessagePreview && (
-                    <p className="min-w-0 truncate text-xs text-muted-foreground">{chat.lastMessagePreview}</p>
-                  )}
-                </div>
-              </div>
-            </Link>
+        <div className="overflow-hidden rounded-xl border border-border/60 bg-card">
+          {userChatsFiltered.map((chat) => (
+            <UserChatListRow key={chat._id} chat={chat} />
           ))}
         </div>
       )}

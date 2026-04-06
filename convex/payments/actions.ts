@@ -127,10 +127,20 @@ export const createPaymentIntent = action({
     amount: v.number(), // Amount in currency unit (e.g., dollars, not cents)
     currency: v.string(), // e.g., "NGN", "USD", "KES"
     userId: v.id("users"),
-    /** Apply up to this many cents from client referral hiring wallet (non-withdrawable). */
+    /** Apply up to this many cents from the client's in-platform wallet toward this hire. */
+    walletCreditCentsToApply: v.optional(v.number()),
+    /** @deprecated Use walletCreditCentsToApply */
     referralCreditCentsToApply: v.optional(v.number()),
   },
-  handler: async (ctx, args): Promise<{ paymentLink: string; paymentId: string; txRef: string }> => {
+  handler: async (
+    ctx,
+    args
+  ): Promise<{
+    paymentLink: string | null;
+    paymentId: string;
+    txRef: string;
+    fundedWithWalletOnly?: boolean;
+  }> => {
     // Verify user and project
     const user = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.userId,
@@ -191,41 +201,58 @@ export const createPaymentIntent = action({
       throw new Error("A payment is already being processed for this project. Please wait or contact support.");
     }
 
-    // Generate unique transaction reference
+    const fundingGrossAmount = args.amount;
+    const currencyLower = args.currency.toLowerCase();
+    const spendableCents = await ctx.runQuery(
+      internalAny.wallets.queries.getClientSpendableWalletCentsInternal,
+      { userId: args.userId, currency: args.currency }
+    );
+
+    const grossCents = Math.round(fundingGrossAmount * 100);
+    const fromUi =
+      args.walletCreditCentsToApply ?? args.referralCreditCentsToApply ?? spendableCents;
+    const requestedApply = Math.max(0, Math.floor(fromUi));
+    let applyCents = Math.min(requestedApply, spendableCents, grossCents);
+
+    const MIN_FW_CENTS = 1;
+    let fwCents = grossCents - applyCents;
+    if (fwCents > 0 && fwCents < MIN_FW_CENTS) {
+      applyCents = Math.max(0, grossCents - MIN_FW_CENTS);
+      applyCents = Math.min(applyCents, spendableCents);
+      fwCents = grossCents - applyCents;
+    }
+    if (fwCents < 0) {
+      throw new Error("Invalid payment amount after wallet credit");
+    }
+    if (fwCents > 0 && fwCents < MIN_FW_CENTS) {
+      throw new Error("Amount too small to charge after applying wallet credit");
+    }
+
+    if (fwCents === 0) {
+      const out = await ctx.runMutation(
+        internalAny.payments.mutations.completePreFundingWithWalletOnlyInternal,
+        {
+          projectId: args.projectId,
+          userId: args.userId,
+          fundingGrossAmount,
+          currency: args.currency,
+          walletCreditCents: applyCents,
+        }
+      );
+      return {
+        paymentLink: null,
+        paymentId: out.paymentId,
+        txRef: out.txRef,
+        fundedWithWalletOnly: true,
+      };
+    }
+
     const txRef = `49gig-${args.projectId}-${Date.now()}`;
 
     // Get redirect URL - use FRONTEND_URL or NEXT_PUBLIC_BASE_URL, fallback to a sensible default
     // CONVEX_SITE_URL points to Convex hosting, not the frontend app
     const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://your-site.com";
     const redirectUrl = `${baseUrl}/dashboard/projects/${args.projectId}/payment/callback`;
-
-    const fundingGrossAmount = args.amount;
-    const currencyLower = args.currency.toLowerCase();
-    const balanceCents = await ctx.runQuery(
-      internalAny.wallets.queries.getClientReferralHiringBalanceCentsInternal,
-      { userId: args.userId, currency: args.currency }
-    );
-
-    const grossCents = Math.round(fundingGrossAmount * 100);
-    const requestedApply = Math.max(
-      0,
-      Math.floor(args.referralCreditCentsToApply ?? balanceCents)
-    );
-    let applyCents = Math.min(requestedApply, balanceCents, grossCents);
-
-    const MIN_FW_CENTS = 1;
-    let fwCents = grossCents - applyCents;
-    if (fwCents > 0 && fwCents < MIN_FW_CENTS) {
-      applyCents = Math.max(0, grossCents - MIN_FW_CENTS);
-      applyCents = Math.min(applyCents, balanceCents);
-      fwCents = grossCents - applyCents;
-    }
-    if (fwCents < 0) {
-      throw new Error("Invalid payment amount after referral credit");
-    }
-    if (fwCents > 0 && fwCents < MIN_FW_CENTS) {
-      throw new Error("Amount too small to charge after applying referral credit");
-    }
 
     const flutterwaveAmount = fwCents / 100;
     const clientWalletCreditApplied = applyCents / 100;

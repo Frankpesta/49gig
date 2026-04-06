@@ -20,6 +20,24 @@ function sumClientReferralHiringCents(
   return Math.max(0, sum);
 }
 
+/** Completed credits (+ refunds) minus debits, in one currency (client wallet toward new hires). */
+function sumClientSpendableCentsForCurrency(
+  txs: Doc<"walletTransactions">[],
+  currencyLower: string
+): number {
+  let sum = 0;
+  for (const t of txs) {
+    if (t.status !== "completed") continue;
+    if (t.currency.toLowerCase() !== currencyLower) continue;
+    if (t.type === "credit" || t.type === "refund") {
+      sum += t.amountCents;
+    } else if (t.type === "debit") {
+      sum -= t.amountCents;
+    }
+  }
+  return Math.max(0, sum);
+}
+
 /**
  * Internal: client hiring balance from referral rewards (same currency as project checkout).
  */
@@ -40,6 +58,30 @@ export const getClientReferralHiringBalanceCentsInternal = internalQuery({
       .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
       .collect();
     return sumClientReferralHiringCents(txs, cur);
+  },
+});
+
+/**
+ * Internal: total client wallet balance usable toward pre-funding (same currency as checkout).
+ * Includes referral hiring credit, withdrawable referral cash, escrow returns, etc.
+ */
+export const getClientSpendableWalletCentsInternal = internalQuery({
+  args: {
+    userId: v.id("users"),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    if (!wallet) return 0;
+    const cur = args.currency.toLowerCase();
+    const txs = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .collect();
+    return sumClientSpendableCentsForCurrency(txs, cur);
   },
 });
 
@@ -99,6 +141,36 @@ export const getMyClientReferralHiringBalance = query({
       .collect();
     return {
       cents: sumClientReferralHiringCents(txs, args.currency.toLowerCase()),
+    };
+  },
+});
+
+/**
+ * Client: spendable wallet toward a new hire (pre-funding), plus referral-hiring subset for UI.
+ */
+export const getMyClientPrefundingWalletBreakdown = query({
+  args: {
+    userId: v.optional(v.id("users")),
+    currency: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await resolveUser(ctx, args.userId);
+    if (!user || user.role !== "client") {
+      return { spendableCents: 0, referralHiringCents: 0 };
+    }
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .first();
+    if (!wallet) return { spendableCents: 0, referralHiringCents: 0 };
+    const cur = args.currency.toLowerCase();
+    const txs = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .collect();
+    return {
+      spendableCents: sumClientSpendableCentsForCurrency(txs, cur),
+      referralHiringCents: sumClientReferralHiringCents(txs, cur),
     };
   },
 });

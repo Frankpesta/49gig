@@ -494,12 +494,15 @@ export default function DashboardPage() {
           ) : (
             <ul className="space-y-3">
               {recentActivity.map((n: Doc<"notifications">) => {
+                const chatHref = (n as { chatThreadHref?: string }).chatThreadHref;
                 const href =
                   n.type === "match" && n.data?.projectId
                     ? `/dashboard/projects/${n.data.projectId}`
-                    : n.type === "message" && n.data?.chatId
-                      ? `/dashboard/chat/${n.data.chatId}`
-                      : null;
+                    : typeof chatHref === "string"
+                      ? chatHref
+                      : n.type === "message" && n.data?.chatId
+                        ? `/dashboard/chat/${n.data.chatId}`
+                        : null;
                 return (
                   <li key={n._id} className="rounded-lg border p-3 transition-colors hover:bg-muted/50">
                     {href ? (

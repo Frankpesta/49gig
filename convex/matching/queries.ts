@@ -1,6 +1,7 @@
 import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
+import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 
 /** Client-safe display name: first name + last initial (e.g. "Daniel O.") */
 function toDisplayName(fullName: string): string {
@@ -92,6 +93,11 @@ export const getMatches = query({
       })
     );
 
+    if (isClient && project.permanentlyExcludedFreelancerIds?.length) {
+      const banned = new Set(project.permanentlyExcludedFreelancerIds.map(String));
+      return enrichedMatches.filter((m) => !banned.has(String(m.freelancerId)));
+    }
+
     return enrichedMatches;
   },
 });
@@ -124,6 +130,10 @@ export const getFreelancerPublicProfile = query({
           project.selectedFreelancerIds.includes(args.freelancerId)));
 
     if (!match && !isPreFundingSelected) {
+      return null;
+    }
+
+    if (isFreelancerPermanentlyExcluded(project, args.freelancerId as string)) {
       return null;
     }
 

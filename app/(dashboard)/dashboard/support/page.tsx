@@ -98,7 +98,7 @@ export default function SupportPage() {
       setIsSubmitted(true);
       // Redirect to chat after a moment
       setTimeout(() => {
-        router.push(`/dashboard/chat/${chatId}`);
+        router.push(`/dashboard/chat/support/${chatId}`);
       }, 2000);
     } catch (error) {
       console.error("Failed to create support chat:", error);

@@ -88,7 +88,7 @@ export const searchByIdAdmin = query({
         kind: string;
         title: (doc: any) => string;
         subtitle?: (doc: any) => string | undefined;
-        href?: (id: string) => string;
+        href?: (id: string, doc: Doc<any>) => string;
       }
     ) => {
       const normalizedId = ctx.db.normalizeId(table, raw as any);
@@ -100,7 +100,7 @@ export const searchByIdAdmin = query({
         id: String(normalizedId),
         title: payload.title(doc),
         subtitle: payload.subtitle?.(doc),
-        href: payload.href?.(String(normalizedId)),
+        href: payload.href?.(String(normalizedId), doc),
       });
     };
 
@@ -150,7 +150,10 @@ export const searchByIdAdmin = query({
       kind: "chat",
       title: (doc) => doc.title || "Chat",
       subtitle: (doc) => `Type: ${doc.type}`,
-      href: (id) => `/dashboard/chat/${id}`,
+      href: (id, doc) =>
+        doc.type === "support"
+          ? `/dashboard/chat/support/${id}`
+          : `/dashboard/chat/${id}`,
     });
     await tryPush("messages", {
       kind: "message",

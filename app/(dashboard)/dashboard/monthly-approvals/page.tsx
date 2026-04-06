@@ -87,9 +87,11 @@ export default function MonthlyApprovalsPage() {
 
       <Card className="rounded-xl overflow-hidden">
         <CardHeader>
-          <CardTitle>Pending Approvals</CardTitle>
+          <CardTitle>Pending approvals</CardTitle>
           <CardDescription>
-            Months appear here only after their billing period has ended. Approve to release funds to the freelancer&apos;s wallet; they withdraw to their bank when ready.
+            All unpaid months for your active hires are listed below. Approve is available only after each
+            billing period ends; until then the button stays disabled. Approval releases funds to the
+            freelancer&apos;s wallet (they withdraw to their bank when ready).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -102,8 +104,8 @@ export default function MonthlyApprovalsPage() {
           ) : pendingCycles.length === 0 ? (
             <DashboardEmptyState
               icon={CalendarCheck}
-              title="No pending approvals"
-              description="All matured billing months are approved or none are due yet. Pending periods appear here after each month ends."
+              title="No pending months"
+              description="There are no pending billing months on your active hires. New periods appear here when a hire is in progress and a month is waiting for approval."
               iconTone="muted"
               className="border-0 bg-transparent py-8 shadow-none"
             />
@@ -114,6 +116,7 @@ export default function MonthlyApprovalsPage() {
                   key={cycle._id}
                   cycle={cycle}
                   userId={user._id}
+                  clockMs={approvalClockMs}
                   onApprove={() => handleApprove(cycle._id)}
                   isApproving={approvingId === cycle._id}
                 />
@@ -129,11 +132,13 @@ export default function MonthlyApprovalsPage() {
 function MonthlyApprovalCard({
   cycle,
   userId,
+  clockMs,
   onApprove,
   isApproving,
 }: {
   cycle: Doc<"monthlyBillingCycles">;
   userId: Id<"users">;
+  clockMs: number;
   onApprove: () => void;
   isApproving: boolean;
 }) {
@@ -151,24 +156,39 @@ function MonthlyApprovalCard({
     ? (project.totalAmount / durMonths).toFixed(2)
     : (cycle.amountCents / 100).toFixed(2);
 
+  const canApprove = cycle.monthEndDate <= clockMs;
+  const periodEndsLabel = new Date(cycle.monthEndDate).toLocaleDateString("en-US", {
+    dateStyle: "medium",
+  });
+
   return (
-    <div className="flex items-center justify-between p-4 rounded-lg border border-border/60 bg-muted/20">
-      <div>
+    <div className="flex flex-col gap-3 p-4 rounded-lg border border-border/60 bg-muted/20 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
         <div className="font-medium">
           {project?.intakeForm?.title ?? "Hire"} – {monthLabel}
         </div>
         <div className="text-sm text-muted-foreground">
           Month {cycle.monthIndex} • ${amountDollars} {cycle.currency.toUpperCase()}
         </div>
+        {!canApprove && (
+          <div className="mt-1 text-xs text-amber-700 dark:text-amber-500">
+            Billing period in progress — you can approve after {periodEndsLabel}.
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" asChild>
           <Link href={`/dashboard/projects/${cycle.projectId}`}>View Hire</Link>
         </Button>
         <Button
           size="sm"
           onClick={onApprove}
-          disabled={isApproving}
+          disabled={!canApprove || isApproving}
+          title={
+            canApprove
+              ? undefined
+              : `Approve will unlock after the billing period ends (${periodEndsLabel}).`
+          }
           className="gap-2"
         >
           {isApproving ? (

@@ -13,10 +13,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, CheckCircle2, XCircle, ExternalLink, Info } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, ExternalLink, Info, Wallet } from "lucide-react";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { getDurationMonths } from "@/lib/project-duration";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { toast } from "sonner";
 
 export default function PaymentPage() {
   const router = useRouter();
@@ -38,8 +39,8 @@ export default function PaymentPage() {
       : "skip"
   );
 
-  const hiringBalance = useQuery(
-    api.wallets.queries.getMyClientReferralHiringBalance,
+  const walletBreakdown = useQuery(
+    api.wallets.queries.getMyClientPrefundingWalletBreakdown,
     user?._id && project
       ? { userId: user._id, currency: project.currency || "USD" }
       : "skip"
@@ -50,17 +51,17 @@ export default function PaymentPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
-  const [referralApplyCents, setReferralApplyCents] = useState(0);
+  const [walletApplyCents, setWalletApplyCents] = useState(0);
 
-  const maxReferralApplyCents = useMemo(() => {
-    if (!project || hiringBalance === undefined) return 0;
+  const maxWalletApplyCents = useMemo(() => {
+    if (!project || walletBreakdown === undefined) return 0;
     const grossCents = Math.round(project.totalAmount * 100);
-    return Math.min(hiringBalance.cents ?? 0, grossCents);
-  }, [project, hiringBalance]);
+    return Math.min(walletBreakdown.spendableCents ?? 0, grossCents);
+  }, [project, walletBreakdown]);
 
   useEffect(() => {
-    setReferralApplyCents(maxReferralApplyCents);
-  }, [maxReferralApplyCents]);
+    setWalletApplyCents(maxWalletApplyCents);
+  }, [maxWalletApplyCents]);
 
   useEffect(() => {
     if (!user || user.role !== "client") {
@@ -121,8 +122,18 @@ export default function PaymentPage() {
         amount: amountToPay,
         currency: project.currency || "USD",
         userId: user._id,
-        referralCreditCentsToApply: referralApplyCents,
+        walletCreditCentsToApply: walletApplyCents,
       });
+
+      if (result.fundedWithWalletOnly) {
+        toast.success("Your hire is funded from your wallet.");
+        router.push(`/dashboard/projects/${projectId}`);
+        return;
+      }
+
+      if (!result.paymentLink) {
+        throw new Error("No checkout link was returned. Please try again.");
+      }
 
       setPaymentLink(result.paymentLink);
       setTxRef(result.txRef);
@@ -199,6 +210,9 @@ export default function PaymentPage() {
   const durMonths = getDurationMonths(project.intakeForm?.projectDuration);
   const perMonth = durMonths > 0 ? project.totalAmount / durMonths : 0;
   const amountToPay = project.totalAmount;
+  const grossCents = Math.round(amountToPay * 100);
+  const walletAppliedCents = Math.min(walletApplyCents, maxWalletApplyCents);
+  const cardChargeApproxZero = grossCents - walletAppliedCents <= 0;
 
   return (
     <div className="space-y-6">
@@ -255,36 +269,50 @@ export default function PaymentPage() {
                 {amountToPay.toFixed(2)} {project.currency.toUpperCase()}
               </span>
             </div>
-            {maxReferralApplyCents > 0 && (
+            {maxWalletApplyCents > 0 && (
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 <div className="flex items-start gap-2">
-                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="space-y-2 text-sm">
-                    <p className="font-medium">Referral hiring credit</p>
+                    <p className="font-medium">Use wallet balance toward this hire</p>
                     <p className="text-xs text-muted-foreground">
-                      Apply up to {(maxReferralApplyCents / 100).toFixed(2)}{" "}
-                      {project.currency.toUpperCase()} from successful referrals. Any amount not covered by
-                      credit is charged to your card (minimum card charge rules apply).
+                      Apply up to {(maxWalletApplyCents / 100).toFixed(2)}{" "}
+                      {project.currency.toUpperCase()}{" "}
+                      from your in-platform balance (referral hiring credit, referral cash, refunds from hires,
+                      etc.). Any remainder is paid by card. If your balance covers the full amount, no card
+                      charge is needed.
                     </p>
+                    {walletBreakdown &&
+                      walletBreakdown.referralHiringCents > 0 &&
+                      walletBreakdown.referralHiringCents < walletBreakdown.spendableCents && (
+                        <p className="text-xs text-muted-foreground flex items-start gap-1">
+                          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          Includes{" "}
+                          {(walletBreakdown.referralHiringCents / 100).toFixed(2)}{" "}
+                          {project.currency.toUpperCase()} from referral hiring credit and other available
+                          balance.
+                        </p>
+                      )}
                     <input
                       type="range"
                       min={0}
-                      max={maxReferralApplyCents}
+                      max={maxWalletApplyCents}
                       step={1}
-                      value={Math.min(referralApplyCents, maxReferralApplyCents)}
-                      onChange={(e) => setReferralApplyCents(parseInt(e.target.value, 10))}
+                      value={Math.min(walletApplyCents, maxWalletApplyCents)}
+                      onChange={(e) => setWalletApplyCents(parseInt(e.target.value, 10))}
                       className="w-full accent-primary"
                     />
                     <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                       <span>
-                        Credit applied: {(Math.min(referralApplyCents, maxReferralApplyCents) / 100).toFixed(2)}{" "}
+                        From wallet:{" "}
+                        {(Math.min(walletApplyCents, maxWalletApplyCents) / 100).toFixed(2)}{" "}
                         {project.currency.toUpperCase()}
                       </span>
                       <span>
                         Card charge (approx.):{" "}
                         {(
                           amountToPay -
-                          Math.min(referralApplyCents, maxReferralApplyCents) / 100
+                          Math.min(walletApplyCents, maxWalletApplyCents) / 100
                         ).toFixed(2)}{" "}
                         {project.currency.toUpperCase()}
                       </span>
@@ -304,7 +332,8 @@ export default function PaymentPage() {
         <CardHeader>
           <CardTitle>Payment Information</CardTitle>
           <CardDescription>
-            Click the button below to proceed to the secure payment page.
+            Pay any card balance below through our secure checkout, or confirm if your wallet covers the full
+            hire.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -331,6 +360,11 @@ export default function PaymentPage() {
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Initializing...
+              </>
+            ) : cardChargeApproxZero && maxWalletApplyCents > 0 ? (
+              <>
+                <span>Fund hire from wallet</span>
+                <CheckCircle2 className="ml-2 h-4 w-4" />
               </>
             ) : (
               <>

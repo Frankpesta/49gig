@@ -2,6 +2,7 @@ import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+import { clientLockedGrossToFreelancerEscrowPool } from "./amounts";
 
 async function getCurrentUserInQuery(
   ctx: QueryCtx,
@@ -60,8 +61,22 @@ export const getDisputes = query({
               respondentName = respondent?.name ?? null;
             }
           }
+          let lockedAmount = d.lockedAmount;
+          if (project && user.role !== "admin" && user.role !== "moderator") {
+            const isFreelancer =
+              project.matchedFreelancerId === user._id ||
+              (project.matchedFreelancerIds?.includes(user._id) ?? false);
+            const isClient = project.clientId === user._id;
+            if (isFreelancer && !isClient) {
+              lockedAmount = clientLockedGrossToFreelancerEscrowPool(
+                d.lockedAmount,
+                project.platformFee ?? 15
+              );
+            }
+          }
           return {
             ...d,
+            lockedAmount,
             projectTitle: project?.intakeForm?.title ?? null,
             initiatorName: initiator?.name ?? null,
             respondentName,
@@ -211,7 +226,14 @@ export const getDispute = query({
 
     // Task 9: Role-based visibility of resolution notes and locked amount
     let visibleResolution = dispute.resolution;
+    // Stored lockedAmount is client gross (includes platform fee). Freelancers see net escrow pool.
     let visibleLockedAmount = dispute.lockedAmount;
+    if (isFreelancer && !isAdminOrModerator) {
+      visibleLockedAmount = clientLockedGrossToFreelancerEscrowPool(
+        dispute.lockedAmount,
+        project.platformFee ?? 15
+      );
+    }
 
     if (dispute.resolution && !isAdminOrModerator) {
       const { decision } = dispute.resolution;
@@ -231,16 +253,6 @@ export const getDispute = query({
           ...dispute.resolution,
           notes: "This dispute was resolved. The outcome was not in your favour.",
         };
-      }
-
-      // Clients see total locked amount (what they paid).
-      // Freelancers see only their portion (locked minus platform fee).
-      if (viewerIsFreelancer && !isAdminOrModerator) {
-        const platformFeeRate = Math.max(
-          0,
-          Math.min(1, (project.platformFee ?? 15) / 100)
-        );
-        visibleLockedAmount = Math.round(dispute.lockedAmount * (1 - platformFeeRate) * 100) / 100;
       }
     }
 

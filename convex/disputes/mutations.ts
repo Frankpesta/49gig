@@ -3,6 +3,11 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
+import { escrowNetToClientLockedGross } from "./amounts";
+import {
+  freelancersRemovedForPermanentExclusion,
+  mergePermanentExclusions,
+} from "../match_exclusions";
 
 const api = require("../_generated/api") as {
   api: {
@@ -36,7 +41,7 @@ async function getCurrentUserInMutation(
 
 /**
  * Initiate a dispute
- * Records full unreleased escrow as lockedAmount (dollars); project becomes disputed so releases are blocked until resolution.
+ * Records client gross funding in dispute (escrow net + platform-fee portion). Unreleased escrow stays net in `project.escrowedAmount`.
  */
 export const initiateDispute = mutation({
   args: {
@@ -196,8 +201,9 @@ export const initiateDispute = mutation({
       }
     }
 
-    // All unreleased escrow is frozen while a dispute is open (same currency units as project.escrowedAmount: dollars).
-    const lockedAmount = Math.max(0, project.escrowedAmount ?? 0);
+    const escrowNet = Math.max(0, project.escrowedAmount ?? 0);
+    const platformFeePct = project.platformFee ?? 15;
+    const lockedAmount = escrowNetToClientLockedGross(escrowNet, platformFeePct);
 
     // Validate partial team dispute: all specified freelancers must be on the project
     const teamMemberIds = project.matchedFreelancerIds ?? [];
@@ -646,9 +652,23 @@ export const resolveDispute = mutation({
       newProjectStatus = "in_progress";
     }
 
+    const exclusionPatch: {
+      permanentlyExcludedFreelancerIds?: Doc<"users">["_id"][];
+    } = {};
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      const removed = freelancersRemovedForPermanentExclusion(project, dispute);
+      if (removed.length > 0) {
+        exclusionPatch.permanentlyExcludedFreelancerIds = mergePermanentExclusions(
+          project.permanentlyExcludedFreelancerIds,
+          removed
+        );
+      }
+    }
+
     await ctx.db.patch(dispute.projectId, {
       status: newProjectStatus,
       updatedAt: now,
+      ...exclusionPatch,
     });
 
     await ctx.scheduler.runAfter(0, releaseDisputeFunds, {

@@ -483,6 +483,12 @@ export default defineSchema({
     /** Idempotency + audit: which dispute triggered the replacement flow. */
     replacementFlowDisputeId: v.optional(v.id("disputes")),
 
+    /**
+     * Freelancers removed after a client-favor or replacement dispute outcome.
+     * Never shown again in generated matches for this hire (same client / project).
+     */
+    permanentlyExcludedFreelancerIds: v.optional(v.array(v.id("users"))),
+
     // Audit
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -572,6 +578,8 @@ export default defineSchema({
 
     // Support (if support chat)
     supportRequestId: v.optional(v.string()),
+    /** Set by admin: primary moderator handling this support thread (inbox triage). */
+    supportAssignedModeratorId: v.optional(v.id("users")),
 
     // Metadata
     title: v.optional(v.string()),

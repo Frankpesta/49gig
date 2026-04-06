@@ -19,6 +19,7 @@ import {
   isFreelancerEligibleForProjectMatch,
   platformRoleIdForTeamRoleKey,
 } from "../../lib/matching-skill-utils";
+import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 
 function projectAllowsPostFundMatchGeneration(project: Doc<"projects">): boolean {
   if (project.status === "funded") return true;
@@ -341,6 +342,10 @@ export const generateMatches = action({
     for (const vettingResult of approvedFreelancers) {
       const freelancer = vettingResult.freelancer;
 
+      if (isFreelancerPermanentlyExcluded(project, freelancer._id as string)) {
+        continue;
+      }
+
       // Skip if freelancer already matched to this project
       const existingMatch = await ctx.runQuery(
         internal.matching.queries.getMatch,
@@ -535,6 +540,9 @@ export const generateTeamMatches = action({
         .filter((m: { status: string }) => m.status === "pending" || m.status === "accepted")
         .map((m: { freelancerId: string }) => m.freelancerId as string)
     );
+    const permanentlyExcludedIds = new Set(
+      (project.permanentlyExcludedFreelancerIds ?? []).map(String)
+    );
 
     if (slotSpecs.length > 0) {
       const acceptedBySlot = slotSpecs.map(() => 0);
@@ -567,6 +575,7 @@ export const generateTeamMatches = action({
 
         for (const { freelancer, vettingResult } of approvedFreelancers) {
           if (reservedFreelancerIds.has(freelancer._id as string)) continue;
+          if (permanentlyExcludedIds.has(String(freelancer._id))) continue;
 
           const existingMatch = await ctx.runQuery(
             internal.matching.queries.getMatch,
@@ -652,6 +661,7 @@ export const generateTeamMatches = action({
 
         for (const { freelancer, vettingResult } of approvedFreelancers) {
           if (reservedFreelancerIds.has(freelancer._id as string)) continue;
+          if (permanentlyExcludedIds.has(String(freelancer._id))) continue;
 
           const existingMatch = await ctx.runQuery(
             internal.matching.queries.getMatch,
@@ -904,6 +914,9 @@ export const generateMatchesForDraft = action({
       }> = [];
 
       for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
+        if (isFreelancerPermanentlyExcluded(project, freelancer._id as string)) {
+          continue;
+        }
         if (
           !isFreelancerEligibleForProjectMatch(
             freelancer,
@@ -1041,6 +1054,9 @@ export const generateMatchesForDraft = action({
       }> = [];
 
       for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
+        if (isFreelancerPermanentlyExcluded(project, freelancer._id as string)) {
+          continue;
+        }
         if (
           !isFreelancerEligibleForProjectMatch(
             freelancer,
