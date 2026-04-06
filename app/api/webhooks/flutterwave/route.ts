@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+function createConvexHttpClient(): ConvexHttpClient | null {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+  if (!url) return null;
+  return new ConvexHttpClient(url);
+}
 
 const secretHash = process.env.FLUTTERWAVE_WEBHOOK_SECRET!;
 
@@ -89,6 +93,15 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`Processing Flutterwave webhook: ${eventType}`);
+
+    const convex = createConvexHttpClient();
+    if (!convex) {
+      console.error("Flutterwave webhook: NEXT_PUBLIC_CONVEX_URL is not set");
+      return NextResponse.json(
+        { error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
 
     // Do something (that doesn't take too long) with the payload
     // Use Convex action for async processing

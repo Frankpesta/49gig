@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { AdminCharts } from "@/components/dashboard/admin-charts";
 import { FreelancerChecklist } from "@/components/dashboard/freelancer-checklist";
+import { FreelancerMatchingReadinessBanner } from "@/components/dashboard/freelancer-matching-readiness-banner";
 import {
   ProjectAnalyticsCard,
   ProjectListCard,
@@ -275,7 +276,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-500">
-      {isFreelancer && <FreelancerChecklist />}
+      {isFreelancer && (
+        <div className="space-y-4">
+          <FreelancerMatchingReadinessBanner />
+          <FreelancerChecklist />
+        </div>
+      )}
 
       {/* Page header - reference style, lively typography */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

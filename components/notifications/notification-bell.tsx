@@ -20,6 +20,8 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { notificationDetailHref } from "@/lib/notification-nav";
 
 const BELL_LIMIT = 10;
 
@@ -27,22 +29,14 @@ function notificationDropdownHref(
   notification: Doc<"notifications">,
   userRole: string | undefined
 ): string {
-  const data = notification.data;
-  if (
-    userRole === "freelancer" &&
-    notification.type === "match" &&
-    data &&
-    typeof data === "object" &&
-    typeof (data as Record<string, unknown>).matchId === "string"
-  ) {
-    const matchId = (data as Record<string, string>).matchId;
-    return `/dashboard/match-requests?matchId=${encodeURIComponent(matchId)}`;
-  }
+  const direct = notificationDetailHref(notification, userRole);
+  if (direct) return direct;
   return `/dashboard/notification-history/${notification._id}`;
 }
 
 export function NotificationBell() {
   const { user } = useAuth();
+  const router = useRouter();
   const inAppEnabled = user?.notificationPreferences?.inApp ?? true;
   const [refreshKey, setRefreshKey] = useState(0);
   const notifications = useQuery(
@@ -62,8 +56,22 @@ export function NotificationBell() {
       setRefreshKey((prev) => prev + 1);
       const pushEnabled = user?.notificationPreferences?.push ?? true;
       if (pushEnabled) {
+        const openPath =
+          payload.data &&
+          typeof payload.data === "object" &&
+          typeof (payload.data as Record<string, unknown>).openPath === "string"
+            ? String((payload.data as Record<string, string>).openPath)
+            : null;
         toast(payload.title, {
           description: payload.message,
+          ...(openPath
+            ? {
+                action: {
+                  label: "View",
+                  onClick: () => router.push(openPath),
+                },
+              }
+            : {}),
         });
       }
     },

@@ -12,6 +12,7 @@ import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-stat
 import { Bell, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { notificationDetailHref } from "@/lib/notification-nav";
 
 const LIST_LIMIT = 100;
 
@@ -80,7 +81,10 @@ export default function NotificationHistoryPage() {
               {list.map((notification: Doc<"notifications">) => (
                 <Link
                   key={notification._id}
-                  href={`/dashboard/notification-history/${notification._id}`}
+                  href={
+                    notificationDetailHref(notification, user.role) ||
+                    `/dashboard/notification-history/${notification._id}`
+                  }
                   className={cn(
                     "flex items-start gap-4 px-6 py-4 transition-colors hover:bg-muted/40",
                     !notification.readAt && "bg-muted/20"

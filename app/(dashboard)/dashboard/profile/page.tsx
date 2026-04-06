@@ -33,6 +33,7 @@ import {
 } from "@/lib/platform-skills";
 import { PROFILE_TIMEZONE_OPTIONS } from "@/lib/timezones";
 import { ProfileCard } from "@/components/profile/profile-card";
+import { FreelancerMatchingReadinessBanner } from "@/components/dashboard/freelancer-matching-readiness-banner";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import {
@@ -110,6 +111,12 @@ export default function ProfilePage() {
     (api as any)["reviews/queries"].getReviewsForFreelancer,
     effectiveUser?._id && effectiveUser?.role === "freelancer"
       ? { freelancerId: effectiveUser._id, userId: effectiveUser._id, limit: 10 }
+      : "skip"
+  );
+  const matchingReadiness = useQuery(
+    api.users.queries.getMyFreelancerMatchingReadiness,
+    effectiveUser?._id && effectiveUser?.role === "freelancer"
+      ? { userId: effectiveUser._id }
       : "skip"
   );
 
@@ -370,6 +377,12 @@ export default function ProfilePage() {
         description="Manage your profile information and preferences."
         icon={User}
       />
+
+      {isFreelancer &&
+        matchingReadiness !== undefined &&
+        matchingReadiness.issues.length > 0 && (
+          <FreelancerMatchingReadinessBanner issuesOverride={matchingReadiness.issues} />
+        )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Profile Hero Card */}
