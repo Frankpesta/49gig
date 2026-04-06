@@ -149,6 +149,23 @@ export default function NotificationDetailPage() {
           {notification.data && typeof notification.data === "object" && (() => {
             const d = notification.data as Record<string, string>;
             const actions: ReactNode[] = [];
+                if (
+                  notification.type === "match" &&
+                  user?.role === "freelancer" &&
+                  typeof d.matchId === "string"
+                ) {
+                  actions.push(
+                    <Button key="respond" asChild>
+                      <Link
+                        href={`/dashboard/match-requests?matchId=${encodeURIComponent(d.matchId)}`}
+                        className="gap-2"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Approve or decline
+                      </Link>
+                    </Button>
+                  );
+                }
                 if (typeof d.projectId === "string") {
                   actions.push(
                     <Button key="hire" variant="outline" asChild>
@@ -158,7 +175,7 @@ export default function NotificationDetailPage() {
                       </Link>
                     </Button>
                   );
-                  if (notification.type === "match") {
+                  if (notification.type === "match" && user?.role !== "freelancer") {
                     actions.push(
                       <Button key="matches" asChild>
                         <Link

@@ -497,7 +497,14 @@ export default function DashboardPage() {
                 const chatHref = (n as { chatThreadHref?: string }).chatThreadHref;
                 const href =
                   n.type === "match" && n.data?.projectId
-                    ? `/dashboard/projects/${n.data.projectId}`
+                    ? isFreelancer &&
+                        n.data &&
+                        typeof n.data === "object" &&
+                        typeof (n.data as Record<string, unknown>).matchId === "string"
+                      ? `/dashboard/match-requests?matchId=${encodeURIComponent(
+                          String((n.data as Record<string, string>).matchId)
+                        )}`
+                      : `/dashboard/projects/${n.data.projectId}`
                     : typeof chatHref === "string"
                       ? chatHref
                       : n.type === "message" && n.data?.chatId

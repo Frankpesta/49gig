@@ -20,7 +20,8 @@ import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-stat
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { Handshake, CheckCircle2, XCircle, Loader2, Clock, DollarSign, Calendar } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
 
 type MatchRequest = {
@@ -42,6 +43,9 @@ const CONFIDENCE_STYLES = {
 
 export default function MatchRequestsPage() {
   const { user, isAuthenticated } = useAuth();
+  const searchParams = useSearchParams();
+  const focusMatchId = searchParams.get("matchId");
+
   const [declineMatchId, setDeclineMatchId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [responding, setResponding] = useState<string | null>(null);
@@ -52,6 +56,23 @@ export default function MatchRequestsPage() {
   );
 
   const respond = useMutation((api as any).matching.mutations.respondToMatchAsFreelancer);
+  const didScrollToMatchRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!focusMatchId || pendingMatches === undefined || pendingMatches.length === 0) return;
+    if (!pendingMatches.some((m: MatchRequest) => m._id === focusMatchId)) return;
+    if (didScrollToMatchRef.current === focusMatchId) return;
+    didScrollToMatchRef.current = focusMatchId;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`freelancer-match-${focusMatchId}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.classList.add("ring-2", "ring-primary", "ring-offset-2", "rounded-xl");
+      window.setTimeout(() => {
+        el?.classList.remove("ring-2", "ring-primary", "ring-offset-2", "rounded-xl");
+      }, 2500);
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [focusMatchId, pendingMatches]);
 
   if (!isAuthenticated || !user) {
     return <DashboardEmptyState icon={Handshake} title="Please log in" iconTone="muted" />;
@@ -115,7 +136,11 @@ export default function MatchRequestsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {pendingMatches.map((match: MatchRequest) => (
-            <Card key={match._id} className="rounded-xl overflow-hidden border-primary/20 shadow-sm">
+            <Card
+              key={match._id}
+              id={`freelancer-match-${match._id}`}
+              className="rounded-xl overflow-hidden border-primary/20 shadow-sm scroll-mt-24"
+            >
               <div className="h-1 bg-gradient-to-r from-primary to-primary/60" />
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">

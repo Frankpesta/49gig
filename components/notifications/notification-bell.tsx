@@ -23,6 +23,24 @@ import Link from "next/link";
 
 const BELL_LIMIT = 10;
 
+function notificationDropdownHref(
+  notification: Doc<"notifications">,
+  userRole: string | undefined
+): string {
+  const data = notification.data;
+  if (
+    userRole === "freelancer" &&
+    notification.type === "match" &&
+    data &&
+    typeof data === "object" &&
+    typeof (data as Record<string, unknown>).matchId === "string"
+  ) {
+    const matchId = (data as Record<string, string>).matchId;
+    return `/dashboard/match-requests?matchId=${encodeURIComponent(matchId)}`;
+  }
+  return `/dashboard/notification-history/${notification._id}`;
+}
+
 export function NotificationBell() {
   const { user } = useAuth();
   const inAppEnabled = user?.notificationPreferences?.inApp ?? true;
@@ -116,7 +134,7 @@ export function NotificationBell() {
             displayedNotifications.map((notification: Doc<"notifications">) => (
               <DropdownMenuItem key={notification._id} asChild>
                 <Link
-                  href={`/dashboard/notification-history/${notification._id}`}
+                  href={notificationDropdownHref(notification, user?.role)}
                   className={cn(
                     "flex cursor-pointer items-start gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3",
                     !notification.readAt && "bg-muted/40"

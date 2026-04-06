@@ -37,6 +37,14 @@ import { getDurationMonths } from "@/lib/project-duration";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ProjectContractView } from "@/components/contracts/project-contract-view";
 import {
   AlertDialog,
@@ -202,6 +210,17 @@ export default function ProjectDetailPage() {
   const adminDeleteProjectMutation = useMutation(
     (api as any)["projects/mutations"].adminDeleteProject
   );
+  const pendingFreelancerMatches = useQuery(
+    (api as any).matching.queries.getPendingFreelancerMatches,
+    user?.role === "freelancer" && user?._id ? { userId: user._id } : "skip"
+  );
+  const respondToMatchAsFreelancer = useMutation(
+    (api as any).matching.mutations.respondToMatchAsFreelancer
+  );
+
+  const [declineMatchId, setDeclineMatchId] = useState<Id<"matches"> | null>(null);
+  const [declineMatchReason, setDeclineMatchReason] = useState("");
+  const [respondingMatchId, setRespondingMatchId] = useState<Id<"matches"> | null>(null);
 
   // Prefill rating form when existing review loads
   useEffect(() => {
@@ -467,6 +486,50 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const pendingMatchForThisProject =
+    user.role === "freelancer" && projectId && Array.isArray(pendingFreelancerMatches)
+      ? pendingFreelancerMatches.find(
+          (m: { projectId: Id<"projects"> }) => m.projectId === projectId
+        )
+      : undefined;
+
+  const handleAcceptPendingMatch = async (matchId: Id<"matches">) => {
+    if (!user?._id) return;
+    setRespondingMatchId(matchId);
+    try {
+      await respondToMatchAsFreelancer({
+        matchId,
+        response: "accepted",
+        userId: user._id,
+      });
+      toast.success("You've accepted! Contract generation is in progress.");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Failed to accept");
+    } finally {
+      setRespondingMatchId(null);
+    }
+  };
+
+  const handleDeclinePendingMatch = async () => {
+    if (!user?._id || !declineMatchId) return;
+    setRespondingMatchId(declineMatchId);
+    try {
+      await respondToMatchAsFreelancer({
+        matchId: declineMatchId,
+        response: "rejected",
+        rejectionReason: declineMatchReason.trim() || undefined,
+        userId: user._id,
+      });
+      toast.success("You've declined this opportunity.");
+      setDeclineMatchId(null);
+      setDeclineMatchReason("");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Failed to decline");
+    } finally {
+      setRespondingMatchId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {isFreelancerReplacementMatching && projectId && (
@@ -476,6 +539,92 @@ export default function ProjectDetailPage() {
           className="animate-in fade-in slide-in-from-top-2 duration-500"
         />
       )}
+
+      {pendingMatchForThisProject && (
+        <Alert className="animate-in fade-in slide-in-from-top-2 duration-500 border-primary/35 bg-primary/5">
+          <User className="h-4 w-4 text-primary" />
+          <AlertTitle className="text-foreground">You&apos;ve been selected for this hire</AlertTitle>
+          <AlertDescription className="text-muted-foreground space-y-4">
+            <p>
+              The client chose you for this project. Accept to move forward with contract preparation, or decline if
+              you can&apos;t take it on.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="gap-1.5"
+                onClick={() => handleAcceptPendingMatch(pendingMatchForThisProject._id)}
+                disabled={respondingMatchId === pendingMatchForThisProject._id}
+              >
+                {respondingMatchId === pendingMatchForThisProject._id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                Accept
+              </Button>
+              <Button
+                variant="outline"
+                className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/5"
+                onClick={() => setDeclineMatchId(pendingMatchForThisProject._id)}
+                disabled={respondingMatchId === pendingMatchForThisProject._id}
+              >
+                <XCircle className="h-4 w-4" />
+                Decline
+              </Button>
+              <Button variant="ghost" size="sm" asChild className="text-muted-foreground">
+                <Link href={`/dashboard/match-requests?matchId=${pendingMatchForThisProject._id}`}>
+                  Open match requests
+                </Link>
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Dialog
+        open={!!declineMatchId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeclineMatchId(null);
+            setDeclineMatchReason("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Decline this opportunity?</DialogTitle>
+            <DialogDescription>
+              The client will be notified and can select another freelancer. You can optionally provide a reason.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Optional: brief reason for declining..."
+            value={declineMatchReason}
+            onChange={(e) => setDeclineMatchReason(e.target.value)}
+            rows={3}
+            className="resize-none"
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeclineMatchId(null);
+                setDeclineMatchReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeclinePendingMatch}
+              disabled={!!respondingMatchId}
+            >
+              {respondingMatchId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Yes, decline
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {clientWaitingFreelancerMatchAcceptance && (
         <Alert className="animate-in fade-in slide-in-from-top-2 duration-500 border-amber-500/45 bg-amber-500/10 dark:bg-amber-950/30">
