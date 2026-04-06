@@ -890,12 +890,14 @@ export const generateMatchesForDraft = action({
       return { matchIds: [], isTeam: false, groupCount: 0, availability: null };
     }
 
-    // Filter by experience level: only match freelancers at the requested level
+    // Filter by experience level: include freelancers at the requested level or above.
+    // Over-qualified freelancers (senior for a mid role) are better than zero matches.
     const levelFiltered = approvedFreelancers.filter((a) => {
       const fl = a.freelancer.profile?.experienceLevel || "mid";
-      return fl === requestedLevel;
+      return levelIndex(fl) >= levelIndex(requestedLevel);
     });
-    // For "hasHigherLevel" check: freelancers at higher level with matching skills
+    // "hasHigherLevel" check is now redundant (higherLevel ⊂ levelFiltered), but keep the
+    // variable for the availability message in case levelFiltered itself is empty.
     const higherLevelFreelancers = approvedFreelancers.filter((a) => {
       const fl = a.freelancer.profile?.experienceLevel || "mid";
       return levelIndex(fl) > levelIndex(requestedLevel);

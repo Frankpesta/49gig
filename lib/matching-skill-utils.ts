@@ -129,8 +129,10 @@ export function calculateSkillOverlapPercent(
 }
 
 /**
- * Hard gate: at least one selected skill must match (when there are normalized skills),
- * and declared techField must align with the hire category when set.
+ * Hard gate: at least one selected skill must match (when there are normalized skills).
+ * When explicit skills are required, techField is used only as a scoring factor — not a hard gate —
+ * because many skills (Python, SQL, TypeScript, …) span multiple categories.
+ * When there are NO required skills, techField is the only category signal, so we gate on it.
  */
 export function isFreelancerEligibleForProjectMatch(
   freelancer: {
@@ -151,6 +153,7 @@ export function isFreelancerEligibleForProjectMatch(
     return false;
   }
   if (normalizedRequired.length > 0) {
+    // Skills are specified — gate on skill match only; techField is a scoring signal, not a hard filter.
     if (
       !freelancerMatchesAtLeastOneRequiredSkill(
         normalizedRequired,
@@ -159,10 +162,11 @@ export function isFreelancerEligibleForProjectMatch(
     ) {
       return false;
     }
-  } else if (!freelancerMatchesRole(freelancer.profile?.techField, projectRoleId)) {
-    return false;
+  } else {
+    // No required skills — use techField as the category proxy.
+    if (!freelancerMatchesRole(freelancer.profile?.techField, projectRoleId)) {
+      return false;
+    }
   }
-  const tf = freelancer.profile?.techField;
-  if (tf && !freelancerMatchesRole(tf, projectRoleId)) return false;
   return true;
 }
