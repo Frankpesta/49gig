@@ -83,6 +83,10 @@ export default function ContractPage() {
   }
 
   const isClient = project.clientId === user._id;
+  const isFreelancer = user.role === "freelancer" && !isClient;
+  const isMatchedFreelancer =
+    project.matchedFreelancerId === user._id ||
+    (project.matchedFreelancerIds?.includes(user._id) ?? false);
   const hasSelected =
     project.selectedFreelancerId ||
     (project.selectedFreelancerIds && project.selectedFreelancerIds.length > 0);
@@ -90,11 +94,8 @@ export default function ContractPage() {
     project.matchedFreelancerId ||
     (project.matchedFreelancerIds && project.matchedFreelancerIds.length > 0);
   const canViewContract =
-    isClient && (hasSelected || hasMatched);
-  const isFreelancer = user.role === "freelancer" && !isClient;
-  const isMatchedFreelancer =
-    project.matchedFreelancerId === user._id ||
-    (project.matchedFreelancerIds?.includes(user._id) ?? false);
+    (isClient && (hasSelected || hasMatched)) ||
+    (isFreelancer && isMatchedFreelancer && (hasSelected || hasMatched));
   const isSelectedNotYetMatched =
     isFreelancer &&
     !isMatchedFreelancer &&
@@ -195,15 +196,30 @@ export default function ContractPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
-          <Link href={`/dashboard/projects/${projectId}/matches`}>
+          <Link
+            href={
+              isClient
+                ? `/dashboard/projects/${projectId}/matches`
+                : "/dashboard/projects"
+            }
+          >
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div>
           <h1 className="text-2xl font-heading font-bold">Sign the contract</h1>
           <p className="text-sm text-muted-foreground">
-            Review and sign the project agreement. Your signature will be added
-            and a copy sent to your email and the freelancer&apos;s email.
+            {isClient ? (
+              <>
+                Review and sign the project agreement. Your signature will be added
+                and a copy sent to your email and the freelancer&apos;s email.
+              </>
+            ) : (
+              <>
+                Review and sign the project agreement. Your signature will be added
+                and a copy sent to your email and the client&apos;s email.
+              </>
+            )}
           </p>
         </div>
       </div>
