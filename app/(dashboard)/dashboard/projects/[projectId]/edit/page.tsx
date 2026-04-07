@@ -87,17 +87,6 @@ const DURATION_DAYS: Record<string, number> = {
   "60": 1825,
 };
 
-const DURATION_DISCOUNT: Record<string, number> = {
-  "1": 1,
-  "3": 0.97,
-  "6": 0.95,
-  "12+": 0.95,
-  "12": 0.95,
-  "24": 0.95,
-  "36": 0.95,
-  "48": 0.95,
-  "60": 0.95,
-};
 
 /** Format duration for display (e.g. "3 months", "2 years") */
 function formatDurationDisplay(projectDuration: string): string {
@@ -365,8 +354,7 @@ export default function EditProjectPage() {
           selectedSkillNames: Object.values(formData.roleSkills).flat(),
         });
       }
-      const discount = DURATION_DISCOUNT[formData.projectDuration] ?? 0.97;
-      return { ...calc, estimatedBudget: Math.round(calc.estimatedBudget * discount) };
+      return calc;
     } catch {
       return null;
     }
@@ -813,7 +801,7 @@ export default function EditProjectPage() {
           ) : budgetCalculation ? (
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 space-y-4">
               <div className="flex justify-between items-baseline">
-                <span className="text-sm font-medium text-muted-foreground">Estimated total</span>
+                <span className="text-sm font-medium text-muted-foreground">Total Cost</span>
                 <span className="text-2xl font-bold">{formatBudget(budgetCalculation.estimatedBudget)}</span>
               </div>
               <p className="text-sm text-muted-foreground">
