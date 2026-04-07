@@ -60,6 +60,7 @@ import {
   getRoleIdForSkill,
   getRoleLabel,
   getRoleLabelFromCategoryLabel,
+  humanizeTeamRoleKey,
   isCategoryLabel,
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
@@ -336,6 +337,23 @@ export default function ProjectDetailPage() {
     (project.status === "draft" || project.status === "pending_funding");
 
   const terminalOrDispute = ["completed", "cancelled", "disputed"].includes(project.status);
+  const confirmedTeamMembers =
+    (
+      project as {
+        confirmedTeamMembers?: Array<{
+          _id: Id<"users">;
+          name: string;
+          teamRole?: string;
+        }>;
+      }
+    ).confirmedTeamMembers ?? [];
+  const isTeamHire = project.intakeForm.hireType === "team";
+  const teamSeatTotal =
+    project.intakeForm.teamMemberCount ??
+    project.intakeForm.teamSlots?.filter((s: { roleId: string }) => s.roleId)?.length ??
+    (confirmedTeamMembers.length > 0
+      ? confirmedTeamMembers.length + (project.pendingTeamMemberSlots ?? 0)
+      : undefined);
   const postFundingSelection = !["draft", "pending_funding"].includes(project.status);
   const clientWaitingFreelancerMatchAcceptance =
     isClient &&
@@ -661,6 +679,24 @@ export default function ProjectDetailPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      {isTeamHire &&
+        user.role === "freelancer" &&
+        isMatchedFreelancer &&
+        !terminalOrDispute &&
+        project.status !== "matched" &&
+        project.status !== "in_progress" && (
+          <Alert className="animate-in fade-in slide-in-from-top-2 duration-500 border-emerald-500/40 bg-emerald-500/8 dark:bg-emerald-950/25">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <AlertTitle className="text-emerald-900 dark:text-emerald-100">
+              You&apos;re on the team
+            </AlertTitle>
+            <AlertDescription className="text-emerald-900/85 dark:text-emerald-100/90">
+              You&apos;ve accepted this hire. We&apos;re still waiting for other team members to confirm before this
+              project moves to matched status and contracts go out.
+            </AlertDescription>
+          </Alert>
+        )}
 
       {clientWaitingFreelancerContractSignature && (
         <Alert className="animate-in fade-in slide-in-from-top-2 duration-500 border-sky-500/40 bg-sky-500/8 dark:bg-sky-950/25">
@@ -1209,7 +1245,36 @@ export default function ProjectDetailPage() {
                   </div>
                 </div>
               )}
-              {project.freelancer && (
+              {isTeamHire && confirmedTeamMembers.length > 0 ? (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <User className="h-4 w-4" />
+                      {confirmedTeamMembers.length === 1 ? "Freelancer" : "Team"}
+                    </div>
+                    {teamSeatTotal != null && teamSeatTotal > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        {confirmedTeamMembers.length} of {teamSeatTotal} seat
+                        {teamSeatTotal === 1 ? "" : "s"} confirmed
+                      </p>
+                    )}
+                    <ul className="space-y-2 text-sm text-muted-foreground">
+                      {confirmedTeamMembers.map((member) => (
+                        <li key={member._id}>
+                          <span className="font-medium text-foreground">{member.name}</span>
+                          {member.teamRole ? (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {humanizeTeamRoleKey(member.teamRole)}
+                            </span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              ) : project.freelancer ? (
                 <>
                   <Separator />
                   <div>
@@ -1222,7 +1287,7 @@ export default function ProjectDetailPage() {
                     </div>
                   </div>
                 </>
-              )}
+              ) : null}
               {showProjectChat && (
                 <>
                   <Separator />

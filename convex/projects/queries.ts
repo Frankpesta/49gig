@@ -352,6 +352,26 @@ export const getProject = query({
       .collect();
     const pendingMatchesCount = matchRows.filter((m) => m.status === "pending").length;
 
+    const confirmedTeamMembers: Array<{
+      _id: Doc<"users">["_id"];
+      name: string;
+      teamRole?: string;
+    }> = [];
+    const seenConfirmedFreelancer = new Set<string>();
+    for (const m of matchRows) {
+      if (m.status !== "accepted" || m.freelancerAction !== "accepted") continue;
+      const fid = m.freelancerId as string;
+      if (seenConfirmedFreelancer.has(fid)) continue;
+      seenConfirmedFreelancer.add(fid);
+      const u = await ctx.db.get(m.freelancerId);
+      if (!u) continue;
+      confirmedTeamMembers.push({
+        _id: u._id,
+        name: u.name,
+        teamRole: m.teamRole,
+      });
+    }
+
     // Get client and freelancer info
     const client = await ctx.db.get(project.clientId);
     const freelancer = project.matchedFreelancerId
@@ -361,6 +381,7 @@ export const getProject = query({
     return {
       ...project,
       pendingMatchesCount,
+      confirmedTeamMembers,
       client: client
         ? {
             _id: client._id,
