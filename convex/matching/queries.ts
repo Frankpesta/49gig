@@ -327,13 +327,20 @@ export const getPendingFreelancerMatches = query({
         const rawProject = await ctx.db.get(match.projectId);
         const project = rawProject as any;
         const client = project ? await ctx.db.get(project.clientId) : null;
+        const intake = project?.intakeForm ?? {};
         return {
           ...match,
-          projectTitle: project?.intakeForm?.title ?? null,
-          projectDescription: project?.intakeForm?.description ?? null,
+          projectTitle: intake.title ?? null,
+          projectDescription: intake.description ?? null,
           clientName: (client as any)?.name ?? null,
-          projectDuration: project?.intakeForm?.projectDuration ?? null,
+          projectDuration: intake.projectDuration ?? null,
           totalAmount: project?.totalAmount ?? null,
+          hireType: intake.hireType ?? null,
+          experienceLevel: intake.experienceLevel ?? null,
+          roleType: intake.roleType ?? null,
+          requiredSkills: intake.requiredSkills ?? [],
+          specialRequirements: intake.specialRequirements ?? null,
+          startDate: intake.startDate ?? null,
         };
       })
     );
