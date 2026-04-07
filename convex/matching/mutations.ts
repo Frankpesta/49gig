@@ -441,6 +441,13 @@ export const respondToMatchAsFreelancer = mutation({
       const allFreelancerAcceptedOnClientPicks = clientAcceptedMatches.every(
         (m) => m.freelancerAction === "accepted"
       );
+      const confirmedFreelancerIdsFromMatches = [
+        ...new Set(
+          clientAcceptedMatches
+            .filter((m) => m.freelancerAction === "accepted")
+            .map((m) => m.freelancerId)
+        ),
+      ];
 
       const slotsRemain = (project.pendingTeamMemberSlots ?? 0) > 0;
       const awaitingMoreClientPicks = project.awaitingMatch === true && slotsRemain;
@@ -449,6 +456,10 @@ export const respondToMatchAsFreelancer = mutation({
         if (!allFreelancerAcceptedOnClientPicks) {
           await ctx.db.patch(match.projectId, {
             status: awaitingMoreClientPicks ? "matching" : "awaiting_freelancer",
+            matchedFreelancerIds:
+              confirmedFreelancerIdsFromMatches.length > 0
+                ? confirmedFreelancerIdsFromMatches
+                : undefined,
             updatedAt: now,
           } as any);
 
@@ -483,6 +494,10 @@ export const respondToMatchAsFreelancer = mutation({
         if (awaitingMoreClientPicks) {
           await ctx.db.patch(match.projectId, {
             status: "matching",
+            matchedFreelancerIds:
+              confirmedFreelancerIdsFromMatches.length > 0
+                ? confirmedFreelancerIdsFromMatches
+                : undefined,
             updatedAt: now,
           } as any);
 
