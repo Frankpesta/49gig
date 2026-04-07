@@ -79,6 +79,7 @@ export type ProjectDuration =
   | (typeof ENGAGEMENT_YEAR_OPTIONS)[number]["value"];
 
 const DURATION_DAYS: Record<string, number> = {
+  "1": 30,
   "3": 90,
   "6": 180,
   "12+": 365,
