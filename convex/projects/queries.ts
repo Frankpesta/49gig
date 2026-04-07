@@ -72,7 +72,7 @@ export const getProjects = query({
       throw new Error("Not authenticated");
     }
 
-    let projects;
+    let projects: Doc<"projects">[];
 
     if (user.role === "admin") {
       // Admins see all projects
@@ -106,21 +106,50 @@ export const getProjects = query({
           .collect();
       }
     } else if (user.role === "freelancer") {
-      // Freelancers see projects they're matched to
-      if (args.status) {
-        projects = await ctx.db
-          .query("projects")
-          .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
-          .filter((q) => q.eq(q.field("status"), args.status!))
-          .order("desc")
-          .collect();
-      } else {
-        projects = await ctx.db
-          .query("projects")
-          .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
-          .order("desc")
-          .collect();
+      // Solo matched via `matchedFreelancerId`, plus any hire where the client selected this
+      // freelancer or they have already accepted (team rosters, legacy rows missing index field).
+      const byAssigned = await ctx.db
+        .query("projects")
+        .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
+        .collect();
+
+      const myMatches = await ctx.db
+        .query("matches")
+        .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+        .collect();
+
+      const relevantProjectIds = new Set<string>();
+      for (const m of myMatches) {
+        if (m.status === "rejected" || m.status === "expired") continue;
+        const awaitingMyResponse =
+          m.clientAction === "accepted" && m.freelancerAction == null;
+        const iAccepted = m.freelancerAction === "accepted";
+        if (awaitingMyResponse || iAccepted) {
+          relevantProjectIds.add(m.projectId as string);
+        }
       }
+
+      const byMatch: Doc<"projects">[] = [];
+      for (const pid of relevantProjectIds) {
+        const p = await ctx.db.get(pid as Doc<"projects">["_id"]);
+        if (p) byMatch.push(p);
+      }
+
+      const seen = new Set<string>();
+      projects = [];
+      const pushUnique = (p: Doc<"projects">) => {
+        const id = p._id as string;
+        if (seen.has(id)) return;
+        seen.add(id);
+        projects.push(p);
+      };
+      for (const p of byAssigned) pushUnique(p);
+      for (const p of byMatch) pushUnique(p);
+
+      if (args.status) {
+        projects = projects.filter((p) => p.status === args.status);
+      }
+      projects.sort((a, b) => b.createdAt - a.createdAt);
     } else {
       // Moderators see all projects (read-only)
       if (args.status) {

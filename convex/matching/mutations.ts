@@ -473,7 +473,11 @@ export const respondToMatchAsFreelancer = mutation({
             data: { matchId: args.matchId, projectId: match.projectId },
           });
 
-          return { success: true };
+          return {
+            success: true,
+            projectId: match.projectId,
+            contractFlowStarted: false,
+          };
         }
 
         if (awaitingMoreClientPicks) {
@@ -501,7 +505,11 @@ export const respondToMatchAsFreelancer = mutation({
             data: { matchId: args.matchId, projectId: match.projectId },
           });
 
-          return { success: true };
+          return {
+            success: true,
+            projectId: match.projectId,
+            contractFlowStarted: false,
+          };
         }
 
         const mergedIds = [
@@ -610,44 +618,48 @@ export const respondToMatchAsFreelancer = mutation({
           .generateAndSendContract as unknown as FunctionReference<"action">;
         await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId: args.matchId });
       }
-    } else {
-      // Freelancer rejected — revert project to "matching" for new selection
-      await ctx.db.patch(args.matchId, {
-        status: "rejected",
-        freelancerAction: "rejected",
-        freelancerActionAt: now,
-        freelancerRejectionReason: args.rejectionReason?.trim(),
-        updatedAt: now,
-      });
 
-      await ctx.db.patch(match.projectId, {
-        status: "matching",
-        updatedAt: now,
-      } as any);
-
-      // Log audit
-      await ctx.db.insert("auditLogs", {
-        action: "match_freelancer_rejected",
-        actionType: "system",
-        actorId: user._id,
-        actorRole: user.role,
-        targetType: "match",
-        targetId: args.matchId,
-        details: { projectId: match.projectId, reason: args.rejectionReason },
-        createdAt: now,
-      });
-
-      // Notify client to select a different freelancer
-      await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: [project.clientId],
-        title: "Freelancer declined",
-        message: `A freelancer has declined the opportunity for "${project.intakeForm.title}". Please review other candidates.`,
-        type: "match",
-        data: { matchId: args.matchId, projectId: match.projectId, freelancerDeclined: true },
-      });
+      return {
+        success: true,
+        projectId: match.projectId,
+        contractFlowStarted: true,
+      };
     }
 
-    return { success: true };
+    // Freelancer rejected — revert project to "matching" for new selection
+    await ctx.db.patch(args.matchId, {
+      status: "rejected",
+      freelancerAction: "rejected",
+      freelancerActionAt: now,
+      freelancerRejectionReason: args.rejectionReason?.trim(),
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(match.projectId, {
+      status: "matching",
+      updatedAt: now,
+    } as any);
+
+    await ctx.db.insert("auditLogs", {
+      action: "match_freelancer_rejected",
+      actionType: "system",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "match",
+      targetId: args.matchId,
+      details: { projectId: match.projectId, reason: args.rejectionReason },
+      createdAt: now,
+    });
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Freelancer declined",
+      message: `A freelancer has declined the opportunity for "${project.intakeForm.title}". Please review other candidates.`,
+      type: "match",
+      data: { matchId: args.matchId, projectId: match.projectId, freelancerDeclined: true },
+    });
+
+    return { success: true, contractFlowStarted: false };
   },
 });
 
