@@ -89,18 +89,6 @@ const DURATION_DAYS: Record<string, number> = {
   "60": 1825,
 };
 
-/** Duration discount: 1% for 3 months, 2% for 6 months, 3% for 12+ months */
-const DURATION_DISCOUNT: Record<string, number> = {
-  "1": 1,
-  "3": 0.99,
-  "6": 0.98,
-  "12+": 0.97,
-  "12": 0.97,
-  "24": 0.97,
-  "36": 0.97,
-  "48": 0.97,
-  "60": 0.97,
-};
 
 /** Format duration for display (e.g. "3 months", "2 years") */
 function formatDurationDisplay(projectDuration: string): string {
@@ -284,10 +272,8 @@ export default function CreateProjectPage() {
               : undefined,
         });
       }
-      const discount = DURATION_DISCOUNT[formData.projectDuration as ProjectDuration] ?? 1;
-      const discountedBudget = Math.round(calc.estimatedBudget * discount);
-      if (!Number.isFinite(discountedBudget) || discountedBudget <= 0) return null;
-      return { ...calc, estimatedBudget: discountedBudget };
+      if (!Number.isFinite(calc.estimatedBudget) || calc.estimatedBudget <= 0) return null;
+      return calc;
     } catch (err) {
       if (process.env.NODE_ENV !== "production") console.error("[budgetCalculation]", err);
       return null;
@@ -1048,7 +1034,7 @@ export default function CreateProjectPage() {
                       {/* Header */}
                       <div className="p-5 pb-4">
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estimated total</span>
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Cost</span>
                           <span className="text-2xl font-bold text-primary tabular-nums">
                             {formatBudget(effectiveBudget)}
                           </span>
@@ -1126,7 +1112,7 @@ export default function CreateProjectPage() {
                   <div className="mt-3 space-y-4">
                     <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total amount</span>
+                        <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Total Cost</span>
                         <span className="text-2xl font-bold text-primary tabular-nums">
                           {formatBudget(effectiveBudget)}
                         </span>

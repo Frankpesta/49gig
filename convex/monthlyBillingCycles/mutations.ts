@@ -4,6 +4,7 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import type { MutationCtx } from "../_generated/server";
+import { getDurationMonths } from "../../lib/project-duration";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -460,7 +461,12 @@ export const autoCreateMonthlyCyclesInternal = internalMutation({
       endMs = now + 3 * monthMs;
       durationMs = 3 * monthMs;
     }
-    const durationMonths = Math.max(1, Math.ceil(durationMs / monthMs));
+    // Use the projectDuration string (e.g. "3", "6", "12") as the canonical number of
+    // billing cycles so the count matches what was shown during project creation and on
+    // the payment page. Falling back to date-arithmetic only when the field is absent.
+    const durationMonths = project.intakeForm?.projectDuration
+      ? Math.max(1, getDurationMonths(project.intakeForm.projectDuration))
+      : Math.max(1, Math.ceil(durationMs / monthMs));
 
     const platformFeeDoc = await ctx.db
       .query("platformSettings")
