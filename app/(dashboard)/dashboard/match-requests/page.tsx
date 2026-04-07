@@ -22,7 +22,7 @@ import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-
 import { Handshake, CheckCircle2, XCircle, Loader2, Clock, DollarSign, Calendar, Briefcase, Star, Users, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
 
 type MatchRequest = {
@@ -52,6 +52,7 @@ const CONFIDENCE_STYLES = {
 
 export default function MatchRequestsPage() {
   const { user, isAuthenticated } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const focusMatchId = searchParams.get("matchId");
 
@@ -96,11 +97,27 @@ export default function MatchRequestsPage() {
     return <DashboardLoadingState label="Loading match requests" />;
   }
 
-  const handleAccept = async (matchId: string) => {
+  const handleAccept = async (matchId: string, projectId?: string | null) => {
     setResponding(matchId);
     try {
-      await respond({ matchId: matchId as Id<"matches">, response: "accepted", userId: user._id });
-      toast.success("You've accepted! Contract generation is in progress.");
+      const result = await respond({
+        matchId: matchId as Id<"matches">,
+        response: "accepted",
+        userId: user._id,
+      });
+      if (result?.contractFlowStarted && result.projectId) {
+        toast.success("You've accepted. Opening the contract to sign.");
+        router.push(`/dashboard/projects/${result.projectId}/contract`);
+      } else {
+        toast.success(
+          projectId
+            ? "You've accepted. Open this hire from Hires when the team is complete to sign."
+            : "You've accepted. We'll notify you when it's time to sign the contract."
+        );
+        if (projectId) {
+          router.push(`/dashboard/projects/${projectId}`);
+        }
+      }
     } catch (e: any) {
       toast.error(e.message || "Failed to accept");
     } finally {
@@ -191,7 +208,7 @@ export default function MatchRequestsPage() {
                 <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     className="flex-1 gap-1.5"
-                    onClick={() => handleAccept(match._id)}
+                    onClick={() => handleAccept(match._id, match.projectId ?? undefined)}
                     disabled={responding === match._id}
                   >
                     {responding === match._id ? (
@@ -346,7 +363,10 @@ export default function MatchRequestsPage() {
             </Button>
             <Button
               className="flex-1 gap-1.5"
-              onClick={async () => { await handleAccept(detailMatch!._id); setDetailMatch(null); }}
+              onClick={async () => {
+                await handleAccept(detailMatch!._id, detailMatch!.projectId ?? undefined);
+                setDetailMatch(null);
+              }}
               disabled={responding === detailMatch?._id}
             >
               {responding === detailMatch?._id ? (

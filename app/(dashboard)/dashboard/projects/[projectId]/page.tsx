@@ -494,15 +494,22 @@ export default function ProjectDetailPage() {
       : undefined;
 
   const handleAcceptPendingMatch = async (matchId: Id<"matches">) => {
-    if (!user?._id) return;
+    if (!user?._id || !projectId) return;
     setRespondingMatchId(matchId);
     try {
-      await respondToMatchAsFreelancer({
+      const result = await respondToMatchAsFreelancer({
         matchId,
         response: "accepted",
         userId: user._id,
       });
-      toast.success("You've accepted! Contract generation is in progress.");
+      if (result?.contractFlowStarted && result.projectId) {
+        toast.success("You've accepted. Opening the contract to sign.");
+        router.push(`/dashboard/projects/${result.projectId}/contract`);
+      } else {
+        toast.success(
+          "You've accepted. We'll notify you when the full team is ready to sign."
+        );
+      }
     } catch (err) {
       toast.error(getUserFriendlyError(err) || "Failed to accept");
     } finally {
