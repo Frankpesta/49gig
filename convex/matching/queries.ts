@@ -319,7 +319,10 @@ export const getPendingFreelancerMatches = query({
       .collect();
 
     const pendingSelection = allMatches.filter(
-      (m: any) => m.clientAction === "accepted" && !m.freelancerAction
+      (m: any) =>
+        m.clientAction === "accepted" &&
+        !m.freelancerAction &&
+        m.status !== "accepted"
     );
 
     return Promise.all(

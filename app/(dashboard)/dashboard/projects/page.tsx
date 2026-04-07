@@ -35,6 +35,15 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { useSearchParams } from "next/navigation";
 import { Doc, Id } from "@/convex/_generated/dataModel";
+
+type TeamAcceptanceProgress = {
+  accepted: { freelancerName: string; teamRole: string | null }[];
+  pendingCount: number;
+};
+
+type ProjectListRow = Doc<"projects"> & {
+  teamAcceptanceProgress?: TeamAcceptanceProgress;
+};
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useState } from "react";
@@ -249,9 +258,10 @@ export default function ProjectsPage() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project: Doc<"projects">) => {
+          {projects.map((project: ProjectListRow) => {
             const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
             const StatusIcon = statusConfig.icon;
+            const teamProgress = isClient ? project.teamAcceptanceProgress : undefined;
 
             return (
               <Card key={project._id} className="rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
@@ -277,6 +287,33 @@ export default function ProjectsPage() {
                   <CardDescription className="line-clamp-2">
                     {project.intakeForm.description}
                   </CardDescription>
+                  {teamProgress &&
+                    (teamProgress.accepted.length > 0 || teamProgress.pendingCount > 0) && (
+                      <div className="mt-3 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs space-y-2">
+                        <p className="font-medium text-foreground">Team confirmations</p>
+                        {teamProgress.accepted.length > 0 && (
+                          <ul className="space-y-1 text-muted-foreground">
+                            {teamProgress.accepted.map((row, idx) => (
+                              <li key={idx} className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                <span className="text-foreground font-medium">{row.freelancerName}</span>
+                                {row.teamRole && (
+                                  <span className="text-muted-foreground">· {row.teamRole}</span>
+                                )}
+                                <span className="text-emerald-700 dark:text-emerald-400">accepted</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {teamProgress.pendingCount > 0 && (
+                          <p className="text-muted-foreground flex items-center gap-1.5">
+                            <Clock className="h-3.5 w-3.5 shrink-0" />
+                            Waiting on {teamProgress.pendingCount} other team member
+                            {teamProgress.pendingCount === 1 ? "" : "s"} to confirm
+                          </p>
+                        )}
+                      </div>
+                    )}
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between text-sm">

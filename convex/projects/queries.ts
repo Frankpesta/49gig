@@ -123,7 +123,10 @@ export const getProjects = query({
         if (m.status === "rejected" || m.status === "expired") continue;
         const awaitingMyResponse =
           m.clientAction === "accepted" && m.freelancerAction == null;
-        const iAccepted = m.freelancerAction === "accepted";
+        // Normal path sets freelancerAction; legacy rows may only have match.status "accepted".
+        const iAccepted =
+          m.freelancerAction === "accepted" ||
+          (m.status === "accepted" && m.clientAction === "accepted");
         if (awaitingMyResponse || iAccepted) {
           relevantProjectIds.add(m.projectId as string);
         }
@@ -179,13 +182,57 @@ export const getProjects = query({
       );
     }
 
-    // Enrich with client/freelancer info
+    // Enrich with client/freelancer info (+ team confirmation progress for clients)
     const enrichedProjects = await Promise.all(
       projects.map(async (project) => {
         const client = await ctx.db.get(project.clientId);
         const freelancer = project.matchedFreelancerId
           ? await ctx.db.get(project.matchedFreelancerId)
           : null;
+
+        let teamAcceptanceProgress:
+          | {
+              accepted: { freelancerName: string; teamRole: string | null }[];
+              pendingCount: number;
+            }
+          | undefined;
+
+        if (
+          user.role === "client" &&
+          user._id === project.clientId &&
+          project.intakeForm.hireType === "team"
+        ) {
+          const matchRows = await ctx.db
+            .query("matches")
+            .withIndex("by_project", (q) => q.eq("projectId", project._id))
+            .collect();
+          const clientPicks = matchRows.filter(
+            (m) =>
+              m.clientAction === "accepted" &&
+              m.status !== "rejected" &&
+              m.status !== "expired"
+          );
+          if (clientPicks.length > 0) {
+            const accepted: { freelancerName: string; teamRole: string | null }[] =
+              [];
+            let pendingCount = 0;
+            for (const m of clientPicks) {
+              const freelancerAccepted =
+                m.freelancerAction === "accepted" ||
+                (m.status === "accepted" && m.clientAction === "accepted");
+              if (freelancerAccepted) {
+                const fl = await ctx.db.get(m.freelancerId);
+                accepted.push({
+                  freelancerName: fl?.name ?? "Freelancer",
+                  teamRole: m.teamRole ?? null,
+                });
+              } else {
+                pendingCount += 1;
+              }
+            }
+            teamAcceptanceProgress = { accepted, pendingCount };
+          }
+        }
 
         return {
           ...project,
@@ -203,6 +250,9 @@ export const getProjects = query({
                 email: freelancer.email,
               }
             : null,
+          ...(teamAcceptanceProgress
+            ? { teamAcceptanceProgress }
+            : {}),
         };
       })
     );
@@ -337,7 +387,12 @@ export const getProject = query({
         .withIndex("by_project", (q) => q.eq("projectId", projectId))
         .filter((q) => q.eq(q.field("freelancerId"), user._id))
         .first();
-      if (match && (match.status === "pending" || match.status === "accepted")) {
+      if (
+        match &&
+        (match.status === "pending" ||
+          match.status === "accepted" ||
+          (match.clientAction === "accepted" && !match.freelancerAction))
+      ) {
         canView = true;
       }
     }
