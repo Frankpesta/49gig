@@ -54,6 +54,7 @@ export const getProjects = query({
         v.literal("pending_funding"),
         v.literal("funded"),
         v.literal("matching"),
+        v.literal("awaiting_freelancer"),
         v.literal("matched"),
         v.literal("in_progress"),
         v.literal("completed"),
@@ -141,7 +142,9 @@ export const getProjects = query({
       projects = projects.filter(
         (p) =>
           p.clientId === user._id &&
-          (p.awaitingMatch === true ||
+          (p.status === "awaiting_freelancer" ||
+            p.status === "matching" ||
+            p.awaitingMatch === true ||
             (p.pendingTeamMemberSlots != null && p.pendingTeamMemberSlots > 0) ||
             (p.rolesAwaitingMatch != null && p.rolesAwaitingMatch.length > 0))
       );

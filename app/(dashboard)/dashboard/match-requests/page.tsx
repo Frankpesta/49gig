@@ -15,10 +15,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
-import { Handshake, CheckCircle2, XCircle, Loader2, Clock, DollarSign, Calendar } from "lucide-react";
+import { Handshake, CheckCircle2, XCircle, Loader2, Clock, DollarSign, Calendar, Briefcase, Star, Users, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
@@ -26,6 +27,7 @@ import { Id } from "@/convex/_generated/dataModel";
 
 type MatchRequest = {
   _id: string;
+  projectId?: string | null;
   projectTitle?: string | null;
   projectDescription?: string | null;
   clientName?: string | null;
@@ -33,6 +35,13 @@ type MatchRequest = {
   totalAmount?: number | null;
   score: number;
   confidence: "low" | "medium" | "high";
+  teamRole?: string | null;
+  hireType?: string | null;
+  experienceLevel?: string | null;
+  roleType?: string | null;
+  requiredSkills?: string[];
+  specialRequirements?: string | null;
+  startDate?: string | null;
 };
 
 const CONFIDENCE_STYLES = {
@@ -49,6 +58,7 @@ export default function MatchRequestsPage() {
   const [declineMatchId, setDeclineMatchId] = useState<string | null>(null);
   const [declineReason, setDeclineReason] = useState("");
   const [responding, setResponding] = useState<string | null>(null);
+  const [detailMatch, setDetailMatch] = useState<MatchRequest | null>(null);
 
   const pendingMatches = useQuery(
     (api as any).matching.queries.getPendingFreelancerMatches,
@@ -139,9 +149,10 @@ export default function MatchRequestsPage() {
             <Card
               key={match._id}
               id={`freelancer-match-${match._id}`}
-              className="rounded-xl overflow-hidden border-primary/20 shadow-sm scroll-mt-24"
+              className="group rounded-xl overflow-hidden border-primary/20 shadow-sm scroll-mt-24 cursor-pointer hover:shadow-md hover:border-primary/40 transition-all"
+              onClick={() => setDetailMatch(match)}
             >
-              <div className="h-1 bg-gradient-to-r from-primary to-primary/60" />
+              <div className="h-1 bg-linear-to-r from-primary to-primary/60" />
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base leading-snug">
@@ -173,11 +184,11 @@ export default function MatchRequestsPage() {
                   )}
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Clock className="h-3.5 w-3.5" />
-                    Match score: {match.score}/100
+                    Score: {match.score}/100
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                   <Button
                     className="flex-1 gap-1.5"
                     onClick={() => handleAccept(match._id)}
@@ -200,13 +211,156 @@ export default function MatchRequestsPage() {
                     Decline
                   </Button>
                 </div>
+
+                <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                  <ChevronRight className="h-3 w-3" /> Tap card to view full project details
+                </p>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {/* Decline dialog */}
+      {/* Project details dialog */}
+      <Dialog open={!!detailMatch} onOpenChange={(open) => { if (!open) setDetailMatch(null); }}>
+        <DialogContent className="flex max-h-[min(90dvh,calc(100dvh-2rem))] flex-col overflow-hidden sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-lg leading-snug pr-6">
+              {detailMatch?.projectTitle || "Project Details"}
+            </DialogTitle>
+            {detailMatch?.clientName && (
+              <DialogDescription>Client: {detailMatch.clientName}</DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="flex-1 space-y-5 overflow-y-auto py-2 pr-1">
+            {/* Match quality badge */}
+            {detailMatch && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${CONFIDENCE_STYLES[detailMatch.confidence]}`}>
+                  {detailMatch.confidence} match
+                </span>
+                <span className="text-xs text-muted-foreground">Match score: {detailMatch.score}/100</span>
+                {detailMatch.teamRole && (
+                  <Badge variant="secondary" className="text-xs">{detailMatch.teamRole}</Badge>
+                )}
+              </div>
+            )}
+
+            {/* Description */}
+            {detailMatch?.projectDescription && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">About this project</p>
+                <p className="text-sm text-foreground/80 leading-relaxed">{detailMatch.projectDescription}</p>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Key details grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {detailMatch?.totalAmount && (
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                    <DollarSign className="h-3.5 w-3.5" /> Total Budget
+                  </div>
+                  <p className="font-semibold text-sm">${detailMatch.totalAmount.toLocaleString()}</p>
+                </div>
+              )}
+              {detailMatch?.projectDuration && (
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                    <Calendar className="h-3.5 w-3.5" /> Duration
+                  </div>
+                  <p className="font-semibold text-sm">
+                    {detailMatch.projectDuration} {Number(detailMatch.projectDuration) === 1 ? "month" : "months"}
+                  </p>
+                </div>
+              )}
+              {detailMatch?.experienceLevel && (
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                    <Star className="h-3.5 w-3.5" /> Level Required
+                  </div>
+                  <p className="font-semibold text-sm capitalize">{detailMatch.experienceLevel}</p>
+                </div>
+              )}
+              {detailMatch?.hireType && (
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                    <Users className="h-3.5 w-3.5" /> Hire Type
+                  </div>
+                  <p className="font-semibold text-sm capitalize">{detailMatch.hireType}</p>
+                </div>
+              )}
+              {detailMatch?.roleType && (
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                    <Briefcase className="h-3.5 w-3.5" /> Commitment
+                  </div>
+                  <p className="font-semibold text-sm capitalize">{detailMatch.roleType.replace("_", " ")}</p>
+                </div>
+              )}
+              {detailMatch?.startDate && (
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                    <Calendar className="h-3.5 w-3.5" /> Start Date
+                  </div>
+                  <p className="font-semibold text-sm">
+                    {new Date(detailMatch.startDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Required skills */}
+            {detailMatch?.requiredSkills && detailMatch.requiredSkills.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Skills Required</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {detailMatch.requiredSkills.map((skill) => (
+                    <Badge key={skill} variant="secondary" className="text-xs">{skill}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Special requirements */}
+            {detailMatch?.specialRequirements && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">Special Requirements</p>
+                <p className="text-sm text-foreground/80 leading-relaxed">{detailMatch.specialRequirements}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="shrink-0 border-t border-border/60 pt-4 gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              className="flex-1 gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/5"
+              onClick={() => { setDeclineMatchId(detailMatch!._id); setDetailMatch(null); }}
+              disabled={responding === detailMatch?._id}
+            >
+              <XCircle className="h-4 w-4" />
+              Decline
+            </Button>
+            <Button
+              className="flex-1 gap-1.5"
+              onClick={async () => { await handleAccept(detailMatch!._id); setDetailMatch(null); }}
+              disabled={responding === detailMatch?._id}
+            >
+              {responding === detailMatch?._id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Accept
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Decline confirmation dialog */}
       <Dialog open={!!declineMatchId} onOpenChange={() => { setDeclineMatchId(null); setDeclineReason(""); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

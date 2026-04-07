@@ -51,6 +51,7 @@ const STATUS_CONFIG: Record<
   },
   funded: { label: "Funded", variant: "default", icon: CheckCircle2 },
   matching: { label: "Matching", variant: "secondary", icon: Clock },
+  awaiting_freelancer: { label: "Awaiting Confirmation", variant: "secondary", icon: Clock },
   matched: { label: "Matched", variant: "default", icon: CheckCircle2 },
   in_progress: { label: "In Progress", variant: "default", icon: Clock },
   completed: { label: "Completed", variant: "default", icon: CheckCircle2 },
@@ -64,6 +65,7 @@ const VALID_PROJECT_STATUSES = [
   "pending_funding",
   "funded",
   "matching",
+  "awaiting_freelancer",
   "matched",
   "in_progress",
   "completed",
@@ -75,6 +77,7 @@ const VALID_PROJECT_STATUSES = [
 const HIRE_FILTER_STATUSES = [
   "draft",
   "pending_funding",
+  "awaiting_freelancer",
   "matched",
   "in_progress",
   "completed",
