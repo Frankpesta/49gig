@@ -122,8 +122,8 @@ export default function NewDisputePage() {
     if (!project || !user?._id) { setTeamMembers([]); return; }
     const ids: string[] = (project as any).matchedFreelancerIds ?? [];
     if (ids.length === 0) { setTeamMembers([]); return; }
-    // Reset scope when project changes
-    setDisputeScope("all");
+    // Default to specific members on team hires so “dispute everyone” is explicit
+    setDisputeScope("partial");
     setDisputedFreelancerIds([]);
   }, [project?._id]);
 
@@ -344,6 +344,16 @@ export default function NewDisputePage() {
                     <span className="text-sm font-medium">Specific member(s)</span>
                   </label>
                 </div>
+                {disputeScope === "all" && (
+                  <p className="text-xs text-muted-foreground">
+                    If the dispute is resolved in your favor, every matched team member may be removed and you&apos;ll replace the full team.
+                  </p>
+                )}
+                {disputeScope === "partial" && (
+                  <p className="text-xs text-muted-foreground">
+                    Only the people you select can be removed if the dispute is resolved in your favor; everyone else stays on the hire.
+                  </p>
+                )}
                 {disputeScope === "partial" && (
                   <div className="rounded-lg border border-border/60 bg-muted/10 p-4 space-y-2">
                     {(projectTeamMembers as { _id: string; name: string; role: string }[]).map((member) => (

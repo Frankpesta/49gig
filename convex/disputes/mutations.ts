@@ -27,23 +27,70 @@ const internalAny = require("../_generated/api").internal as {
 };
 const internalApi = require("../_generated/api").internal as any;
 
+/** Role labels for disputed members (accepted match rows only), before sweep rejects them. */
+async function teamRoleLabelsForDisputedFreelancers(
+  ctx: MutationCtx,
+  projectId: Id<"projects">,
+  disputedFreelancerIds: Id<"users">[]
+): Promise<string[]> {
+  if (disputedFreelancerIds.length === 0) return [];
+  const rm = new Set(disputedFreelancerIds.map(String));
+  const rows = await ctx.db
+    .query("matches")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .collect();
+  const out = new Set<string>();
+  for (const m of rows) {
+    if (!rm.has(String(m.freelancerId))) continue;
+    if (m.status === "accepted" && m.teamRole) out.add(m.teamRole);
+  }
+  return [...out];
+}
+
 /**
  * Align project UX with applyFreelancerReplacementInternal so clients see “Choose replacement” / matches
  * after moderator client-favor or replacement decisions (partial or full team).
+ *
+ * For partial team disputes, scopes `pendingTeamMemberSlots` / `rolesAwaitingMatch` to the removed seats only
+ * so matching and copy do not treat the whole team as open.
  */
 async function ensureReplacementMatchingProjectFields(
   ctx: MutationCtx,
-  args: { projectId: Id<"projects">; disputeId: Id<"disputes">; now: number }
+  args: {
+    projectId: Id<"projects">;
+    disputeId: Id<"disputes">;
+    now: number;
+    partialDisputedFreelancerIds?: Id<"users">[];
+  }
 ) {
   const p = await ctx.db.get(args.projectId);
   if (!p || p.status !== "matching") return;
-  await ctx.db.patch(args.projectId, {
+
+  const patch: Record<string, unknown> = {
     replacementMatchingAt: p.replacementMatchingAt ?? args.now,
     awaitingMatch: true,
     awaitingMatchSince: p.awaitingMatchSince ?? args.now,
     replacementFlowDisputeId: p.replacementFlowDisputeId ?? args.disputeId,
     updatedAt: args.now,
-  });
+  };
+
+  if (args.partialDisputedFreelancerIds && args.partialDisputedFreelancerIds.length > 0) {
+    const roleLabels = await teamRoleLabelsForDisputedFreelancers(
+      ctx,
+      args.projectId,
+      args.partialDisputedFreelancerIds
+    );
+    patch.pendingTeamMemberSlots = args.partialDisputedFreelancerIds.length;
+    patch.rolesAwaitingMatch = roleLabels.length > 0 ? roleLabels : undefined;
+  } else if (
+    (p.matchedFreelancerIds?.length ?? 0) === 0 &&
+    !p.matchedFreelancerId
+  ) {
+    patch.pendingTeamMemberSlots = undefined;
+    patch.rolesAwaitingMatch = undefined;
+  }
+
+  await ctx.db.patch(args.projectId, patch as any);
 }
 
 /**
@@ -235,6 +282,7 @@ export const initiateDispute = mutation({
 
     // Validate partial team dispute: all specified freelancers must be on the project
     const teamMemberIds = project.matchedFreelancerIds ?? [];
+    let disputedIdsUnique: Id<"users">[] | undefined;
     if (args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0) {
       if (!isClient) {
         throw new Error("Only clients can initiate partial team disputes.");
@@ -242,7 +290,10 @@ export const initiateDispute = mutation({
       if (teamMemberIds.length === 0) {
         throw new Error("Partial team disputes are only available for team hires.");
       }
-      for (const fid of args.disputedFreelancerIds) {
+      disputedIdsUnique = Array.from(
+        new Set(args.disputedFreelancerIds.map(String))
+      ) as Id<"users">[];
+      for (const fid of disputedIdsUnique) {
         if (!teamMemberIds.includes(fid)) {
           throw new Error(`Freelancer ${fid} is not a matched member of this project.`);
         }
@@ -251,12 +302,13 @@ export const initiateDispute = mutation({
 
     const isPartialTeamDispute =
       isClient &&
-      (args.disputedFreelancerIds?.length ?? 0) > 0 &&
+      !!disputedIdsUnique &&
+      disputedIdsUnique.length > 0 &&
       teamMemberIds.length > 0 &&
-      (args.disputedFreelancerIds?.length ?? 0) < teamMemberIds.length;
+      disputedIdsUnique.length < teamMemberIds.length;
 
     let lockedAmount: number;
-    if (isPartialTeamDispute && args.disputedFreelancerIds) {
+    if (isPartialTeamDispute && disputedIdsUnique) {
       const totalPoolCents = Math.round(escrowNet * 100);
       const shareMap = await computeTeamPoolShareCentsByFreelancerId(
         ctx,
@@ -267,7 +319,7 @@ export const initiateDispute = mutation({
       );
       const disputedNetCents = sumShareCentsForFreelancers(
         shareMap,
-        args.disputedFreelancerIds
+        disputedIdsUnique
       );
       lockedAmount = escrowNetToClientLockedGross(disputedNetCents / 100, platformFeePct);
     } else {
@@ -288,8 +340,8 @@ export const initiateDispute = mutation({
       status: "open",
       lockedAmount,
       disputedFreelancerIds:
-        args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0
-          ? args.disputedFreelancerIds
+        disputedIdsUnique && disputedIdsUnique.length > 0
+          ? disputedIdsUnique
           : undefined,
       teamEscrowBasisFreelancerIds:
         teamMemberIds.length > 0 ? [...teamMemberIds] : undefined,
@@ -751,12 +803,18 @@ export const resolveDispute = mutation({
 
       if (isPartialTeam && dispute.disputedFreelancerIds) {
         // Partial team dispute: remove only the disputed members, keep remaining
+        const disputed = dispute.disputedFreelancerIds;
         const remainingIds = (project.matchedFreelancerIds ?? []).filter(
-          (id) => !dispute.disputedFreelancerIds!.includes(id)
+          (id) => !disputed.includes(id)
+        );
+        const nextSelected = (project.selectedFreelancerIds ?? []).filter(
+          (id) => !disputed.includes(id)
         );
         await ctx.db.patch(dispute.projectId, {
           matchedFreelancerIds: remainingIds,
           status: "matching",
+          selectedFreelancerIds:
+            nextSelected.length > 0 ? nextSelected : undefined,
           updatedAt: now,
         } as any);
       } else {
@@ -764,11 +822,14 @@ export const resolveDispute = mutation({
         if (isTeamProject) {
           await ctx.db.patch(dispute.projectId, {
             matchedFreelancerIds: [],
+            selectedFreelancerIds: undefined,
+            selectedFreelancerId: undefined,
             updatedAt: now,
           } as any);
         } else {
           await ctx.db.patch(dispute.projectId, {
             matchedFreelancerId: undefined,
+            selectedFreelancerId: undefined,
             updatedAt: now,
           } as any);
         }
@@ -776,10 +837,19 @@ export const resolveDispute = mutation({
     }
 
     if (args.decision === "client_favor" || args.decision === "replacement") {
+      const teamLenPreRemove = (project.matchedFreelancerIds?.length ?? 0);
+      const isPartialTeamResolve =
+        teamLenPreRemove > 0 &&
+        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
+        dispute.disputedFreelancerIds!.length < teamLenPreRemove;
       await ensureReplacementMatchingProjectFields(ctx, {
         projectId: dispute.projectId,
         disputeId: args.disputeId,
         now,
+        partialDisputedFreelancerIds:
+          isPartialTeamResolve && dispute.disputedFreelancerIds
+            ? dispute.disputedFreelancerIds
+            : undefined,
       });
     }
 
@@ -974,23 +1044,32 @@ export const resolveDisputeInternal = internalMutation({
         dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
 
       if (isPartialTeam && dispute.disputedFreelancerIds) {
+        const disputed = dispute.disputedFreelancerIds;
         const remainingIds = (project.matchedFreelancerIds ?? []).filter(
-          (id) => !dispute.disputedFreelancerIds!.includes(id)
+          (id) => !disputed.includes(id)
+        );
+        const nextSelected = (project.selectedFreelancerIds ?? []).filter(
+          (id) => !disputed.includes(id)
         );
         await ctx.db.patch(dispute.projectId, {
           matchedFreelancerIds: remainingIds,
           status: "matching",
+          selectedFreelancerIds:
+            nextSelected.length > 0 ? nextSelected : undefined,
           updatedAt: now,
         } as any);
       } else {
         if (isTeamProject) {
           await ctx.db.patch(dispute.projectId, {
             matchedFreelancerIds: [],
+            selectedFreelancerIds: undefined,
+            selectedFreelancerId: undefined,
             updatedAt: now,
           } as any);
         } else {
           await ctx.db.patch(dispute.projectId, {
             matchedFreelancerId: undefined,
+            selectedFreelancerId: undefined,
             updatedAt: now,
           } as any);
         }
@@ -998,10 +1077,19 @@ export const resolveDisputeInternal = internalMutation({
     }
 
     if (args.decision === "client_favor" || args.decision === "replacement") {
+      const teamLenPreRemove = (project.matchedFreelancerIds?.length ?? 0);
+      const isPartialTeamResolve =
+        teamLenPreRemove > 0 &&
+        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
+        dispute.disputedFreelancerIds!.length < teamLenPreRemove;
       await ensureReplacementMatchingProjectFields(ctx, {
         projectId: dispute.projectId,
         disputeId: args.disputeId,
         now,
+        partialDisputedFreelancerIds:
+          isPartialTeamResolve && dispute.disputedFreelancerIds
+            ? dispute.disputedFreelancerIds
+            : undefined,
       });
     }
 
