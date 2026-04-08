@@ -3,6 +3,12 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import { clientLockedGrossToFreelancerEscrowPool } from "./amounts";
+import {
+  computeTeamPoolShareCentsByFreelancerId,
+  sumShareCentsForFreelancers,
+  teamBasisUserIdsForDispute,
+} from "../teamEscrowShares";
+import type { Id } from "../_generated/dataModel";
 
 async function getCurrentUserInQuery(
   ctx: QueryCtx,
@@ -462,3 +468,78 @@ export const getDisputeDocInternal = internalQuery({
   },
 });
 
+/**
+ * Freelancer-net escrow cents attributed to disputed team members, using teamBudgetBreakdown
+ * and accepted matches (same rules as monthly releases). Uses team snapshot on the dispute when set.
+ */
+export const computeDisputedTeamEscrowNetCentsFromDisputeInternal = internalQuery({
+  args: { disputeId: v.id("disputes") },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) return { disputedNetCents: 0 };
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) return { disputedNetCents: 0 };
+
+    const disputedIds = dispute.disputedFreelancerIds ?? [];
+    const teamBasis = teamBasisUserIdsForDispute(dispute, project);
+
+    if (disputedIds.length === 0 || teamBasis.length === 0) {
+      return { disputedNetCents: 0 };
+    }
+
+    for (const id of disputedIds) {
+      if (!teamBasis.some((m) => String(m) === String(id))) {
+        throw new Error(
+          "Dispute references freelancers who were not on the team snapshot for this hire."
+        );
+      }
+    }
+
+    const totalPoolCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+    const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+      ctx,
+      dispute.projectId,
+      teamBasis,
+      project.teamBudgetBreakdown,
+      totalPoolCents
+    );
+    const disputedNetCents = sumShareCentsForFreelancers(shareMap, disputedIds);
+    return { disputedNetCents };
+  },
+});
+
+/** Disputed members’ share of a specific monthly cycle amount (team rules). */
+export const computeDisputedMonthlyCycleShareCentsInternal = internalQuery({
+  args: { disputeId: v.id("disputes") },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute?.monthlyCycleId) return { disputedNetCents: 0 };
+    const cycle = await ctx.db.get(dispute.monthlyCycleId);
+    const project = await ctx.db.get(dispute.projectId);
+    if (!cycle || !project) return { disputedNetCents: 0 };
+
+    const disputedIds = dispute.disputedFreelancerIds ?? [];
+    const teamBasis = teamBasisUserIdsForDispute(dispute, project);
+    if (disputedIds.length === 0 || teamBasis.length === 0) {
+      return { disputedNetCents: 0 };
+    }
+    for (const id of disputedIds) {
+      if (!teamBasis.some((m) => String(m) === String(id))) {
+        throw new Error(
+          "Dispute references freelancers who were not on the team snapshot for this hire."
+        );
+      }
+    }
+
+    const poolCents = Math.max(0, cycle.amountCents);
+    const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+      ctx,
+      dispute.projectId,
+      teamBasis,
+      project.teamBudgetBreakdown,
+      poolCents
+    );
+    const disputedNetCents = sumShareCentsForFreelancers(shareMap, disputedIds);
+    return { disputedNetCents };
+  },
+});

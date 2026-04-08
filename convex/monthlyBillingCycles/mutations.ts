@@ -5,6 +5,7 @@ import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import type { MutationCtx } from "../_generated/server";
 import { getDurationMonths } from "../../lib/project-duration";
+import { assertUsdCurrency } from "../currencyPolicy";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -109,6 +110,7 @@ export const creditClientWalletFromEscrowInternal = internalMutation({
   },
   handler: async (ctx, args) => {
     if (args.amountCents <= 0) return { credited: 0 };
+    assertUsdCurrency(args.currency, "creditClientWalletFromEscrowInternal");
     const project = await ctx.db.get(args.projectId);
     if (!project) return { credited: 0 };
     const maxCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
@@ -199,6 +201,40 @@ export const cancelDisputedMonthlyCycleInternal = internalMutation({
       disputeId: undefined,
       updatedAt: Date.now(),
     });
+  },
+});
+
+/**
+ * Partial team client-favor: remove disputed members’ share from this cycle only;
+ * keep the rest pending for continuing freelancers.
+ */
+export const applyPartialDisputeCycleReductionInternal = internalMutation({
+  args: {
+    monthlyCycleId: v.id("monthlyBillingCycles"),
+    removeCents: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (args.removeCents <= 0) return { ok: true as const };
+    const c = await ctx.db.get(args.monthlyCycleId);
+    if (!c) return { ok: false as const };
+    const now = Date.now();
+    const nextAmount = c.amountCents - args.removeCents;
+    if (nextAmount <= 0) {
+      await ctx.db.patch(args.monthlyCycleId, {
+        status: "cancelled",
+        amountCents: 0,
+        disputeId: undefined,
+        updatedAt: now,
+      });
+    } else {
+      await ctx.db.patch(args.monthlyCycleId, {
+        amountCents: nextAmount,
+        status: "pending",
+        disputeId: undefined,
+        updatedAt: now,
+      });
+    }
+    return { ok: true as const };
   },
 });
 

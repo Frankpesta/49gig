@@ -6,6 +6,7 @@ import type { FunctionReference } from "convex/server";
 import { resolveTargetTeamSize } from "../../lib/budget-calculator";
 import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
 import { clearReplacementFlowFieldsOnProject } from "./replacement";
+import { assertUsdCurrency } from "../currencyPolicy";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -495,6 +496,42 @@ export const updateProjectStatus = mutation({
       updates.completedAt = Date.now();
     }
 
+    if (args.status === "cancelled" && isAdmin) {
+      const basePayment = await ctx.runQuery(
+        internalAny.payments.queries.getPaymentByProject,
+        { projectId: args.projectId }
+      );
+      const currencyPay = (basePayment?.currency || project.currency || "usd").toLowerCase();
+      assertUsdCurrency(currencyPay, "Admin cancel hire");
+
+      await ctx.runMutation(
+        internalAny.wallets.mutations.completePendingDisputeRefundsForProjectInternal,
+        {
+          userId: project.clientId,
+          projectId: args.projectId,
+          reasonSuffix: "(hire cancelled by admin — funds moved to your wallet balance)",
+        }
+      );
+
+      const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+      if (escrowCents > 0) {
+        await ctx.runMutation(
+          internalAny.monthlyBillingCycles.mutations.creditClientWalletFromEscrowInternal,
+          {
+            projectId: args.projectId,
+            amountCents: escrowCents,
+            currency: currencyPay,
+            description: `Hire cancelled by admin — remaining escrow credited (${project.intakeForm.title})`,
+          }
+        );
+      }
+
+      await ctx.runMutation(
+        internalAny.monthlyBillingCycles.mutations.cancelPendingAndDisputedCyclesInternal,
+        { projectId: args.projectId }
+      );
+    }
+
     await ctx.db.patch(args.projectId, updates);
 
     if (args.status === "completed") {
@@ -553,17 +590,38 @@ export const updateProjectStatus = mutation({
       cancelled: "Cancelled",
       disputed: "Disputed",
     };
-    const recipientIds = [project.clientId];
+    const recipientIds: Doc<"users">["_id"][] = [project.clientId];
     if (project.matchedFreelancerId) {
       recipientIds.push(project.matchedFreelancerId);
     }
-    await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: recipientIds,
-      title: "Project status updated",
-      message: `Project "${project.intakeForm.title}" is now ${statusLabels[args.status]}.`,
-      type: "project",
-      data: { projectId: args.projectId, status: args.status },
-    });
+    if (project.matchedFreelancerIds?.length) {
+      for (const id of project.matchedFreelancerIds) {
+        if (!recipientIds.some((x) => String(x) === String(id))) recipientIds.push(id);
+      }
+    }
+
+    if (args.status === "cancelled" && isAdmin) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: recipientIds,
+        title: "Hire cancelled by admin",
+        message: `An administrator cancelled "${project.intakeForm.title}". Pending dispute credits and remaining escrow (if any) were applied to the client's wallet per policy.`,
+        type: "project",
+        data: { projectId: args.projectId, status: args.status, adminCancelled: true },
+      });
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.projects.actions.sendHireAdminCancelledEmailsInternal,
+        { projectId: args.projectId }
+      );
+    } else {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: recipientIds,
+        title: "Project status updated",
+        message: `Project "${project.intakeForm.title}" is now ${statusLabels[args.status]}.`,
+        type: "project",
+        data: { projectId: args.projectId, status: args.status },
+      });
+    }
 
     return args.projectId;
   },
@@ -1768,6 +1826,83 @@ export const updateProjectStatusInternal = internalMutation({
     });
 
     return args.projectId;
+  },
+});
+
+/**
+ * After dispute removal: reject matches, trim scheduled calls, remove freelancers from project chat.
+ */
+export const sweepFreelancersRemovedFromProjectInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    freelancerIds: v.array(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    if (args.freelancerIds.length === 0) return { ok: true as const };
+    const now = Date.now();
+    const removedSet = new Set(args.freelancerIds.map(String));
+
+    const matches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const m of matches) {
+      if (!removedSet.has(String(m.freelancerId))) continue;
+      if (m.status === "rejected" || m.status === "expired") continue;
+      await ctx.db.patch(m._id, {
+        status: "rejected",
+        freelancerAction: "rejected",
+        freelancerActionAt: now,
+        freelancerRejectionReason:
+          m.freelancerRejectionReason ?? "Removed from hire after dispute resolution",
+        updatedAt: now,
+      });
+    }
+
+    const calls = await ctx.db
+      .query("scheduledCalls")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    for (const c of calls) {
+      const still = c.freelancerIds.filter((id) => !removedSet.has(String(id)));
+      if (still.length === 0) {
+        await ctx.db.delete(c._id);
+      } else if (still.length !== c.freelancerIds.length) {
+        await ctx.db.patch(c._id, { freelancerIds: still, updatedAt: now });
+      }
+    }
+
+    const chat = await ctx.db
+      .query("chats")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .first();
+    if (chat) {
+      const parts = chat.participants.filter((p) => !removedSet.has(String(p)));
+      if (parts.length !== chat.participants.length) {
+        await ctx.db.patch(chat._id, { participants: parts, updatedAt: now });
+      }
+    }
+
+    return { ok: true as const };
+  },
+});
+
+/** Internal: add or subtract escrow (dollars, freelancer-net pool). */
+export const adjustProjectEscrowInternal = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    deltaDollars: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+    const next = Math.max(0, (project.escrowedAmount ?? 0) + args.deltaDollars);
+    await ctx.db.patch(args.projectId, {
+      escrowedAmount: next,
+      updatedAt: Date.now(),
+    });
   },
 });
 

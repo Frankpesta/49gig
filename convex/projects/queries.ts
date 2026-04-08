@@ -818,3 +818,62 @@ export const getProjectTeamMembers = query({
     );
   },
 });
+
+/** Admin: escrow, dispute refund wallet rows, monthly cycles for a hire. */
+export const getProjectMoneyAuditForAdmin = query({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user || user.role !== "admin") return null;
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return null;
+
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", project.clientId))
+      .first();
+
+    let pendingRefundCents = 0;
+    let completedRefundCents = 0;
+    if (wallet) {
+      const txs = await ctx.db
+        .query("walletTransactions")
+        .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+        .collect();
+      for (const t of txs) {
+        if (t.projectId !== args.projectId || t.type !== "refund") continue;
+        if (t.status === "pending") pendingRefundCents += t.amountCents;
+        else if (t.status === "completed") completedRefundCents += t.amountCents;
+      }
+    }
+
+    const cycles = await ctx.db
+      .query("monthlyBillingCycles")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+
+    return {
+      projectId: args.projectId,
+      title: project.intakeForm?.title ?? null,
+      status: project.status,
+      escrowedAmount: project.escrowedAmount ?? 0,
+      currency: project.currency ?? "usd",
+      clientId: project.clientId,
+      pendingRefundCents,
+      completedRefundCents,
+      cycles: cycles
+        .map((c) => ({
+          _id: c._id,
+          monthIndex: c.monthIndex,
+          status: c.status,
+          amountCents: c.amountCents,
+          currency: c.currency,
+        }))
+        .sort((a, b) => a.monthIndex - b.monthIndex),
+    };
+  },
+});

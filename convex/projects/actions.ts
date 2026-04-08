@@ -13,6 +13,7 @@ import {
   AdminNewProjectEmail,
   AdminMatchConfirmedEmail,
 } from "../../emails/templates";
+import { ProjectAdminCancelledEmail } from "../../emails/templates/project-admin-cancelled-email";
 
 const internalAny: any = require("../_generated/api").internal;
 
@@ -361,5 +362,64 @@ export const sendMonthlyCyclePendingReminderEmail = internalAction({
     });
 
     return { success: true };
+  },
+});
+
+/** In-app notifications are sent from the mutation; this sends matching emails. */
+export const sendHireAdminCancelledEmailsInternal = internalAction({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const project = await ctx.runQuery(internalAny.projects.queries.getProjectInternal, {
+      projectId: args.projectId,
+    });
+    if (!project) return { ok: false as const };
+
+    const client = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
+      userId: project.clientId,
+    });
+    const appUrl = getAppUrl();
+    const dashboardUrl = `${appUrl}/dashboard/projects/${args.projectId}`;
+    const projectName = project.intakeForm?.title ?? "Your hire";
+
+    if (client?.email) {
+      await sendEmail({
+        to: client.email,
+        subject: `Hire cancelled by admin: ${projectName}`,
+        react: React.createElement(ProjectAdminCancelledEmail, {
+          recipientName: client.name || "there",
+          projectName,
+          roleLabel: "client",
+          dashboardUrl,
+          appUrl,
+        }),
+      });
+    }
+
+    const freelancerIdStrs: string[] = [
+      ...(project.matchedFreelancerId ? [String(project.matchedFreelancerId)] : []),
+      ...(project.matchedFreelancerIds ?? []).map(String),
+    ];
+    const uniqFreelancers = [...new Set(freelancerIdStrs)];
+
+    for (const fid of uniqFreelancers) {
+      const freelancer = await ctx.runQuery(internalAny.users.queries.getUserByIdInternal, {
+        userId: fid as any,
+      });
+      if (freelancer?.email) {
+        await sendEmail({
+          to: freelancer.email,
+          subject: `Hire cancelled: ${projectName}`,
+          react: React.createElement(ProjectAdminCancelledEmail, {
+            recipientName: freelancer.name || "there",
+            projectName,
+            roleLabel: "freelancer",
+            dashboardUrl,
+            appUrl,
+          }),
+        });
+      }
+    }
+
+    return { ok: true as const };
   },
 });

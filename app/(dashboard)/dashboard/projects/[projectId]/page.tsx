@@ -27,6 +27,7 @@ import {
   LucideIcon,
   Loader2,
   Trash2,
+  Ban,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Id } from "@/convex/_generated/dataModel";
@@ -155,6 +156,8 @@ export default function ProjectDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showAdminDeleteDialog, setShowAdminDeleteDialog] = useState(false);
   const [isAdminDeleting, setIsAdminDeleting] = useState(false);
+  const [showAdminCancelDialog, setShowAdminCancelDialog] = useState(false);
+  const [isAdminCancelling, setIsAdminCancelling] = useState(false);
 
   // Validate the projectId from URL params
   const isValidId = isValidConvexId(projectIdParam);
@@ -181,6 +184,13 @@ export default function ProjectDetailPage() {
   const monthlyCycles = useQuery(
     api.monthlyBillingCycles.queries.getCyclesByProjectId,
     projectId ? { projectId } : "skip"
+  );
+
+  const moneyAudit = useQuery(
+    (api as any)["projects/queries"].getProjectMoneyAuditForAdmin,
+    user?.role === "admin" && user?._id && projectId
+      ? { projectId, userId: user._id }
+      : "skip"
   );
 
   useEffect(() => {
@@ -504,6 +514,27 @@ export default function ProjectDetailPage() {
     }
   };
 
+  const handleAdminCancelProject = async () => {
+    if (!projectId || !user?._id || user.role !== "admin") return;
+    setShowAdminCancelDialog(false);
+    setIsAdminCancelling(true);
+    try {
+      await updateProjectStatus({
+        projectId,
+        status: "cancelled",
+        userId: user._id,
+      });
+      toast.success(
+        "Hire cancelled. Pending dispute refunds and remaining escrow were credited to the client wallet where applicable; open billing cycles were cancelled."
+      );
+      router.refresh();
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not cancel hire");
+    } finally {
+      setIsAdminCancelling(false);
+    }
+  };
+
   const pendingMatchForThisProject =
     user.role === "freelancer" && projectId && Array.isArray(pendingFreelancerMatches)
       ? pendingFreelancerMatches.find(
@@ -716,11 +747,51 @@ export default function ProjectDetailPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base text-destructive">Admin</CardTitle>
             <CardDescription>
-              Permanently delete this hire (any status). Blocked if escrow is non-zero, a dispute is open, a payment is
-              in progress, or a pending refund exists for this project.
+              Cancel marks the hire cancelled (USD only). Pending dispute refund rows are completed into the
+              client&apos;s wallet; remaining escrow is credited the same way; pending/disputed monthly cycles are
+              cancelled. Matched freelancers get an in-app notification and email. Permanent delete is separate.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            {project.status !== "cancelled" && project.status !== "completed" && (
+              <>
+                <Button
+                  variant="outline"
+                  className="min-h-11 w-full touch-manipulation border-destructive/50 sm:w-auto"
+                  onClick={() => setShowAdminCancelDialog(true)}
+                >
+                  <Ban className="mr-2 h-4 w-4" />
+                  Cancel hire (admin)
+                </Button>
+                <AlertDialog open={showAdminCancelDialog} onOpenChange={setShowAdminCancelDialog}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Cancel this hire as admin?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        The hire will be marked cancelled. Pending dispute refunds and remaining escrow (if any) are
+                        credited to the client&apos;s wallet. Non-approved monthly cycles on this hire are cancelled.
+                        The client and matched freelancers are notified.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isAdminCancelling}>Close</AlertDialogCancel>
+                      <Button
+                        variant="destructive"
+                        onClick={handleAdminCancelProject}
+                        disabled={isAdminCancelling}
+                      >
+                        {isAdminCancelling ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Ban className="mr-2 h-4 w-4" />
+                        )}
+                        {isAdminCancelling ? "Cancelling…" : "Confirm cancel"}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
             <Button
               variant="destructive"
               className="min-h-11 w-full touch-manipulation sm:w-auto"
@@ -753,6 +824,44 @@ export default function ProjectDetailPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+            {moneyAudit && (
+              <div className="mt-4 w-full rounded-md border border-border bg-card/80 p-3 text-sm">
+                <p className="font-medium text-foreground">Money audit (read-only)</p>
+                <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
+                  <li>
+                    Escrow: {moneyAudit.currency.toUpperCase()}{" "}
+                    {(moneyAudit.escrowedAmount as number).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </li>
+                  <li>
+                    Client pending dispute refunds: USD{" "}
+                    {(moneyAudit.pendingRefundCents / 100).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </li>
+                  <li>
+                    Client completed dispute refunds (this hire): USD{" "}
+                    {(moneyAudit.completedRefundCents / 100).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </li>
+                  <li>Monthly cycles: {moneyAudit.cycles.length} row(s) — see list below.</li>
+                </ul>
+                <ul className="mt-2 max-h-32 overflow-y-auto text-xs text-muted-foreground">
+                  {moneyAudit.cycles.map(
+                    (c: { _id: string; monthIndex: number; status: string; amountCents: number }) => (
+                      <li key={c._id}>
+                        Month {c.monthIndex}: {c.status} — {(c.amountCents / 100).toFixed(2)}
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
