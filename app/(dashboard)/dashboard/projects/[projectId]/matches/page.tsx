@@ -589,6 +589,17 @@ export default function ProjectMatchesPage() {
         return map;
       })()
     : new Map<string, EnrichedMatch[]>();
+  /** Seats still filled by retained team members (no pending carousel for that role). */
+  const acceptedMatchesByRole = useMemo(() => {
+    const map = new Map<string, EnrichedMatch[]>();
+    if (!isTeam) return map;
+    for (const m of matchesList) {
+      if (m.status !== "accepted" || !m.teamRole) continue;
+      if (!map.has(m.teamRole)) map.set(m.teamRole, []);
+      map.get(m.teamRole)!.push(m as EnrichedMatch);
+    }
+    return map;
+  }, [isTeam, matchesList]);
   const allRoleLabels = isTeam && project
     ? getRoleLabelsForProjectIntake(project.intakeForm)
     : [];
@@ -609,10 +620,16 @@ export default function ProjectMatchesPage() {
   /** Seats the engine could not staff yet — client can still proceed with other roles. */
   const rolesWithNoMatches = useMemo(() => {
     if (!isTeam || allRoleLabels.length === 0) return [];
-    return allRoleLabels.filter(
-      (r) => (matchesByRoleMap.get(r) ?? []).length === 0
-    );
-  }, [isTeam, allRoleLabels, matchesByRoleMap]);
+    return allRoleLabels.filter((r) => {
+      const pendingForRole = (matchesByRoleMap.get(r) ?? []).length;
+      if (pendingForRole > 0) return false;
+      const hasAcceptedSeat = matchesList.some(
+        (m) => m.status === "accepted" && m.teamRole === r
+      );
+      if (hasAcceptedSeat) return false;
+      return true;
+    });
+  }, [isTeam, allRoleLabels, matchesByRoleMap, matchesList]);
 
   const sortedTeamPools = useMemo(() => {
     const map = new Map<string, EnrichedMatch[]>();
@@ -672,7 +689,11 @@ export default function ProjectMatchesPage() {
     rolesForAvailabilityNote.length > 0 &&
     rolesForAvailabilityNote.some((role: string) => {
       const n = matchesByRoleMap.get(role) ?? [];
-      return n.length === 0;
+      if (n.length > 0) return false;
+      const hasAcceptedSeat = matchesList.some(
+        (m) => m.status === "accepted" && m.teamRole === role
+      );
+      return !hasAcceptedSeat;
     });
   const hasUnavailableSingleSlot =
     !isTeam && !matchingRunning && pendingMatches.length === 0;
@@ -1189,7 +1210,7 @@ export default function ProjectMatchesPage() {
                 : "You’ve already chosen who to hire below. Continue to payment when you’re ready, or open your hire to review the contract."
               : isFreelancerReplacementFlow
                 ? isTeam
-                  ? "Fill each open role with a new freelancer. Your escrow is unchanged — you’ll sign an updated contract after selection."
+                  ? "Replace only the open role(s) below. Team members you did not dispute stay on this hire. Your escrow is unchanged — you’ll sign an updated contract after selection."
                   : "Pick a new freelancer for this hire. Funds stay in escrow until you approve monthly payouts as usual."
                 : isFundedMatchingContinuation
                   ? `Choose up to ${project.pendingTeamMemberSlots} more team member(s). We show one strong suggestion per seat at a time—you can cycle through up to ${MATCH_CAROUSEL_CAP} per seat.`
@@ -1478,6 +1499,7 @@ export default function ProjectMatchesPage() {
                 roleMatches.find((x) => x.freelancerId === chosenId)
               : undefined;
             const current = pool[idx];
+            const retainedForRole = acceptedMatchesByRole.get(roleLabel) ?? [];
 
             return (
               <div key={roleLabel} className="mx-auto w-full max-w-xl space-y-4">
@@ -1495,7 +1517,30 @@ export default function ProjectMatchesPage() {
                   )}
                 </div>
 
-                {roleMatches.length === 0 ? (
+                {retainedForRole.length > 0 && roleMatches.length === 0 ? (
+                  <Card className="rounded-xl border-border/60 bg-muted/15">
+                    <CardContent className="space-y-3 py-5 px-4 sm:px-6">
+                      <p className="text-sm font-medium text-foreground">
+                        Current team member (not part of this dispute)
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        This seat stays filled. You only need to choose replacements for open roles below.
+                      </p>
+                      {retainedForRole.map((m) => (
+                        <MatchCard
+                          key={m._id}
+                          match={m}
+                          rank={1}
+                          isSelected={true}
+                          onSelect={() => {}}
+                          onViewProfile={() => setViewingFreelancerId(m.freelancerId)}
+                          isTeam
+                          primaryCtaLabel="On your team"
+                        />
+                      ))}
+                    </CardContent>
+                  </Card>
+                ) : roleMatches.length === 0 ? (
                   <Card className="rounded-xl border-dashed border-border/60 bg-muted/20">
                     <CardContent className="py-8 px-4 sm:px-6 text-center">
                       <p className="font-medium text-muted-foreground">
