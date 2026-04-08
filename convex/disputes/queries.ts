@@ -8,8 +8,6 @@ import {
   sumShareCentsForFreelancers,
   teamBasisUserIdsForDispute,
 } from "../teamEscrowShares";
-import type { Id } from "../_generated/dataModel";
-
 async function getCurrentUserInQuery(
   ctx: QueryCtx,
   userId?: string
@@ -106,25 +104,43 @@ export const getDisputes = query({
       return enrichDisputes(raw);
     }
 
-    // Get user's projects (as client or matched freelancer)
-    const userProjects = await ctx.db
-      .query("projects")
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("clientId"), user._id),
-          q.eq(q.field("matchedFreelancerId"), user._id)
-        )
-      )
-      .collect();
+    // Projects as client + solo matched freelancer + team (accepted match rows; team uses matchedFreelancerIds)
+    const projectIdSet = new Set<string>();
 
-    const projectIds = userProjects.map((p) => p._id);
+    const asClient = await ctx.db
+      .query("projects")
+      .withIndex("by_client", (q) => q.eq("clientId", user._id))
+      .collect();
+    for (const p of asClient) projectIdSet.add(p._id as string);
+
+    const asSoloFreelancer = await ctx.db
+      .query("projects")
+      .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
+      .collect();
+    for (const p of asSoloFreelancer) projectIdSet.add(p._id as string);
+
+    const acceptedTeamMatches = await ctx.db
+      .query("matches")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .filter((q) => q.eq(q.field("status"), "accepted"))
+      .collect();
+    for (const m of acceptedTeamMatches) projectIdSet.add(m.projectId as string);
+
+    // Disputes they initiated while not yet on project roster (edge)
+    const asInitiator = await ctx.db
+      .query("disputes")
+      .withIndex("by_initiator", (q) => q.eq("initiatorId", user._id))
+      .collect();
+    for (const d of asInitiator) projectIdSet.add(d.projectId as string);
+
+    const projectIds = Array.from(projectIdSet) as Doc<"projects">["_id"][];
 
     if (projectIds.length === 0) {
       return [];
     }
 
     // Get disputes for user's projects
-    const allDisputes: any[] = [];
+    const allDisputes: Doc<"disputes">[] = [];
     for (const projectId of projectIds) {
       const disputes = await ctx.db
         .query("disputes")
@@ -198,11 +214,19 @@ export const getDispute = query({
       return null;
     }
 
-    // Check authorization (include team freelancers)
+    // Check authorization (include team freelancers + anyone with a match row — e.g. removed after dispute)
     const isClient = project.clientId === user._id;
-    const isFreelancer =
+    let isFreelancer =
       project.matchedFreelancerId === user._id ||
       (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
+    if (!isFreelancer && user.role === "freelancer") {
+      const anyMatchOnHire = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", dispute.projectId))
+        .filter((q) => q.eq(q.field("freelancerId"), user._id))
+        .first();
+      isFreelancer = anyMatchOnHire != null;
+    }
     const isInitiator = dispute.initiatorId === user._id;
     const isAssignedModerator =
       dispute.assignedModeratorId === user._id;
@@ -367,9 +391,17 @@ export const listDisputeMessages = query({
     if (!project) return [];
 
     const isClient = project.clientId === user._id;
-    const isFreelancer =
+    let isFreelancer =
       project.matchedFreelancerId === user._id ||
       (project.matchedFreelancerIds?.includes(user._id) ?? false);
+    if (!isFreelancer && user.role === "freelancer") {
+      const anyMatchOnHire = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", dispute.projectId))
+        .filter((q) => q.eq(q.field("freelancerId"), user._id))
+        .first();
+      isFreelancer = anyMatchOnHire != null;
+    }
     const isStaff = user.role === "admin" || user.role === "moderator";
     const isAssigned = dispute.assignedModeratorId === user._id;
 
