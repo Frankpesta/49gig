@@ -1,5 +1,6 @@
 import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
+import { assertUsdCurrency } from "../currencyPolicy";
 
 /**
  * Get or create wallet for a user (internal).
@@ -199,6 +200,7 @@ export const recordPendingRefund = internalMutation({
   },
   handler: async (ctx, args) => {
     if (args.amountCents <= 0) return { success: true };
+    assertUsdCurrency(args.currency, "recordPendingRefund");
     let wallet = await ctx.db
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -276,6 +278,8 @@ export const clearPendingRefundsForProject = internalMutation({
 
     let cleared = 0;
     for (const tx of pending) {
+      const fresh = await ctx.db.get(tx._id);
+      if (!fresh || fresh.status !== "pending") continue;
       await ctx.db.patch(tx._id, {
         status: "failed",
         description: `${tx.description} (consumed as project continuation credit)`,
@@ -298,5 +302,86 @@ export const clearPendingRefundsForProject = internalMutation({
     }
 
     return { cleared };
+  },
+});
+
+/**
+ * Turn pending dispute refund rows for a project into completed refunds and credit wallet balance,
+ * so the client can withdraw or apply funds toward new hires.
+ */
+export const completePendingDisputeRefundsForProjectInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+    projectId: v.id("projects"),
+    reasonSuffix: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const wallet = await ctx.db
+      .query("wallets")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    if (!wallet) {
+      return { completed: 0, totalCents: 0 };
+    }
+
+    const pending = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("projectId"), args.projectId),
+          q.eq(q.field("type"), "refund"),
+          q.eq(q.field("status"), "pending")
+        )
+      )
+      .collect();
+
+    if (pending.length === 0) {
+      return { completed: 0, totalCents: 0 };
+    }
+
+    const sorted = [...pending].sort((a, b) => a.createdAt - b.createdAt);
+    let balance = wallet.balanceCents ?? 0;
+    let totalCents = 0;
+    let completedCount = 0;
+    const now = Date.now();
+    const suffix = args.reasonSuffix?.trim() ? ` ${args.reasonSuffix.trim()}` : "";
+
+    for (const tx of sorted) {
+      const fresh = await ctx.db.get(tx._id);
+      if (!fresh || fresh.status !== "pending") continue;
+      balance += fresh.amountCents;
+      totalCents += fresh.amountCents;
+      completedCount += 1;
+      await ctx.db.patch(tx._id, {
+        status: "completed",
+        balanceAfterCents: balance,
+        description: `${fresh.description}${suffix}`,
+      });
+    }
+
+    if (totalCents > 0) {
+      await ctx.db.patch(wallet._id, {
+        balanceCents: balance,
+        updatedAt: now,
+      });
+
+      await ctx.db.insert("auditLogs", {
+        action: "pending_dispute_refunds_completed",
+        actionType: "admin",
+        actorId: args.userId,
+        actorRole: "client",
+        targetType: "wallet",
+        targetId: wallet._id,
+        details: {
+          projectId: args.projectId,
+          completed: completedCount,
+          totalCents,
+        },
+        createdAt: now,
+      });
+    }
+
+    return { completed: completedCount, totalCents };
   },
 });

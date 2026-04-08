@@ -2,6 +2,8 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "../_generated/api";
+import { escrowNetToClientLockedGross } from "./amounts";
+import { assertUsdCurrency } from "../currencyPolicy";
 
 /**
  * Automated dispute resolution
@@ -180,28 +182,31 @@ export const releaseDisputeFunds = action({
       { projectId: dispute.projectId }
     );
     const currency = (basePayment?.currency || project.currency || "usd").toLowerCase();
+    assertUsdCurrency(currency, "releaseDisputeFunds");
 
-    // Determine if this is a partial team dispute (some freelancers disputed, not all)
     const teamMemberIds: string[] = (project as any).matchedFreelancerIds ?? [];
     const disputedIds: string[] = (dispute as any).disputedFreelancerIds ?? [];
+    const hasTeamBasisSnapshot =
+      (dispute as any).teamEscrowBasisFreelancerIds?.length > 0;
+    let teamBasis: string[] = hasTeamBasisSnapshot
+      ? (dispute as any).teamEscrowBasisFreelancerIds.map(String)
+      : teamMemberIds.map(String);
+    if (!hasTeamBasisSnapshot && disputedIds.length > 0) {
+      const set = new Set(teamBasis);
+      for (const id of disputedIds) set.add(String(id));
+      teamBasis = Array.from(set);
+    }
     const isPartialTeam =
-      teamMemberIds.length > 0 &&
+      teamBasis.length > 0 &&
       disputedIds.length > 0 &&
-      disputedIds.length < teamMemberIds.length;
+      disputedIds.every((id) => teamBasis.includes(String(id))) &&
+      disputedIds.length < teamBasis.length;
 
     if (decision === "client_favor" && !isPartialTeam) {
-      // Keep project funds reserved for replacement flow, but reflect a pending client refund
-      // (includes platform fee component so the client sees the full paid amount).
+      // Pending refund equals escrow net (freelancer pool) only — never gross-funded amount,
+      // so the hold never exceeds what we zero from escrow.
       const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
-      const grossPaidCents = basePayment?.fundingGrossAmount
-        ? Math.round(basePayment.fundingGrossAmount * 100)
-        : Math.round(
-            Math.max(
-              0,
-              (basePayment?.amount ?? 0) + (basePayment?.platformFee ?? 0)
-            ) * 100
-          );
-      const pendingRefundCents = Math.max(escrowCents, grossPaidCents);
+      const pendingRefundCents = escrowCents;
       if (pendingRefundCents > 0) {
         await ctx.runMutation(internal.wallets.mutations.recordPendingRefund, {
           userId: project.clientId,
@@ -211,44 +216,11 @@ export const releaseDisputeFunds = action({
           projectId: dispute.projectId,
         });
       }
-      if (dispute.monthlyCycleId) {
-        await ctx.runMutation(
-          internal.monthlyBillingCycles.mutations.cancelDisputedMonthlyCycleInternal,
-          { monthlyCycleId: dispute.monthlyCycleId }
-        );
-      }
-    } else if (decision === "client_favor" && isPartialTeam) {
-      // Partial team dispute: calculate the removed members' portion of escrow
-      const totalEscrowCents = Math.round(Math.max(0, (project as any).escrowedAmount ?? 0) * 100);
-      const teamBudgetBreakdown: Record<string, number> = (project as any).teamBudgetBreakdown ?? {};
-      let removedShareCents = 0;
-
-      if (Object.keys(teamBudgetBreakdown).length > 0) {
-        // Use per-role breakdown to calculate the removed members' share
-        const totalBreakdownCents = Object.values(teamBudgetBreakdown).reduce((a, b) => a + b, 0);
-        for (const fid of disputedIds) {
-          // Find corresponding slot for this freelancer by matching order (teamBudgetBreakdown keys are roleIds)
-          // Fallback: divide equally
-          const share = totalBreakdownCents > 0
-            ? Math.round((totalEscrowCents / teamMemberIds.length))
-            : Math.round(totalEscrowCents / teamMemberIds.length);
-          removedShareCents += share;
-        }
-      } else {
-        // Equal share per member
-        removedShareCents = Math.round((totalEscrowCents / Math.max(1, teamMemberIds.length)) * disputedIds.length);
-      }
-
-      // Clamp to available escrow
-      removedShareCents = Math.min(removedShareCents, totalEscrowCents);
-
-      if (removedShareCents > 0) {
-        await ctx.runMutation(internal.wallets.mutations.recordPendingRefund, {
-          userId: project.clientId,
-          amountCents: removedShareCents,
-          currency,
-          description: `Pending dispute refund hold for ${disputedIds.length} removed team member(s) on ${project.intakeForm.title}`,
+      const netEscrowDollars = Math.max(0, (project as any).escrowedAmount ?? 0);
+      if (netEscrowDollars > 0) {
+        await ctx.runMutation(internal.projects.mutations.adjustProjectEscrowInternal, {
           projectId: dispute.projectId,
+          deltaDollars: -netEscrowDollars,
         });
       }
       if (dispute.monthlyCycleId) {
@@ -257,7 +229,53 @@ export const releaseDisputeFunds = action({
           { monthlyCycleId: dispute.monthlyCycleId }
         );
       }
-      // Remaining escrow stays for the continuing team members
+    } else if (decision === "client_favor" && isPartialTeam) {
+      let disputedNetCents = 0;
+      if (dispute.monthlyCycleId) {
+        const c = await ctx.runQuery(
+          internal.disputes.queries.computeDisputedMonthlyCycleShareCentsInternal,
+          { disputeId: args.disputeId }
+        );
+        disputedNetCents = c.disputedNetCents;
+      } else {
+        const c = await ctx.runQuery(
+          internal.disputes.queries.computeDisputedTeamEscrowNetCentsFromDisputeInternal,
+          { disputeId: args.disputeId }
+        );
+        disputedNetCents = c.disputedNetCents;
+      }
+      const feePct = (project as any).platformFee ?? 15;
+      const pendingRefundCents = Math.round(
+        escrowNetToClientLockedGross(disputedNetCents / 100, feePct) * 100
+      );
+
+      if (pendingRefundCents > 0) {
+        await ctx.runMutation(internal.wallets.mutations.recordPendingRefund, {
+          userId: project.clientId,
+          amountCents: pendingRefundCents,
+          currency,
+          description: `Pending dispute refund hold for ${disputedIds.length} removed team member(s) on ${project.intakeForm.title}`,
+          projectId: dispute.projectId,
+        });
+      }
+
+      const netDollarsToRelease = disputedNetCents / 100;
+      if (netDollarsToRelease > 0) {
+        await ctx.runMutation(internal.projects.mutations.adjustProjectEscrowInternal, {
+          projectId: dispute.projectId,
+          deltaDollars: -netDollarsToRelease,
+        });
+      }
+
+      if (dispute.monthlyCycleId && disputedNetCents > 0) {
+        await ctx.runMutation(
+          internal.monthlyBillingCycles.mutations.applyPartialDisputeCycleReductionInternal,
+          {
+            monthlyCycleId: dispute.monthlyCycleId,
+            removeCents: disputedNetCents,
+          }
+        );
+      }
     } // end partial team client_favor
     
     if (decision === "freelancer_favor") {

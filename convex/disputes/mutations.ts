@@ -8,6 +8,11 @@ import {
   freelancersRemovedForPermanentExclusion,
   mergePermanentExclusions,
 } from "../match_exclusions";
+import {
+  computeTeamPoolShareCentsByFreelancerId,
+  sumShareCentsForFreelancers,
+} from "../teamEscrowShares";
+import type { Id } from "../_generated/dataModel";
 
 const api = require("../_generated/api") as {
   api: {
@@ -20,6 +25,7 @@ const api = require("../_generated/api") as {
 const internalAny = require("../_generated/api").internal as {
   disputes: { staffEmails: { sendDisputeAssignmentEmailInternal: unknown } };
 };
+const internalApi = require("../_generated/api").internal as any;
 
 /**
  * Helper to get current user in mutations
@@ -207,7 +213,6 @@ export const initiateDispute = mutation({
 
     const escrowNet = Math.max(0, project.escrowedAmount ?? 0);
     const platformFeePct = project.platformFee ?? 15;
-    const lockedAmount = escrowNetToClientLockedGross(escrowNet, platformFeePct);
 
     // Validate partial team dispute: all specified freelancers must be on the project
     const teamMemberIds = project.matchedFreelancerIds ?? [];
@@ -223,6 +228,31 @@ export const initiateDispute = mutation({
           throw new Error(`Freelancer ${fid} is not a matched member of this project.`);
         }
       }
+    }
+
+    const isPartialTeamDispute =
+      isClient &&
+      (args.disputedFreelancerIds?.length ?? 0) > 0 &&
+      teamMemberIds.length > 0 &&
+      (args.disputedFreelancerIds?.length ?? 0) < teamMemberIds.length;
+
+    let lockedAmount: number;
+    if (isPartialTeamDispute && args.disputedFreelancerIds) {
+      const totalPoolCents = Math.round(escrowNet * 100);
+      const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+        ctx,
+        projectId,
+        teamMemberIds as Id<"users">[],
+        project.teamBudgetBreakdown,
+        totalPoolCents
+      );
+      const disputedNetCents = sumShareCentsForFreelancers(
+        shareMap,
+        args.disputedFreelancerIds
+      );
+      lockedAmount = escrowNetToClientLockedGross(disputedNetCents / 100, platformFeePct);
+    } else {
+      lockedAmount = escrowNetToClientLockedGross(escrowNet, platformFeePct);
     }
 
     // Create dispute
@@ -242,6 +272,8 @@ export const initiateDispute = mutation({
         args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0
           ? args.disputedFreelancerIds
           : undefined,
+      teamEscrowBasisFreelancerIds:
+        teamMemberIds.length > 0 ? [...teamMemberIds] : undefined,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -724,6 +756,19 @@ export const resolveDispute = mutation({
       }
     }
 
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      const removedSweep = freelancersRemovedForPermanentExclusion(project, dispute);
+      if (removedSweep.length > 0) {
+        await ctx.runMutation(
+          internalApi.projects.mutations.sweepFreelancersRemovedFromProjectInternal,
+          {
+            projectId: dispute.projectId,
+            freelancerIds: removedSweep,
+          }
+        );
+      }
+    }
+
     // Send personalized notifications to each party
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [project.clientId],
@@ -745,7 +790,45 @@ export const resolveDispute = mutation({
     const uniqueFreelancerIds = Array.from(new Set(freelancerIds.map(String))).map(
       (id) => id as Doc<"users">["_id"]
     );
-    if (uniqueFreelancerIds.length > 0) {
+
+    if (
+      (args.decision === "client_favor" || args.decision === "replacement") &&
+      uniqueFreelancerIds.length > 0
+    ) {
+      const removedIds = freelancersRemovedForPermanentExclusion(project, dispute);
+      const removedSet = new Set(removedIds.map(String));
+      const isPartialTeamResolve =
+        (project.matchedFreelancerIds?.length ?? 0) > 0 &&
+        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
+        (dispute.disputedFreelancerIds?.length ?? 0) <
+          (project.matchedFreelancerIds?.length ?? 0);
+
+      const ruledAgainst = uniqueFreelancerIds.filter((id) => removedSet.has(String(id)));
+      if (ruledAgainst.length > 0) {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: ruledAgainst,
+          title: "Dispute resolved",
+          message: decisionFreelancerMsg,
+          type: "dispute",
+          data: { disputeId: args.disputeId, projectId: dispute.projectId },
+        });
+      }
+
+      if (isPartialTeamResolve) {
+        const remainingNotify = uniqueFreelancerIds.filter(
+          (id) => !removedSet.has(String(id))
+        );
+        if (remainingNotify.length > 0) {
+          await ctx.scheduler.runAfter(0, sendSystemNotification, {
+            userIds: remainingNotify,
+            title: "Dispute resolved",
+            message: `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`,
+            type: "dispute",
+            data: { disputeId: args.disputeId, projectId: dispute.projectId },
+          });
+        }
+      }
+    } else if (uniqueFreelancerIds.length > 0) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
         userIds: uniqueFreelancerIds,
         title: "Dispute resolved",
@@ -832,28 +915,165 @@ export const resolveDisputeInternal = internalMutation({
       newProjectStatus = "in_progress";
     }
 
+    const exclusionPatch: {
+      permanentlyExcludedFreelancerIds?: Doc<"users">["_id"][];
+    } = {};
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      const removed = freelancersRemovedForPermanentExclusion(project, dispute);
+      if (removed.length > 0) {
+        exclusionPatch.permanentlyExcludedFreelancerIds = mergePermanentExclusions(
+          project.permanentlyExcludedFreelancerIds,
+          removed
+        );
+      }
+    }
+
     await ctx.db.patch(dispute.projectId, {
       status: newProjectStatus,
       updatedAt: now,
+      ...exclusionPatch,
     });
 
     await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
       disputeId: args.disputeId,
     });
 
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      const isTeamProject = (project.matchedFreelancerIds?.length ?? 0) > 0;
+      const isPartialTeam =
+        isTeamProject &&
+        dispute.disputedFreelancerIds &&
+        dispute.disputedFreelancerIds.length > 0 &&
+        dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
+
+      if (isPartialTeam && dispute.disputedFreelancerIds) {
+        const remainingIds = (project.matchedFreelancerIds ?? []).filter(
+          (id) => !dispute.disputedFreelancerIds!.includes(id)
+        );
+        await ctx.db.patch(dispute.projectId, {
+          matchedFreelancerIds: remainingIds,
+          status: "matching",
+          updatedAt: now,
+        } as any);
+      } else {
+        if (isTeamProject) {
+          await ctx.db.patch(dispute.projectId, {
+            matchedFreelancerIds: [],
+            updatedAt: now,
+          } as any);
+        } else {
+          await ctx.db.patch(dispute.projectId, {
+            matchedFreelancerId: undefined,
+            updatedAt: now,
+          } as any);
+        }
+      }
+    }
+
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      const removedSweep = freelancersRemovedForPermanentExclusion(project, dispute);
+      if (removedSweep.length > 0) {
+        await ctx.runMutation(
+          internalApi.projects.mutations.sweepFreelancersRemovedFromProjectInternal,
+          {
+            projectId: dispute.projectId,
+            freelancerIds: removedSweep,
+          }
+        );
+      }
+    }
+
     const sendSystemNotification =
       api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
         "action",
         "internal"
       >;
-    const notifyUserIds = [project.clientId, project.matchedFreelancerId].filter(
-      Boolean
-    ) as Doc<"users">["_id"][];
-    if (notifyUserIds.length > 0) {
+    const sendSelectReplacementClientEmail = api.api.projects.actions
+      .sendSelectReplacementClientEmail as unknown as FunctionReference<
+      "action",
+      "internal"
+    >;
+
+    const decisionClientMsg =
+      args.decision === "client_favor"
+        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. Your funds are reserved for this hire and you can select replacement freelancer(s) to continue.`
+        : args.decision === "freelancer_favor"
+          ? `The dispute for "${project.intakeForm.title}" was not resolved in your favor.`
+          : args.decision === "partial"
+            ? `The dispute for "${project.intakeForm.title}" was partially resolved. ${args.notes}`
+            : `The dispute for "${project.intakeForm.title}" resulted in a replacement decision.`;
+
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [project.clientId],
+      title: "Dispute resolved",
+      message: decisionClientMsg,
+      type: "dispute",
+      data: { disputeId: args.disputeId, projectId: dispute.projectId },
+    });
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      await ctx.scheduler.runAfter(0, sendSelectReplacementClientEmail, {
+        projectId: dispute.projectId,
+      });
+    }
+
+    const decisionFreelancerMsg =
+      args.decision === "freelancer_favor"
+        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. ${args.notes}`
+        : args.decision === "client_favor"
+          ? `The dispute for "${project.intakeForm.title}" was not resolved in your favor. The client's position was upheld.`
+          : args.decision === "partial"
+            ? `The dispute for "${project.intakeForm.title}" was partially resolved. ${args.notes}`
+            : `The dispute for "${project.intakeForm.title}" resulted in a replacement decision. You have been removed from this hire.`;
+
+    const freelancerNotifyIds = [
+      project.matchedFreelancerId,
+      ...(project.matchedFreelancerIds ?? []),
+    ].filter(Boolean) as Doc<"users">["_id"][];
+    const uniqueFreelancerIds = Array.from(new Set(freelancerNotifyIds.map(String))).map(
+      (id) => id as Doc<"users">["_id"]
+    );
+
+    if (
+      (args.decision === "client_favor" || args.decision === "replacement") &&
+      uniqueFreelancerIds.length > 0
+    ) {
+      const removedIds = freelancersRemovedForPermanentExclusion(project, dispute);
+      const removedSet = new Set(removedIds.map(String));
+      const isPartialTeamResolve =
+        (project.matchedFreelancerIds?.length ?? 0) > 0 &&
+        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
+        (dispute.disputedFreelancerIds?.length ?? 0) <
+          (project.matchedFreelancerIds?.length ?? 0);
+
+      const ruledAgainst = uniqueFreelancerIds.filter((id) => removedSet.has(String(id)));
+      if (ruledAgainst.length > 0) {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: ruledAgainst,
+          title: "Dispute resolved",
+          message: decisionFreelancerMsg,
+          type: "dispute",
+          data: { disputeId: args.disputeId, projectId: dispute.projectId },
+        });
+      }
+      if (isPartialTeamResolve) {
+        const remainingNotify = uniqueFreelancerIds.filter(
+          (id) => !removedSet.has(String(id))
+        );
+        if (remainingNotify.length > 0) {
+          await ctx.scheduler.runAfter(0, sendSystemNotification, {
+            userIds: remainingNotify,
+            title: "Dispute resolved",
+            message: `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`,
+            type: "dispute",
+            data: { disputeId: args.disputeId, projectId: dispute.projectId },
+          });
+        }
+      }
+    } else if (uniqueFreelancerIds.length > 0) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: notifyUserIds,
+        userIds: uniqueFreelancerIds,
         title: "Dispute resolved",
-        message: `The dispute for ${project.intakeForm.title} has been resolved.`,
+        message: decisionFreelancerMsg,
         type: "dispute",
         data: { disputeId: args.disputeId, projectId: dispute.projectId },
       });

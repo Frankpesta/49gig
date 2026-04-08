@@ -994,6 +994,8 @@ export default defineSchema({
     // Partial team dispute: IDs of specific freelancers being disputed (team hires only)
     // When set, only these freelancers are suspended/removed on client-favor resolution
     disputedFreelancerIds: v.optional(v.array(v.id("users"))),
+    /** Matched team at dispute open — used after resolve when project members are patched */
+    teamEscrowBasisFreelancerIds: v.optional(v.array(v.id("users"))),
 
     // Initiator
     initiatorId: v.id("users"),
