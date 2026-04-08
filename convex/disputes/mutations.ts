@@ -28,6 +28,25 @@ const internalAny = require("../_generated/api").internal as {
 const internalApi = require("../_generated/api").internal as any;
 
 /**
+ * Align project UX with applyFreelancerReplacementInternal so clients see “Choose replacement” / matches
+ * after moderator client-favor or replacement decisions (partial or full team).
+ */
+async function ensureReplacementMatchingProjectFields(
+  ctx: MutationCtx,
+  args: { projectId: Id<"projects">; disputeId: Id<"disputes">; now: number }
+) {
+  const p = await ctx.db.get(args.projectId);
+  if (!p || p.status !== "matching") return;
+  await ctx.db.patch(args.projectId, {
+    replacementMatchingAt: p.replacementMatchingAt ?? args.now,
+    awaitingMatch: true,
+    awaitingMatchSince: p.awaitingMatchSince ?? args.now,
+    replacementFlowDisputeId: p.replacementFlowDisputeId ?? args.disputeId,
+    updatedAt: args.now,
+  });
+}
+
+/**
  * Helper to get current user in mutations
  */
 async function getCurrentUserInMutation(
@@ -757,6 +776,14 @@ export const resolveDispute = mutation({
     }
 
     if (args.decision === "client_favor" || args.decision === "replacement") {
+      await ensureReplacementMatchingProjectFields(ctx, {
+        projectId: dispute.projectId,
+        disputeId: args.disputeId,
+        now,
+      });
+    }
+
+    if (args.decision === "client_favor" || args.decision === "replacement") {
       const removedSweep = freelancersRemovedForPermanentExclusion(project, dispute);
       if (removedSweep.length > 0) {
         await ctx.runMutation(
@@ -968,6 +995,14 @@ export const resolveDisputeInternal = internalMutation({
           } as any);
         }
       }
+    }
+
+    if (args.decision === "client_favor" || args.decision === "replacement") {
+      await ensureReplacementMatchingProjectFields(ctx, {
+        projectId: dispute.projectId,
+        disputeId: args.disputeId,
+        now,
+      });
     }
 
     if (args.decision === "client_favor" || args.decision === "replacement") {

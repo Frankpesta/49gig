@@ -365,6 +365,10 @@ export default function ProjectDetailPage() {
       ? confirmedTeamMembers.length + (project.pendingTeamMemberSlots ?? 0)
       : undefined);
   const postFundingSelection = !["draft", "pending_funding"].includes(project.status);
+  const showClientMatchesHeaderButton =
+    showClientViewMatches ||
+    isFreelancerReplacementMatching ||
+    (isClient && project.status === "matching" && postFundingSelection);
   const clientWaitingFreelancerMatchAcceptance =
     isClient &&
     !isFreelancerReplacementMatching &&
@@ -899,7 +903,7 @@ export default function ProjectDetailPage() {
                 </Link>
               </Button>
             )}
-            {(showClientViewMatches || isFreelancerReplacementMatching) && (
+            {showClientMatchesHeaderButton && (
               <Button asChild className={isFreelancerReplacementMatching ? "shadow-md" : undefined}>
                 <Link href={`/dashboard/projects/${project._id}/matches`}>
                   <UserSearch className="mr-2 h-4 w-4" />
