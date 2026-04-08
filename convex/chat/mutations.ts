@@ -58,9 +58,11 @@ export const createProjectChat = mutation({
       throw new Error("Project not found");
     }
 
-    // Check authorization
+    // Check authorization (include team roster; matchedFreelancerId is solo-hire only)
     const isClient = project.clientId === user._id;
-    const isFreelancer = project.matchedFreelancerId === user._id;
+    const isFreelancer =
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds?.includes(user._id) ?? false);
     const isAdminOrModerator =
       user.role === "admin" || user.role === "moderator";
 
@@ -541,10 +543,20 @@ export const createSupportChat = mutation({
       .withIndex("by_role", (q) => q.eq("role", "admin"))
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
-    const adminIds = admins.map((admin) => admin._id);
-    if (adminIds.length > 0) {
+    const moderators = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "moderator"))
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+    const staffIds = [
+      ...new Set([
+        ...admins.map((a) => a._id),
+        ...moderators.map((m) => m._id),
+      ]),
+    ];
+    if (staffIds.length > 0) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: adminIds,
+        userIds: staffIds,
         title: "New support request",
         message: `${user.name} opened a support request: "${args.subject}".`,
         type: "support",
@@ -614,6 +626,34 @@ export const assignSupportChatModerator = mutation({
         moderatorId: args.moderatorId,
       },
       createdAt: now,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.moderatorId],
+      title: "Support thread assigned",
+      message: `You were assigned to a support request: "${chat.title ?? "Support"}".`,
+      type: "support",
+      data: { chatId: args.chatId },
+    });
+
+    const { internal: internalApi } = require("../_generated/api") as {
+      internal: {
+        chat: { actions: { sendSupportChatAssignedEmailInternal: unknown } };
+      };
+    };
+    await (
+      ctx.scheduler.runAfter as (
+        delayMs: number,
+        fn: unknown,
+        fnArgs: { chatId: typeof args.chatId }
+      ) => Promise<unknown>
+    )(0, internalApi.chat.actions.sendSupportChatAssignedEmailInternal, {
+      chatId: args.chatId,
     });
 
     return { success: true };

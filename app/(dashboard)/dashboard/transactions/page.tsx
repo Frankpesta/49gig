@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -98,6 +98,10 @@ export default function TransactionsPage() {
 
   const { user } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (user?.role === "moderator") router.replace("/dashboard");
+  }, [user?.role, router]);
   const searchParams = useSearchParams();
 
   // Filters

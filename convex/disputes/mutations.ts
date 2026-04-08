@@ -17,6 +17,10 @@ const api = require("../_generated/api") as {
   };
 };
 
+const internalAny = require("../_generated/api").internal as {
+  disputes: { staffEmails: { sendDisputeAssignmentEmailInternal: unknown } };
+};
+
 /**
  * Helper to get current user in mutations
  */
@@ -538,6 +542,16 @@ export const assignModerator = mutation({
       message: "A dispute has been assigned to you for review.",
       type: "dispute",
       data: { disputeId: args.disputeId, projectId: dispute.projectId },
+    });
+
+    await (
+      ctx.scheduler.runAfter as (
+        delayMs: number,
+        fn: unknown,
+        fnArgs: { disputeId: typeof args.disputeId }
+      ) => Promise<unknown>
+    )(0, internalAny.disputes.staffEmails.sendDisputeAssignmentEmailInternal, {
+      disputeId: args.disputeId,
     });
 
     return { success: true };

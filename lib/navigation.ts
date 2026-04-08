@@ -69,7 +69,7 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/projects",
     icon: FolderKanban,
     section: "menu",
-    roles: ["client", "freelancer", "admin"],
+    roles: ["client", "freelancer", "admin", "moderator"],
     children: [
       {
         title: "All Projects",
@@ -136,7 +136,7 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/wallet",
     icon: Wallet,
     section: "menu",
-    roles: ["freelancer", "client", "admin", "moderator"],
+    roles: ["freelancer", "client", "admin"],
   },
 
   // Referrals (share link; clients earn hiring credit, freelancers wallet balance)
@@ -163,7 +163,7 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/transactions",
     icon: CreditCard,
     section: "menu",
-    roles: ["client", "freelancer", "admin", "moderator"],
+    roles: ["client", "freelancer", "admin"],
   },
 
   // Disputes
@@ -181,7 +181,7 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/users",
     icon: Users,
     section: "menu",
-    roles: ["admin", "moderator"],
+    roles: ["admin"],
   },
 
   // Admin: Base rates by tech stack (moderators cannot change rates)
@@ -208,7 +208,7 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/blog",
     icon: BookOpen,
     section: "menu",
-    roles: ["admin", "moderator"],
+    roles: ["admin"],
   },
 
   // Admin & Moderator: KYC Review
@@ -235,7 +235,7 @@ export const navigationItems: NavItem[] = [
     url: "/dashboard/send-email",
     icon: Send,
     section: "menu",
-    roles: ["admin", "moderator"],
+    roles: ["admin"],
   },
 
   // Admin & Moderator: Notifications

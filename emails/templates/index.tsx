@@ -1020,22 +1020,24 @@ export function ContractReadyEmail({
   appUrl,
   logoUrl,
   date,
-  contractUrl,
+  contractUrl: _contractUrl,
 }: BaseEmailProps & { projectName: string; contractUrl: string }) {
   return (
     <EmailLayout
-      preview={`Your contract for "${projectName}" is ready to download.`}
+      preview={`Your contract for "${projectName}" is attached as a PDF.`}
       heroLabel="Contract Ready"
       heroTitle="Your contract is ready."
-      heroSubtitle="A signed PDF has been prepared for your records. Download it below."
+      heroSubtitle="A signed PDF is attached to this email for your records."
       logoUrl={logoUrl}
       appUrl={appUrl}
       date={date}
     >
       <Text style={textStyle}>
-        Hi <strong>{name}</strong>, the contract for <strong>{projectName}</strong> is ready. A signed copy can be downloaded below and is also attached to this email.
+        Hi <strong>{name}</strong>, the contract for <strong>{projectName}</strong> is ready. Your signed PDF is attached—open it from your email app; no separate download step is required.
       </Text>
-      <EmailButton href={contractUrl}>Download Contract</EmailButton>
+      <Text style={{ ...textStyle, marginTop: "16px", fontSize: "14px", color: "#6b7280" }}>
+        You can still review or sign in the app under this hire&apos;s contract page if needed.
+      </Text>
     </EmailLayout>
   );
 }

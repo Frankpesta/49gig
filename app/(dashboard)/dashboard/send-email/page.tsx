@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,7 +28,12 @@ import { Id } from "@/convex/_generated/dataModel";
 type RecipientType = "all" | "clients" | "freelancers" | "individual";
 
 export default function SendEmailPage() {
+  const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === "moderator") router.replace("/dashboard");
+  }, [isAuthenticated, user?.role, router]);
   const [recipientType, setRecipientType] = useState<RecipientType>("all");
   const [recipientUserId, setRecipientUserId] = useState<Id<"users"> | "">("");
   const [subject, setSubject] = useState("");
@@ -36,16 +42,12 @@ export default function SendEmailPage() {
 
   const counts = useQuery(
     api.users.queries.getBroadcastRecipientCounts,
-    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
-      ? { userId: user._id }
-      : "skip"
+    isAuthenticated && user?._id && user.role === "admin" ? { userId: user._id } : "skip"
   );
 
   const users = useQuery(
     api.users.queries.getAllUsersAdmin,
-    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
-      ? { userId: user._id }
-      : "skip"
+    isAuthenticated && user?._id && user.role === "admin" ? { userId: user._id } : "skip"
   );
 
   const sendEmail = useAction(api.email.actions.sendAdminBroadcastEmail);
@@ -87,13 +89,13 @@ export default function SendEmailPage() {
     return <DashboardEmptyState icon={Mail} title="Please log in" iconTone="muted" />;
   }
 
-  if (user.role !== "admin" && user.role !== "moderator") {
+  if (user.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={Mail}
         iconTone="muted"
         title="Access restricted"
-        description="Only admins and moderators can send platform emails."
+        description="Only admins can send platform emails."
         action={
           <Button asChild>
             <Link href="/dashboard">Back to Dashboard</Link>

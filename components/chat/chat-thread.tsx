@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Check,
   CheckCheck,
+  CircleCheck,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -47,6 +48,7 @@ export function ChatThread({
     }>
   >([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -89,6 +91,7 @@ export function ChatThread({
   const sendMessage = useMutation(api.chat.mutations.sendMessage);
   const markAsRead = useMutation(api.chat.mutations.markAsRead);
   const generateUploadUrl = useMutation(api.chat.mutations.generateUploadUrl);
+  const archiveChat = useMutation(api.chat.mutations.archiveChat);
 
   const isStaff = user?.role === "admin" || user?.role === "moderator";
   const defaultBack =
@@ -261,6 +264,19 @@ export function ChatThread({
     );
   }
 
+  const handleMarkSupportResolved = async () => {
+    if (!chat?._id || !user?._id || threadKind !== "support") return;
+    setIsArchiving(true);
+    try {
+      await archiveChat({ chatId: chat._id, userId: user._id });
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
   const displayMessages = messages || [];
   const participantsList =
     "participants" in chat &&
@@ -323,20 +339,43 @@ export function ChatThread({
             )}
           </div>
         </div>
-        {participantsList[0] && (
-          <Avatar className="h-9 w-9 shrink-0 border-2 border-primary-foreground/30 sm:h-10 sm:w-10">
-            {otherParticipants[0]?.imageUrl && (
-              <AvatarImage
-                src={otherParticipants[0].imageUrl}
-                alt={otherParticipants[0].name}
-              />
+        <div className="flex shrink-0 items-center gap-1.5">
+          {threadKind === "support" &&
+            isStaff &&
+            chat.status === "active" && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-9 shrink-0 gap-1 border-primary-foreground/25 bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/25"
+                disabled={isArchiving}
+                onClick={handleMarkSupportResolved}
+              >
+                <CircleCheck className="h-4 w-4" />
+                {isArchiving ? "…" : "Mark resolved"}
+              </Button>
             )}
-            <AvatarFallback className="bg-primary-foreground/20 text-sm text-primary-foreground">
-              {(otherParticipants[0]?.name ?? "?").charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        )}
+          {participantsList[0] && (
+            <Avatar className="h-9 w-9 shrink-0 border-2 border-primary-foreground/30 sm:h-10 sm:w-10">
+              {otherParticipants[0]?.imageUrl && (
+                <AvatarImage
+                  src={otherParticipants[0].imageUrl}
+                  alt={otherParticipants[0].name}
+                />
+              )}
+              <AvatarFallback className="bg-primary-foreground/20 text-sm text-primary-foreground">
+                {(otherParticipants[0]?.name ?? "?").charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          )}
+        </div>
       </div>
+
+      {threadKind === "support" && chat.status === "archived" && (
+        <div className="shrink-0 border-b border-border bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground">
+          This support conversation is resolved (archived). Replies are disabled.
+        </div>
+      )}
 
       <div
         className="min-h-0 flex-1 overflow-y-auto px-2 py-3 sm:px-4 sm:py-4"
@@ -502,7 +541,11 @@ export function ChatThread({
               type="button"
               className="h-11 w-11 shrink-0 rounded-full"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || isSending}
+              disabled={
+                isUploading ||
+                isSending ||
+                (threadKind === "support" && chat.status === "archived")
+              }
               title="Attach file or image"
             >
               <Paperclip className="h-5 w-5" />
@@ -512,7 +555,7 @@ export function ChatThread({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              disabled={isSending}
+              disabled={isSending || (threadKind === "support" && chat.status === "archived")}
               rows={1}
               className="min-h-11 max-h-40 flex-1 resize-none rounded-2xl border-border/80 bg-background px-4 py-2.5 text-base leading-relaxed overflow-y-auto"
             />
@@ -523,6 +566,7 @@ export function ChatThread({
               disabled={
                 isSending ||
                 isUploading ||
+                (threadKind === "support" && chat.status === "archived") ||
                 (!message.trim() && pendingFiles.length === 0)
               }
               aria-label="Send"
