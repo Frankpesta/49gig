@@ -120,6 +120,31 @@ export const debitWallet = internalMutation({
     ),
   },
   handler: async (ctx, args) => {
+    // Idempotent: pre_funding webhook and callback can both succeed; only debit once per payment.
+    if (
+      args.paymentId &&
+      args.category === "hiring_credit" &&
+      args.amountCents > 0
+    ) {
+      const prior = await ctx.db
+        .query("walletTransactions")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .filter((q) =>
+          q.and(
+            q.eq(q.field("paymentId"), args.paymentId),
+            q.eq(q.field("type"), "debit"),
+            q.eq(q.field("category"), "hiring_credit")
+          )
+        )
+        .first();
+      if (prior) {
+        return {
+          walletId: prior.walletId,
+          newBalanceCents: prior.balanceAfterCents ?? 0,
+        };
+      }
+    }
+
     const wallet = await ctx.db
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))

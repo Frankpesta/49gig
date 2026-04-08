@@ -200,9 +200,14 @@ export default function UserDetailPage() {
       : "skip"
   );
 
+  const isStaffViewer = currentUser?.role === "admin" || currentUser?.role === "moderator";
+  const isModeratorViewer = currentUser?.role === "moderator";
+
   const walletStats = useQuery(
     api.wallets.queries.getWalletStats,
-    isAuthenticated && currentUser?._id ? { userId: userId as Id<"users"> } : "skip"
+    isAuthenticated && currentUser?._id && !isModeratorViewer
+      ? { userId: userId as Id<"users"> }
+      : "skip"
   );
 
   // Only fetch vetting data when the target user is confirmed to be a freelancer
@@ -330,13 +335,17 @@ export default function UserDetailPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild className="shrink-0">
-          <Link href="/dashboard/users">
+          <Link href={isModeratorViewer ? "/dashboard" : "/dashboard/users"}>
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
         <DashboardPageHeader
           title="User Details"
-          description={`Full profile and admin actions for ${profileData.name}`}
+          description={
+            isModeratorViewer
+              ? `Profile overview for ${profileData.name} (financial details hidden)`
+              : `Full profile and admin actions for ${profileData.name}`
+          }
           icon={User}
           className="flex-1"
         />
@@ -415,29 +424,33 @@ export default function UserDetailPage() {
 
         {/* RIGHT: Details */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Admin Actions */}
+          {/* Admin Actions (moderators: navigation only; no role/suspend) */}
           <Card className="rounded-xl overflow-hidden">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Activity className="h-4 w-4 text-primary" />
-                Admin Actions
+                {isModeratorViewer ? "Actions" : "Admin Actions"}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setNewRole(profileData.role); setRoleDialogOpen(true); }}>
-                <Shield className="h-3.5 w-3.5" />
-                Change Role
-              </Button>
-              {profileData.status === "active" ? (
-                <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => setSuspendDialogOpen(true)}>
-                  <Ban className="h-3.5 w-3.5" />
-                  Suspend
-                </Button>
-              ) : profileData.status === "suspended" ? (
-                <Button size="sm" variant="default" className="gap-1.5" onClick={handleReactivate} disabled={isActioning}>
-                  {isActioning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
-                  Reactivate
-                </Button>
+              {currentUser.role === "admin" ? (
+                <>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setNewRole(profileData.role); setRoleDialogOpen(true); }}>
+                    <Shield className="h-3.5 w-3.5" />
+                    Change Role
+                  </Button>
+                  {profileData.status === "active" ? (
+                    <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => setSuspendDialogOpen(true)}>
+                      <Ban className="h-3.5 w-3.5" />
+                      Suspend
+                    </Button>
+                  ) : profileData.status === "suspended" ? (
+                    <Button size="sm" variant="default" className="gap-1.5" onClick={handleReactivate} disabled={isActioning}>
+                      {isActioning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCheck className="h-3.5 w-3.5" />}
+                      Reactivate
+                    </Button>
+                  ) : null}
+                </>
               ) : null}
               <Button size="sm" variant="outline" className="gap-1.5" asChild>
                 <Link href={`/dashboard/users/${profileData._id}/projects`}>
@@ -445,7 +458,7 @@ export default function UserDetailPage() {
                   View Projects
                 </Link>
               </Button>
-              {isFreelancer && (
+              {isFreelancer && isStaffViewer && (
                 <Button size="sm" variant="outline" className="gap-1.5" asChild>
                   <Link href={`/dashboard/users/${profileData._id}/kyc`}>
                     <ShieldCheck className="h-3.5 w-3.5" />
@@ -456,37 +469,39 @@ export default function UserDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Wallet Stats */}
-          <Card className="rounded-xl overflow-hidden">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-primary" />
-                {isFreelancer ? "Earnings" : "Wallet"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {walletStats === undefined ? (
-                <div className="text-sm text-muted-foreground">Loading wallet…</div>
-              ) : !walletStats ? (
-                <div className="text-sm text-muted-foreground">No wallet found.</div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <div className="rounded-lg bg-muted/30 px-4 py-3">
-                    <p className="text-xs text-muted-foreground">Available</p>
-                    <p className="text-lg font-bold">${((walletStats.availableCents ?? 0) / 100).toFixed(2)}</p>
+          {/* Wallet Stats — admin only; hidden from moderators */}
+          {currentUser.role === "admin" ? (
+            <Card className="rounded-xl overflow-hidden">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  {isFreelancer ? "Earnings" : "Wallet"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {walletStats === undefined ? (
+                  <div className="text-sm text-muted-foreground">Loading wallet…</div>
+                ) : !walletStats ? (
+                  <div className="text-sm text-muted-foreground">No wallet found.</div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="rounded-lg bg-muted/30 px-4 py-3">
+                      <p className="text-xs text-muted-foreground">Available</p>
+                      <p className="text-lg font-bold">${((walletStats.availableCents ?? 0) / 100).toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 px-4 py-3">
+                      <p className="text-xs text-muted-foreground">Pending</p>
+                      <p className="text-lg font-bold">${((walletStats.pendingCents ?? 0) / 100).toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 px-4 py-3">
+                      <p className="text-xs text-muted-foreground">Total {isFreelancer ? "Earned" : "Paid Out"}</p>
+                      <p className="text-lg font-bold">${((walletStats.withdrawnCents ?? 0) / 100).toFixed(2)}</p>
+                    </div>
                   </div>
-                  <div className="rounded-lg bg-muted/30 px-4 py-3">
-                    <p className="text-xs text-muted-foreground">Pending</p>
-                    <p className="text-lg font-bold">${((walletStats.pendingCents ?? 0) / 100).toFixed(2)}</p>
-                  </div>
-                  <div className="rounded-lg bg-muted/30 px-4 py-3">
-                    <p className="text-xs text-muted-foreground">Total {isFreelancer ? "Earned" : "Paid Out"}</p>
-                    <p className="text-lg font-bold">${((walletStats.withdrawnCents ?? 0) / 100).toFixed(2)}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* Role-specific profile */}
           {isFreelancer && (
@@ -504,7 +519,9 @@ export default function UserDetailPage() {
                   <InfoRow label="Tech Field" value={profileData.profile?.techField?.replace(/_/g, " ")} icon={Activity} />
                   <InfoRow label="Phone Number" value={profileData.profile?.phoneNumber} icon={Phone} />
                   <InfoRow label="Address" value={(profileData.profile as any)?.address} icon={MapPin} />
-                  <InfoRow label="Hourly Rate" value={profileData.profile?.hourlyRate ? `$${profileData.profile.hourlyRate}/hr` : null} icon={CreditCard} />
+                  {!isModeratorViewer ? (
+                    <InfoRow label="Hourly Rate" value={profileData.profile?.hourlyRate ? `$${profileData.profile.hourlyRate}/hr` : null} icon={CreditCard} />
+                  ) : null}
                   <InfoRow label="Timezone" value={profileData.profile?.timezone} icon={Globe} />
                   <InfoRow label="Availability" value={profileData.profile?.availability} icon={Clock} />
                   {profileData.profile?.skills && profileData.profile.skills.length > 0 && (

@@ -1,7 +1,17 @@
-import { query, type QueryCtx } from "../_generated/server";
+import { query, internalQuery, type QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
+
+/**
+ * Internal: load chat by id (for scheduled emails / actions).
+ */
+export const getChatByIdInternal = internalQuery({
+  args: { chatId: v.id("chats") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.chatId);
+  },
+});
 
 async function attachUnreadCounts<T extends Doc<"chats">>(
   ctx: QueryCtx,

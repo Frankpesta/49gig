@@ -70,8 +70,8 @@ export default function UserProjectsPage() {
         icon={Shield}
         iconTone="muted"
         title="Access restricted"
-        description="Only admins and moderators can view user projects."
-        action={<Button asChild><Link href="/dashboard/users">Back to Users</Link></Button>}
+        description="Only staff can view user projects."
+        action={<Button asChild><Link href="/dashboard">Back to Dashboard</Link></Button>}
       />
     );
   }
@@ -86,7 +86,13 @@ export default function UserProjectsPage() {
         icon={User}
         iconTone="muted"
         title="User not found"
-        action={<Button asChild><Link href="/dashboard/users">Back to Users</Link></Button>}
+        action={
+          <Button asChild>
+            <Link href={currentUser.role === "moderator" ? "/dashboard" : "/dashboard/users"}>
+              {currentUser.role === "moderator" ? "Back to Dashboard" : "Back to Users"}
+            </Link>
+          </Button>
+        }
       />
     );
   }
@@ -97,7 +103,7 @@ export default function UserProjectsPage() {
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild className="shrink-0">
-          <Link href={`/dashboard/users/${userId}`}>
+          <Link href={`/dashboard/users/${userId}`} aria-label="Back to user profile">
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>

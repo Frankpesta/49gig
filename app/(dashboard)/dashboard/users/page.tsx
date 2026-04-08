@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Doc, Id } from "@/convex/_generated/dataModel";
@@ -70,6 +71,7 @@ import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 
 export default function UsersPage() {
+  const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
@@ -95,9 +97,15 @@ export default function UsersPage() {
   const [rejectReviewNotes, setRejectReviewNotes] = useState("");
   const [vettingActionLoading, setVettingActionLoading] = useState(false);
 
+  useEffect(() => {
+    if (isAuthenticated && user?.role === "moderator") {
+      router.replace("/dashboard");
+    }
+  }, [isAuthenticated, user?.role, router]);
+
   const users = useQuery(
     api.users.queries.getAllUsersAdmin,
-    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
+    isAuthenticated && user?._id && user.role === "admin"
       ? {
           userId: user._id,
           role: roleFilter !== "all" ? (roleFilter as "client" | "freelancer" | "moderator" | "admin") : undefined,
@@ -375,13 +383,13 @@ export default function UsersPage() {
     return <DashboardEmptyState icon={Users} title="Please log in" iconTone="muted" />;
   }
 
-  if (user.role !== "admin" && user.role !== "moderator") {
+  if (user.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={Shield}
         iconTone="muted"
         title="Access denied"
-        description="Admin or Moderator role required."
+        description="Admin role required."
       />
     );
   }

@@ -454,3 +454,11 @@ export const getDisputeAdminContext = query({
   },
 });
 
+/** Internal: raw dispute row for scheduled emails. */
+export const getDisputeDocInternal = internalQuery({
+  args: { disputeId: v.id("disputes") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.disputeId);
+  },
+});
+

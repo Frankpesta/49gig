@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +39,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function WalletPage() {
+  const router = useRouter();
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (user?.role === "moderator") router.replace("/dashboard");
+  }, [user?.role, router]);
   const { trackEvent } = useAnalytics();
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -70,7 +76,7 @@ export default function WalletPage() {
   );
   const adminPayoutRequests = useQuery(
     api.referrals.queries.getClientPayoutRequests,
-    user?.role === "admin" || user?.role === "moderator" ? {} : "skip"
+    user?.role === "admin" ? {} : "skip"
   );
   const markCompleted = useMutation(api.referrals.mutations.markClientPayoutCompleted);
   const rejectPayout = useMutation(api.referrals.mutations.rejectClientPayout);

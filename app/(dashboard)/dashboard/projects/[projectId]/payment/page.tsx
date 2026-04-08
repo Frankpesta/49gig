@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Card,
   CardContent,
@@ -52,6 +54,8 @@ export default function PaymentPage() {
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
   const [walletApplyCents, setWalletApplyCents] = useState(0);
+  type FundingPreference = "wallet_max" | "custom" | "card_only";
+  const [fundingPreference, setFundingPreference] = useState<FundingPreference>("wallet_max");
 
   const maxWalletApplyCents = useMemo(() => {
     if (!project || walletBreakdown === undefined) return 0;
@@ -60,7 +64,20 @@ export default function PaymentPage() {
   }, [project, walletBreakdown]);
 
   useEffect(() => {
-    setWalletApplyCents(maxWalletApplyCents);
+    if (fundingPreference === "wallet_max") {
+      setWalletApplyCents(maxWalletApplyCents);
+    } else if (fundingPreference === "card_only") {
+      setWalletApplyCents(0);
+    } else {
+      setWalletApplyCents((c) => Math.min(c, maxWalletApplyCents));
+    }
+  }, [maxWalletApplyCents, fundingPreference]);
+
+  const onFundingPreferenceChange = useCallback((value: string) => {
+    const v = value as FundingPreference;
+    setFundingPreference(v);
+    if (v === "wallet_max") setWalletApplyCents(maxWalletApplyCents);
+    else if (v === "card_only") setWalletApplyCents(0);
   }, [maxWalletApplyCents]);
 
   useEffect(() => {
@@ -274,7 +291,37 @@ export default function PaymentPage() {
                 <div className="flex items-start gap-2">
                   <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <div className="space-y-2 text-sm">
-                    <p className="font-medium">Use wallet balance toward this hire</p>
+                    <p className="font-medium">Pay from wallet and/or card</p>
+                    <p className="text-xs text-muted-foreground">
+                      Choose how much of your in-platform balance to apply (
+                      {project.currency.toUpperCase()}). The server charges your card only for what is left after
+                      wallet credit (never the full hire price plus wallet).
+                    </p>
+                    <RadioGroup
+                      value={fundingPreference}
+                      onValueChange={onFundingPreferenceChange}
+                      className="grid gap-2 pt-1"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="wallet_max" id="fund-wallet-max" />
+                        <Label htmlFor="fund-wallet-max" className="font-normal cursor-pointer">
+                          Use all available wallet credit first ({(maxWalletApplyCents / 100).toFixed(2)}{" "}
+                          {project.currency.toUpperCase()})
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="custom" id="fund-custom" />
+                        <Label htmlFor="fund-custom" className="font-normal cursor-pointer">
+                          Custom amount (slider below)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="card_only" id="fund-card-only" />
+                        <Label htmlFor="fund-card-only" className="font-normal cursor-pointer">
+                          Pay full amount by card (do not use wallet)
+                        </Label>
+                      </div>
+                    </RadioGroup>
                     <p className="text-xs text-muted-foreground">
                       Apply up to {(maxWalletApplyCents / 100).toFixed(2)}{" "}
                       {project.currency.toUpperCase()}{" "}
@@ -299,8 +346,12 @@ export default function PaymentPage() {
                       max={maxWalletApplyCents}
                       step={1}
                       value={Math.min(walletApplyCents, maxWalletApplyCents)}
-                      onChange={(e) => setWalletApplyCents(parseInt(e.target.value, 10))}
-                      className="w-full accent-primary"
+                      onChange={(e) => {
+                        setFundingPreference("custom");
+                        setWalletApplyCents(parseInt(e.target.value, 10));
+                      }}
+                      disabled={fundingPreference !== "custom"}
+                      className="w-full accent-primary disabled:opacity-50"
                     />
                     <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
                       <span>

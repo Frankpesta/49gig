@@ -2,6 +2,13 @@ import { v } from "convex/values";
 import { mutation, MutationCtx } from "../_generated/server";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
+import type { FunctionReference } from "convex/server";
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemNotification: unknown } };
+  };
+};
 
 async function getCurrentUserInMutation(
   ctx: MutationCtx,
@@ -127,6 +134,19 @@ export const assignContactEnquiryToModerator = mutation({
       ) => Promise<unknown>
     )(0, internalApi.contactEnquiries.actions.sendContactEnquiryAssignmentEmailInternal, {
       enquiryId: args.enquiryId,
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: [args.moderatorId],
+      title: "Enquiry assigned",
+      message: `A contact enquiry was assigned to you: "${enquiry.subject}".`,
+      type: "support",
+      data: { enquiryId: args.enquiryId },
     });
 
     return { success: true };

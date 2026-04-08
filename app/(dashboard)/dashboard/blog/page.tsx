@@ -29,7 +29,8 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-heade
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { FileText, Plus, Pencil, Trash2, Eye, Loader2, Send } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
@@ -44,14 +45,19 @@ type BlogPost = {
 };
 
 export default function DashboardBlogPage() {
+  const router = useRouter();
   const { user, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === "moderator") router.replace("/dashboard");
+  }, [isAuthenticated, user?.role, router]);
   const [deleteId, setDeleteId] = useState<Id<"blogPosts"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [publishingId, setPublishingId] = useState<Id<"blogPosts"> | null>(null);
 
   const posts = useQuery(
     (api as any).blog.queries.listAllForAdmin,
-    isAuthenticated && user?._id && (user.role === "admin" || user.role === "moderator")
+    isAuthenticated && user?._id && user.role === "admin"
       ? { userId: user._id, limit: 50 }
       : "skip"
   );
@@ -89,13 +95,13 @@ export default function DashboardBlogPage() {
     return <DashboardEmptyState icon={FileText} title="Please log in" iconTone="muted" />;
   }
 
-  if (user.role !== "admin" && user.role !== "moderator") {
+  if (user.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={FileText}
         iconTone="muted"
         title="Access restricted"
-        description="Only admins and moderators can manage the blog."
+        description="Only admins can manage the blog."
         action={
           <Button asChild>
             <Link href="/dashboard">Back to Dashboard</Link>

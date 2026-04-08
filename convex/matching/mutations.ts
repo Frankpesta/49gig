@@ -20,6 +20,12 @@ const api = require("../_generated/api") as {
   };
 };
 
+const internalAny = require("../_generated/api").internal as {
+  projects: {
+    actions: { sendMatchSuccessEmails: FunctionReference<"action", "internal"> };
+  };
+};
+
 /**
  * Create a match (internal - called by matching action)
  */
@@ -576,6 +582,9 @@ export const respondToMatchAsFreelancer = mutation({
           data: { projectId: match.projectId, continuationCreditApplied: true },
         });
 
+        await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendMatchSuccessEmails, {
+          projectId: match.projectId,
+        });
         const generateAndSendContract = api.api.contracts.actions
           .generateAndSendContract as unknown as FunctionReference<"action">;
         await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId: args.matchId });
@@ -629,6 +638,9 @@ export const respondToMatchAsFreelancer = mutation({
           data: { projectId: match.projectId, continuationCreditApplied: true },
         });
 
+        await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendMatchSuccessEmails, {
+          projectId: match.projectId,
+        });
         const generateAndSendContract = api.api.contracts.actions
           .generateAndSendContract as unknown as FunctionReference<"action">;
         await ctx.scheduler.runAfter(0, generateAndSendContract, { matchId: args.matchId });
