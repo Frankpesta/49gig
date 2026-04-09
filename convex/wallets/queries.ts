@@ -2,41 +2,11 @@ import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
-
-function sumClientReferralHiringCents(
-  txs: Doc<"walletTransactions">[],
-  currencyLower: string
-): number {
-  let sum = 0;
-  for (const t of txs) {
-    if (t.status !== "completed") continue;
-    if (t.currency.toLowerCase() !== currencyLower) continue;
-    if (t.type === "credit" && t.category === "client_referral_credit") {
-      sum += t.amountCents;
-    } else if (t.type === "debit" && t.category === "hiring_credit") {
-      sum -= t.amountCents;
-    }
-  }
-  return Math.max(0, sum);
-}
-
-/** Completed credits (+ refunds) minus debits, in one currency (client wallet toward new hires). */
-function sumClientSpendableCentsForCurrency(
-  txs: Doc<"walletTransactions">[],
-  currencyLower: string
-): number {
-  let sum = 0;
-  for (const t of txs) {
-    if (t.status !== "completed") continue;
-    if (t.currency.toLowerCase() !== currencyLower) continue;
-    if (t.type === "credit" || t.type === "refund") {
-      sum += t.amountCents;
-    } else if (t.type === "debit") {
-      sum -= t.amountCents;
-    }
-  }
-  return Math.max(0, sum);
-}
+import {
+  clientBankWithdrawableCents,
+  sumClientReferralHiringCents,
+  sumClientSpendableCentsForCurrency,
+} from "./clientBalanceMath";
 
 /**
  * Internal: client hiring balance from referral rewards (same currency as project checkout).
@@ -156,13 +126,23 @@ export const getMyClientPrefundingWalletBreakdown = query({
   handler: async (ctx, args) => {
     const user = await resolveUser(ctx, args.userId);
     if (!user || user.role !== "client") {
-      return { spendableCents: 0, referralHiringCents: 0 };
+      return {
+        spendableCents: 0,
+        referralHiringCents: 0,
+        bankWithdrawableCents: 0,
+      };
     }
     const wallet = await ctx.db
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .first();
-    if (!wallet) return { spendableCents: 0, referralHiringCents: 0 };
+    if (!wallet) {
+      return {
+        spendableCents: 0,
+        referralHiringCents: 0,
+        bankWithdrawableCents: 0,
+      };
+    }
     const cur = args.currency.toLowerCase();
     const txs = await ctx.db
       .query("walletTransactions")
@@ -171,6 +151,7 @@ export const getMyClientPrefundingWalletBreakdown = query({
     return {
       spendableCents: sumClientSpendableCentsForCurrency(txs, cur),
       referralHiringCents: sumClientReferralHiringCents(txs, cur),
+      bankWithdrawableCents: clientBankWithdrawableCents(txs, cur),
     };
   },
 });

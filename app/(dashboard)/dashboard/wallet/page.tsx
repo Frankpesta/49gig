@@ -64,9 +64,11 @@ export default function WalletPage() {
   const transactions = useQuery(api.wallets.queries.getMyWalletTransactions, user?._id ? { limit: 50, userId: user._id } : "skip");
   const withdrawFromWallet = useAction(api.payments.actions.withdrawFromWallet);
   const reconcileWallet = useAction(api.wallets.actions.reconcileWalletFromPayments);
-  const referralCash = useQuery(
-    api.wallets.queries.getClientReferralCashBalanceCents,
-    user?._id && user.role === "client" ? { userId: user._id } : "skip"
+  const clientWalletBreakdown = useQuery(
+    api.wallets.queries.getMyClientPrefundingWalletBreakdown,
+    user?._id && user.role === "client"
+      ? { userId: user._id, currency: wallet?.currency?.toLowerCase() ?? "usd" }
+      : "skip"
   );
   const requestPaypalPayout = useMutation(api.referrals.mutations.requestClientReferralPaypalPayout);
   const requestCryptoPayout = useMutation(api.referrals.mutations.requestClientReferralCryptoPayout);
@@ -131,7 +133,8 @@ export default function WalletPage() {
   const formatDollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
   if (user.role === "client") {
-    const referralWithdrawable = referralCash?.cents ?? 0;
+    const clientBankWithdrawable =
+      clientWalletBreakdown?.bankWithdrawableCents ?? 0;
     const walletAvailable = walletStats?.availableCents ?? 0;
     const walletPending = walletStats?.pendingCents ?? 0;
 
@@ -143,7 +146,7 @@ export default function WalletPage() {
         return;
       }
       const amountCents = Math.round(amount * 100);
-      if (amountCents > referralWithdrawable) {
+      if (amountCents > clientBankWithdrawable) {
         toast.error("Amount exceeds withdrawable balance");
         return;
       }
@@ -167,7 +170,7 @@ export default function WalletPage() {
         return;
       }
       const amountCents = Math.round(amount * 100);
-      if (amountCents > referralWithdrawable) {
+      if (amountCents > clientBankWithdrawable) {
         toast.error("Amount exceeds withdrawable balance");
         return;
       }
@@ -201,7 +204,7 @@ export default function WalletPage() {
         return;
       }
       const amountCents = Math.round(amount * 100);
-      if (amountCents > referralWithdrawable) {
+      if (amountCents > clientBankWithdrawable) {
         toast.error("Amount exceeds withdrawable balance");
         return;
       }
@@ -265,14 +268,15 @@ export default function WalletPage() {
           <CardHeader>
             <CardTitle>Withdrawable balance</CardTitle>
             <CardDescription>
-              Link a bank account under Settings to withdraw available wallet cash via bank.
+              Cash you can withdraw (bank, PayPal, or crypto). Legacy hiring-only referral
+              credits apply at checkout only and are not included here.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {referralCash === undefined ? (
+            {clientWalletBreakdown === undefined ? (
               <Skeleton className="h-10 w-32" />
             ) : (
-              <p className="text-3xl font-bold">{formatDollars(referralWithdrawable)}</p>
+              <p className="text-3xl font-bold">{formatDollars(clientBankWithdrawable)}</p>
             )}
           </CardContent>
         </Card>
@@ -296,7 +300,7 @@ export default function WalletPage() {
             </div>
             <Button
               onClick={handleClientBankWithdraw}
-              disabled={isWithdrawing || referralWithdrawable < 100}
+              disabled={isWithdrawing || clientBankWithdrawable < 100}
             >
               {isWithdrawing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Withdraw"}
             </Button>
@@ -340,7 +344,7 @@ export default function WalletPage() {
             </div>
             <Button
               onClick={handlePaypalRequest}
-              disabled={paypalSubmitting || referralWithdrawable < 100}
+              disabled={paypalSubmitting || clientBankWithdrawable < 100}
               className="gap-2"
             >
               {paypalSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowUpFromLine className="h-4 w-4" /> Submit request</>}
@@ -394,7 +398,7 @@ export default function WalletPage() {
             </div>
             <Button
               onClick={handleCryptoRequest}
-              disabled={cryptoSubmitting || referralWithdrawable < 100}
+              disabled={cryptoSubmitting || clientBankWithdrawable < 100}
               className="gap-2"
             >
               {cryptoSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <><ArrowUpFromLine className="h-4 w-4" /> Submit request</>}
@@ -434,7 +438,7 @@ export default function WalletPage() {
 
   type PayoutRequest = { _id: Id<"clientReferralPayoutRequests">; amountCents: number; method?: string; paypalEmail?: string; cryptoNetwork?: string; cryptoAddress?: string; createdAt: number; adminNote?: string; status: string; clientName?: string; clientEmail?: string };
 
-  if (user.role === "admin" || user.role === "moderator") {
+  if (user.role === "admin") {
     const pendingRequests = (adminPayoutRequests ?? [] as PayoutRequest[]).filter((r: PayoutRequest) => r.status === "pending" || r.status === "processing");
     const completedRequests = (adminPayoutRequests ?? [] as PayoutRequest[]).filter((r: PayoutRequest) => r.status === "completed" || r.status === "rejected");
 

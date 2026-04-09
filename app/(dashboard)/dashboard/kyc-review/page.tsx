@@ -109,13 +109,13 @@ export default function KycReviewPage() {
     return <DashboardEmptyState icon={ShieldCheck} title="Please log in" iconTone="muted" />;
   }
 
-  if (user.role !== "admin" && user.role !== "moderator") {
+  if (user.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={ShieldCheck}
         iconTone="muted"
         title="Access restricted"
-        description="Only admins and moderators can review KYC submissions."
+        description="Only admins can review KYC submissions."
         action={
           <Button asChild>
             <Link href="/dashboard">Back to Dashboard</Link>

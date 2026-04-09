@@ -14,10 +14,10 @@ async function requireFreelancer(ctx: any, userId?: Id<"users">) {
   return user as Doc<"users">;
 }
 
-async function requireAdminOrModerator(ctx: any, userId?: Id<"users">) {
+async function requireAdmin(ctx: any, userId?: Id<"users">) {
   const user = userId ? await ctx.db.get(userId) : await getCurrentUser(ctx);
-  if (!user || ((user as Doc<"users">).role !== "admin" && (user as Doc<"users">).role !== "moderator"))
-    throw new Error("Only admins and moderators can review KYC");
+  if (!user || (user as Doc<"users">).role !== "admin")
+    throw new Error("Only admins can review KYC");
   return user as Doc<"users">;
 }
 
@@ -93,7 +93,7 @@ export const submitKyc = mutation({
 });
 
 /**
- * Admin/Moderator: Approve KYC
+ * Admin: Approve KYC
  */
 export const approveKyc = mutation({
   args: {
@@ -101,7 +101,7 @@ export const approveKyc = mutation({
     reviewerUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    await requireAdminOrModerator(ctx, args.reviewerUserId);
+    await requireAdmin(ctx, args.reviewerUserId);
     const submission = await ctx.db
       .query("kycSubmissions")
       .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
@@ -110,7 +110,7 @@ export const approveKyc = mutation({
       throw new Error("KYC submission not found or not pending review");
 
     const now = Date.now();
-    const reviewer = await requireAdminOrModerator(ctx, args.reviewerUserId);
+    const reviewer = await requireAdmin(ctx, args.reviewerUserId);
 
     await ctx.db.patch(submission._id, {
       status: "approved",
@@ -162,7 +162,7 @@ export const KYC_REJECTION_REASONS = {
 } as const;
 
 /**
- * Admin/Moderator: Reject KYC (ID step or Address step)
+ * Admin: Reject KYC (ID step or Address step)
  */
 export const rejectKyc = mutation({
   args: {
@@ -172,7 +172,7 @@ export const rejectKyc = mutation({
     reviewerUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    await requireAdminOrModerator(ctx, args.reviewerUserId);
+    await requireAdmin(ctx, args.reviewerUserId);
     const submission = await ctx.db
       .query("kycSubmissions")
       .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
@@ -181,7 +181,7 @@ export const rejectKyc = mutation({
       throw new Error("KYC submission not found or not pending review");
 
     const now = Date.now();
-    const reviewer = await requireAdminOrModerator(ctx, args.reviewerUserId);
+    const reviewer = await requireAdmin(ctx, args.reviewerUserId);
 
     const isIdStep = args.step === "id";
     const newIdCount = isIdStep ? submission.idRejectionCount + 1 : submission.idRejectionCount;

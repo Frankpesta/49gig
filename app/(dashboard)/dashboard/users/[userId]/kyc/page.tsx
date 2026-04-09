@@ -120,14 +120,14 @@ export default function UserKycPage() {
 
   const profileData = useQuery(
     api.users.queries.getUserProfileForAdmin,
-    isAuthenticated && currentUser?._id && (currentUser.role === "admin" || currentUser.role === "moderator")
+    isAuthenticated && currentUser?._id && currentUser.role === "admin"
       ? { targetUserId: userId as Id<"users">, adminUserId: currentUser._id }
       : "skip"
   );
 
   const kycData = useQuery(
     api.kyc.queries.getKycByFreelancerId,
-    isAuthenticated && currentUser?._id && (currentUser.role === "admin" || currentUser.role === "moderator")
+    isAuthenticated && currentUser?._id && currentUser.role === "admin"
       ? { freelancerId: userId as Id<"users">, reviewerUserId: currentUser._id }
       : "skip"
   );
@@ -177,13 +177,13 @@ export default function UserKycPage() {
     return <DashboardEmptyState icon={User} title="Please log in" iconTone="muted" />;
   }
 
-  if (currentUser.role !== "admin" && currentUser.role !== "moderator") {
+  if (currentUser.role !== "admin") {
     return (
       <DashboardEmptyState
         icon={Shield}
         iconTone="muted"
         title="Access restricted"
-        description="Only admins and moderators can review KYC documents."
+        description="Only admins can review KYC documents."
         action={<Button asChild><Link href="/dashboard/users">Back to Users</Link></Button>}
       />
     );

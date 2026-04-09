@@ -21,10 +21,7 @@ type TestProctoringGateProps = {
   children: React.ReactNode;
 };
 
-/**
- * Cost-effective proctoring: webcam on (no upload), tab visibility, blur, paste, camera track loss.
- * Metrics are batched to Convex — no video storage or third-party AI.
- */
+/** Webcam consent gate before timed vetting segments; telemetry is handled after consent. */
 export function TestProctoringGate({
   userId,
   segment,
@@ -186,13 +183,6 @@ export function TestProctoringGate({
           <CardDescription className="text-pretty leading-relaxed">{description}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Alert className="bg-muted/40 border-border/60">
-            <AlertDescription className="text-sm leading-relaxed">
-              We keep your test fair without storing video: your camera stays on your device only. We record
-              simple signals (e.g. tab hidden, paste attempts, camera interruptions) to protect the community.
-              No AI models and no cloud recording — minimal cost, strong deterrence.
-            </AlertDescription>
-          </Alert>
           <div className="relative overflow-hidden rounded-lg border bg-muted/20 aspect-video max-h-[200px]">
             <video
               ref={videoRef}

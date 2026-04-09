@@ -62,6 +62,23 @@ async function resolveStaffUser(
   return u;
 }
 
+/** Approve/reject freelancer verification: admins only */
+async function resolveAdminUser(
+  ctx: MutationCtx,
+  adminUserId?: string
+): Promise<Doc<"users"> | null> {
+  if (adminUserId) {
+    const u = await ctx.db.get(adminUserId as Doc<"users">["_id"]);
+    if (!u || u.status !== "active") return null;
+    if (u.role !== "admin") return null;
+    return u;
+  }
+  const u = await getCurrentUser(ctx);
+  if (!u || u.status !== "active") return null;
+  if (u.role !== "admin") return null;
+  return u as Doc<"users">;
+}
+
 type FraudFlag = NonNullable<Doc<"vettingResults">["fraudFlags"]>[number];
 
 /**
@@ -783,7 +800,7 @@ export const completeVerification = mutation({
 });
 
 /**
- * Admin/Moderator: Approve verification
+ * Admin: Approve verification
  */
 export const approveVerification = mutation({
   args: {
@@ -792,9 +809,9 @@ export const approveVerification = mutation({
     adminUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const admin = await resolveStaffUser(ctx, args.adminUserId);
+    const admin = await resolveAdminUser(ctx, args.adminUserId);
     if (!admin) {
-      throw new Error("Unauthorized");
+      throw new Error("Only admins can approve freelancer verification");
     }
 
     const freelancer = await ctx.db.get(args.freelancerId);
@@ -864,7 +881,7 @@ export const approveVerification = mutation({
 });
 
 /**
- * Admin/Moderator: Reject verification
+ * Admin: Reject verification
  */
 export const rejectVerification = mutation({
   args: {
@@ -873,9 +890,9 @@ export const rejectVerification = mutation({
     adminUserId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const admin = await resolveStaffUser(ctx, args.adminUserId);
+    const admin = await resolveAdminUser(ctx, args.adminUserId);
     if (!admin) {
-      throw new Error("Unauthorized");
+      throw new Error("Only admins can reject freelancer verification");
     }
 
     const freelancer = await ctx.db.get(args.freelancerId);

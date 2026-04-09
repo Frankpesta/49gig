@@ -147,7 +147,7 @@ export const getVerificationResults = query({
 });
 
 /**
- * Get all pending verifications (admin/moderator only)
+ * Get all pending verifications (admin only)
  */
 export const getPendingVerifications = query({
   args: {
@@ -163,7 +163,7 @@ export const getPendingVerifications = query({
   },
   handler: async (ctx, args) => {
     const viewer = await resolveViewerForVerificationQuery(ctx, args.adminUserId);
-    if (!viewer || (viewer.role !== "admin" && viewer.role !== "moderator")) {
+    if (!viewer || viewer.role !== "admin") {
       throw new Error("Unauthorized");
     }
 

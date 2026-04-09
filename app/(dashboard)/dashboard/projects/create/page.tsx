@@ -57,6 +57,7 @@ import { TeamSlotsEditor } from "@/components/hire/team-slots-editor";
 import { toast } from "sonner";
 import { getDurationMonths } from "@/lib/project-duration";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { EXPERIENCE_LEVEL_OPTIONS } from "@/lib/experience-level-labels";
 
 const PROJECT_DURATIONS = [
   { value: "1", label: "1 month" },
@@ -100,12 +101,6 @@ function formatDurationDisplay(projectDuration: string): string {
   }
   return `${months} month${months > 1 ? "s" : ""}`;
 }
-
-const EXPERIENCE_LEVELS = [
-  { value: "junior", label: "Junior (1–3 years)" },
-  { value: "mid", label: "Mid-level (3–5 years)" },
-  { value: "senior", label: "Senior (5+ years)" },
-] as const;
 
 const ROLE_TYPES = [
   { value: "full_time", label: "Full time" },
@@ -960,7 +955,7 @@ export default function CreateProjectPage() {
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Preferred experience level</Label>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {EXPERIENCE_LEVELS.map((level) => (
+                    {EXPERIENCE_LEVEL_OPTIONS.map((level) => (
                       <button
                         key={level.value}
                         type="button"
