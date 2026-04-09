@@ -146,6 +146,7 @@ export const signup = mutation({
         // Client profile fields
         companyName: v.optional(v.string()),
         workEmail: v.optional(v.string()),
+        /** E.164 when collected with country code (clients & freelancers) */
         phoneNumber: v.optional(v.string()),
         companyWebsite: v.optional(v.string()),
         country: v.optional(v.string()),

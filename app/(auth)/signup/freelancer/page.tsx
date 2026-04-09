@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -23,11 +24,15 @@ import {
   PLATFORM_CATEGORIES,
   SKILLS_FOR_MCQ_CODING,
   SOFTWARE_DEV_FIELDS,
+  PROGRAMMING_LANGUAGE_OTHER,
+  buildLanguagesWrittenFromSelection,
   getSkillsForCategory,
   getSoftwareDevFieldSkills,
 } from "@/lib/platform-skills";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { CountrySelector } from "@/components/ui/country-selector";
+import { getCountryByCode } from "@/lib/countries";
 import { Eye, EyeOff } from "lucide-react";
 
 const EXPERIENCE_LEVELS = [
@@ -52,6 +57,9 @@ export default function FreelancerSignupPage() {
     experienceLevel: "",
     skills: [] as string[],
     languagesWritten: [] as string[],
+    otherLanguagesDetail: "",
+    phoneCountryCode: "",
+    phoneNational: "",
   });
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
@@ -92,6 +100,9 @@ export default function FreelancerSignupPage() {
         languagesWritten: formData.languagesWritten.filter(
           (l) => l !== language
         ),
+        ...(language === PROGRAMMING_LANGUAGE_OTHER
+          ? { otherLanguagesDetail: "" }
+          : {}),
       });
     } else {
       setFormData({
@@ -141,6 +152,49 @@ export default function FreelancerSignupPage() {
       return;
     }
 
+    const checklistOnly = formData.languagesWritten.filter(
+      (l) => l !== PROGRAMMING_LANGUAGE_OTHER
+    );
+    const otherOn = formData.languagesWritten.includes(
+      PROGRAMMING_LANGUAGE_OTHER
+    );
+    const builtLanguages = buildLanguagesWrittenFromSelection(
+      checklistOnly,
+      otherOn,
+      formData.otherLanguagesDetail
+    );
+    if (builtLanguages.error) {
+      setError(builtLanguages.error);
+      return;
+    }
+    if (
+      formData.techField === "software_development" &&
+      builtLanguages.languages.length === 0
+    ) {
+      setError(
+        "Software Development requires at least one programming language. Select from the list and/or list languages under Other."
+      );
+      return;
+    }
+
+    const nationalDigits = formData.phoneNational.replace(/\D/g, "");
+    let signupPhoneE164: string | undefined;
+    if (nationalDigits) {
+      if (!formData.phoneCountryCode) {
+        setError("Select your phone country code, or leave the phone field empty.");
+        return;
+      }
+      const pc = getCountryByCode(formData.phoneCountryCode);
+      if (!pc) {
+        setError("Invalid phone country code.");
+        return;
+      }
+      signupPhoneE164 = `${pc.phoneCode}${nationalDigits}`;
+    } else if (formData.phoneCountryCode) {
+      setError("Enter your phone number after the country code, or clear the country selector.");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -155,7 +209,8 @@ export default function FreelancerSignupPage() {
           techField: formData.techField as any,
           experienceLevel: formData.experienceLevel as any,
           skills: formData.skills,
-          languagesWritten: formData.languagesWritten,
+          languagesWritten: builtLanguages.languages,
+          ...(signupPhoneE164 ? { phoneNumber: signupPhoneE164 } : {}),
         },
       });
 
@@ -305,6 +360,43 @@ export default function FreelancerSignupPage() {
             >
               {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
+          </div>
+        </div>
+
+        <div className="space-y-0.5">
+          <Label htmlFor="freelancer-phone-national" className="text-sm font-medium">
+            Phone <span className="text-muted-foreground font-normal">(optional)</span>
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            Country code and local number. You can add or edit this when you complete your profile.
+          </p>
+          <div className="flex gap-2">
+            <div className="w-[min(100%,10rem)] shrink-0">
+              <CountrySelector
+                value={formData.phoneCountryCode}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, phoneCountryCode: value })
+                }
+                disabled={isLoading}
+                className="h-11 w-full"
+              />
+            </div>
+            <Input
+              id="freelancer-phone-national"
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              placeholder="Local number"
+              value={formData.phoneNational}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  phoneNational: e.target.value.replace(/\D/g, ""),
+                })
+              }
+              disabled={isLoading || !formData.phoneCountryCode}
+              className="h-11 flex-1 min-w-0 rounded-lg"
+            />
           </div>
         </div>
 
@@ -487,7 +579,7 @@ export default function FreelancerSignupPage() {
                         Programming Languages Written
                       </Label>
                       <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
-                        {[...SKILLS_FOR_MCQ_CODING, "R", "Swift", "Kotlin", "Scala", "MATLAB", "HTML/CSS", "Other"].map((language) => (
+                        {[...SKILLS_FOR_MCQ_CODING, "R", "Swift", "Kotlin", "Scala", "MATLAB", "HTML/CSS", PROGRAMMING_LANGUAGE_OTHER].map((language) => (
                           <label
                             key={language}
                             className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded"
@@ -505,6 +597,36 @@ export default function FreelancerSignupPage() {
                           </label>
                         ))}
                       </div>
+                      {formData.languagesWritten.includes(
+                        PROGRAMMING_LANGUAGE_OTHER
+                      ) && (
+                        <div className="space-y-2 mt-2">
+                          <Label
+                            htmlFor="signup-other-languages"
+                            className="text-sm font-medium"
+                          >
+                            Languages you use{" "}
+                            <span className="text-destructive">*</span>
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            Comma or newline separated. Used for verification and
+                            skill tests.
+                          </p>
+                          <Textarea
+                            id="signup-other-languages"
+                            value={formData.otherLanguagesDetail}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                otherLanguagesDetail: e.target.value,
+                              })
+                            }
+                            disabled={isLoading}
+                            placeholder="e.g. Dart, Elixir, Perl"
+                            className="min-h-[88px] resize-y rounded-lg"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 

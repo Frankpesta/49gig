@@ -207,6 +207,101 @@ export const PROGRAMMING_LANGUAGES = [
   "Other",
 ] as const;
 
+/** Sentinel checkbox value — not persisted; custom list is merged into `languagesWritten`. */
+export const PROGRAMMING_LANGUAGE_OTHER = "Other";
+
+/** True if `label` matches a fixed checklist entry (excludes {@link PROGRAMMING_LANGUAGE_OTHER}). */
+export function isFixedProgrammingLanguageLabel(label: string): boolean {
+  const t = label.trim().toLowerCase();
+  if (!t || t === "other") return false;
+  return PROGRAMMING_LANGUAGES.some(
+    (p) => p !== "Other" && p.toLowerCase() === t
+  );
+}
+
+/** Split comma/semicolon/newline-separated input into language names. */
+export function parseCustomProgrammingLanguagesInput(raw: string): string[] {
+  return raw
+    .split(/[,;\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Merge checklist picks (without "Other") + optional custom languages from the "Other" field.
+ * Returns deduped list suitable for `profile.languagesWritten` (never includes "Other").
+ */
+export function buildLanguagesWrittenFromSelection(
+  selectedFromChecklist: string[],
+  otherSelected: boolean,
+  customLanguagesRaw: string
+): { languages: string[]; error?: string } {
+  const base = selectedFromChecklist.filter(
+    (s) => s.trim().toLowerCase() !== "other"
+  );
+  const custom = parseCustomProgrammingLanguagesInput(customLanguagesRaw);
+  if (otherSelected && custom.length === 0) {
+    return {
+      languages: [],
+      error:
+        "When you select Other, list at least one programming language (comma or newline separated).",
+    };
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of [...base, ...custom]) {
+    const k = x.trim().toLowerCase();
+    if (!k) continue;
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(x.trim());
+    }
+  }
+  return { languages: out };
+}
+
+/** Hydrate UI state from stored profile (custom langs not on the checklist → Other + detail). */
+export function initialLanguagesFormFromProfile(
+  languagesWritten: string[] | null | undefined
+): {
+  checklistSelections: string[];
+  otherSelected: boolean;
+  otherDetail: string;
+} {
+  const list = languagesWritten ?? [];
+  const checklistSelections: string[] = [];
+  const custom: string[] = [];
+  let hadBareOther = false;
+  for (const l of list) {
+    const t = l.trim();
+    if (!t) continue;
+    if (t.toLowerCase() === "other") {
+      hadBareOther = true;
+      continue;
+    }
+    if (isFixedProgrammingLanguageLabel(t)) {
+      const canonical = PROGRAMMING_LANGUAGES.find(
+        (p) => p !== "Other" && p.toLowerCase() === t.toLowerCase()
+      )!;
+      if (
+        !checklistSelections.some(
+          (c) => c.toLowerCase() === canonical.toLowerCase()
+        )
+      ) {
+        checklistSelections.push(canonical);
+      }
+    } else {
+      custom.push(t);
+    }
+  }
+  const otherSelected = custom.length > 0 || hadBareOther;
+  return {
+    checklistSelections,
+    otherSelected,
+    otherDetail: custom.join(", "),
+  };
+}
+
 /** Categories that are assessed by portfolio strength only (no MCQ/coding). */
 export const PORTFOLIO_ONLY_CATEGORIES: PlatformCategoryId[] = ["ui_ux_design"];
 

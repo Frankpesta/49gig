@@ -110,3 +110,25 @@ export function getCountryByCode(code: string): Country | undefined {
 export function getCountryByPhoneCode(phoneCode: string): Country | undefined {
   return countries.find((c) => c.phoneCode === phoneCode);
 }
+
+/**
+ * Parse a stored E.164 number into ISO country code + national digits.
+ * Longest dial-code prefix wins (e.g. +1 vs +12). Returns null if not E.164.
+ */
+export function splitE164ToCountryAndNational(phone: string): {
+  countryCode: string;
+  nationalDigits: string;
+} | null {
+  const t = phone.trim().replace(/\s/g, "");
+  if (!t.startsWith("+")) return null;
+  const ordered = [...countries].sort(
+    (a, b) => b.phoneCode.length - a.phoneCode.length
+  );
+  for (const c of ordered) {
+    if (t.startsWith(c.phoneCode)) {
+      const nationalDigits = t.slice(c.phoneCode.length).replace(/\D/g, "");
+      return { countryCode: c.code, nationalDigits };
+    }
+  }
+  return null;
+}

@@ -67,15 +67,27 @@ function hasProgrammingLanguage(profile: {
   languagesWritten?: string[];
   skills?: string[];
 }): { has: boolean; first?: string } {
-  const langs = profile.languagesWritten ?? [];
+  const langsRaw = profile.languagesWritten ?? [];
+  const langsOnly = langsRaw
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && s.toLowerCase() !== "other");
   const skills = profile.skills ?? [];
-  const combined = [...new Set([...langs, ...skills])];
+  const combined = [...new Set([...langsOnly, ...skills])];
   const normalized = combined.map((s) => s.toLowerCase().replace(/\s+/g, ""));
   for (let i = 0; i < combined.length; i++) {
     const n = normalized[i];
-    if (PROGRAMMING_LANGUAGE_IDS.has(n) || n.includes("javascript") || n.includes("typescript") || n.includes("python")) {
+    if (
+      PROGRAMMING_LANGUAGE_IDS.has(n) ||
+      n.includes("javascript") ||
+      n.includes("typescript") ||
+      n.includes("python")
+    ) {
       return { has: true, first: combined[i] };
     }
+  }
+  // Custom / uncommon languages from profile (e.g. from "Other" free-text) still count for coding path.
+  if (langsOnly.length > 0) {
+    return { has: true, first: langsOnly[0] };
   }
   return { has: false };
 }
