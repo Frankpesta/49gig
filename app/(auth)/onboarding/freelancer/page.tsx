@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
   CardContent,
@@ -28,8 +29,18 @@ import { toast } from "sonner";
 import {
   PLATFORM_ROLES,
   PROGRAMMING_LANGUAGES,
+  PROGRAMMING_LANGUAGE_OTHER,
+  buildLanguagesWrittenFromSelection,
+  initialLanguagesFormFromProfile,
   getSkillsForRole,
 } from "@/lib/platform-skills";
+import {
+  requiresBehanceUrl,
+  requiresGithubUrl,
+  requiresProfessionalLink,
+} from "@/lib/freelancer-profile-links";
+import { CountrySelector } from "@/components/ui/country-selector";
+import { getCountryByCode, splitE164ToCountryAndNational } from "@/lib/countries";
 
 const EXPERIENCE_LEVELS = [
   { value: "junior", label: "Junior" },
@@ -59,8 +70,14 @@ export default function FreelancerOnboardingPage() {
     languagesWritten: [] as string[],
     country: "",
     timezone: "",
+    phoneCountryCode: "",
     phoneNumber: "",
     address: "",
+    githubUrl: "",
+    behanceUrl: "",
+    linkedinUrl: "",
+    portfolioUrl: "",
+    otherLanguagesDetail: "",
   });
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
@@ -78,15 +95,27 @@ export default function FreelancerOnboardingPage() {
         rawTech && PLATFORM_ROLES.some((r) => r.id === rawTech)
           ? rawTech
           : LEGACY_TECH_FIELD_TO_CATEGORY[rawTech] ?? rawTech;
+      const rawPhone = String((user.profile as any).phoneNumber || "").trim();
+      const e164 = splitE164ToCountryAndNational(rawPhone);
+      const langInit = initialLanguagesFormFromProfile(user.profile.languagesWritten);
       setFormData({
         techField,
         experienceLevel: user.profile.experienceLevel || "",
         skills: user.profile.skills || [],
-        languagesWritten: user.profile.languagesWritten || [],
+        languagesWritten: [
+          ...langInit.checklistSelections,
+          ...(langInit.otherSelected ? [PROGRAMMING_LANGUAGE_OTHER] : []),
+        ],
+        otherLanguagesDetail: langInit.otherDetail,
         country: user.profile.country || "",
         timezone: user.profile.timezone || "",
-        phoneNumber: (user.profile as any).phoneNumber || "",
+        phoneCountryCode: e164?.countryCode ?? "",
+        phoneNumber: e164?.nationalDigits ?? rawPhone.replace(/\D/g, ""),
         address: (user.profile as any).address || "",
+        githubUrl: user.profile.githubUrl || "",
+        behanceUrl: user.profile.behanceUrl || "",
+        linkedinUrl: user.profile.linkedinUrl || "",
+        portfolioUrl: user.profile.portfolioUrl || "",
       });
     }
   }, [user]);
@@ -117,6 +146,9 @@ export default function FreelancerOnboardingPage() {
         languagesWritten: formData.languagesWritten.filter(
           (l) => l !== language
         ),
+        ...(language === PROGRAMMING_LANGUAGE_OTHER
+          ? { otherLanguagesDetail: "" }
+          : {}),
       });
     } else {
       setFormData({
@@ -130,10 +162,21 @@ export default function FreelancerOnboardingPage() {
     e.preventDefault();
     setError("");
 
-    if (!formData.phoneNumber.trim()) {
+    if (!formData.phoneCountryCode.trim()) {
+      setError("Select the country code for your phone number");
+      return;
+    }
+    const nationalDigits = formData.phoneNumber.replace(/\D/g, "");
+    if (!nationalDigits) {
       setError("Phone number is required");
       return;
     }
+    const phoneCountry = getCountryByCode(formData.phoneCountryCode);
+    if (!phoneCountry) {
+      setError("Invalid country calling code");
+      return;
+    }
+    const fullPhoneE164 = `${phoneCountry.phoneCode}${nationalDigits}`;
 
     if (!formData.address.trim()) {
       setError("Address is required");
@@ -155,9 +198,48 @@ export default function FreelancerOnboardingPage() {
       return;
     }
 
+    const checklistOnly = formData.languagesWritten.filter(
+      (l) => l !== PROGRAMMING_LANGUAGE_OTHER
+    );
+    const otherSelected = formData.languagesWritten.includes(
+      PROGRAMMING_LANGUAGE_OTHER
+    );
+    const builtLanguages = buildLanguagesWrittenFromSelection(
+      checklistOnly,
+      otherSelected,
+      formData.otherLanguagesDetail
+    );
+    if (builtLanguages.error) {
+      setError(builtLanguages.error);
+      return;
+    }
+
     // Software Development requires at least one programming language (for skill test).
-    if (formData.techField === "software_development" && formData.languagesWritten.length === 0) {
-      setError("Software Development requires at least one programming language. Please select at least one language you write code in.");
+    if (
+      formData.techField === "software_development" &&
+      builtLanguages.languages.length === 0
+    ) {
+      setError(
+        "Software Development requires at least one programming language. Select from the list and/or list languages under Other."
+      );
+      return;
+    }
+
+    const tf = formData.techField || undefined;
+    if (requiresGithubUrl(tf) && !formData.githubUrl.trim()) {
+      setError("GitHub profile URL is required for your category.");
+      return;
+    }
+    if (requiresBehanceUrl(tf) && !formData.behanceUrl.trim()) {
+      setError("Behance profile URL is required for design roles.");
+      return;
+    }
+    if (
+      requiresProfessionalLink(tf) &&
+      !formData.linkedinUrl.trim() &&
+      !formData.portfolioUrl.trim()
+    ) {
+      setError("Add a LinkedIn URL or a portfolio / website URL for your category.");
       return;
     }
 
@@ -167,14 +249,18 @@ export default function FreelancerOnboardingPage() {
       const sessionToken = typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
       await updateProfile({
         profile: {
-          phoneNumber: formData.phoneNumber.trim(),
+          phoneNumber: fullPhoneE164,
           address: formData.address.trim(),
           techField: formData.techField as any,
           experienceLevel: formData.experienceLevel as any,
           skills: formData.skills,
-          languagesWritten: formData.languagesWritten,
+          languagesWritten: builtLanguages.languages,
           ...(formData.country && { country: formData.country }),
           ...(formData.timezone && { timezone: formData.timezone }),
+          githubUrl: formData.githubUrl.trim() || undefined,
+          behanceUrl: formData.behanceUrl.trim() || undefined,
+          linkedinUrl: formData.linkedinUrl.trim() || undefined,
+          portfolioUrl: formData.portfolioUrl.trim() || undefined,
         },
         sessionToken: sessionToken || undefined,
       });
@@ -195,6 +281,14 @@ export default function FreelancerOnboardingPage() {
       </div>
     );
   }
+
+  const techField = formData.techField || undefined;
+  const githubRequired = requiresGithubUrl(techField);
+  const behanceRequired = requiresBehanceUrl(techField);
+  const professionalLinkRequired = requiresProfessionalLink(techField);
+  const selectedPhoneCountry = formData.phoneCountryCode
+    ? getCountryByCode(formData.phoneCountryCode)
+    : null;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-linear-to-br from-background via-primary/5 to-background">
@@ -235,35 +329,61 @@ export default function FreelancerOnboardingPage() {
                   </div>
                 )}
 
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber" className="text-sm font-medium">
-                      Phone Number <span className="text-destructive">*</span>
-                    </Label>
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber" className="text-sm font-medium">
+                    Phone number <span className="text-destructive">*</span>
+                    {selectedPhoneCountry && (
+                      <span className="text-muted-foreground font-normal">
+                        {" "}
+                        ({selectedPhoneCountry.phoneCode})
+                      </span>
+                    )}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Choose your country code, then enter your number without the leading zero.
+                  </p>
+                  <div className="flex gap-2">
+                    <div className="w-[min(100%,10rem)] shrink-0">
+                      <CountrySelector
+                        value={formData.phoneCountryCode}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, phoneCountryCode: value })
+                        }
+                        disabled={isLoading}
+                        className="h-11 w-full"
+                      />
+                    </div>
                     <Input
                       id="phoneNumber"
                       type="tel"
-                      placeholder="+234 800 000 0000"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      placeholder="e.g. 8000000000"
                       value={formData.phoneNumber}
-                      onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          phoneNumber: e.target.value.replace(/\D/g, ""),
+                        })
+                      }
                       required
-                      disabled={isLoading}
-                      className="h-11"
+                      disabled={isLoading || !formData.phoneCountryCode}
+                      className="h-11 flex-1 min-w-0"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="country" className="text-sm font-medium">
-                      Country (optional)
-                    </Label>
-                    <Input
-                      id="country"
-                      placeholder="e.g. Nigeria, Kenya"
-                      value={formData.country}
-                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                      disabled={isLoading}
-                      className="h-11"
-                    />
-                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="country" className="text-sm font-medium">
+                    Country (optional)
+                  </Label>
+                  <Input
+                    id="country"
+                    placeholder="e.g. Nigeria, Kenya"
+                    value={formData.country}
+                    onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                    disabled={isLoading}
+                    className="h-11"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -339,6 +459,100 @@ export default function FreelancerOnboardingPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                )}
+                {formData.techField && (
+                  <div className="space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+                    <div>
+                      <p className="text-sm font-medium">Professional links</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Same rules as your dashboard profile. Clients use these to verify your background.
+                      </p>
+                    </div>
+                    {githubRequired && (
+                      <div className="space-y-2">
+                        <Label htmlFor="githubUrl" className="text-sm font-medium">
+                          GitHub profile URL <span className="text-destructive">*</span>
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Link on github.com (your profile or organization).
+                        </p>
+                        <Input
+                          id="githubUrl"
+                          type="url"
+                          inputMode="url"
+                          placeholder="https://github.com/yourusername"
+                          value={formData.githubUrl}
+                          onChange={(e) => setFormData({ ...formData, githubUrl: e.target.value })}
+                          disabled={isLoading}
+                          className="h-11"
+                          required
+                        />
+                      </div>
+                    )}
+                    {behanceRequired && (
+                      <div className="space-y-2">
+                        <Label htmlFor="behanceUrl" className="text-sm font-medium">
+                          Behance profile URL <span className="text-destructive">*</span>
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Your portfolio on behance.net.
+                        </p>
+                        <Input
+                          id="behanceUrl"
+                          type="url"
+                          inputMode="url"
+                          placeholder="https://www.behance.net/yourprofile"
+                          value={formData.behanceUrl}
+                          onChange={(e) => setFormData({ ...formData, behanceUrl: e.target.value })}
+                          disabled={isLoading}
+                          className="h-11"
+                          required
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="linkedinUrl" className="text-sm font-medium">
+                        LinkedIn URL
+                        {professionalLinkRequired && (
+                          <span className="text-muted-foreground font-normal text-xs">
+                            {" "}
+                            (required if no portfolio below)
+                          </span>
+                        )}
+                      </Label>
+                      <Input
+                        id="linkedinUrl"
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://www.linkedin.com/in/yourprofile"
+                        value={formData.linkedinUrl}
+                        onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
+                        disabled={isLoading}
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="portfolioUrl" className="text-sm font-medium">
+                        Portfolio / website URL
+                        {professionalLinkRequired && (
+                          <span className="text-muted-foreground font-normal text-xs">
+                            {" "}
+                            (required if no LinkedIn above)
+                          </span>
+                        )}
+                      </Label>
+                      <Input
+                        id="portfolioUrl"
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://your-site.com"
+                        value={formData.portfolioUrl}
+                        onChange={(e) => setFormData({ ...formData, portfolioUrl: e.target.value })}
+                        disabled={isLoading}
+                        className="h-11"
+                      />
+                    </div>
                   </div>
                 )}
                 <div className="space-y-2">
@@ -467,6 +681,37 @@ export default function FreelancerOnboardingPage() {
                       </label>
                     ))}
                   </div>
+                  {formData.languagesWritten.includes(
+                    PROGRAMMING_LANGUAGE_OTHER
+                  ) && (
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="other-languages-detail"
+                        className="text-sm font-medium"
+                      >
+                        Languages you use{" "}
+                        <span className="text-destructive">*</span>
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        List every language we should assess (comma or newline
+                        separated). Skill tests use your profile languages,
+                        including these.
+                      </p>
+                      <Textarea
+                        id="other-languages-detail"
+                        value={formData.otherLanguagesDetail}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            otherLanguagesDetail: e.target.value,
+                          })
+                        }
+                        disabled={isLoading}
+                        placeholder="e.g. Dart, Elixir, Lua"
+                        className="min-h-[88px] resize-y"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-2">
