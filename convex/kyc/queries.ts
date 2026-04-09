@@ -47,7 +47,7 @@ export const getKycForFreelancer = query({
 });
 
 /**
- * List pending KYC submissions for admin/moderator review
+ * List pending KYC submissions for admin review
  */
 export const getPendingKycSubmissions = query({
   args: { userId: v.optional(v.id("users")) },
@@ -55,8 +55,7 @@ export const getPendingKycSubmissions = query({
     const user = args.userId
       ? await ctx.db.get(args.userId)
       : await getCurrentUser(ctx);
-    if (!user || ((user as Doc<"users">).role !== "admin" && (user as Doc<"users">).role !== "moderator"))
-      return [];
+    if (!user || (user as Doc<"users">).role !== "admin") return [];
     const list = await ctx.db
       .query("kycSubmissions")
       .withIndex("by_status", (q) => q.eq("status", "pending_review"))
@@ -82,7 +81,7 @@ export const getPendingKycSubmissions = query({
 });
 
 /**
- * Get one KYC submission by freelancer ID (admin/moderator)
+ * Get one KYC submission by freelancer ID (admin)
  */
 export const getKycByFreelancerId = query({
   args: {
@@ -93,8 +92,7 @@ export const getKycByFreelancerId = query({
     const reviewer = args.reviewerUserId
       ? await ctx.db.get(args.reviewerUserId)
       : await getCurrentUser(ctx);
-    if (!reviewer || ((reviewer as Doc<"users">).role !== "admin" && (reviewer as Doc<"users">).role !== "moderator"))
-      return null;
+    if (!reviewer || (reviewer as Doc<"users">).role !== "admin") return null;
     const submission = await ctx.db
       .query("kycSubmissions")
       .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))

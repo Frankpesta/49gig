@@ -21,6 +21,7 @@ import {
   getRoleLabel,
 } from "@/lib/platform-skills";
 import { Copy, Users } from "lucide-react";
+import { EXPERIENCE_LEVEL_OPTIONS } from "@/lib/experience-level-labels";
 
 export interface TeamSlotsEditorProps {
   slots: TeamSlotIntake[];
@@ -240,10 +241,11 @@ export function TeamSlotsEditor({
                           <SelectValue placeholder="Select level…" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="junior">Junior</SelectItem>
-                          <SelectItem value="mid">Mid-Level</SelectItem>
-                          <SelectItem value="senior">Senior</SelectItem>
-                          <SelectItem value="expert">Expert</SelectItem>
+                          {EXPERIENCE_LEVEL_OPTIONS.map(({ value, label }) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

@@ -17,14 +17,14 @@ async function viewerUser(
   return u as Doc<"users">;
 }
 
-/** Get all pending/processing payout requests (admin/moderator only). */
+/** Get all pending/processing payout requests / history (admin only). */
 export const getClientPayoutRequests = query({
   args: {
     status: v.optional(v.union(v.literal("pending"), v.literal("processing"), v.literal("completed"), v.literal("rejected"))),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
-    if (!user || (user.role !== "admin" && user.role !== "moderator")) return [];
+    if (!user || user.role !== "admin") return [];
 
     const requests = args.status
       ? await ctx.db

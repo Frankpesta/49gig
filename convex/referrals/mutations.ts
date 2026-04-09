@@ -1,21 +1,8 @@
 import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
-import { Doc } from "../_generated/dataModel";
 import { ensureUserReferralCode } from "./helpers";
-
-function sumClientReferralCashCents(txs: Doc<"walletTransactions">[]): number {
-  let sum = 0;
-  for (const t of txs) {
-    if (t.status !== "completed") continue;
-    if (t.type === "credit" && t.category === "client_referral_payout") {
-      sum += t.amountCents;
-    } else if (t.type === "debit" && t.category === "withdrawal_referral") {
-      sum -= t.amountCents;
-    }
-  }
-  return Math.max(0, sum);
-}
+import { clientBankWithdrawableCents } from "../wallets/clientBalanceMath";
 
 /** Assign a share code if missing (idempotent). */
 export const ensureMyReferralCode = mutation({
@@ -33,7 +20,7 @@ export const ensureMyReferralCode = mutation({
 });
 
 /**
- * Crypto withdrawal request for client referral cash.
+ * Crypto withdrawal request (client wallet funds excluding legacy hiring-only credit).
  * Admin reviews and manually sends payment, then marks as completed.
  */
 export const requestClientReferralCryptoPayout = mutation({
@@ -61,8 +48,10 @@ export const requestClientReferralCryptoPayout = mutation({
       .query("walletTransactions")
       .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
       .collect();
-    const available = sumClientReferralCashCents(txs);
-    if (args.amountCents > available) throw new Error("Insufficient referral cash balance");
+    const cur = (wallet.currency ?? "usd").toLowerCase();
+    const available = clientBankWithdrawableCents(txs, cur);
+    if (args.amountCents > available)
+      throw new Error("Insufficient withdrawable balance");
 
     const existing = await ctx.db
       .query("clientReferralPayoutRequests")
@@ -89,7 +78,7 @@ export const requestClientReferralCryptoPayout = mutation({
 });
 
 /**
- * PayPal withdrawal request for client referral cash.
+ * PayPal withdrawal request (client wallet funds excluding legacy hiring-only credit).
  * Admin reviews and manually sends payment, then marks as completed.
  */
 export const requestClientReferralPaypalPayout = mutation({
@@ -120,9 +109,10 @@ export const requestClientReferralPaypalPayout = mutation({
       .query("walletTransactions")
       .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
       .collect();
-    const available = sumClientReferralCashCents(txs);
+    const cur = (wallet.currency ?? "usd").toLowerCase();
+    const available = clientBankWithdrawableCents(txs, cur);
     if (args.amountCents > available) {
-      throw new Error("Insufficient referral cash balance");
+      throw new Error("Insufficient withdrawable balance");
     }
 
     // Check for an already-pending request to avoid duplicates
@@ -152,8 +142,8 @@ export const requestClientReferralPaypalPayout = mutation({
 });
 
 /**
- * Admin: mark a client referral payout request as completed (funds sent via PayPal).
- * This deducts the amount from the client's referral cash balance.
+ * Admin: mark a client payout request as completed (funds sent off-platform).
+ * Deducts from the client's wallet via a completed debit.
  */
 export const markClientPayoutCompleted = mutation({
   args: {
@@ -162,7 +152,7 @@ export const markClientPayoutCompleted = mutation({
   },
   handler: async (ctx, args) => {
     const admin = await getCurrentUser(ctx);
-    if (!admin || (admin.role !== "admin" && admin.role !== "moderator")) {
+    if (!admin || admin.role !== "admin") {
       throw new Error("Only admins can mark payouts as completed");
     }
 
@@ -217,7 +207,7 @@ export const rejectClientPayout = mutation({
   },
   handler: async (ctx, args) => {
     const admin = await getCurrentUser(ctx);
-    if (!admin || (admin.role !== "admin" && admin.role !== "moderator")) {
+    if (!admin || admin.role !== "admin") {
       throw new Error("Only admins can reject payouts");
     }
 

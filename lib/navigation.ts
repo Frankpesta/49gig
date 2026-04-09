@@ -211,13 +211,13 @@ export const navigationItems: NavItem[] = [
     roles: ["admin"],
   },
 
-  // Admin & Moderator: KYC Review
+  // Admin: KYC Review
   {
     title: "KYC Review",
     url: "/dashboard/kyc-review",
     icon: ShieldCheck,
     section: "menu",
-    roles: ["admin", "moderator"],
+    roles: ["admin"],
   },
 
   // Admin & Moderator: Contact Enquiries

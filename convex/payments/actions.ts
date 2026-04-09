@@ -763,14 +763,18 @@ export const withdrawFromWallet = action({
     }
 
     if (user.role === "client") {
-      const referralCash = await ctx.runQuery(
-        apiAny.wallets.queries.getClientReferralCashBalanceCents,
-        { userId: args.userId },
+      const spendable = await ctx.runQuery(
+        internalAny.wallets.queries.getClientSpendableWalletCentsInternal,
+        { userId: args.userId, currency: "usd" }
       );
-      const cap = referralCash?.cents ?? 0;
-      if (args.amountCents > cap) {
+      const hiringOnly = await ctx.runQuery(
+        internalAny.wallets.queries.getClientReferralHiringBalanceCentsInternal,
+        { userId: args.userId, currency: "usd" }
+      );
+      const maxWithdraw = Math.max(0, spendable - hiringOnly);
+      if (args.amountCents > maxWithdraw) {
         throw new Error(
-          "You can only withdraw referral reward cash (available balance shown on your wallet). Hiring credits cannot be withdrawn."
+          "That amount exceeds your withdrawable wallet balance. Anything marked for hire checkout only must be used toward a project first."
         );
       }
     }
@@ -784,7 +788,7 @@ export const withdrawFromWallet = action({
       amount: amountDollars,
       narration:
         user.role === "client"
-          ? `49GIG referral reward withdrawal`
+          ? `49GIG client wallet withdrawal`
           : `49GIG wallet withdrawal`,
       currency: "USD",
       reference: transferRef,
@@ -796,7 +800,7 @@ export const withdrawFromWallet = action({
       amountCents: args.amountCents,
       currency: "usd",
       description:
-        user.role === "client" ? `Referral cash withdrawal` : `Withdrawal to bank`,
+        user.role === "client" ? `Wallet withdrawal to bank` : `Withdrawal to bank`,
       flutterwaveTransferId: transferRef,
       category: user.role === "client" ? "withdrawal_referral" : undefined,
     });

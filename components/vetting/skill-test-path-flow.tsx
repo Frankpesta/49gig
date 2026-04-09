@@ -233,8 +233,8 @@ export function SkillTestPathFlow() {
         <CardHeader>
           <CardTitle>Skill assessment</CardTitle>
           <CardDescription>
-            You&apos;ll be asked to allow your webcam before the timed test starts (video is not uploaded).
-            Questions are generated from your profile (category and skills).
+            These tests are proctored. Any form of malpractice will not be tolerated—you will be removed from
+            the test immediately. Questions are generated from your profile (category and skills).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

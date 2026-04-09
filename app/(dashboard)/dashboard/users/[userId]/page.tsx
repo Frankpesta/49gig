@@ -458,7 +458,7 @@ export default function UserDetailPage() {
                   View Projects
                 </Link>
               </Button>
-              {isFreelancer && isStaffViewer && (
+              {isFreelancer && currentUser.role === "admin" && (
                 <Button size="sm" variant="outline" className="gap-1.5" asChild>
                   <Link href={`/dashboard/users/${profileData._id}/kyc`}>
                     <ShieldCheck className="h-3.5 w-3.5" />

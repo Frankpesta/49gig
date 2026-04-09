@@ -617,7 +617,7 @@ export function EnglishTest({ onComplete }: EnglishTestProps) {
       userId={user._id}
       segment="english"
       title="English assessment — webcam"
-      description="Allow camera access to start. Video is not recorded or uploaded; we only log lightweight integrity signals while you test."
+      description="These tests are proctored. Any form of malpractice will not be tolerated—you will be removed from the test immediately."
       onReady={() => {}}
     >
       <EnglishTestInner onComplete={onComplete} />

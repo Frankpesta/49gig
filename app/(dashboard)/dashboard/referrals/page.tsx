@@ -64,7 +64,7 @@ export default function ReferralsPage() {
     <div className="space-y-8 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="Referrals"
-        description="Share your link with new clients. When their hire is funded, you earn a percentage of the first funding — it pays out after the client approves the first monthly payment on that hire (freelancers: wallet; clients: withdrawable balance in Wallet)."
+        description="Share your link with new clients. When their hire is funded, you earn a percentage of the first funding after the client approves the first monthly payment on that hire. Rewards are added to your wallet and can be withdrawn like other balance (see Wallet)."
         icon={Gift}
       />
 
@@ -115,17 +115,10 @@ export default function ReferralsPage() {
                     <p className="text-2xl font-semibold">{s.rewardsCreditedCount}</p>
                   </div>
                 </div>
-                {user.role === "client" && (
-                  <p className="text-sm text-muted-foreground">
-                    Your referral rewards are hiring credit only—they apply at checkout when you fund a hire, and
-                    cannot be withdrawn.
-                  </p>
-                )}
-                {user.role === "freelancer" && (
-                  <p className="text-sm text-muted-foreground">
-                    Referral rewards go to your wallet and can be withdrawn like other earnings.
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">
+                  Referral rewards are credited to your wallet after the referred hire’s first month is approved. Use
+                  the Wallet page to withdraw them like any other available balance.
+                </p>
               </>
             );
           })()}

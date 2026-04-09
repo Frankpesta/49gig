@@ -797,6 +797,7 @@ export default function UsersPage() {
                                         const en = vr.englishProficiency;
                                         const proc = vr.proctoringSummary;
                                         const canFinalApprove =
+                                          user.role === "admin" &&
                                           (vr.status === "pending_admin" || vr.status === "flagged") &&
                                           selectedUser.verificationStatus === "pending_review";
                                         return (
