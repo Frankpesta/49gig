@@ -356,6 +356,9 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-6 px-4 sm:px-6">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
+            For reading and writing sections, a <strong>laptop or desktop</strong> is recommended for comfort and accuracy.
+          </div>
           <ErrorHandler
             error={error}
             onRetry={handleRetry}

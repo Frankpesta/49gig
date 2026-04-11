@@ -607,6 +607,70 @@ export function VerificationApprovedEmail({
   );
 }
 
+export function VerificationTerminatedEmail({
+  name = "there",
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps) {
+  return (
+    <EmailLayout
+      preview="Update on your 49GIG freelancer application"
+      heroLabel="Application"
+      heroTitle="We’re unable to proceed right now"
+      heroSubtitle="Thank you for your interest in 49GIG."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>,
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        After reviewing your verification attempts, we&apos;re sorry we can&apos;t move forward with your application
+        at this time. You&apos;re welcome to try again later with a new signup if our requirements change.
+      </Text>
+      <Text style={mutedTextStyle}>If you have questions, contact support from our website.</Text>
+    </EmailLayout>
+  );
+}
+
+export function DisputeUpdateEmail({
+  name = "there",
+  headline,
+  bodyText,
+  ctaHref,
+  ctaLabel = "Open dispute",
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & {
+  headline: string;
+  bodyText: string;
+  ctaHref: string;
+  ctaLabel?: string;
+}) {
+  return (
+    <EmailLayout
+      preview={headline}
+      heroLabel="Dispute"
+      heroTitle={headline}
+      heroSubtitle="Sign in to your dashboard for full details and next steps."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>,
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px", whiteSpace: "pre-wrap" as const }}>
+        {bodyText}
+      </Text>
+      <EmailButton href={ctaHref}>{ctaLabel}</EmailButton>
+    </EmailLayout>
+  );
+}
+
 export function VerificationRejectedEmail({
   name = "there",
   reason,
@@ -633,7 +697,7 @@ export function VerificationRejectedEmail({
       <Text style={{ ...textStyle, marginBottom: "24px" }}>
         Please review your submitted details and continue your verification. If you need help, our support team is available from your dashboard.
       </Text>
-      <EmailButton href={`${appUrl}/verification`}>Continue Verification</EmailButton>
+      <EmailButton href={`${appUrl}/onboarding/verification`}>Continue Verification</EmailButton>
     </EmailLayout>
   );
 }

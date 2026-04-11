@@ -100,7 +100,7 @@ export default function ResumeUploadPage() {
     if (isVerified?.verified) {
       router.replace("/dashboard");
     } else {
-      router.replace("/verification");
+      router.replace("/onboarding/verification");
     }
   }, [resumeInfo?.resumeStatus, isVerified, router]);
 
@@ -187,7 +187,7 @@ export default function ResumeUploadPage() {
 
       localStorage.removeItem("pending_resume_upload");
       setSuccess(true);
-      setTimeout(() => router.replace("/verification"), 800);
+      setTimeout(() => router.replace("/onboarding/verification"), 800);
     } catch (err: any) {
       setError(getUserFriendlyError(err) || "Failed to upload resume.");
     } finally {

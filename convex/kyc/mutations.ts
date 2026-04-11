@@ -2,6 +2,9 @@ import { mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
+import {
+  weightedVerificationOverall,
+} from "../vetting/scoring";
 
 const internalAny = require("../_generated/api").internal as any;
 
@@ -41,11 +44,12 @@ export const submitKyc = mutation({
     idType: v.union(
       v.literal("nin"),
       v.literal("international_passport"),
+      v.literal("voters_card"),
       v.literal("other")
     ),
     idOtherLabel: v.optional(v.string()),
     idFrontFileId: v.id("_storage"),
-    idBackFileId: v.id("_storage"),
+    idBackFileId: v.optional(v.id("_storage")),
     addressDocFileId: v.id("_storage"),
     addressDocType: v.union(
       v.literal("utility_bill"),
@@ -57,6 +61,24 @@ export const submitKyc = mutation({
     const user = await requireFreelancer(ctx, args.userId);
     const now = Date.now();
 
+    if (args.idType === "other" && !args.idBackFileId) {
+      throw new Error("For “other” ID types, upload both front and back.");
+    }
+
+    const vetting = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .first();
+    if (!vetting) {
+      throw new Error("Complete your verification tests before submitting KYC.");
+    }
+    const weighted = weightedVerificationOverall(vetting);
+    if (weighted == null || weighted < 50) {
+      throw new Error(
+        "Your weighted test score must be at least 50% before you can submit KYC. Finish English (including writing) and skills first."
+      );
+    }
+
     const existing = await ctx.db
       .query("kycSubmissions")
       .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
@@ -67,7 +89,7 @@ export const submitKyc = mutation({
       idType: args.idType,
       idOtherLabel: args.idOtherLabel,
       idFrontFileId: args.idFrontFileId,
-      idBackFileId: args.idBackFileId,
+      idBackFileId: (args.idBackFileId ?? args.idFrontFileId) as Id<"_storage">,
       addressDocFileId: args.addressDocFileId,
       addressDocType: args.addressDocType,
       status: "pending_review" as const,
@@ -119,11 +141,21 @@ export const approveKyc = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.patch(args.freelancerId, {
+    const vetting = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+      .first();
+
+    const patchUser: Record<string, unknown> = {
       kycStatus: "approved",
       kycApprovedAt: now,
       updatedAt: now,
-    });
+    };
+    if (vetting?.status === "approved") {
+      patchUser.verificationStatus = "approved";
+      patchUser.verificationCompletedAt = now;
+    }
+    await ctx.db.patch(args.freelancerId, patchUser as any);
 
     const freelancer = await ctx.db.get(args.freelancerId);
     await ctx.scheduler.runAfter(0, internalAny.kyc.actions.sendKycApprovedEmail, {
@@ -138,6 +170,78 @@ export const approveKyc = mutation({
       { freelancerId: args.freelancerId }
     );
 
+    return { success: true };
+  },
+});
+
+/**
+ * Admin: one-click approve freelancer signup (vetting pending_admin + KYC pending_review).
+ */
+export const approveFreelancerSignup = mutation({
+  args: {
+    freelancerId: v.id("users"),
+    reviewerUserId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx, args.reviewerUserId);
+    const freelancer = await ctx.db.get(args.freelancerId);
+    if (!freelancer || freelancer.role !== "freelancer" || freelancer.status !== "active") {
+      throw new Error("Freelancer not found");
+    }
+    const vetting = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+      .first();
+    if (!vetting || vetting.status !== "pending_admin") {
+      throw new Error("Tests are not in pending admin review");
+    }
+    const kyc = await ctx.db
+      .query("kycSubmissions")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+      .first();
+    if (!kyc || kyc.status !== "pending_review") {
+      throw new Error("KYC is not pending review");
+    }
+    const now = Date.now();
+    const reviewer = await requireAdmin(ctx, args.reviewerUserId);
+    await ctx.db.patch(vetting._id, {
+      status: "approved",
+      reviewedBy: reviewer._id,
+      reviewedAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(kyc._id, {
+      status: "approved",
+      reviewedBy: reviewer._id,
+      reviewedAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(args.freelancerId, {
+      verificationStatus: "approved",
+      verificationCompletedAt: now,
+      kycStatus: "approved",
+      kycApprovedAt: now,
+      updatedAt: now,
+    });
+    await ctx.scheduler.runAfter(0, internalAny.kyc.actions.sendKycApprovedEmail, {
+      email: freelancer.email ?? "",
+      name: freelancer.name ?? "there",
+    });
+    await ctx.scheduler.runAfter(
+      5000,
+      internalAny.matching.autoAssign.checkAndAutoAssignForFreelancer,
+      { freelancerId: args.freelancerId }
+    );
+    await ctx.db.insert("auditLogs", {
+      action: "freelancer_signup_approved",
+      actionType: "admin",
+      actorId: reviewer._id,
+      actorRole: "admin",
+      targetType: "user",
+      targetId: args.freelancerId,
+      details: {},
+      createdAt: now,
+    });
     return { success: true };
   },
 });

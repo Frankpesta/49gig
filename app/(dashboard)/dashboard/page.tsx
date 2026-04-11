@@ -264,11 +264,11 @@ export default function DashboardPage() {
           badge: "Talent",
         },
         {
-          title: "Revenue",
+          title: "Total revenue",
           subtitle: "This month (UTC)",
           value: formatCurrency(dashboardMetrics?.metrics?.revenue ?? 0),
           description:
-            "Net platform fees from hire payments, minus estimated clawback on client refunds.",
+            "Gross client hire payments that entered the platform (funding, top-ups, milestone charges).",
           icon: DollarSign,
           variant: "default" as const,
           trend: { value: 5, label: "30d", isPositive: true },

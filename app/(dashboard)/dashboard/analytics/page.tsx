@@ -119,7 +119,7 @@ export default function AnalyticsPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Platform fees (net)
+                Total revenue (inflow)
               </CardTitle>
               <div className="relative">
                 <div className="absolute inset-0 bg-green-500/10 rounded-full blur-xl group-hover:bg-green-500/20 transition-colors duration-300" />
@@ -131,15 +131,15 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold mb-1">
-              ${analytics.payments.totalPlatformFeesNet.toFixed(2)}
+              ${(analytics.payments.totalClientFundsInflow ?? 0).toFixed(2)}
             </div>
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
               <span>{analytics.payments.succeeded} succeeded charges</span>
               <span>•</span>
-              <span>${analytics.payments.totalAmount.toFixed(2)} card volume</span>
+              <span>Net platform fees ${analytics.payments.totalPlatformFeesNet.toFixed(2)}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Gross fees ${analytics.payments.totalPlatformFees.toFixed(2)}
+              Gross platform fee rows ${analytics.payments.totalPlatformFees.toFixed(2)}
               {analytics.payments.totalPlatformFeeRefundClawback > 0
                 ? ` · Est. refund clawback −$${analytics.payments.totalPlatformFeeRefundClawback.toFixed(2)}`
                 : null}
@@ -279,17 +279,29 @@ export default function AnalyticsPage() {
               <span className="text-sm">Failed</span>
               <Badge variant="destructive">{analytics.payments.failed}</Badge>
             </div>
-            <div className="border-t pt-4">
+            <div className="border-t pt-4 space-y-2">
               <div className="flex justify-between items-center">
-                <span className="text-sm font-medium">Total Revenue</span>
+                <span className="text-sm font-medium">Total revenue (client inflow)</span>
+                <span className="text-lg font-bold">
+                  ${(analytics.payments.totalClientFundsInflow ?? 0).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">All succeeded payment volume</span>
                 <span className="text-lg font-bold">
                   ${analytics.payments.totalAmount.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-sm font-medium">Platform Fees</span>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Platform fees (gross)</span>
                 <span className="text-lg font-bold">
                   ${analytics.payments.totalPlatformFees.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium">Platform fees (net)</span>
+                <span className="text-lg font-bold">
+                  ${analytics.payments.totalPlatformFeesNet.toFixed(2)}
                 </span>
               </div>
             </div>

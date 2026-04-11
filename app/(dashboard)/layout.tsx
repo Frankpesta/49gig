@@ -10,6 +10,14 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { DashboardFooter } from "@/components/dashboard/dashboard-footer";
 
+function isFreelancerOnboardingPath(path: string) {
+  return (
+    path.startsWith("/onboarding") ||
+    path.startsWith("/verification") ||
+    path.startsWith("/dashboard/verification")
+  );
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -79,7 +87,7 @@ export default function DashboardLayout({
 
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
     const onResumeUpload = currentPath.startsWith("/resume-upload");
-    const onVerificationPage = currentPath.startsWith("/verification");
+    const onVerificationPage = isFreelancerOnboardingPath(currentPath);
     const resumeStatus = resumeInfo?.resumeStatus;
     const hasUploaded =
       resumeStatus === "uploaded" ||
@@ -113,7 +121,7 @@ export default function DashboardLayout({
       if (typeof window === "undefined") return;
       
       const currentPath = window.location.pathname;
-      const isOnVerificationPage = currentPath.startsWith("/verification");
+      const isOnVerificationPage = isFreelancerOnboardingPath(currentPath);
 
       // If verification status is still loading, don't redirect yet
       // The loading state will be shown
@@ -126,7 +134,7 @@ export default function DashboardLayout({
         // Only redirect if not already on verification page
         if (!isOnVerificationPage) {
           // Use replace to prevent back button from going to dashboard
-          router.replace("/verification");
+          router.replace("/onboarding/verification");
           return;
         }
       }
@@ -149,8 +157,8 @@ export default function DashboardLayout({
       !isVerified.verified
     ) {
       const currentPath = window.location.pathname;
-      if (!currentPath.startsWith("/verification")) {
-        router.replace("/verification");
+      if (!isFreelancerOnboardingPath(currentPath)) {
+        router.replace("/onboarding/verification");
       }
     }
   }, [userProfile?._id, effectiveUser?._id, isAuthenticated, isInitializing, isVerified, router, userProfile, effectiveUser]);
@@ -197,7 +205,7 @@ export default function DashboardLayout({
     !isVerified.verified
   ) {
     const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-    const isOnVerificationPage = currentPath.startsWith("/verification");
+    const isOnVerificationPage = isFreelancerOnboardingPath(currentPath);
     
     // If on verification page, allow it to render (don't block it)
     if (isOnVerificationPage) {

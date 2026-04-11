@@ -33,7 +33,7 @@ export const sendKycRejectedEmail = internalAction({
           args.reason
         ),
         React.createElement("p", { style: { marginTop: "16px" } },
-          "Log in to your dashboard and go to Verification to upload new documents. Use clear images or PDFs (max 5MB)."
+          "Log in and open Freelancer verification at /onboarding/verification to upload new documents. Use clear images or PDFs (max 5MB)."
         ),
         React.createElement("p", { style: { marginTop: "24px", color: "#6b7280", fontSize: "14px" } },
           "If you have questions, contact support."

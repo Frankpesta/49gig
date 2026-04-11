@@ -29,9 +29,12 @@ export function proxy(request: NextRequest) {
     (route) => pathname === route || pathname.startsWith(route + "/")
   );
 
-  // Check if this is a dashboard route (excluding verification page)
+  const isOnboardingRoute = pathname.startsWith("/onboarding");
+
+  // Dashboard routes (exclude legacy /dashboard/verification redirect)
   const isDashboardRoute =
-    pathname.startsWith("/dashboard") && !pathname.startsWith("/verification");
+    pathname.startsWith("/dashboard") &&
+    !pathname.startsWith("/dashboard/verification");
 
   // Create response
   const response = NextResponse.next();
@@ -42,8 +45,7 @@ export function proxy(request: NextRequest) {
     response.headers.set("x-require-verification", "true");
   }
 
-  // For verification page, allow access
-  if (pathname.startsWith("/verification")) {
+  if (isOnboardingRoute || pathname.startsWith("/verification")) {
     response.headers.set("x-verification-page", "true");
   }
 

@@ -56,7 +56,7 @@ export default function LoginPage() {
           await new Promise((resolve) => setTimeout(resolve, 50));
 
           if (result.userRole === "freelancer") {
-            router.replace((result as { isFullyVetted?: boolean }).isFullyVetted ? "/dashboard" : "/verification");
+            router.replace((result as { isFullyVetted?: boolean }).isFullyVetted ? "/dashboard" : "/onboarding/verification");
           } else {
             router.push("/dashboard");
           }
@@ -98,7 +98,7 @@ export default function LoginPage() {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         if (result.userRole === "freelancer") {
-          router.replace((result as { isFullyVetted?: boolean }).isFullyVetted ? "/dashboard" : "/verification");
+          router.replace((result as { isFullyVetted?: boolean }).isFullyVetted ? "/dashboard" : "/onboarding/verification");
         } else {
           router.push("/dashboard");
         }

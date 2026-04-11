@@ -57,7 +57,7 @@ export function FreelancerChecklist() {
       id: "verification",
       label: "Complete Verification",
       completed: verificationStatus?.verificationStatus === "approved",
-      href: "/verification",
+      href: "/onboarding/verification",
       icon: <ShieldCheck className="h-4 w-4" />,
     },
     {

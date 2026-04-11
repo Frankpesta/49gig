@@ -28,3 +28,20 @@ export function estimatedPlatformFeeClawbackOnRefund(
   const pct = Math.max(0, Math.min(100, projectPlatformFeePercent));
   return Math.max(0, p.amount * (pct / 100));
 }
+
+/** Client charges that fund the platform (gross USD charged before split to escrow). */
+const CLIENT_FUNDS_INFLOW_TYPES = new Set<Doc<"payments">["type"]>([
+  "pre_funding",
+  "top_up",
+  "milestone_release",
+]);
+
+/**
+ * Gross client payment amount (USD) when money enters the platform for hires.
+ * Uses the payment row's gross `amount` on succeeded funding/top-up/milestone charges.
+ */
+export function grossClientFundsInflowOnPayment(p: Doc<"payments">): number {
+  if (p.status !== "succeeded") return 0;
+  if (CLIENT_FUNDS_INFLOW_TYPES.has(p.type)) return Math.max(0, p.amount);
+  return 0;
+}

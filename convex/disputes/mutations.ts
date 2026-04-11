@@ -13,6 +13,11 @@ import {
   sumShareCentsForFreelancers,
 } from "../teamEscrowShares";
 import type { Id } from "../_generated/dataModel";
+import {
+  getDisputePartyUserIds,
+  getDisputeRecipientFreelancerIds,
+  viewerIsDisputeParty,
+} from "./partyAccess";
 
 const api = require("../_generated/api") as {
   api: {
@@ -23,7 +28,13 @@ const api = require("../_generated/api") as {
 };
 
 const internalAny = require("../_generated/api").internal as {
-  disputes: { staffEmails: { sendDisputeAssignmentEmailInternal: unknown } };
+  disputes: {
+    staffEmails: {
+      sendDisputeAssignmentEmailInternal: unknown;
+      sendDisputePartyEmailsInternal: unknown;
+      sendDisputeEscalationAdminsInternal: unknown;
+    };
+  };
 };
 const internalApi = require("../_generated/api").internal as any;
 
@@ -96,6 +107,24 @@ async function ensureReplacementMatchingProjectFields(
 /**
  * Helper to get current user in mutations
  */
+/** Client, staff, or freelancers who are parties to this dispute (partial team → disputed only). */
+function assertDisputeThreadAccess(
+  user: Doc<"users">,
+  project: Doc<"projects">,
+  dispute: Doc<"disputes">
+) {
+  const isStaff = user.role === "admin" || user.role === "moderator";
+  if (isStaff) return;
+  if (project.clientId === user._id) return;
+  if (
+    user.role === "freelancer" &&
+    viewerIsDisputeParty(user._id, project, dispute)
+  ) {
+    return;
+  }
+  throw new Error("You are not a party to this dispute.");
+}
+
 async function getCurrentUserInMutation(
   ctx: MutationCtx,
   userId?: string
@@ -357,11 +386,13 @@ export const initiateDispute = mutation({
       });
     }
 
-    // Update project status to disputed
-    await ctx.db.patch(projectId, {
-      status: "disputed",
-      updatedAt: Date.now(),
-    });
+    // Full-team or solo hire: mark hire disputed for everyone. Partial team: unaffected members keep working.
+    if (!isPartialTeamDispute) {
+      await ctx.db.patch(projectId, {
+        status: "disputed",
+        updatedAt: Date.now(),
+      });
+    }
 
     const sendSystemNotification =
       api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
@@ -370,7 +401,22 @@ export const initiateDispute = mutation({
       >;
     const releaseDisputeFunds =
       api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
-    
+
+    const syntheticDispute: Pick<Doc<"disputes">, "initiatorId" | "disputedFreelancerIds"> = {
+      initiatorId: user._id,
+      disputedFreelancerIds:
+        disputedIdsUnique && disputedIdsUnique.length > 0
+          ? disputedIdsUnique
+          : undefined,
+    };
+    const partyUserIds = getDisputePartyUserIds(
+      project,
+      syntheticDispute as Doc<"disputes">
+    );
+    const notifyUserIds = partyUserIds.filter(
+      (id) => String(id) !== String(user._id)
+    );
+
     // Create audit log
     await ctx.db.insert("auditLogs", {
       action: "dispute_initiated",
@@ -388,15 +434,26 @@ export const initiateDispute = mutation({
       createdAt: Date.now(),
     });
 
-    const otherPartyId =
-      user._id === project.clientId ? project.matchedFreelancerId : project.clientId;
-    if (otherPartyId) {
+    if (notifyUserIds.length > 0) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: [otherPartyId],
+        userIds: notifyUserIds,
         title: "New dispute opened",
         message: `A dispute was opened for ${project.intakeForm.title}.`,
         type: "dispute",
         data: { disputeId, projectId },
+      });
+      await (
+        ctx.scheduler.runAfter as (
+          delayMs: number,
+          fn: unknown,
+          fnArgs: Record<string, unknown>
+        ) => Promise<unknown>
+      )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+        userIds: notifyUserIds,
+        subject: `[49GIG] Dispute opened: ${project.intakeForm.title ?? "Hire"}`,
+        headline: "A dispute was opened",
+        bodyText: `A dispute was opened on "${project.intakeForm.title}".\n\nReason: ${args.reason}\n\nOpen the dispute thread in your dashboard for details and next steps.`,
+        disputeId,
       });
     }
     await ctx.db.insert("disputeMessages", {
@@ -448,21 +505,18 @@ export const sendDisputeChatMessage = mutation({
     const project = await ctx.db.get(dispute.projectId);
     if (!project) throw new Error("Project not found");
 
-    const isClient = project.clientId === user._id;
-    const isFreelancer =
-      project.matchedFreelancerId === user._id ||
-      (project.matchedFreelancerIds?.includes(user._id) ?? false);
-    const isStaff = user.role === "admin" || user.role === "moderator";
+    assertDisputeThreadAccess(user, project, dispute);
 
-    if (!isClient && !isFreelancer && !isStaff) {
-      throw new Error("Not authorized to post in this dispute");
-    }
+    const isClient = project.clientId === user._id;
+    const isFreelancerParty =
+      user.role === "freelancer" &&
+      viewerIsDisputeParty(user._id, project, dispute);
 
     let authorRole: "client" | "freelancer" | "moderator" | "admin" | "system" =
       "client";
     if (user.role === "admin") authorRole = "admin";
     else if (user.role === "moderator") authorRole = "moderator";
-    else if (isFreelancer) authorRole = "freelancer";
+    else if (isFreelancerParty) authorRole = "freelancer";
     else authorRole = "client";
 
     // Resolve attachment download URLs from storage
@@ -535,16 +589,7 @@ export const addEvidence = mutation({
       throw new Error("Project not found");
     }
 
-    // Check authorization - must be client, freelancer, or admin/moderator
-    const isClient = project.clientId === user._id;
-    const isFreelancer = project.matchedFreelancerId === user._id;
-    const isInitiator = dispute.initiatorId === user._id;
-    const isAdminOrModerator =
-      user.role === "admin" || user.role === "moderator";
-
-    if (!isClient && !isFreelancer && !isInitiator && !isAdminOrModerator) {
-      throw new Error("Unauthorized");
-    }
+    assertDisputeThreadAccess(user, project, dispute);
 
     // Check if dispute is still open
     if (dispute.status !== "open" && dispute.status !== "under_review") {
@@ -866,6 +911,8 @@ export const resolveDispute = mutation({
       }
     }
 
+    const recipientFreelancerIds = getDisputeRecipientFreelancerIds(project, dispute);
+
     // Send personalized notifications to each party
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [project.clientId],
@@ -874,19 +921,26 @@ export const resolveDispute = mutation({
       type: "dispute",
       data: { disputeId: args.disputeId, projectId: dispute.projectId },
     });
+    await (
+      ctx.scheduler.runAfter as (
+        delayMs: number,
+        fn: unknown,
+        fnArgs: Record<string, unknown>
+      ) => Promise<unknown>
+    )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+      userIds: [project.clientId],
+      subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+      headline: "Dispute resolved",
+      bodyText: decisionClientMsg,
+      disputeId: args.disputeId,
+    });
     if (args.decision === "client_favor" || args.decision === "replacement") {
       await ctx.scheduler.runAfter(0, sendSelectReplacementClientEmail, {
         projectId: dispute.projectId,
       });
     }
 
-    const freelancerIds = [
-      project.matchedFreelancerId,
-      ...(project.matchedFreelancerIds ?? []),
-    ].filter(Boolean) as Doc<"users">["_id"][];
-    const uniqueFreelancerIds = Array.from(new Set(freelancerIds.map(String))).map(
-      (id) => id as Doc<"users">["_id"]
-    );
+    const uniqueFreelancerIds = recipientFreelancerIds;
 
     if (
       (args.decision === "client_favor" || args.decision === "replacement") &&
@@ -1133,6 +1187,19 @@ export const resolveDisputeInternal = internalMutation({
       type: "dispute",
       data: { disputeId: args.disputeId, projectId: dispute.projectId },
     });
+    await (
+      ctx.scheduler.runAfter as (
+        delayMs: number,
+        fn: unknown,
+        fnArgs: Record<string, unknown>
+      ) => Promise<unknown>
+    )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+      userIds: [project.clientId],
+      subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+      headline: "Dispute resolved",
+      bodyText: decisionClientMsg,
+      disputeId: args.disputeId,
+    });
     if (args.decision === "client_favor" || args.decision === "replacement") {
       await ctx.scheduler.runAfter(0, sendSelectReplacementClientEmail, {
         projectId: dispute.projectId,
@@ -1148,13 +1215,7 @@ export const resolveDisputeInternal = internalMutation({
             ? `The dispute for "${project.intakeForm.title}" was partially resolved. ${args.notes}`
             : `The dispute for "${project.intakeForm.title}" resulted in a replacement decision. You have been removed from this hire.`;
 
-    const freelancerNotifyIds = [
-      project.matchedFreelancerId,
-      ...(project.matchedFreelancerIds ?? []),
-    ].filter(Boolean) as Doc<"users">["_id"][];
-    const uniqueFreelancerIds = Array.from(new Set(freelancerNotifyIds.map(String))).map(
-      (id) => id as Doc<"users">["_id"]
-    );
+    const uniqueFreelancerIds = getDisputeRecipientFreelancerIds(project, dispute);
 
     if (
       (args.decision === "client_favor" || args.decision === "replacement") &&
@@ -1177,18 +1238,45 @@ export const resolveDisputeInternal = internalMutation({
           type: "dispute",
           data: { disputeId: args.disputeId, projectId: dispute.projectId },
         });
+        await (
+          ctx.scheduler.runAfter as (
+            delayMs: number,
+            fn: unknown,
+            fnArgs: Record<string, unknown>
+          ) => Promise<unknown>
+        )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+          userIds: ruledAgainst,
+          subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+          headline: "Dispute resolved",
+          bodyText: decisionFreelancerMsg,
+          disputeId: args.disputeId,
+        });
       }
       if (isPartialTeamResolve) {
         const remainingNotify = uniqueFreelancerIds.filter(
           (id) => !removedSet.has(String(id))
         );
         if (remainingNotify.length > 0) {
+          const partialMsg = `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`;
           await ctx.scheduler.runAfter(0, sendSystemNotification, {
             userIds: remainingNotify,
             title: "Dispute resolved",
-            message: `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`,
+            message: partialMsg,
             type: "dispute",
             data: { disputeId: args.disputeId, projectId: dispute.projectId },
+          });
+          await (
+            ctx.scheduler.runAfter as (
+              delayMs: number,
+              fn: unknown,
+              fnArgs: Record<string, unknown>
+            ) => Promise<unknown>
+          )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+            userIds: remainingNotify,
+            subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+            headline: "Dispute resolved",
+            bodyText: partialMsg,
+            disputeId: args.disputeId,
           });
         }
       }
@@ -1199,6 +1287,19 @@ export const resolveDisputeInternal = internalMutation({
         message: decisionFreelancerMsg,
         type: "dispute",
         data: { disputeId: args.disputeId, projectId: dispute.projectId },
+      });
+      await (
+        ctx.scheduler.runAfter as (
+          delayMs: number,
+          fn: unknown,
+          fnArgs: Record<string, unknown>
+        ) => Promise<unknown>
+      )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+        userIds: uniqueFreelancerIds,
+        subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+        headline: "Dispute resolved",
+        bodyText: decisionFreelancerMsg,
+        disputeId: args.disputeId,
       });
     }
 
@@ -1250,7 +1351,50 @@ export const escalateDispute = mutation({
       createdAt: Date.now(),
     });
 
-    // TODO: Notify admins
+    const project = await ctx.db.get(dispute.projectId);
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    if (project) {
+      const partyIds = getDisputePartyUserIds(project, dispute).filter(
+        (id) => String(id) !== String(user._id)
+      );
+      if (partyIds.length > 0) {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: partyIds,
+          title: "Dispute escalated",
+          message: `A dispute on "${project.intakeForm.title}" was escalated for admin review.`,
+          type: "dispute",
+          data: { disputeId: args.disputeId, projectId: dispute.projectId },
+        });
+        await (
+          ctx.scheduler.runAfter as (
+            delayMs: number,
+            fn: unknown,
+            fnArgs: Record<string, unknown>
+          ) => Promise<unknown>
+        )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+          userIds: partyIds,
+          subject: `[49GIG] Dispute escalated: ${project.intakeForm.title ?? "Hire"}`,
+          headline: "Dispute escalated",
+          bodyText: `A dispute on "${project.intakeForm.title}" was escalated for admin review.\n\nModerator note: ${args.reason}`,
+          disputeId: args.disputeId,
+        });
+      }
+    }
+
+    await (
+      ctx.scheduler.runAfter as (
+        delayMs: number,
+        fn: unknown,
+        fnArgs: Record<string, unknown>
+      ) => Promise<unknown>
+    )(0, internalAny.disputes.staffEmails.sendDisputeEscalationAdminsInternal, {
+      disputeId: args.disputeId,
+      reason: args.reason,
+    });
 
     return { success: true };
   },
@@ -1298,6 +1442,39 @@ export const closeDispute = mutation({
       targetId: args.disputeId,
       createdAt: Date.now(),
     });
+
+    const project = await ctx.db.get(dispute.projectId);
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    if (project) {
+      const partyIds = getDisputePartyUserIds(project, dispute);
+      if (partyIds.length > 0) {
+        const msg = `The dispute on "${project.intakeForm.title}" has been closed by support.`;
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: partyIds,
+          title: "Dispute closed",
+          message: msg,
+          type: "dispute",
+          data: { disputeId: args.disputeId, projectId: dispute.projectId },
+        });
+        await (
+          ctx.scheduler.runAfter as (
+            delayMs: number,
+            fn: unknown,
+            fnArgs: Record<string, unknown>
+          ) => Promise<unknown>
+        )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+          userIds: partyIds,
+          subject: `[49GIG] Dispute closed: ${project.intakeForm.title ?? "Hire"}`,
+          headline: "Dispute closed",
+          bodyText: msg,
+          disputeId: args.disputeId,
+        });
+      }
+    }
 
     return { success: true };
   },
@@ -1356,28 +1533,34 @@ export const cancelDispute = mutation({
       });
     }
 
-    // Notify the other party
-    const initiatorRole = dispute.initiatorRole;
-    let notifyIds: Doc<"users">["_id"][] = [];
-    if (initiatorRole === "client" && project) {
-      const freelancerIds = [
-        project.matchedFreelancerId,
-        ...(project.matchedFreelancerIds ?? []),
-      ].filter(Boolean) as Doc<"users">["_id"][];
-      notifyIds = Array.from(new Set(freelancerIds.map(String))).map(
-        (id) => id as Doc<"users">["_id"]
-      );
-    } else if (project) {
-      notifyIds = [project.clientId];
-    }
+    const notifyIds =
+      project
+        ? getDisputePartyUserIds(project, dispute).filter(
+            (id) => String(id) !== String(user._id)
+          )
+        : [];
 
     if (notifyIds.length > 0) {
+      const cancelMsg = `The dispute has been cancelled by the ${dispute.initiatorRole} who initiated it.\n\nReason: ${args.reason.trim()}`;
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
         userIds: notifyIds,
         title: "Dispute cancelled",
-        message: `The dispute has been cancelled by the ${initiatorRole} who initiated it. Reason: ${args.reason.trim()}`,
+        message: cancelMsg.replace(/\n\n/g, " "),
         type: "dispute",
         data: { disputeId: args.disputeId, projectId: dispute.projectId },
+      });
+      await (
+        ctx.scheduler.runAfter as (
+          delayMs: number,
+          fn: unknown,
+          fnArgs: Record<string, unknown>
+        ) => Promise<unknown>
+      )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+        userIds: notifyIds,
+        subject: `[49GIG] Dispute cancelled: ${project?.intakeForm.title ?? "Hire"}`,
+        headline: "Dispute cancelled",
+        bodyText: cancelMsg,
+        disputeId: args.disputeId,
       });
     }
 

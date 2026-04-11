@@ -302,8 +302,16 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
+  const displayStatus =
+    user.role === "freelancer" &&
+    (project as { freelancerHireDisplayStatus?: string }).freelancerHireDisplayStatus
+      ? (project as { freelancerHireDisplayStatus: string }).freelancerHireDisplayStatus
+      : project.status;
+  const statusConfig = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
+  const openDisputeOnHire = (project as { openDisputeOnHire?: boolean }).openDisputeOnHire ?? false;
+  const viewerIsDisputePartyOnHire =
+    (project as { viewerIsDisputePartyOnHire?: boolean }).viewerIsDisputePartyOnHire ?? false;
   const isAdmin = user.role === "admin";
   const isStaff = user.role === "admin" || user.role === "moderator";
   const isClient = user.role === "client" && project.clientId === user._id;
@@ -347,7 +355,7 @@ export default function ProjectDetailPage() {
     !project.clientContractSignedAt &&
     (project.status === "draft" || project.status === "pending_funding");
 
-  const terminalOrDispute = ["completed", "cancelled", "disputed"].includes(project.status);
+  const terminalOrDispute = ["completed", "cancelled", "disputed"].includes(displayStatus);
   const confirmedTeamMembers =
     (
       project as {
@@ -913,6 +921,13 @@ export default function ProjectDetailPage() {
                 Created {new Date(project.createdAt).toLocaleDateString()}
               </span>
             </div>
+            {user.role === "freelancer" &&
+              openDisputeOnHire &&
+              !viewerIsDisputePartyOnHire && (
+                <p className="mt-3 max-w-2xl rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                  A dispute is open on this hire involving other team members. You are not part of that dispute; you can keep working. Only affected parties can access the dispute thread.
+                </p>
+              )}
           </div>
         </div>
         {isClient && (

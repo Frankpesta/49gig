@@ -81,7 +81,7 @@ export default function SelectRolePage() {
         // CRITICAL: Check user role and redirect accordingly
         // Freelancers MUST go to verification page immediately
         if (result.userRole === "freelancer") {
-          router.replace("/verification");
+          router.replace("/onboarding/verification");
         } else {
           // Redirect clients to dashboard
           router.push("/dashboard?welcome=true");

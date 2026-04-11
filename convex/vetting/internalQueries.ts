@@ -12,20 +12,29 @@ const experienceLevelValidator = v.union(
   v.literal("expert")
 );
 
+export const getVettingResultDocInternal = internalQuery({
+  args: { vettingResultId: v.id("vettingResults") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.vettingResultId);
+  },
+});
+
 /** Return up to 50 existing MCQ question IDs for a category+level (any matching skill set). */
 export const getExistingMcqIds = internalQuery({
   args: {
     categoryId: v.string(),
     experienceLevel: experienceLevelValidator,
+    excludeIds: v.optional(v.array(v.id("vettingMcqQuestions"))),
   },
   handler: async (ctx, args) => {
+    const exclude = new Set((args.excludeIds ?? []).map(String));
     const questions = await ctx.db
       .query("vettingMcqQuestions")
       .withIndex("by_category_level", (q) =>
         q.eq("categoryId", args.categoryId).eq("experienceLevel", args.experienceLevel)
       )
-      .take(60);
-    return questions.map((q) => q._id);
+      .take(200);
+    return questions.filter((q) => !exclude.has(String(q._id))).map((q) => q._id);
   },
 });
 
@@ -119,8 +128,10 @@ export const getExistingCodingPromptIds = internalQuery({
     categoryId: v.string(),
     language: v.string(),
     experienceLevel: experienceLevelValidator,
+    excludeIds: v.optional(v.array(v.id("vettingCodingPrompts"))),
   },
   handler: async (ctx, args) => {
+    const exclude = new Set((args.excludeIds ?? []).map(String));
     const prompts = await ctx.db
       .query("vettingCodingPrompts")
       .withIndex("by_category_language_level", (q) =>
@@ -129,7 +140,7 @@ export const getExistingCodingPromptIds = internalQuery({
           .eq("language", args.language)
           .eq("experienceLevel", args.experienceLevel)
       )
-      .take(5);
-    return prompts.map((p) => p._id);
+      .take(40);
+    return prompts.filter((p) => !exclude.has(String(p._id))).map((p) => p._id);
   },
 });
