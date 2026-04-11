@@ -26,11 +26,16 @@ export const getOrGenerateSkillMcqQuestions = internalAction({
     categoryId: v.string(),
     skillTopics: v.array(v.string()),
     experienceLevel: experienceLevelValidator,
+    excludeQuestionIds: v.optional(v.array(v.id("vettingMcqQuestions"))),
   },
   handler: async (ctx, args): Promise<Id<"vettingMcqQuestions">[]> => {
     const existingIds: Id<"vettingMcqQuestions">[] = await ctx.runQuery(
       internalAny.vetting.internalQueries.getExistingMcqIds,
-      { categoryId: args.categoryId, experienceLevel: args.experienceLevel }
+      {
+        categoryId: args.categoryId,
+        experienceLevel: args.experienceLevel,
+        excludeIds: args.excludeQuestionIds,
+      }
     );
 
     if (existingIds.length >= MCQ_COUNT) {
@@ -51,6 +56,8 @@ export const getOrGenerateSkillMcqQuestions = internalAction({
       categoryId: args.categoryId,
       experienceLevel: args.experienceLevel,
       skillTopics: args.skillTopics,
+      keySuffix:
+        args.excludeQuestionIds && args.excludeQuestionIds.length > 0 ? ":retake" : "",
     });
 
     const ids: Id<"vettingMcqQuestions">[] = await ctx.runMutation(
@@ -70,6 +77,7 @@ export const getOrGenerateCodingPrompts = internalAction({
     categoryId: v.string(),
     language: v.string(),
     experienceLevel: experienceLevelValidator,
+    excludePromptIds: v.optional(v.array(v.id("vettingCodingPrompts"))),
   },
   handler: async (ctx, args): Promise<Id<"vettingCodingPrompts">[]> => {
     const existingIds: Id<"vettingCodingPrompts">[] = await ctx.runQuery(
@@ -78,6 +86,7 @@ export const getOrGenerateCodingPrompts = internalAction({
         categoryId: args.categoryId,
         language: args.language,
         experienceLevel: args.experienceLevel,
+        excludeIds: args.excludePromptIds,
       }
     );
 
@@ -93,6 +102,8 @@ export const getOrGenerateCodingPrompts = internalAction({
       difficulty,
       count: CODING_PROMPT_COUNT,
       experienceLevel: args.experienceLevel,
+      keySuffix:
+        args.excludePromptIds && args.excludePromptIds.length > 0 ? ":retake" : "",
     });
 
     const ids: Id<"vettingCodingPrompts">[] = await ctx.runMutation(
@@ -136,6 +147,7 @@ async function generateMcqWithOpenAI(
     categoryId: string;
     experienceLevel: string;
     skillTopics: string[];
+    keySuffix?: string;
   }
 ): Promise<
   Array<{
@@ -153,11 +165,11 @@ async function generateMcqWithOpenAI(
 Rules:
 - Output valid JSON only, no markdown.
 - Each question has: "question", "options" (array of 4 strings), "correctIndex" (0-based).
-- Questions must be very hard and relevant to the topics and difficulty.
+- Prioritize multi-step reasoning, edge cases, debugging scenarios, trade-offs, and applied problem solving — not textbook definitions.
 - Do not repeat the same idea. Cover different aspects of the topics.`;
 
   const user = `Generate exactly ${params.count} MCQ questions on: ${params.topics}.
-Difficulty: ${params.difficulty}.
+Difficulty: ${params.difficulty} (make most items challenging even for experienced practitioners).
 Return a JSON array of objects: [ { "question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0 }, ... ]`;
 
   const completion = await openai.chat.completions.create({
@@ -180,7 +192,7 @@ Return a JSON array of objects: [ { "question": "...", "options": ["A", "B", "C"
     throw new Error("OpenAI did not return valid MCQ array");
   }
 
-  const keyPrefix = `${params.categoryId}:${params.skillTopics.join(",")}:${params.experienceLevel}:`;
+  const keyPrefix = `${params.categoryId}:${params.skillTopics.join(",")}:${params.experienceLevel}:${params.keySuffix ?? ""}:`;
   const level = params.experienceLevel as "junior" | "mid" | "senior" | "expert";
 
   return arr.slice(0, params.count).map((item, i) => ({
@@ -208,6 +220,7 @@ async function generateCodingPromptsWithOpenAI(
     difficulty: string;
     count: number;
     experienceLevel: "junior" | "mid" | "senior" | "expert";
+    keySuffix?: string;
   }
 ): Promise<
   Array<{
@@ -223,10 +236,11 @@ async function generateCodingPromptsWithOpenAI(
   }>
 > {
   const sys = `You are an expert technical assessor. Generate coding challenge prompts for ${params.language}.
-Output valid JSON only. Each challenge has: "title", "description" (clear problem statement), "starterCode" (optional), "testCases" (array of { "input": string, "expectedOutput": string } - at least 2 test cases so we can run automated tests).`;
+Output valid JSON only. Each challenge has: "title", "description" (clear problem statement with constraints), "starterCode" (optional), "testCases" (array of { "input": string, "expectedOutput": string } - at least 2 test cases).
+Favor algorithmic thinking, careful handling of edge cases, and realistic constraints — avoid trivial one-liners.`;
 
   const user = `Generate exactly ${params.count} coding challenges in ${params.language} for category ${params.categoryId}.
-Difficulty: ${params.difficulty}.
+Difficulty: ${params.difficulty} (substantive problems; not beginner syntax drills).
 For each challenge include testCases: array of at least 2 objects with "input" and "expectedOutput" (exact string the program should print for that input).
 Return JSON array: [ { "title": "...", "description": "...", "starterCode": "optional", "testCases": [ { "input": "...", "expectedOutput": "..." } ] }, ... ]`;
 
@@ -255,7 +269,7 @@ Return JSON array: [ { "title": "...", "description": "...", "starterCode": "opt
     throw new Error("OpenAI did not return valid coding prompts array");
   }
 
-  const keyPrefix = `${params.categoryId}:${params.language}:${params.experienceLevel}:`;
+  const keyPrefix = `${params.categoryId}:${params.language}:${params.experienceLevel}:${params.keySuffix ?? ""}:`;
   return arr.slice(0, params.count).map((item, i) => {
     const testCases = Array.isArray(item.testCases)
       ? item.testCases

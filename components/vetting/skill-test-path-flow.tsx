@@ -26,6 +26,15 @@ import { Textarea } from "@/components/ui/textarea";
 
 const SKILL_TEST_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
+function DesktopRecommendedBanner() {
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
+      For the best experience — especially coding challenges — use a <strong>laptop or desktop</strong> with a
+      full keyboard. Phones and small tablets are not recommended.
+    </div>
+  );
+}
+
 /** Shuffle array deterministically by seed; returns [shuffledValues, originalIndexForDisplayIndex]. */
 function shuffleWithSeed<T>(arr: T[], seed: string): { values: T[]; originalIndices: number[] } {
   const indices = arr.map((_, i) => i);
@@ -238,6 +247,7 @@ export function SkillTestPathFlow() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <DesktopRecommendedBanner />
           <ErrorHandler error={error} onRetry={handleStartTest} onDismiss={() => setError(null)} title="Error" />
           {error?.message?.includes("Complete your profile") && (
             <Button variant="outline" className="w-full" asChild>
@@ -306,6 +316,7 @@ export function SkillTestPathFlow() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <DesktopRecommendedBanner />
           {timerBar}
           {timeUp && (
             <div className="rounded-lg border border-amber-500 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm font-medium text-amber-800 dark:text-amber-200">

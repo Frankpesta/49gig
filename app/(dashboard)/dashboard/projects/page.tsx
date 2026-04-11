@@ -249,8 +249,16 @@ export default function ProjectsPage() {
         />
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project: Doc<"projects">) => {
-            const statusConfig = STATUS_CONFIG[project.status] || STATUS_CONFIG.draft;
+          {projects.map((project: Doc<"projects"> & {
+            freelancerHireDisplayStatus?: string;
+            openDisputeOnHire?: boolean;
+            viewerIsDisputePartyOnHire?: boolean;
+          }) => {
+            const displayStatus =
+              user?.role === "freelancer" && project.freelancerHireDisplayStatus
+                ? project.freelancerHireDisplayStatus
+                : project.status;
+            const statusConfig = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.draft;
             const StatusIcon = statusConfig.icon;
 
             return (
@@ -261,7 +269,7 @@ export default function ProjectsPage() {
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <DashboardStatusBadge
                         label={statusConfig.label}
-                        tone={mapStatusTone(project.status)}
+                        tone={mapStatusTone(displayStatus)}
                         icon={<StatusIcon className="h-3 w-3" />}
                       />
                       {hireMatchingInProgress(project) && (
@@ -279,6 +287,13 @@ export default function ProjectsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {user?.role === "freelancer" &&
+                    project.openDisputeOnHire &&
+                    project.viewerIsDisputePartyOnHire === false && (
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                        A dispute is open on this hire involving other team members. You are not part of that dispute and can continue your work.
+                      </p>
+                    )}
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <DollarSign className="h-4 w-4" />

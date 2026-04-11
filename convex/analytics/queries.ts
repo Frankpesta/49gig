@@ -4,6 +4,7 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import {
   estimatedPlatformFeeClawbackOnRefund,
+  grossClientFundsInflowOnPayment,
   platformFeeRecognizedOnPayment,
 } from "../platformRevenue";
 
@@ -64,8 +65,10 @@ export const getPlatformAnalytics = query({
     );
 
     let platformFeesGross = 0;
+    let totalClientFundsInflow = 0;
     for (const p of allPayments) {
       platformFeesGross += platformFeeRecognizedOnPayment(p);
+      totalClientFundsInflow += grossClientFundsInflowOnPayment(p);
     }
 
     let platformFeeRefundClawback = 0;
@@ -83,6 +86,8 @@ export const getPlatformAnalytics = query({
       totalAmount: allPayments
         .filter((p) => p.status === "succeeded")
         .reduce((sum, p) => sum + p.amount, 0),
+      /** Gross client hire funding (pre_funding, top_up, milestone_release) that entered the platform. */
+      totalClientFundsInflow,
       /** Gross platform fees on succeeded charges (pre-fund, top-up, milestones, platform_fee rows). */
       totalPlatformFees: platformFeesGross,
       /** Estimated fee share of gross refunds to clients (hire fee % × refund amount). */
@@ -207,24 +212,29 @@ export const getAdminChartData = query({
     const revenueByMonth = months.map((month) => {
       let recognized = 0;
       let clawback = 0;
+      let grossClientInflow = 0;
       for (const p of allPayments) {
         if (p.createdAt < month.start || p.createdAt >= month.end) continue;
         recognized += platformFeeRecognizedOnPayment(p);
+        grossClientInflow += grossClientFundsInflowOnPayment(p);
         if (p.type === "refund" && p.status === "refunded") {
           const proj = p.projectId ? projectById.get(String(p.projectId)) : undefined;
           clawback += estimatedPlatformFeeClawbackOnRefund(p, proj?.platformFee ?? 25);
         }
       }
-      const net = Math.max(0, recognized - clawback);
+      const platformFeesNet = Math.max(0, recognized - clawback);
       const volume = allPayments.filter(
         (p) =>
           p.createdAt >= month.start &&
           p.createdAt < month.end &&
-          platformFeeRecognizedOnPayment(p) > 0
+          grossClientFundsInflowOnPayment(p) > 0
       ).length;
       return {
         month: month.label,
-        revenue: net,
+        /** Gross client funds into platform (hire payments). */
+        revenue: grossClientInflow,
+        grossClientInflow,
+        platformFeesNet,
         volume,
       };
     });

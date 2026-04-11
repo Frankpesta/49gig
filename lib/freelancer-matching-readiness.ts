@@ -93,7 +93,7 @@ export function getFreelancerMatchingReadinessIssues(
       description:
         "Complete platform verification and wait for approval to be eligible for matches.",
       actionLabel: "Go to verification",
-      href: "/verification",
+      href: "/onboarding/verification",
     });
   }
 
@@ -104,7 +104,7 @@ export function getFreelancerMatchingReadinessIssues(
       description:
         "Approved KYC is required before you can appear in client match results.",
       actionLabel: "Complete KYC",
-      href: "/dashboard/verification",
+      href: "/onboarding/verification",
     });
   }
 

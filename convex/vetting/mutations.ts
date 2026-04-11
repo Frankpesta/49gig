@@ -1,8 +1,13 @@
 import { mutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { calculateOverallScore, checkFraudFlags } from "./engine";
+import {
+  averageSkillScore,
+  englishCompositeFromVetting,
+  weightedVerificationOverall,
+} from "./scoring";
 import { getCurrentUser } from "../auth";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 
 const api = require("../_generated/api") as {
@@ -10,6 +15,7 @@ const api = require("../_generated/api") as {
     notifications: { actions: { sendSystemNotification: unknown } };
   };
 };
+const internalAny = require("../_generated/api").internal as any;
 
 /**
  * Helper function to get current user in mutations
@@ -310,36 +316,22 @@ export const submitEnglishProficiency = mutation({
       suspiciousActivity.push("session_id_mismatch");
     }
 
-    // Calculate overall English score (weighted: grammar 40%, comprehension 40%, written 20%)
-    // Written response will be graded by AI action
-    const overallScore =
-      args.grammarScore * 0.4 + args.comprehensionScore * 0.4;
-
-    // Update English proficiency
+    // Written section is graded asynchronously; English step completes only after written score exists.
     await ctx.db.patch(vettingResult._id, {
       englishProficiency: {
         grammarScore: args.grammarScore,
         comprehensionScore: args.comprehensionScore,
-        overallScore,
-        completedAt: Date.now(),
+        overallScore: undefined,
+        completedAt: undefined,
         testSessionId: args.testSessionId,
         timeSpent: args.timeSpent,
-        attempts:
-          (vettingResult.englishProficiency.attempts || 0) + 1,
+        attempts: (vettingResult.englishProficiency.attempts || 0) + 1,
         suspiciousActivity,
         browserFingerprint: args.browserFingerprint,
         ipAddress: args.ipAddress,
       },
       updatedAt: Date.now(),
     });
-
-    // Update steps completed
-    if (!vettingResult.stepsCompleted.includes("english")) {
-      await ctx.db.patch(vettingResult._id, {
-        stepsCompleted: [...vettingResult.stepsCompleted, "english"],
-        currentStep: "skills",
-      });
-    }
 
     // Create audit log
     await ctx.db.insert("auditLogs", {
@@ -578,103 +570,219 @@ export const completeVerification = mutation({
       throw new Error("Only freelancers can complete verification");
     }
 
+    const freelancer = user;
+
     const vettingResult = await ctx.db
       .query("vettingResults")
-      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", freelancer._id))
       .first();
 
     if (!vettingResult) {
       throw new Error("Verification not initialized");
     }
+    const vettingRow = vettingResult;
 
     // Check all steps are completed (English + Skills only)
     const requiredSteps = ["english", "skills"];
     const allStepsCompleted = requiredSteps.every((step) =>
-      vettingResult.stepsCompleted.includes(step as any)
+      vettingRow.stepsCompleted.includes(step as "english" | "skills" | "identity")
     );
 
     if (!allStepsCompleted) {
       throw new Error("Not all verification steps are completed");
     }
 
-    // Check English proficiency is completed
-    if (!vettingResult.englishProficiency.overallScore) {
-      throw new Error("English proficiency test not completed");
+    const englishComposite = englishCompositeFromVetting(vettingRow.englishProficiency);
+    if (englishComposite == null) {
+      throw new Error("Finish the English test (including the written section) before submitting.");
     }
 
-    // Check at least one skill is assessed
-    if (vettingResult.skillAssessments.length === 0) {
+    if (vettingRow.skillAssessments.length === 0) {
       throw new Error("At least one skill assessment is required");
     }
 
-    const englishScore = vettingResult.englishProficiency.overallScore;
-    const avgSkillScore =
-      vettingResult.skillAssessments.length > 0
-        ? vettingResult.skillAssessments.reduce((s, a) => s + a.score, 0) /
-          vettingResult.skillAssessments.length
-        : 0;
-
-    // Minimum 50% required in BOTH English and Skills; otherwise reject (do NOT delete account — user can retake)
+    const avgSkillScore = averageSkillScore(vettingRow);
     const MIN_PERCENT = 50;
-    const englishFailed = englishScore < MIN_PERCENT;
+    const englishFailed = englishComposite < MIN_PERCENT;
     const skillsFailed = avgSkillScore < MIN_PERCENT;
-    if (englishFailed || skillsFailed) {
-      const overallScore = calculateOverallScore({
-        englishScore,
-        skillScores: vettingResult.skillAssessments.map((a) => a.score),
-      });
 
-      // Allow retake: remove failed step(s) from stepsCompleted and set currentStep to first failed
-      const newStepsCompleted = vettingResult.stepsCompleted.filter(
-        (s) => (s === "english" && !englishFailed) || (s === "skills" && !skillsFailed)
-      );
-      const retakeStep = englishFailed ? "english" : "skills";
+    const engRound = vettingRow.englishAttemptRound ?? 0;
+    const skRound = vettingRow.skillsAttemptRound ?? 0;
 
-      await ctx.db.patch(vettingResult._id, {
-        overallScore,
+    async function hardFailVerification(reason: string) {
+      const now = Date.now();
+      await ctx.db.patch(vettingRow._id, {
         status: "rejected",
-        currentStep: retakeStep,
+        updatedAt: now,
+      });
+      await ctx.db.patch(freelancer._id, {
+        status: "deleted",
+        verificationStatus: "rejected",
+        updatedAt: now,
+      });
+      await ctx.runMutation(internalAny.auth.sessions.revokeAllSessionsForUserInternal, {
+        userId: freelancer._id,
+        reason: "verification_terminated",
+      });
+      await (
+        ctx.scheduler.runAfter as (d: number, fn: unknown, a: Record<string, unknown>) => Promise<unknown>
+      )(0, internalAny.vetting.staffEmails.sendVerificationTerminatedEmailInternal, {
+        email: freelancer.email ?? "",
+        name: freelancer.name ?? "there",
+      });
+      await ctx.db.insert("auditLogs", {
+        action: "freelancer_removed_failed_verification_twice",
+        actionType: "system",
+        actorId: freelancer._id,
+        actorRole: freelancer.role,
+        targetType: "vettingResult",
+        targetId: vettingRow._id,
+        details: { reason },
+        createdAt: now,
+      });
+    }
+
+    if (englishFailed) {
+      if (engRound >= 1) {
+        await hardFailVerification("english_below_minimum_after_retake");
+        return {
+          success: false,
+          accountDeleted: true,
+          status: "rejected" as const,
+          message:
+            "We're unable to proceed after two English attempts. We've sent you an email with more information.",
+        };
+      }
+      const overallScore =
+        weightedVerificationOverall(vettingRow) ??
+        calculateOverallScore({
+          englishScore: englishComposite,
+          skillScores: vettingRow.skillAssessments.map((a) => a.score),
+        });
+      const newStepsCompleted = vettingRow.stepsCompleted.filter((s) => s !== "english");
+      await ctx.db.patch(vettingRow._id, {
+        overallScore,
+        status: "pending",
+        currentStep: "english",
         stepsCompleted: newStepsCompleted,
+        englishAttemptRound: 1,
+        englishFailedAttempts: (vettingRow.englishFailedAttempts ?? 0) + 1,
+        englishProficiency: {
+          ...vettingRow.englishProficiency,
+          grammarScore: undefined,
+          comprehensionScore: undefined,
+          writtenResponseScore: undefined,
+          overallScore: undefined,
+          completedAt: undefined,
+          testSessionId: undefined,
+        },
         updatedAt: Date.now(),
       });
-
+      await ctx.db.patch(freelancer._id, {
+        verificationStatus: "in_progress",
+        updatedAt: Date.now(),
+      });
       await ctx.db.insert("auditLogs", {
         action: "verification_failed_minimum_scores",
         actionType: "system",
-        actorId: user._id,
-        actorRole: user.role,
+        actorId: freelancer._id,
+        actorRole: freelancer.role,
         targetType: "vettingResult",
-        targetId: vettingResult._id,
-        details: { englishScore, avgSkillScore, minRequired: MIN_PERCENT },
+        targetId: vettingRow._id,
+        details: {
+          englishComposite,
+          avgSkillScore,
+          minRequired: MIN_PERCENT,
+          dimension: "english",
+          retakeOffered: true,
+        },
         createdAt: Date.now(),
       });
-
-      const failedParts: string[] = [];
-      if (englishFailed) failedParts.push("English");
-      if (skillsFailed) failedParts.push("Skills");
-
       return {
         success: false,
         accountDeleted: false,
         status: "rejected" as const,
-        englishScore: Math.round(englishScore),
+        englishScore: Math.round(englishComposite),
         avgSkillScore: Math.round(avgSkillScore),
-        message: `You need at least ${MIN_PERCENT}% in both English and Skills. Your scores: English ${Math.round(englishScore)}%, Skills average ${Math.round(avgSkillScore)}%. Please retake the ${failedParts.join(" and ")} section(s) to continue.`,
+        message: `You scored below ${MIN_PERCENT}% on the English assessment (average of grammar, comprehension, and writing). You failed the first try — tap Retake below to try once more. If you score below ${MIN_PERCENT}% again, your application will be closed.`,
       };
     }
 
-    const proc = vettingResult.proctoringSummary;
+    if (skillsFailed) {
+      if (skRound >= 1) {
+        await hardFailVerification("skills_below_minimum_after_retake");
+        return {
+          success: false,
+          accountDeleted: true,
+          status: "rejected" as const,
+          message:
+            "We're unable to proceed after two skill assessment attempts. We've sent you an email with more information.",
+        };
+      }
+      const overallScore =
+        weightedVerificationOverall(vettingRow) ??
+        calculateOverallScore({
+          englishScore: englishComposite,
+          skillScores: vettingRow.skillAssessments.map((a) => a.score),
+        });
+      const newStepsCompleted = vettingRow.stepsCompleted.filter((s) => s !== "skills");
+      await ctx.db.patch(vettingRow._id, {
+        overallScore,
+        status: "pending",
+        currentStep: "skills",
+        stepsCompleted: newStepsCompleted,
+        skillsAttemptRound: 1,
+        skillsFailedAttempts: (vettingRow.skillsFailedAttempts ?? 0) + 1,
+        skillAssessments: [],
+        updatedAt: Date.now(),
+      });
+      await ctx.db.patch(freelancer._id, {
+        verificationStatus: "in_progress",
+        updatedAt: Date.now(),
+      });
+      await ctx.db.insert("auditLogs", {
+        action: "verification_failed_minimum_scores",
+        actionType: "system",
+        actorId: freelancer._id,
+        actorRole: freelancer.role,
+        targetType: "vettingResult",
+        targetId: vettingRow._id,
+        details: {
+          englishComposite,
+          avgSkillScore,
+          minRequired: MIN_PERCENT,
+          dimension: "skills",
+          retakeOffered: true,
+        },
+        createdAt: Date.now(),
+      });
+      return {
+        success: false,
+        accountDeleted: false,
+        status: "rejected" as const,
+        englishScore: Math.round(englishComposite),
+        avgSkillScore: Math.round(avgSkillScore),
+        message: `You scored below ${MIN_PERCENT}% on the skills assessment (average across your skill tests). You failed the first try — start the skill test again for one more attempt. If you score below ${MIN_PERCENT}% again, your application will be closed.`,
+      };
+    }
+
+    const proc = vettingRow.proctoringSummary;
     if (!proc?.englishProctoringReadyAt || !proc?.skillsProctoringReadyAt) {
       throw new Error(
         "Enable your webcam for both the English and skill assessments before submitting. Open each section, allow camera access, then submit again."
       );
     }
 
-    // Recalculate overall score (English 30%, Skills 70%)
-    const overallScore = calculateOverallScore({
-      englishScore,
-      skillScores: vettingResult.skillAssessments.map((a) => a.score),
-    });
+    const overallScore =
+      weightedVerificationOverall(vettingRow) ??
+      calculateOverallScore({
+        englishScore: englishComposite,
+        skillScores: vettingRow.skillAssessments.map((a) => a.score),
+      });
+
+    if (overallScore < MIN_PERCENT) {
+      throw new Error(`Your weighted verification score must be at least ${MIN_PERCENT}% to submit KYC.`);
+    }
 
     const now = Date.now();
     const proctoringFlags: FraudFlag[] = [];
@@ -707,37 +815,25 @@ export const completeVerification = mutation({
       });
     }
 
-    const existingFlags = [...(vettingResult.fraudFlags ?? [])];
+    const existingFlags = [...(vettingRow.fraudFlags ?? [])];
     const allFlags = [...existingFlags, ...proctoringFlags];
 
     const criticalOrHigh = allFlags.filter(
       (f) => f.severity === "critical" || f.severity === "high"
     );
-    const hasMediumOrLow = allFlags.some(
-      (f) => f.severity === "medium" || f.severity === "low"
-    );
 
-    let vettingStatus: "pending_admin" | "flagged" | "rejected";
-    let userVerificationStatus:
-      | "not_started"
-      | "in_progress"
-      | "pending_review"
-      | "approved"
-      | "rejected"
-      | "suspended";
+    let vettingStatus: "pending_admin" | "rejected";
+    let userVerificationStatus: "pending_review" | "rejected";
 
     if (criticalOrHigh.length > 0) {
       vettingStatus = "rejected";
       userVerificationStatus = "rejected";
-    } else if (overallScore < 70 || hasMediumOrLow) {
-      vettingStatus = "flagged";
-      userVerificationStatus = "pending_review";
     } else {
       vettingStatus = "pending_admin";
       userVerificationStatus = "pending_review";
     }
 
-    await ctx.db.patch(vettingResult._id, {
+    await ctx.db.patch(vettingRow._id, {
       overallScore,
       fraudFlags: allFlags.length > 0 ? allFlags : undefined,
       status: vettingStatus,
@@ -745,7 +841,7 @@ export const completeVerification = mutation({
       updatedAt: now,
     });
 
-    await ctx.db.patch(user._id, {
+    await ctx.db.patch(freelancer._id, {
       verificationStatus: userVerificationStatus,
       updatedAt: now,
     });
@@ -753,14 +849,14 @@ export const completeVerification = mutation({
     await ctx.db.insert("auditLogs", {
       action: "verification_completed",
       actionType: "system",
-      actorId: user._id,
-      actorRole: user.role,
+      actorId: freelancer._id,
+      actorRole: freelancer.role,
       targetType: "vettingResult",
-      targetId: vettingResult._id,
+      targetId: vettingRow._id,
       details: {
         overallScore,
         vettingStatus,
-        stepsCompleted: vettingResult.stepsCompleted,
+        stepsCompleted: vettingRow.stepsCompleted,
       },
       createdAt: now,
     });
@@ -771,30 +867,28 @@ export const completeVerification = mutation({
         "internal"
       >;
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: [user._id],
+      userIds: [freelancer._id],
       title:
         vettingStatus === "rejected"
           ? "Verification not approved"
           : "Verification submitted",
       message:
         vettingStatus === "rejected"
-          ? "Your verification could not be approved automatically. Check your dashboard for details."
-          : "Your tests are complete. Our team will review and finalize your verification shortly.",
+          ? "Your verification could not be approved due to integrity checks."
+          : "Your tests are submitted. Complete KYC if you haven't yet, then wait for admin approval.",
       type: "verification",
-      data: { vettingResultId: vettingResult._id },
+      data: { vettingResultId: vettingRow._id },
     });
 
     return {
-      success: true,
+      success: vettingStatus !== "rejected",
       accountDeleted: false,
       status: vettingStatus,
       overallScore,
       message:
         vettingStatus === "rejected"
           ? "Verification was rejected due to integrity checks. Contact support if you need help."
-          : vettingStatus === "flagged"
-            ? "Submitted for review — our team will assess your results and any flags."
-            : "Submitted — final approval is pending a quick review by our team.",
+          : "Submitted. Upload KYC if needed, then an admin will approve your account.",
     };
   },
 });
@@ -830,6 +924,9 @@ export const approveVerification = mutation({
 
     if (vettingResult.status !== "pending_admin" && vettingResult.status !== "flagged") {
       throw new Error("This freelancer is not awaiting admin approval");
+    }
+    if (freelancer.kycStatus !== "approved") {
+      throw new Error("Approve KYC first before approving verification tests.");
     }
 
     // Update vetting result
@@ -1115,7 +1212,7 @@ export const adminOverrideFreelancerVerificationAndTests = mutation({
   },
 });
 
-const SKILL_TEST_PASS_THRESHOLD = 60;
+const SKILL_TEST_PASS_THRESHOLD = 50;
 const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes for auto-submit after time up
 
 /**
@@ -1181,37 +1278,6 @@ export const submitMcqAnswers = mutation({
       combinedScore = Math.round(session.portfolioScore * 0.3 + mcqScore * 0.7);
     }
 
-    // Count failed sessions before this one (for retake/delete logic)
-    const allSessions = await ctx.db
-      .query("vettingSkillTestSessions")
-      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
-      .collect();
-    const failedBeforeThis = allSessions.filter(
-      (s) =>
-        s._id !== args.sessionId &&
-        s.status === "completed" &&
-        s.mcqScore != null &&
-        (s.pathType === "mcq_only"
-          ? s.mcqScore < SKILL_TEST_PASS_THRESHOLD
-          : s.pathType === "portfolio_mcq" && s.portfolioScore != null
-          ? s.portfolioScore * 0.3 + s.mcqScore * 0.7 < SKILL_TEST_PASS_THRESHOLD
-          : s.pathType === "coding_mcq" && s.codingSubmissions?.length
-          ? (() => {
-              let ct = 0,
-                cp = 0;
-              for (const sub of s.codingSubmissions!) {
-                const r = sub.runResult as { passed?: number; total?: number } | undefined;
-                if (r && typeof r.passed === "number" && typeof r.total === "number" && r.total > 0) {
-                  cp += r.passed;
-                  ct += r.total;
-                }
-              }
-              const cs = ct > 0 ? Math.round((cp / ct) * 100) : 0;
-              return (cs + s.mcqScore!) / 2 < SKILL_TEST_PASS_THRESHOLD;
-            })()
-          : s.mcqScore < SKILL_TEST_PASS_THRESHOLD)
-    ).length;
-
     await ctx.db.patch(args.sessionId, {
       mcqAnswers: args.answers,
       mcqScore,
@@ -1220,18 +1286,8 @@ export const submitMcqAnswers = mutation({
       updatedAt: Date.now(),
     });
 
-    // If failed (combined score < 60) and this is the 2nd failure, deactivate user
-    if (
-      combinedScore < SKILL_TEST_PASS_THRESHOLD &&
-      failedBeforeThis + 1 >= 2
-    ) {
-      await ctx.db.patch(user._id, {
-        status: "deleted",
-        updatedAt: Date.now(),
-      });
-    }
+    // Account removal after repeated failures is handled in completeVerification (retake flow).
 
-    // Push aggregate skill assessment to vetting result so completeVerification can use it
     const vettingResult = await ctx.db.get(session.vettingResultId);
     if (vettingResult) {
       const newAssessment = {
@@ -1244,8 +1300,19 @@ export const submitMcqAnswers = mutation({
       };
       const stepsCompleted = vettingResult.stepsCompleted ?? [];
       const hasSkills = stepsCompleted.includes("skills");
+      const prevMcq = vettingResult.usedMcqQuestionIds ?? [];
+      const prevCoding = vettingResult.usedCodingPromptIds ?? [];
+      const mergedMcq = Array.from(
+        new Set([...prevMcq.map(String), ...(session.mcqQuestionIds ?? []).map(String)])
+      ) as Id<"vettingMcqQuestions">[];
+      const mergedCoding = Array.from(
+        new Set([...prevCoding.map(String), ...(session.codingPromptIds ?? []).map(String)])
+      ) as Id<"vettingCodingPrompts">[];
       await ctx.db.patch(session.vettingResultId, {
-        skillAssessments: [...(vettingResult.skillAssessments || []), newAssessment],
+        skillAssessments: [newAssessment],
+        usedMcqQuestionIds: mergedMcq,
+        usedCodingPromptIds:
+          mergedCoding.length > 0 ? mergedCoding : vettingResult.usedCodingPromptIds,
         ...(!hasSkills && {
           stepsCompleted: [...stepsCompleted, "skills"],
           currentStep: "complete",
@@ -1349,25 +1416,36 @@ export const updateEnglishWrittenScore = mutation({
       throw new Error("Vetting result not found");
     }
 
-    // Recalculate overall English score
     const grammarScore = vettingResult.englishProficiency.grammarScore || 0;
     const comprehensionScore = vettingResult.englishProficiency.comprehensionScore || 0;
-    const overallScore =
-      grammarScore * 0.4 + comprehensionScore * 0.4 + args.writtenResponseScore * 0.2;
+    const englishOverall =
+      (grammarScore + comprehensionScore + args.writtenResponseScore) / 3;
+
+    const now = Date.now();
+    const stepsDone = (
+      vettingResult.stepsCompleted.includes("english")
+        ? vettingResult.stepsCompleted
+        : [...vettingResult.stepsCompleted, "english" as const]
+    ) as Doc<"vettingResults">["stepsCompleted"];
+    const nextCurrentStep = stepsDone.includes("skills")
+      ? vettingResult.currentStep ?? "complete"
+      : "skills";
 
     await ctx.db.patch(args.vettingResultId, {
       englishProficiency: {
         ...vettingResult.englishProficiency,
         writtenResponseScore: args.writtenResponseScore,
-        overallScore,
+        overallScore: Math.round(englishOverall * 100) / 100,
+        completedAt: now,
       },
-      updatedAt: Date.now(),
+      stepsCompleted: stepsDone,
+      currentStep: nextCurrentStep,
+      updatedAt: now,
     });
 
-    // Recalculate overall verification score
     const skillScores = vettingResult.skillAssessments.map((a) => a.score);
     const newOverallScore = calculateOverallScore({
-      englishScore: overallScore,
+      englishScore: englishOverall,
       skillScores,
     });
 

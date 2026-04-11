@@ -84,6 +84,12 @@ export const getVerificationStatus = query({
             englishProficiency: vettingResult.englishProficiency,
             skillAssessments: vettingResult.skillAssessments,
             fraudFlags: vettingResult.fraudFlags,
+            englishAttemptRound: vettingResult.englishAttemptRound ?? 0,
+            skillsAttemptRound: vettingResult.skillsAttemptRound ?? 0,
+            englishFailedAttempts: vettingResult.englishFailedAttempts ?? 0,
+            skillsFailedAttempts: vettingResult.skillsFailedAttempts ?? 0,
+            usedMcqQuestionIds: vettingResult.usedMcqQuestionIds,
+            usedCodingPromptIds: vettingResult.usedCodingPromptIds,
           }
         : null,
       kycSubmission: kycSubmission

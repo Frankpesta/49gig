@@ -7,6 +7,7 @@ import {
   projectEligibleForAdminManualMatch,
   isTeamProject,
 } from "./manualMatchEligibility";
+import { viewerIsDisputeParty } from "../disputes/partyAccess";
 
 /**
  * Helper function to get current user in queries
@@ -187,6 +188,49 @@ export const getProjects = query({
           ? await ctx.db.get(project.matchedFreelancerId)
           : null;
 
+        let freelancerHireDisplayStatus: Doc<"projects">["status"] | undefined;
+        let openDisputeOnHire = false;
+        let viewerIsDisputePartyOnHire = false;
+
+        if (user.role === "freelancer") {
+          const disputesOnProject = await ctx.db
+            .query("disputes")
+            .withIndex("by_project", (q) => q.eq("projectId", project._id))
+            .collect();
+          const openDisputes = disputesOnProject.filter(
+            (d) =>
+              d.status === "open" ||
+              d.status === "under_review" ||
+              d.status === "escalated"
+          );
+          openDisputeOnHire = openDisputes.length > 0;
+          for (const d of openDisputes) {
+            if (viewerIsDisputeParty(user._id, project, d)) {
+              viewerIsDisputePartyOnHire = true;
+              break;
+            }
+          }
+
+          freelancerHireDisplayStatus = project.status;
+          if (project.status === "disputed" && openDisputes.length > 0) {
+            const d = openDisputes[0];
+            const teamIds = project.matchedFreelancerId
+              ? [project.matchedFreelancerId]
+              : project.matchedFreelancerIds ?? [];
+            const disputed = d.disputedFreelancerIds ?? [];
+            const isPartialTeamDispute =
+              teamIds.length > 1 &&
+              disputed.length > 0 &&
+              disputed.length < teamIds.length;
+            if (
+              isPartialTeamDispute &&
+              !viewerIsDisputeParty(user._id, project, d)
+            ) {
+              freelancerHireDisplayStatus = "in_progress";
+            }
+          }
+        }
+
         return {
           ...project,
           client: client
@@ -203,6 +247,13 @@ export const getProjects = query({
                 email: freelancer.email,
               }
             : null,
+          ...(user.role === "freelancer"
+            ? {
+                freelancerHireDisplayStatus,
+                openDisputeOnHire,
+                viewerIsDisputePartyOnHire,
+              }
+            : {}),
         };
       })
     );
@@ -378,6 +429,48 @@ export const getProject = query({
       ? await ctx.db.get(project.matchedFreelancerId)
       : null;
 
+    let freelancerHireDisplayStatus: Doc<"projects">["status"] | undefined;
+    let openDisputeOnHire = false;
+    let viewerIsDisputePartyOnHire = false;
+
+    if (user.role === "freelancer") {
+      const disputesOnProject = await ctx.db
+        .query("disputes")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
+        .collect();
+      const openDisputes = disputesOnProject.filter(
+        (d) =>
+          d.status === "open" ||
+          d.status === "under_review" ||
+          d.status === "escalated"
+      );
+      openDisputeOnHire = openDisputes.length > 0;
+      for (const d of openDisputes) {
+        if (viewerIsDisputeParty(user._id, project, d)) {
+          viewerIsDisputePartyOnHire = true;
+          break;
+        }
+      }
+      freelancerHireDisplayStatus = project.status;
+      if (project.status === "disputed" && openDisputes.length > 0) {
+        const d = openDisputes[0];
+        const teamIds = project.matchedFreelancerId
+          ? [project.matchedFreelancerId]
+          : project.matchedFreelancerIds ?? [];
+        const disputed = d.disputedFreelancerIds ?? [];
+        const isPartialTeamDispute =
+          teamIds.length > 1 &&
+          disputed.length > 0 &&
+          disputed.length < teamIds.length;
+        if (
+          isPartialTeamDispute &&
+          !viewerIsDisputeParty(user._id, project, d)
+        ) {
+          freelancerHireDisplayStatus = "in_progress";
+        }
+      }
+    }
+
     return {
       ...project,
       pendingMatchesCount,
@@ -398,6 +491,13 @@ export const getProject = query({
             profile: freelancer.profile,
           }
         : null,
+      ...(user.role === "freelancer"
+        ? {
+            freelancerHireDisplayStatus,
+            openDisputeOnHire,
+            viewerIsDisputePartyOnHire,
+          }
+        : {}),
     };
   },
 });

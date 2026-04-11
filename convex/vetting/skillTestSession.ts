@@ -36,16 +36,6 @@ export const startSkillTest = action({
       throw new Error("User not found or not an active freelancer");
     }
 
-    const failedCount = await ctx.runQuery(
-      internalAny.vetting.internalQueries.countFailedSkillTestSessions,
-      { freelancerId: args.userId }
-    );
-    if (failedCount >= 2) {
-      throw new Error(
-        "You have failed the skill test twice. Your account has been deactivated. Please contact support if you believe this is an error."
-      );
-    }
-
     const profile = user.profile ?? {};
     const path = getVettingPath({
       techField: profile.techField,
@@ -79,12 +69,20 @@ export const startSkillTest = action({
       }
     );
 
+    const vettingDoc = await ctx.runQuery(
+      internalAny.vetting.internalQueries.getVettingResultDocInternal,
+      { vettingResultId }
+    );
+    const excludeMcq = vettingDoc?.usedMcqQuestionIds ?? [];
+    const excludeCoding = vettingDoc?.usedCodingPromptIds ?? [];
+
     const mcqIds = await ctx.runAction(
       (internalAny as any)["vetting/questionGeneration"].getOrGenerateSkillMcqQuestions,
       {
         categoryId: path.categoryId,
         skillTopics: path.selectedSkills,
         experienceLevel: path.experienceLevel,
+        excludeQuestionIds: excludeMcq,
       }
     );
 
@@ -96,6 +94,7 @@ export const startSkillTest = action({
           categoryId: path.categoryId,
           language: path.selectedLanguage,
           experienceLevel: path.experienceLevel,
+          excludePromptIds: excludeCoding,
         }
       );
     }

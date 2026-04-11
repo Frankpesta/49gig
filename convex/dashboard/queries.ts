@@ -4,6 +4,7 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import {
   estimatedPlatformFeeClawbackOnRefund,
+  grossClientFundsInflowOnPayment,
   platformFeeRecognizedOnPayment,
 } from "../platformRevenue";
 
@@ -502,6 +503,8 @@ export const getDashboardMetrics = query({
     let clawbackMtd = 0;
     let recognizedAllTime = 0;
     let clawbackAllTime = 0;
+    let grossInflowMtd = 0;
+    let grossInflowAllTime = 0;
 
     for (const payment of allPayments) {
       const rec = platformFeeRecognizedOnPayment(payment);
@@ -509,6 +512,13 @@ export const getDashboardMetrics = query({
         recognizedAllTime += rec;
         if (payment.createdAt >= monthStartMs) {
           recognizedMtd += rec;
+        }
+      }
+      const inflow = grossClientFundsInflowOnPayment(payment);
+      if (inflow > 0) {
+        grossInflowAllTime += inflow;
+        if (payment.createdAt >= monthStartMs) {
+          grossInflowMtd += inflow;
         }
       }
     }
@@ -525,8 +535,11 @@ export const getDashboardMetrics = query({
       }
     }
 
-    const revenue = Math.max(0, recognizedMtd - clawbackMtd);
-    const revenueAllTime = Math.max(0, recognizedAllTime - clawbackAllTime);
+    /** Total client funds that entered the platform (MTD / all time). */
+    const revenue = grossInflowMtd;
+    const revenueAllTime = grossInflowAllTime;
+    const platformFeesNetMtd = Math.max(0, recognizedMtd - clawbackMtd);
+    const platformFeesNetAllTime = Math.max(0, recognizedAllTime - clawbackAllTime);
 
     const disputes = await ctx.db
       .query("disputes")
@@ -551,10 +564,14 @@ export const getDashboardMetrics = query({
         totalProjects,
         activeClients,
         activeFreelancers,
-        /** Net platform fees for the current UTC calendar month (charges minus est. refund clawback). */
+        /** Gross client funds into the platform MTD (succeeded pre_funding, top_up, milestone_release). */
         revenue,
-        /** Net platform fees all time. */
+        /** Gross client funds into the platform all time. */
         revenueAllTime,
+        /** Net platform fees MTD (fee portion minus est. refund clawback). */
+        platformFeesNetMtd,
+        /** Net platform fees all time. */
+        platformFeesNetAllTime,
         /** Gross fees recognized MTD (before refund adjustment). */
         platformFeesRecognizedMtd: recognizedMtd,
         /** Estimated fee clawback from refunds MTD. */

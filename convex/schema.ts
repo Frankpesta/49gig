@@ -231,11 +231,13 @@ export default defineSchema({
     idType: v.union(
       v.literal("nin"),
       v.literal("international_passport"),
+      v.literal("voters_card"),
       v.literal("other")
     ),
     idOtherLabel: v.optional(v.string()),
     idFrontFileId: v.id("_storage"),
-    idBackFileId: v.id("_storage"),
+    /** Optional for single-sided IDs (e.g. passport data page, NIN slip). */
+    idBackFileId: v.optional(v.id("_storage")),
     addressDocFileId: v.id("_storage"),
     addressDocType: v.union(
       v.literal("utility_bill"),
@@ -677,6 +679,16 @@ export default defineSchema({
       browserFingerprint: v.optional(v.string()), // Browser fingerprint hash
       ipAddress: v.optional(v.string()), // IP address during test
     }),
+
+    /** English attempt round (0 = first try, 1 = one retake used). */
+    englishAttemptRound: v.optional(v.number()),
+    englishFailedAttempts: v.optional(v.number()),
+    /** Skills composite attempt round for 50% gate + retake. */
+    skillsAttemptRound: v.optional(v.number()),
+    skillsFailedAttempts: v.optional(v.number()),
+    /** MCQ / coding IDs already shown (retakes must not repeat). */
+    usedMcqQuestionIds: v.optional(v.array(v.id("vettingMcqQuestions"))),
+    usedCodingPromptIds: v.optional(v.array(v.id("vettingCodingPrompts"))),
 
     // Skill Assessments
     skillAssessments: v.array(

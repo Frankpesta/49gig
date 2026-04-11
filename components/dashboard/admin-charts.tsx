@@ -38,6 +38,8 @@ type AdminChartData = {
   revenueByMonth: Array<{
     month: string;
     revenue: number;
+    grossClientInflow?: number;
+    platformFeesNet?: number;
     volume: number;
   }>;
   projectsByMonth: Array<{
@@ -139,9 +141,9 @@ export function AdminCharts({
 
       <Card className="overflow-hidden">
         <CardHeader className="border-b">
-          <CardTitle>Revenue trend</CardTitle>
+          <CardTitle>Client funds trend</CardTitle>
           <CardDescription>
-            Net platform fees per month (successful charges minus est. refund clawback)
+            Gross hire payments entering the platform per month (pre-funding, top-ups, milestone charges)
           </CardDescription>
         </CardHeader>
         <CardContent className="h-[280px] pt-6">
@@ -151,11 +153,12 @@ export function AdminCharts({
               <XAxis dataKey="month" tickLine={false} axisLine={false} />
               <YAxis tickLine={false} axisLine={false} />
               <Tooltip
-                formatter={(value) =>
-                  formatCurrency(typeof value === "number" ? value : 0)
-                }
+                formatter={(value, name) => [
+                  formatCurrency(typeof value === "number" ? value : 0),
+                  name === "platformFeesNet" ? "Net platform fees" : "Gross client inflow",
+                ]}
               />
-              <Bar dataKey="revenue" fill="#22c55e" radius={[6, 6, 0, 0]} />
+              <Bar dataKey="revenue" name="Gross client inflow" fill="#22c55e" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

@@ -211,10 +211,10 @@ export const navigationItems: NavItem[] = [
     roles: ["admin"],
   },
 
-  // Admin: KYC Review
+  // Admin: Freelancer signup approvals (tests + KYC)
   {
-    title: "KYC Review",
-    url: "/dashboard/kyc-review",
+    title: "Freelancer approvals",
+    url: "/dashboard/freelancer-approvals",
     icon: ShieldCheck,
     section: "menu",
     roles: ["admin"],

@@ -23,7 +23,7 @@ export const deleteKycDocumentsOlderThan12Months = internalMutation({
 
       try {
         await ctx.storage.delete(sub.idFrontFileId);
-        await ctx.storage.delete(sub.idBackFileId);
+        if (sub.idBackFileId) await ctx.storage.delete(sub.idBackFileId);
         await ctx.storage.delete(sub.addressDocFileId);
       } catch {
         // Ignore if file already missing

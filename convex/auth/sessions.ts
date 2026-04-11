@@ -407,3 +407,25 @@ export const cleanupSessions = internalMutation({
     };
   },
 });
+
+/** Internal: revoke every active session for a user (e.g. account removed after failed verification). */
+export const revokeAllSessionsForUserInternal = internalMutation({
+  args: { userId: v.id("users"), reason: v.string() },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const sessions = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+    for (const session of sessions) {
+      await ctx.db.patch(session._id, {
+        isActive: false,
+        revokedAt: now,
+        revokedReason: args.reason,
+        updatedAt: now,
+      });
+    }
+    return { sessionsRevoked: sessions.length };
+  },
+});

@@ -7,6 +7,7 @@ import {
   sumClientReferralHiringCents,
   sumClientSpendableCentsForCurrency,
 } from "./clientBalanceMath";
+import { computeTeamPoolShareCentsByFreelancerId } from "../teamEscrowShares";
 
 /**
  * Internal: client hiring balance from referral rewards (same currency as project checkout).
@@ -379,7 +380,8 @@ export const getWalletStats = query({
           q.or(
             q.eq(q.field("status"), "in_progress"),
             q.eq(q.field("status"), "matched"),
-            q.eq(q.field("status"), "funded")
+            q.eq(q.field("status"), "funded"),
+            q.eq(q.field("status"), "disputed")
           )
         )
         .collect();
@@ -393,17 +395,29 @@ export const getWalletStats = query({
       }
 
       for (const project of myProjects) {
-        const freelancerCount = project.matchedFreelancerId
-          ? 1
-          : (project.matchedFreelancerIds?.length ?? 1);
+        const teamIds = project.matchedFreelancerId
+          ? [project.matchedFreelancerId]
+          : [...(project.matchedFreelancerIds ?? [])];
+        if (teamIds.length === 0) continue;
+
         const cycles = await ctx.db
           .query("monthlyBillingCycles")
           .withIndex("by_project", (q) => q.eq("projectId", project._id))
           .filter((q) => q.eq(q.field("status"), "pending"))
           .collect();
-        for (const c of cycles) {
-          pendingCents += Math.floor(c.amountCents / freelancerCount);
-        }
+        if (cycles.length === 0) continue;
+
+        const poolCents = cycles.reduce((s, c) => s + Math.max(0, c.amountCents), 0);
+        if (poolCents <= 0) continue;
+
+        const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+          ctx,
+          project._id,
+          teamIds,
+          project.teamBudgetBreakdown,
+          poolCents
+        );
+        pendingCents += shareMap.get(String(userId)) ?? 0;
       }
     }
 

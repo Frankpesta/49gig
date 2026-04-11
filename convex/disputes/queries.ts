@@ -8,6 +8,7 @@ import {
   sumShareCentsForFreelancers,
   teamBasisUserIdsForDispute,
 } from "../teamEscrowShares";
+import { getDisputePartyUserIds, viewerIsDisputeParty } from "./partyAccess";
 async function getCurrentUserInQuery(
   ctx: QueryCtx,
   userId?: string
@@ -155,7 +156,20 @@ export const getDisputes = query({
       : allDisputes;
 
     const sorted = filtered.sort((a, b) => b.createdAt - a.createdAt);
-    return enrichDisputes(sorted);
+    const partyFiltered: Doc<"disputes">[] = [];
+    for (const d of sorted) {
+      const proj = await ctx.db.get(d.projectId);
+      if (!proj) continue;
+      if (
+        user.role === "freelancer" &&
+        viewerIsDisputeParty(user._id, proj, d)
+      ) {
+        partyFiltered.push(d);
+      } else if (user.role !== "freelancer") {
+        partyFiltered.push(d);
+      }
+    }
+    return enrichDisputes(partyFiltered);
   },
 });
 
@@ -227,19 +241,17 @@ export const getDispute = query({
         .first();
       isFreelancer = anyMatchOnHire != null;
     }
-    const isInitiator = dispute.initiatorId === user._id;
     const isAssignedModerator =
       dispute.assignedModeratorId === user._id;
     const isAdminOrModerator =
       user.role === "admin" || user.role === "moderator";
+    const isParty =
+      isClient ||
+      isAdminOrModerator ||
+      isAssignedModerator ||
+      viewerIsDisputeParty(user._id, project, dispute);
 
-    if (
-      !isClient &&
-      !isFreelancer &&
-      !isInitiator &&
-      !isAssignedModerator &&
-      !isAdminOrModerator
-    ) {
+    if (!isParty) {
       return null;
     }
 
@@ -258,7 +270,10 @@ export const getDispute = query({
     let visibleResolution = dispute.resolution;
     // Stored lockedAmount is client gross (includes platform fee). Freelancers see net escrow pool.
     let visibleLockedAmount = dispute.lockedAmount;
-    if (isFreelancer && !isAdminOrModerator) {
+    const isFreelancerParty =
+      user.role === "freelancer" &&
+      viewerIsDisputeParty(user._id, project, dispute);
+    if (isFreelancerParty && !isAdminOrModerator) {
       visibleLockedAmount = clientLockedGrossToFreelancerEscrowPool(
         dispute.lockedAmount,
         project.platformFee ?? 15
@@ -269,7 +284,7 @@ export const getDispute = query({
       const { decision } = dispute.resolution;
       // Determine if the viewer is the "winner"
       const viewerIsClient = isClient;
-      const viewerIsFreelancer = isFreelancer;
+      const viewerIsFreelancer = isFreelancerParty;
       const clientWon = decision === "client_favor";
       const freelancerWon = decision === "freelancer_favor";
       const isWinner =
@@ -391,21 +406,15 @@ export const listDisputeMessages = query({
     if (!project) return [];
 
     const isClient = project.clientId === user._id;
-    let isFreelancer =
-      project.matchedFreelancerId === user._id ||
-      (project.matchedFreelancerIds?.includes(user._id) ?? false);
-    if (!isFreelancer && user.role === "freelancer") {
-      const anyMatchOnHire = await ctx.db
-        .query("matches")
-        .withIndex("by_project", (q) => q.eq("projectId", dispute.projectId))
-        .filter((q) => q.eq(q.field("freelancerId"), user._id))
-        .first();
-      isFreelancer = anyMatchOnHire != null;
-    }
     const isStaff = user.role === "admin" || user.role === "moderator";
     const isAssigned = dispute.assignedModeratorId === user._id;
+    const isParty =
+      isClient ||
+      isStaff ||
+      isAssigned ||
+      viewerIsDisputeParty(user._id, project, dispute);
 
-    if (!isClient && !isFreelancer && !isStaff && !isAssigned) {
+    if (!isParty) {
       return [];
     }
 
@@ -448,9 +457,15 @@ export const getDisputeAdminContext = query({
     if (!project) return null;
 
     const client = await ctx.db.get(project.clientId);
-    const fIds = project.matchedFreelancerId
+    const allFIds = project.matchedFreelancerId
       ? [project.matchedFreelancerId]
       : project.matchedFreelancerIds ?? [];
+    const disputed = dispute.disputedFreelancerIds ?? [];
+    const isPartialTeam =
+      allFIds.length > 1 &&
+      disputed.length > 0 &&
+      disputed.length < allFIds.length;
+    const fIds = isPartialTeam ? disputed : allFIds;
     const freelancers = (
       await Promise.all(fIds.map((id) => ctx.db.get(id)))
     ).filter(Boolean) as Doc<"users">[];

@@ -22,9 +22,10 @@ import { getUserFriendlyError } from "@/lib/error-handling";
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
 const ID_TYPES = [
-  { value: "nin", label: "NIN (National ID)" },
-  { value: "international_passport", label: "International Passport" },
-  { value: "other", label: "Other government-issued ID" },
+  { value: "nin", label: "NIN slip (one side)" },
+  { value: "international_passport", label: "International passport (data page only)" },
+  { value: "voters_card", label: "Voter’s card (one side)" },
+  { value: "other", label: "Other government-issued ID (front + back)" },
 ] as const;
 
 const ADDRESS_TYPES = [
@@ -35,6 +36,7 @@ const ADDRESS_TYPES = [
 
 export function KycStep({ userId }: { userId: Id<"users"> }) {
   const kycData = useQuery(api.kyc.queries.getKycForFreelancer, { userId });
+  const verificationStatus = useQuery(api.vetting.queries.getVerificationStatus, { userId });
   const generateUploadUrl = useMutation(api.kyc.mutations.generateUploadUrl);
   const submitKyc = useMutation(api.kyc.mutations.submitKyc);
 
@@ -74,19 +76,25 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
     }
   };
 
+  const needsIdBack = idType === "other";
+
   const handleSubmit = async () => {
-    if (!idFrontFileId || !idBackFileId || !addressFileId) {
+    if (!idFrontFileId || !addressFileId) {
       toast.error("Please upload all required documents");
+      return;
+    }
+    if (needsIdBack && !idBackFileId) {
+      toast.error("Upload both front and back for this ID type");
       return;
     }
     setIsSubmitting(true);
     try {
       await submitKyc({
         userId,
-        idType: idType as "nin" | "international_passport" | "other",
+        idType: idType as "nin" | "international_passport" | "voters_card" | "other",
         idOtherLabel: idType === "other" ? idOtherLabel : undefined,
         idFrontFileId,
-        idBackFileId,
+        idBackFileId: needsIdBack ? idBackFileId! : undefined,
         addressDocFileId: addressFileId,
         addressDocType: addressDocType as "utility_bill" | "bank_statement" | "tenancy_agreement",
       });
@@ -103,6 +111,9 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
   const status = kycData?.kycStatus;
   const isPending = status === "pending_review";
   const isRejected = status === "id_rejected" || status === "address_rejected";
+  const weightedOk =
+    verificationStatus?.vettingResult &&
+    (verificationStatus.vettingResult.overallScore ?? 0) >= 50;
 
   return (
     <Card>
@@ -138,7 +149,14 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
           </div>
         )}
 
-        {status !== "approved" && !isPending && (
+        {verificationStatus && !weightedOk && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 p-3 text-sm text-amber-900 dark:text-amber-200">
+            Your weighted test score must be at least 50% before you can submit KYC. Finish English (including writing)
+            and skills, then use Submit for review on the verification page.
+          </div>
+        )}
+
+        {status !== "approved" && !isPending && weightedOk && (
           <>
             <div className="space-y-4">
               <div>
@@ -165,9 +183,15 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
                 )}
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className={`grid gap-4 ${needsIdBack ? "sm:grid-cols-2" : ""}`}>
                 <div>
-                  <Label className="text-sm font-medium">ID front</Label>
+                  <Label className="text-sm font-medium">
+                    {idType === "international_passport"
+                      ? "Passport — data page"
+                      : needsIdBack
+                        ? "ID front"
+                        : "ID document (single image)"}
+                  </Label>
                   <label className={`mt-2 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50 ${uploading === "ID front" ? "pointer-events-none opacity-60" : ""}`}>
                     <Input
                       type="file"
@@ -184,24 +208,26 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
                   </label>
                   {uploading === "ID front" && <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>}
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">ID back</Label>
-                  <label className={`mt-2 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50 ${uploading === "ID back" ? "pointer-events-none opacity-60" : ""}`}>
-                    <Input
-                      type="file"
-                      accept="image/*,.pdf"
-                      onChange={(e) => handleFile(e, setIdBackFileId, "ID back")}
-                      disabled={!!uploading}
-                      className="sr-only"
-                    />
-                    <FileUp className="h-5 w-5 shrink-0 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      {idBackFileId ? "Replace file" : "Choose file"}
-                    </span>
-                    {idBackFileId && <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />}
-                  </label>
-                  {uploading === "ID back" && <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>}
-                </div>
+                {needsIdBack && (
+                  <div>
+                    <Label className="text-sm font-medium">ID back</Label>
+                    <label className={`mt-2 flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 transition-colors hover:bg-muted/50 ${uploading === "ID back" ? "pointer-events-none opacity-60" : ""}`}>
+                      <Input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={(e) => handleFile(e, setIdBackFileId, "ID back")}
+                        disabled={!!uploading}
+                        className="sr-only"
+                      />
+                      <FileUp className="h-5 w-5 shrink-0 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {idBackFileId ? "Replace file" : "Choose file"}
+                      </span>
+                      {idBackFileId && <CheckCircle2 className="ml-auto h-5 w-5 shrink-0 text-green-600" />}
+                    </label>
+                    {uploading === "ID back" && <p className="mt-1 text-xs text-muted-foreground">Uploading…</p>}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -243,7 +269,13 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
 
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !idFrontFileId || !idBackFileId || !addressFileId}
+              disabled={
+                isSubmitting ||
+                !idFrontFileId ||
+                !addressFileId ||
+                (needsIdBack && !idBackFileId) ||
+                !weightedOk
+              }
               className="gap-2"
             >
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
