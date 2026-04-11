@@ -61,6 +61,7 @@ import {
   ExternalLink,
   Ban,
   UserCheck,
+  Trash2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -96,6 +97,8 @@ export default function UsersPage() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReviewNotes, setRejectReviewNotes] = useState("");
   const [vettingActionLoading, setVettingActionLoading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user?.role === "moderator") {
@@ -197,7 +200,11 @@ export default function UsersPage() {
         adminUserId: user._id,
       });
       setSelectedUser(null);
-      toast.success("User status updated successfully");
+      toast.success(
+        newStatus === "deleted"
+          ? "Account permanently deleted."
+          : "User status updated successfully"
+      );
     } catch (error) {
       console.error("Failed to update status:", error);
       const errorMessage = getUserFriendlyError(error) || "Failed to update user status";
@@ -270,6 +277,29 @@ export default function UsersPage() {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleAdminDeleteAccount = async () => {
+    if (!user?._id || !selectedUser || user.role !== "admin") return;
+    setDeleteAccountLoading(true);
+    try {
+      await updateUserStatus({
+        userId: selectedUser._id,
+        newStatus: "deleted",
+        adminUserId: user._id,
+      });
+      toast.success("Account permanently deleted.");
+      setDeleteDialogOpen(false);
+      setSelectedUser(null);
+    } catch (error) {
+      setErrorDialog({
+        open: true,
+        title: "Delete failed",
+        message: getUserFriendlyError(error) || "Could not delete this account.",
+      });
+    } finally {
+      setDeleteAccountLoading(false);
     }
   };
 
@@ -775,6 +805,30 @@ export default function UsersPage() {
                                   </div>
                                 )}
 
+                                {user.role === "admin" &&
+                                  selectedUser._id !== user._id &&
+                                  selectedUser.status !== "deleted" && (
+                                    <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                                      <p className="text-xs text-muted-foreground leading-relaxed">
+                                        Permanently removes the user document and purges their sessions, vetting, wallet
+                                        (must be zero), notifications, and other user-owned data. Blocked if they are a
+                                        client on any project, tied to an active hire, have open disputes, or pending
+                                        referral payouts.
+                                      </p>
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        className="gap-2 w-full sm:w-auto"
+                                        onClick={() => setDeleteDialogOpen(true)}
+                                        disabled={isUpdating || deleteAccountLoading}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete account…
+                                      </Button>
+                                    </div>
+                                  )}
+
                                 {selectedUser.role === "freelancer" && (
                                   <>
                                     <Separator />
@@ -1122,6 +1176,49 @@ export default function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Delete this account?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  This permanently deletes{" "}
+                  <span className="font-medium text-foreground">
+                    {selectedUser?.name ?? "this user"}
+                  </span>{" "}
+                  ({selectedUser?.email ?? "no email"}) from the database, including related records (sessions, vetting,
+                  notifications, etc.). This cannot be undone.
+                </p>
+                <p>
+                  It will fail if they own any client projects, are on an active hire or escrow flow, have open
+                  disputes, a non-zero wallet, or pending referral payout requests.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteAccountLoading}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleAdminDeleteAccount()}
+              disabled={deleteAccountLoading}
+            >
+              {deleteAccountLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete account"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={suspendDialogOpen}

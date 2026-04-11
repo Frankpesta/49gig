@@ -98,6 +98,7 @@ import type * as scheduledCalls_queries from "../scheduledCalls/queries.js";
 import type * as sessions from "../sessions.js";
 import type * as teamEscrowShares from "../teamEscrowShares.js";
 import type * as transactions_queries from "../transactions/queries.js";
+import type * as users_hardDeleteUser from "../users/hardDeleteUser.js";
 import type * as users_mutations from "../users/mutations.js";
 import type * as users_queries from "../users/queries.js";
 import type * as vetting_actions from "../vetting/actions.js";
@@ -217,6 +218,7 @@ declare const fullApi: ApiFromModules<{
   sessions: typeof sessions;
   teamEscrowShares: typeof teamEscrowShares;
   "transactions/queries": typeof transactions_queries;
+  "users/hardDeleteUser": typeof users_hardDeleteUser;
   "users/mutations": typeof users_mutations;
   "users/queries": typeof users_queries;
   "vetting/actions": typeof vetting_actions;

@@ -4,6 +4,7 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { applyFreelancerProfileLinkRules } from "../../lib/freelancer-profile-links";
+import { hardDeleteUserAccount } from "./hardDeleteUser";
 
 const api = require("../_generated/api") as {
   api: {
@@ -296,37 +297,12 @@ export const deleteUserAccountInternal = internalMutation({
     const user = await ctx.db.get(args.userId);
     if (!user) return;
 
-    if (user.status === "deleted") return;
-
-    const now = Date.now();
-    await ctx.db.patch(args.userId, {
-      status: "deleted",
-      updatedAt: now,
-    });
-
-    const sessions = await ctx.db
-      .query("sessions")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
-
-    for (const session of sessions) {
-      await ctx.db.patch(session._id, {
-        isActive: false,
-        revokedAt: now,
-        revokedReason: args.reason || "account_deleted",
-        updatedAt: now,
-      });
-    }
-
-    await ctx.db.insert("auditLogs", {
-      action: "account_deleted",
-      actionType: "system",
-      actorId: args.userId,
-      actorRole: user.role,
-      targetType: "user",
-      targetId: args.userId,
-      details: { reason: args.reason },
-      createdAt: now,
+    await hardDeleteUserAccount(ctx, {
+      targetUserId: args.userId,
+      auditActorId: args.userId,
+      auditActorRole: user.role,
+      auditActionType: "system",
+      reason: args.reason,
     });
   },
 });
@@ -344,38 +320,12 @@ export const deleteAccount = mutation({
       throw new Error("Not authenticated");
     }
 
-    if (user.status === "deleted") {
-      throw new Error("Account already deleted");
-    }
-
-    const now = Date.now();
-    await ctx.db.patch(user._id, {
-      status: "deleted",
-      updatedAt: now,
-    });
-
-    const sessions = await ctx.db
-      .query("sessions")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect();
-
-    for (const session of sessions) {
-      await ctx.db.patch(session._id, {
-        isActive: false,
-        revokedAt: now,
-        revokedReason: "account_deleted",
-        updatedAt: now,
-      });
-    }
-
-    await ctx.db.insert("auditLogs", {
-      action: "account_deleted",
-      actionType: "system",
-      actorId: user._id,
-      actorRole: user.role,
-      targetType: "user",
-      targetId: user._id,
-      createdAt: now,
+    await hardDeleteUserAccount(ctx, {
+      targetUserId: user._id,
+      auditActorId: user._id,
+      auditActorRole: user.role,
+      auditActionType: "auth",
+      reason: "self_service",
     });
 
     return { success: true };
@@ -521,6 +471,17 @@ export const updateUserStatus = mutation({
       throw new Error("Only an admin can suspend or remove staff accounts");
     }
 
+    if (args.newStatus === "deleted") {
+      await hardDeleteUserAccount(ctx, {
+        targetUserId: args.userId,
+        auditActorId: admin._id,
+        auditActorRole: admin.role,
+        auditActionType: "admin",
+        reason: "admin_update_user_status",
+      });
+      return { success: true };
+    }
+
     const now = Date.now();
 
     if (args.newStatus === "active") {
@@ -552,7 +513,7 @@ export const updateUserStatus = mutation({
     }
 
     // Immediately revoke all sessions so suspended users lose access without waiting for token expiry
-    if (args.newStatus === "suspended" || args.newStatus === "deleted") {
+    if (args.newStatus === "suspended") {
       const sessions = await ctx.db
         .query("sessions")
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -562,8 +523,7 @@ export const updateUserStatus = mutation({
           await ctx.db.patch(session._id, {
             isActive: false,
             revokedAt: now,
-            revokedReason:
-              args.newStatus === "deleted" ? "account_deleted" : "account_suspended",
+            revokedReason: "account_suspended",
             updatedAt: now,
           });
         }
@@ -598,9 +558,7 @@ export const updateUserStatus = mutation({
       message:
         args.newStatus === "suspended"
           ? "Your account has been suspended. Contact support if you need help."
-          : args.newStatus === "deleted"
-            ? "Your account has been removed."
-            : "Your account is active again.",
+          : "Your account is active again.",
       type: "account",
       data: { userId: args.userId, status: args.newStatus },
     });
