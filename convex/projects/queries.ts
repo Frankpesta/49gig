@@ -378,10 +378,22 @@ export const getProject = query({
       ? await ctx.db.get(project.matchedFreelancerId)
       : null;
 
+    /** Seat label from this user's match (for team earnings display). */
+    let viewerMatchTeamRole: string | undefined;
+    if (user.role === "freelancer") {
+      const mine = matchRows.find(
+        (m) =>
+          m.freelancerId === user._id &&
+          (m.status === "pending" || m.status === "accepted")
+      );
+      viewerMatchTeamRole = mine?.teamRole ?? undefined;
+    }
+
     return {
       ...project,
       pendingMatchesCount,
       confirmedTeamMembers,
+      viewerMatchTeamRole,
       client: client
         ? {
             _id: client._id,
