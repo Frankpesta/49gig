@@ -316,6 +316,22 @@ export const submitEnglishProficiency = mutation({
       suspiciousActivity.push("session_id_mismatch");
     }
 
+    const prevEng = vettingResult.englishProficiency;
+    const duplicatePendingSubmission =
+      prevEng.overallScore === undefined &&
+      prevEng.writtenResponse === args.writtenResponse &&
+      prevEng.grammarScore === args.grammarScore &&
+      prevEng.comprehensionScore === args.comprehensionScore &&
+      prevEng.testSessionId === args.testSessionId;
+
+    if (duplicatePendingSubmission) {
+      return {
+        success: true,
+        message: "Your written response is already being graded. This page will update shortly.",
+        writtenResponsePending: true,
+      };
+    }
+
     // Written section is graded asynchronously; English step completes only after written score exists.
     await ctx.db.patch(vettingResult._id, {
       englishProficiency: {
@@ -1424,6 +1440,14 @@ export const updateEnglishWrittenScore = mutation({
     const vettingResult = await ctx.db.get(args.vettingResultId);
     if (!vettingResult) {
       throw new Error("Vetting result not found");
+    }
+
+    if (vettingResult.englishProficiency.overallScore != null) {
+      return {
+        success: true,
+        overallScore: vettingResult.overallScore,
+        skipped: true as const,
+      };
     }
 
     const grammarScore = vettingResult.englishProficiency.grammarScore || 0;

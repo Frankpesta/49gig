@@ -341,9 +341,37 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
     setWordCount(words.length);
   }, [writtenResponse]);
 
+  const vr = verificationStatus?.vettingResult;
+  const eng = vr?.englishProficiency;
+  const waitingForWrittenGrade =
+    !!vr &&
+    !vr.stepsCompleted?.includes("english") &&
+    eng?.grammarScore != null &&
+    eng?.comprehensionScore != null &&
+    eng?.overallScore == null;
+
   const englishGraded =
-    verificationStatus?.vettingResult?.englishProficiency?.overallScore != null &&
-    verificationStatus.vettingResult.stepsCompleted?.includes("english");
+    eng?.overallScore != null && vr?.stepsCompleted?.includes("english");
+
+  // After refresh, resume "grading" UI instead of restarting grammar.
+  useEffect(() => {
+    if (waitingForWrittenGrade && phase !== "completed") {
+      setPhase("completed");
+      if (grammarScore === null && eng?.grammarScore != null) {
+        setGrammarScore(eng.grammarScore);
+      }
+      if (comprehensionScore === null && eng?.comprehensionScore != null) {
+        setComprehensionScore(eng.comprehensionScore);
+      }
+    }
+  }, [
+    waitingForWrittenGrade,
+    phase,
+    eng?.grammarScore,
+    eng?.comprehensionScore,
+    grammarScore,
+    comprehensionScore,
+  ]);
 
   useEffect(() => {
     if (phase === "completed" && englishGraded && onComplete) {
@@ -592,7 +620,7 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
   }
 
   if (phase === "completed") {
-    const overall = verificationStatus?.vettingResult?.englishProficiency?.overallScore;
+    const overall = eng?.overallScore;
     return (
       <Card>
         <CardHeader>
