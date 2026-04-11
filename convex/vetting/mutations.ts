@@ -321,8 +321,10 @@ export const submitEnglishProficiency = mutation({
       englishProficiency: {
         grammarScore: args.grammarScore,
         comprehensionScore: args.comprehensionScore,
+        writtenResponse: args.writtenResponse,
         overallScore: undefined,
         completedAt: undefined,
+        writtenResponseScore: undefined,
         testSessionId: args.testSessionId,
         timeSpent: args.timeSpent,
         attempts: (vettingResult.englishProficiency.attempts || 0) + 1,
@@ -331,6 +333,13 @@ export const submitEnglishProficiency = mutation({
         ipAddress: args.ipAddress,
       },
       updatedAt: Date.now(),
+    });
+
+    await (
+      ctx.scheduler.runAfter as (d: number, fn: unknown, a: Record<string, unknown>) => Promise<unknown>
+    )(0, internalAny.vetting.actions.gradeWrittenResponse, {
+      vettingResultId: vettingResult._id,
+      writtenResponse: args.writtenResponse,
     });
 
     // Create audit log
@@ -671,6 +680,7 @@ export const completeVerification = mutation({
           ...vettingRow.englishProficiency,
           grammarScore: undefined,
           comprehensionScore: undefined,
+          writtenResponse: undefined,
           writtenResponseScore: undefined,
           overallScore: undefined,
           completedAt: undefined,
