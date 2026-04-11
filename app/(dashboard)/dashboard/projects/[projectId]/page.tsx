@@ -66,6 +66,7 @@ import {
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
 import { getRoleLabelsForProjectIntake } from "@/lib/team-slots";
+import { freelancerEngagementNetTotalUsd } from "@/lib/project-freelancer-earnings";
 import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
 
 const STATUS_CONFIG: Record<
@@ -366,6 +367,27 @@ export default function ProjectDetailPage() {
       }
     ).confirmedTeamMembers ?? [];
   const isTeamHire = project.intakeForm.hireType === "team";
+  const viewerMatchTeamRole = (
+    project as { viewerMatchTeamRole?: string }
+  ).viewerMatchTeamRole;
+  const freelancerNetEngagementTotalUsd =
+    user.role === "freelancer" && !isStaff
+      ? freelancerEngagementNetTotalUsd(
+          {
+            totalAmount: project.totalAmount,
+            platformFee: project.platformFee,
+            teamBudgetBreakdown: project.teamBudgetBreakdown,
+            intakeForm: project.intakeForm,
+            matchedFreelancerIds: project.matchedFreelancerIds as
+              | string[]
+              | undefined,
+            matchedFreelancerId: project.matchedFreelancerId as
+              | string
+              | undefined,
+          },
+          viewerMatchTeamRole
+        )
+      : null;
   const teamSeatTotal =
     project.intakeForm.teamMemberCount ??
     project.intakeForm.teamSlots?.filter((s: { roleId: string }) => s.roleId)?.length ??
@@ -1312,18 +1334,27 @@ export default function ProjectDetailPage() {
               </div>
               <Separator />
               <div>
-                <div className="text-sm font-medium">Budget</div>
+                <div className="text-sm font-medium">
+                  {isClient || isStaff ? "Budget" : "Your earnings (this hire)"}
+                </div>
                 <div className="text-lg font-semibold">
                   {isClient || isStaff
                     ? `$${project.totalAmount.toLocaleString()}`
-                    : `$${((project.totalAmount * (100 - (project.platformFee ?? 25))) / 100).toLocaleString()}`}
+                    : freelancerNetEngagementTotalUsd != null
+                      ? `$${freelancerNetEngagementTotalUsd.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}`
+                      : `$${((project.totalAmount * (100 - (project.platformFee ?? 25))) / 100).toLocaleString()}`}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {isClient
                     ? "Total amount for this hire"
                     : isStaff
                       ? "Hire total (staff view)"
-                      : "Your share for this engagement"}
+                      : isTeamHire
+                        ? "Estimated total you'll earn over the engagement (your seat's share of this team hire, net of fees)."
+                        : "Estimated total you'll earn over the engagement (net of platform fee)."}
                 </div>
               </div>
               <Separator />

@@ -429,52 +429,22 @@ export const getProject = query({
       ? await ctx.db.get(project.matchedFreelancerId)
       : null;
 
-    let freelancerHireDisplayStatus: Doc<"projects">["status"] | undefined;
-    let openDisputeOnHire = false;
-    let viewerIsDisputePartyOnHire = false;
-
+    /** Seat label from this user's match (for team earnings display). */
+    let viewerMatchTeamRole: string | undefined;
     if (user.role === "freelancer") {
-      const disputesOnProject = await ctx.db
-        .query("disputes")
-        .withIndex("by_project", (q) => q.eq("projectId", projectId))
-        .collect();
-      const openDisputes = disputesOnProject.filter(
-        (d) =>
-          d.status === "open" ||
-          d.status === "under_review" ||
-          d.status === "escalated"
+      const mine = matchRows.find(
+        (m) =>
+          m.freelancerId === user._id &&
+          (m.status === "pending" || m.status === "accepted")
       );
-      openDisputeOnHire = openDisputes.length > 0;
-      for (const d of openDisputes) {
-        if (viewerIsDisputeParty(user._id, project, d)) {
-          viewerIsDisputePartyOnHire = true;
-          break;
-        }
-      }
-      freelancerHireDisplayStatus = project.status;
-      if (project.status === "disputed" && openDisputes.length > 0) {
-        const d = openDisputes[0];
-        const teamIds = project.matchedFreelancerId
-          ? [project.matchedFreelancerId]
-          : project.matchedFreelancerIds ?? [];
-        const disputed = d.disputedFreelancerIds ?? [];
-        const isPartialTeamDispute =
-          teamIds.length > 1 &&
-          disputed.length > 0 &&
-          disputed.length < teamIds.length;
-        if (
-          isPartialTeamDispute &&
-          !viewerIsDisputeParty(user._id, project, d)
-        ) {
-          freelancerHireDisplayStatus = "in_progress";
-        }
-      }
+      viewerMatchTeamRole = mine?.teamRole ?? undefined;
     }
 
     return {
       ...project,
       pendingMatchesCount,
       confirmedTeamMembers,
+      viewerMatchTeamRole,
       client: client
         ? {
             _id: client._id,
