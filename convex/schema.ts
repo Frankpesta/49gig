@@ -668,6 +668,8 @@ export default defineSchema({
     englishProficiency: v.object({
       grammarScore: v.optional(v.number()), // 0-100
       comprehensionScore: v.optional(v.number()), // 0-100
+      /** Latest submitted written response text (for grading and audit). */
+      writtenResponse: v.optional(v.string()),
       writtenResponseScore: v.optional(v.number()), // 0-100
       overallScore: v.optional(v.number()), // Weighted average
       completedAt: v.optional(v.number()),

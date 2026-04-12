@@ -316,13 +316,31 @@ export const submitEnglishProficiency = mutation({
       suspiciousActivity.push("session_id_mismatch");
     }
 
+    const prevEng = vettingResult.englishProficiency;
+    const duplicatePendingSubmission =
+      prevEng.overallScore === undefined &&
+      prevEng.writtenResponse === args.writtenResponse &&
+      prevEng.grammarScore === args.grammarScore &&
+      prevEng.comprehensionScore === args.comprehensionScore &&
+      prevEng.testSessionId === args.testSessionId;
+
+    if (duplicatePendingSubmission) {
+      return {
+        success: true,
+        message: "Your written response is already being graded. This page will update shortly.",
+        writtenResponsePending: true,
+      };
+    }
+
     // Written section is graded asynchronously; English step completes only after written score exists.
     await ctx.db.patch(vettingResult._id, {
       englishProficiency: {
         grammarScore: args.grammarScore,
         comprehensionScore: args.comprehensionScore,
+        writtenResponse: args.writtenResponse,
         overallScore: undefined,
         completedAt: undefined,
+        writtenResponseScore: undefined,
         testSessionId: args.testSessionId,
         timeSpent: args.timeSpent,
         attempts: (vettingResult.englishProficiency.attempts || 0) + 1,
@@ -331,6 +349,13 @@ export const submitEnglishProficiency = mutation({
         ipAddress: args.ipAddress,
       },
       updatedAt: Date.now(),
+    });
+
+    await (
+      ctx.scheduler.runAfter as (d: number, fn: unknown, a: Record<string, unknown>) => Promise<unknown>
+    )(0, internalAny.vetting.actions.gradeWrittenResponse, {
+      vettingResultId: vettingResult._id,
+      writtenResponse: args.writtenResponse,
     });
 
     // Create audit log
@@ -671,6 +696,7 @@ export const completeVerification = mutation({
           ...vettingRow.englishProficiency,
           grammarScore: undefined,
           comprehensionScore: undefined,
+          writtenResponse: undefined,
           writtenResponseScore: undefined,
           overallScore: undefined,
           completedAt: undefined,
@@ -1414,6 +1440,14 @@ export const updateEnglishWrittenScore = mutation({
     const vettingResult = await ctx.db.get(args.vettingResultId);
     if (!vettingResult) {
       throw new Error("Vetting result not found");
+    }
+
+    if (vettingResult.englishProficiency.overallScore != null) {
+      return {
+        success: true,
+        overallScore: vettingResult.overallScore,
+        skipped: true as const,
+      };
     }
 
     const grammarScore = vettingResult.englishProficiency.grammarScore || 0;

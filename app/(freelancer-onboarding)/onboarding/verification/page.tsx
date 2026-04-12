@@ -384,11 +384,7 @@ export default function OnboardingVerificationPage() {
                   </Card>
                 )}
               {canTakeTests && currentStep === "english" && !stepsCompleted.includes("english") && (
-                <EnglishTest
-                  onComplete={() => {
-                    window.location.reload();
-                  }}
-                />
+                <EnglishTest />
               )}
               {canTakeTests && currentStep === "skills" && !stepsCompleted.includes("skills") && user && (
                 <SkillTestPathFlow />

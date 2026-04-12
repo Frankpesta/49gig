@@ -35,6 +35,10 @@ type TestPhase = "grammar" | "comprehension" | "written" | "completed";
 
 function EnglishTestInner({ onComplete }: EnglishTestProps) {
   const { user } = useAuth();
+  const verificationStatus = useQuery(
+    api.vetting.queries.getVerificationStatus,
+    user?._id ? { userId: user._id } : "skip"
+  );
   const [phase, setPhase] = useState<TestPhase>("grammar");
   const [sessionId, setSessionId] = useState<string>("");
   const [startTime, setStartTime] = useState<number>(0);
@@ -318,9 +322,6 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
       });
 
       setPhase("completed");
-      if (onComplete) {
-        onComplete();
-      }
     } catch (err: any) {
       const error = err instanceof Error ? err : new Error(String(err));
       setError(error);
@@ -339,6 +340,44 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
     const words = writtenResponse.trim().split(/\s+/).filter((w) => w.length > 0);
     setWordCount(words.length);
   }, [writtenResponse]);
+
+  const vr = verificationStatus?.vettingResult;
+  const eng = vr?.englishProficiency;
+  const waitingForWrittenGrade =
+    !!vr &&
+    !vr.stepsCompleted?.includes("english") &&
+    eng?.grammarScore != null &&
+    eng?.comprehensionScore != null &&
+    eng?.overallScore == null;
+
+  const englishGraded =
+    eng?.overallScore != null && vr?.stepsCompleted?.includes("english");
+
+  // After refresh, resume "grading" UI instead of restarting grammar.
+  useEffect(() => {
+    if (waitingForWrittenGrade && phase !== "completed") {
+      setPhase("completed");
+      if (grammarScore === null && eng?.grammarScore != null) {
+        setGrammarScore(eng.grammarScore);
+      }
+      if (comprehensionScore === null && eng?.comprehensionScore != null) {
+        setComprehensionScore(eng.comprehensionScore);
+      }
+    }
+  }, [
+    waitingForWrittenGrade,
+    phase,
+    eng?.grammarScore,
+    eng?.comprehensionScore,
+    grammarScore,
+    comprehensionScore,
+  ]);
+
+  useEffect(() => {
+    if (phase === "completed" && englishGraded && onComplete) {
+      onComplete();
+    }
+  }, [phase, englishGraded, onComplete]);
 
   if (phase === "grammar") {
     return (
@@ -581,28 +620,53 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
   }
 
   if (phase === "completed") {
+    const overall = eng?.overallScore;
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-6 w-6 text-green-600" />
-            English Test Completed
+            {englishGraded ? (
+              <>
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                English test complete
+              </>
+            ) : (
+              <>
+                <Clock className="h-6 w-6 text-primary animate-pulse" />
+                Finishing your English assessment
+              </>
+            )}
           </CardTitle>
+          {!englishGraded && (
+            <CardDescription>
+              We&apos;re scoring your written response. This usually takes a few seconds — stay on this page.
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground">Grammar Score:</p>
+              <p className="text-sm text-muted-foreground">Grammar score</p>
               <p className="text-2xl font-bold">{grammarScore}%</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Comprehension Score:</p>
+              <p className="text-sm text-muted-foreground">Comprehension score</p>
               <p className="text-2xl font-bold">{comprehensionScore}%</p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Your written response is being graded by AI. You will receive your final
-              English proficiency score shortly.
-            </p>
+            {englishGraded && overall != null ? (
+              <div>
+                <p className="text-sm text-muted-foreground">Overall English score</p>
+                <p className="text-2xl font-bold">{overall}%</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  You can continue to the skill assessment above when it appears.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Your written response is being graded. The next step will unlock automatically — you do not need to
+                submit the English test again.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
