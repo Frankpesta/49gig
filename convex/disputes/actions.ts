@@ -244,7 +244,11 @@ export const releaseDisputeFunds = action({
         );
         disputedNetCents = c.disputedNetCents;
       }
-      const feePct = (project as any).platformFee ?? 15;
+      const defaultFee = await ctx.runQuery(
+        internal.platformSettings.queries.getPlatformFeePercentageInternal,
+        {}
+      );
+      const feePct = (project as any).platformFee ?? defaultFee;
       const pendingRefundCents = Math.round(
         escrowNetToClientLockedGross(disputedNetCents / 100, feePct) * 100
       );

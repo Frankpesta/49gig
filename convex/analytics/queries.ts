@@ -7,6 +7,7 @@ import {
   grossClientFundsInflowOnPayment,
   platformFeeRecognizedOnPayment,
 } from "../platformRevenue";
+import { getDefaultPlatformFeePercent } from "../platformFeeResolve";
 
 /**
  * Get platform analytics (admin only)
@@ -71,11 +72,15 @@ export const getPlatformAnalytics = query({
       totalClientFundsInflow += grossClientFundsInflowOnPayment(p);
     }
 
+    const defaultPlatformFee = await getDefaultPlatformFeePercent(ctx);
     let platformFeeRefundClawback = 0;
     for (const p of allPayments) {
       if (p.type !== "refund" || p.status !== "refunded") continue;
       const proj = p.projectId ? projectByIdForFees.get(String(p.projectId)) : undefined;
-      platformFeeRefundClawback += estimatedPlatformFeeClawbackOnRefund(p, proj?.platformFee ?? 25);
+      platformFeeRefundClawback += estimatedPlatformFeeClawbackOnRefund(
+        p,
+        proj?.platformFee ?? defaultPlatformFee
+      );
     }
 
     const paymentStats = {
@@ -139,7 +144,6 @@ export const getPlatformAnalytics = query({
       verifications: verificationStats,
       disputes: disputeStats,
       matches: matchStats,
-      generatedAt: Date.now(),
     };
   },
 });
@@ -194,6 +198,7 @@ export const getAdminChartData = query({
     const allPayments = await ctx.db.query("payments").collect();
     const allProjects = await ctx.db.query("projects").collect();
     const allDisputes = await ctx.db.query("disputes").collect();
+    const defaultPlatformFee = await getDefaultPlatformFeePercent(ctx);
 
     const usersByMonth = months.map((month) => {
       const monthUsers = allUsers.filter(
@@ -219,7 +224,10 @@ export const getAdminChartData = query({
         grossClientInflow += grossClientFundsInflowOnPayment(p);
         if (p.type === "refund" && p.status === "refunded") {
           const proj = p.projectId ? projectById.get(String(p.projectId)) : undefined;
-          clawback += estimatedPlatformFeeClawbackOnRefund(p, proj?.platformFee ?? 25);
+          clawback += estimatedPlatformFeeClawbackOnRefund(
+            p,
+            proj?.platformFee ?? defaultPlatformFee
+          );
         }
       }
       const platformFeesNet = Math.max(0, recognized - clawback);
@@ -273,7 +281,6 @@ export const getAdminChartData = query({
         name,
         value,
       })),
-      generatedAt: Date.now(),
     };
   },
 });

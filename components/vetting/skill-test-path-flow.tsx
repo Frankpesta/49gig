@@ -20,7 +20,7 @@ import { Code, FileQuestion, Loader2, CheckCircle2, ChevronLeft, ChevronRight, P
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ErrorHandler } from "./error-handler";
-import { useSkillProctoringTelemetry } from "./test-proctoring";
+import { TestProctoringGate, useSkillProctoringTelemetry } from "./test-proctoring";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -77,6 +77,22 @@ const LANGUAGES = [
 
 export function SkillTestPathFlow() {
   const { user } = useAuth();
+  if (!user?._id) return null;
+  return (
+    <TestProctoringGate
+      userId={user._id}
+      segment="skills"
+      title="Skill assessment — webcam"
+      description="These tests are proctored. Any form of malpractice will not be tolerated—you will be removed from the test immediately."
+      onReady={() => {}}
+    >
+      <SkillTestPathFlowInner />
+    </TestProctoringGate>
+  );
+}
+
+function SkillTestPathFlowInner() {
+  const { user } = useAuth();
   const userId = user?._id;
 
   const session = useQuery(
@@ -85,7 +101,6 @@ export function SkillTestPathFlow() {
   );
 
   const startSkillTest = useAction(api.vetting.skillTestSession.startSkillTest);
-  const confirmProctoringCamera = useMutation(api.vetting.mutations.confirmProctoringCamera);
   const submitMcqAnswers = useMutation(api.vetting.mutations.submitMcqAnswers);
   const submitCodingSubmission = useMutation(api.vetting.mutations.submitCodingSubmission);
   const setSessionPortfolioScore = useMutation(api.vetting.mutations.setSessionPortfolioScore);
@@ -191,9 +206,12 @@ export function SkillTestPathFlow() {
       selectedOptionIndex: answerMap.has(q._id) ? (answerMap.get(q._id) as number) : -1,
     }));
     autoSubmittedRef.current = true;
-    submitMcqAnswers({ sessionId: session._id, answers, userId })
-      .then(() => window.location.reload())
-      .catch(() => {});
+    // Convex subscription on `session.status` will re-render this flow when MCQ is scored.
+    void submitMcqAnswers({ sessionId: session._id, answers, userId }).catch(
+      () => {
+        autoSubmittedRef.current = false;
+      }
+    );
   }, [timeUp, session?.status, session?._id, mcqAnswers, mcqQuestions, userId, submitMcqAnswers]);
 
   const proctoringTelemetryActive =
@@ -203,18 +221,11 @@ export function SkillTestPathFlow() {
   if (!userId) return null;
 
   const handleStartTest = async () => {
+    if (!userId) return;
     setError(null);
     setStarting(true);
     try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("Camera access is required for the skill assessment. Use a supported browser.");
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false,
-      });
-      stream.getTracks().forEach((t) => t.stop());
-      await confirmProctoringCamera({ userId, segment: "skills" });
+      // Camera + proctoring consent is already handled by the enclosing TestProctoringGate.
       await startSkillTest({ userId });
     } catch (e) {
       setError(e instanceof Error ? e : new Error(String(e)));
@@ -296,7 +307,7 @@ export function SkillTestPathFlow() {
           portfolioScore: result.score,
           userId,
         });
-        window.location.reload();
+        // `session.status` will move from `portfolio_review` → `mcq` via the Convex subscription.
       } catch (e) {
         setError(e instanceof Error ? e : new Error(String(e)));
       } finally {
@@ -545,7 +556,9 @@ export function SkillTestPathFlow() {
           answers,
           userId,
         });
-        window.location.reload();
+        setMcqAnswers({});
+        setMcqIndex(0);
+        // Convex subscription will flip `session.status` → "completed" and re-render.
       } catch (e) {
         setError(e instanceof Error ? e : new Error(String(e)));
       } finally {
@@ -613,22 +626,22 @@ export function SkillTestPathFlow() {
               })()}
             </div>
           </div>
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex w-full gap-2 sm:w-auto">
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => setMcqIndex((i) => Math.max(0, i - 1))}
                 disabled={mcqIndex === 0}
+                className="h-11 flex-1 sm:h-9 sm:flex-none"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Previous
               </Button>
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => setMcqIndex((i) => Math.min(total - 1, i + 1))}
                 disabled={mcqIndex === total - 1}
+                className="h-11 flex-1 sm:h-9 sm:flex-none"
               >
                 Next
                 <ChevronRight className="h-4 w-4" />
@@ -637,6 +650,7 @@ export function SkillTestPathFlow() {
             <Button
               onClick={handleSubmitMcq}
               disabled={answered < total || submitMcqLoading || timeUp}
+              className="h-11 w-full sm:h-9 sm:w-auto"
             >
               {submitMcqLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {timeUp ? "Time's up" : "Submit assessment"}

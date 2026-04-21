@@ -26,10 +26,10 @@ export default function ClientOnboardingPage() {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     companyName: "",
+    country: "",
     workEmail: "",
     phoneNumber: "",
     companyWebsite: "",
-    country: "",
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -38,17 +38,15 @@ export default function ClientOnboardingPage() {
   );
 
   useEffect(() => {
-    // Pre-fill with existing profile data if available
     if (user?.profile) {
       setFormData({
         companyName: user.profile.companyName || "",
+        country: user.profile.country || "",
         workEmail: user.profile.workEmail || user.email || "",
         phoneNumber: user.profile.phoneNumber || "",
         companyWebsite: user.profile.companyWebsite || "",
-        country: user.profile.country || "",
       });
     } else {
-      // Pre-fill work email with user email
       setFormData((prev) => ({
         ...prev,
         workEmail: user?.email || "",
@@ -126,17 +124,17 @@ export default function ClientOnboardingPage() {
               Complete your profile
             </h1>
             <p className="text-muted-foreground leading-relaxed">
-              Please provide your company information to continue
+              Tell us about your company. You can edit everything else from your profile later.
             </p>
           </div>
 
           <Card className="shadow-2xl border-border/50 bg-background/80 backdrop-blur-xl">
             <CardHeader className="space-y-2 px-8 pt-8 pb-6">
               <CardTitle className="text-2xl font-heading font-semibold">
-                Company & Contact Information
+                Company Information
               </CardTitle>
               <CardDescription>
-                Complete your profile to get started
+                Only a couple of required fields to get you hiring.
               </CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit}>
@@ -148,10 +146,7 @@ export default function ClientOnboardingPage() {
                 )}
 
                 <div className="space-y-3">
-                  <Label
-                    htmlFor="companyName"
-                    className="text-sm font-medium"
-                  >
+                  <Label htmlFor="companyName" className="text-sm font-medium">
                     Company / Organization Name
                   </Label>
                   <Input
@@ -160,19 +155,31 @@ export default function ClientOnboardingPage() {
                     placeholder="Acme Inc."
                     value={formData.companyName}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        companyName: e.target.value,
-                      })
+                      setFormData({ ...formData, companyName: e.target.value })
                     }
                     required
                     disabled={isLoading}
                     className="h-11"
                   />
                 </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="country" className="text-sm font-medium">
+                    Country / Region
+                  </Label>
+                  <CountrySelector
+                    value={formData.country}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, country: value })
+                    }
+                    disabled={isLoading}
+                    className="w-full"
+                  />
+                </div>
+
                 <div className="space-y-3">
                   <Label htmlFor="workEmail" className="text-sm font-medium">
-                    Work Email Address
+                    Work Email (optional)
                   </Label>
                   <Input
                     id="workEmail"
@@ -180,32 +187,20 @@ export default function ClientOnboardingPage() {
                     placeholder="work@company.com"
                     value={formData.workEmail}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        workEmail: e.target.value,
-                      })
+                      setFormData({ ...formData, workEmail: e.target.value })
                     }
                     disabled={isLoading}
                     className="h-11"
                   />
                 </div>
+
                 <div className="space-y-3">
-                  <Label
-                    htmlFor="phoneNumber"
-                    className="text-sm font-medium"
-                  >
-                    Phone Number {selectedCountry && `(${selectedCountry.phoneCode})`}
+                  <Label htmlFor="phoneNumber" className="text-sm font-medium">
+                    Phone Number (optional)
                   </Label>
                   <div className="flex gap-2">
-                    <div className="w-[140px]">
-                      <CountrySelector
-                        value={formData.country}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, country: value })
-                        }
-                        disabled={isLoading}
-                        className="w-full"
-                      />
+                    <div className="flex h-11 w-[90px] items-center justify-center rounded-lg border border-input bg-muted/40 text-sm text-muted-foreground">
+                      {selectedCountry?.phoneCode || "+—"}
                     </div>
                     <Input
                       id="phoneNumber"
@@ -222,12 +217,13 @@ export default function ClientOnboardingPage() {
                       className="h-11 flex-1"
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    You can verify this number later in your profile.
+                  </p>
                 </div>
+
                 <div className="space-y-3">
-                  <Label
-                    htmlFor="companyWebsite"
-                    className="text-sm font-medium"
-                  >
+                  <Label htmlFor="companyWebsite" className="text-sm font-medium">
                     Company Website (optional)
                   </Label>
                   <Input
@@ -243,19 +239,6 @@ export default function ClientOnboardingPage() {
                     }
                     disabled={isLoading}
                     className="h-11"
-                  />
-                </div>
-                <div className="space-y-3">
-                  <Label htmlFor="country" className="text-sm font-medium">
-                    Country / Region
-                  </Label>
-                  <CountrySelector
-                    value={formData.country}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, country: value })
-                    }
-                    disabled={isLoading}
-                    className="w-full"
                   />
                 </div>
 

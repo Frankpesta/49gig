@@ -4,6 +4,7 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { escrowNetToClientLockedGross } from "./amounts";
+import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 import {
   freelancersRemovedForPermanentExclusion,
   mergePermanentExclusions,
@@ -307,7 +308,10 @@ export const initiateDispute = mutation({
     }
 
     const escrowNet = Math.max(0, project.escrowedAmount ?? 0);
-    const platformFeePct = project.platformFee ?? 15;
+    const platformFeePct = await effectivePlatformFeePercentForProject(
+      ctx,
+      project.platformFee
+    );
 
     // Validate partial team dispute: all specified freelancers must be on the project
     const teamMemberIds = project.matchedFreelancerIds ?? [];

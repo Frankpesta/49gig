@@ -685,9 +685,20 @@ export default defineSchema({
     /** English attempt round (0 = first try, 1 = one retake used). */
     englishAttemptRound: v.optional(v.number()),
     englishFailedAttempts: v.optional(v.number()),
+    /**
+     * Timestamp (ms) before which an English retake must not be accepted.
+     * Set when `completeVerification` fails the English composite for the
+     * first time; `submitEnglishProficiency` enforces it.
+     */
+    englishRetakeAvailableAt: v.optional(v.number()),
     /** Skills composite attempt round for 50% gate + retake. */
     skillsAttemptRound: v.optional(v.number()),
     skillsFailedAttempts: v.optional(v.number()),
+    /**
+     * Timestamp (ms) before which a skill-test retake must not be accepted.
+     * Set on the first skills failure; `startSkillTest` enforces it.
+     */
+    skillsRetakeAvailableAt: v.optional(v.number()),
     /** MCQ / coding IDs already shown (retakes must not repeat). */
     usedMcqQuestionIds: v.optional(v.array(v.id("vettingMcqQuestions"))),
     usedCodingPromptIds: v.optional(v.array(v.id("vettingCodingPrompts"))),
@@ -1270,6 +1281,19 @@ export default defineSchema({
     .index("by_actor", ["actorId"])
     .index("by_target", ["targetType", "targetId"])
     .index("by_created", ["createdAt"]),
+
+  /**
+   * Tracks webhook events we've already processed so retries are idempotent.
+   * Keyed by `{provider, eventId}`. Writes are best-effort: a concurrent duplicate
+   * that slips past the check is still safe because the downstream mutations
+   * (handlePaymentSuccess/Failure/Cancellation) have their own transition guards.
+   */
+  processedWebhookEvents: defineTable({
+    provider: v.union(v.literal("flutterwave")),
+    eventId: v.string(),
+    eventType: v.optional(v.string()),
+    processedAt: v.number(),
+  }).index("by_provider_event", ["provider", "eventId"]),
 
   sessions: defineTable({
     // User

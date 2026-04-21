@@ -34,6 +34,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { getDurationMonths } from "@/lib/project-duration";
 import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -1345,7 +1346,7 @@ export default function ProjectDetailPage() {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}`
-                      : `$${((project.totalAmount * (100 - (project.platformFee ?? 25))) / 100).toLocaleString()}`}
+                      : `$${((project.totalAmount * (100 - (project.platformFee ?? DEFAULT_PLATFORM_FEE_PERCENT))) / 100).toLocaleString()}`}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {isClient

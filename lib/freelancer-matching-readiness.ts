@@ -1,18 +1,7 @@
 /**
  * UX copy + routes for “why you might not appear in client matching”.
- * Aligns with lib/matching-skill-utils isFreelancerEligibleForProjectMatch and Convex pool filters.
+ * Aligns with lib/matching-skill-utils isFreelancerEligibleForProjectMatch (phone + skill fit).
  */
-
-import {
-  freelancerHasPhoneAndLinksForMatching,
-  normalizeHttpUrl,
-  requiresBehanceUrl,
-  requiresGithubUrl,
-  requiresProfessionalLink,
-  validateBehanceHost,
-  validateGithubHost,
-  validateLinkedInHost,
-} from "./freelancer-profile-links";
 
 export type MatchingReadinessIssue = {
   id: string;
@@ -41,32 +30,9 @@ function phoneGap(user: FreelancerUserLike): boolean {
   return user.phoneVerifiedAt == null;
 }
 
-function profileLinkGaps(user: FreelancerUserLike): string[] {
-  const p = user.profile ?? {};
-  const tf = p.techField;
-  const gaps: string[] = [];
-  const gh = normalizeHttpUrl(p.githubUrl);
-  const bh = normalizeHttpUrl(p.behanceUrl);
-  const li = normalizeHttpUrl(p.linkedinUrl);
-  const po = normalizeHttpUrl(p.portfolioUrl);
-
-  if (requiresGithubUrl(tf)) {
-    if (!gh || !validateGithubHost(gh)) gaps.push("github");
-  }
-  if (requiresBehanceUrl(tf)) {
-    if (!bh || !validateBehanceHost(bh)) gaps.push("behance");
-  }
-  if (requiresProfessionalLink(tf)) {
-    const liOk = !!li && validateLinkedInHost(li);
-    const poOk = !!po;
-    if (!liOk && !poOk) gaps.push("linkedin_or_portfolio");
-  }
-  return gaps;
-}
-
 /**
  * Ordered checklist of blockers for being eligible when clients run matching.
- * Does not include “add skills” (soft / project-dependent).
+ * Does not include portfolio links (enforced at onboarding / profile); does not include skill fit (project-dependent).
  */
 export function getFreelancerMatchingReadinessIssues(
   user: FreelancerUserLike
@@ -91,7 +57,7 @@ export function getFreelancerMatchingReadinessIssues(
       id: "verification",
       title: "Verification not approved",
       description:
-        "Complete platform verification and wait for approval to be eligible for matches.",
+        "Complete platform verification and wait for admin approval to be eligible for matches.",
       actionLabel: "Go to verification",
       href: "/onboarding/verification",
     });
@@ -119,56 +85,23 @@ export function getFreelancerMatchingReadinessIssues(
     });
   }
 
-  const linkGaps = profileLinkGaps(user);
-  if (linkGaps.includes("github")) {
-    issues.push({
-      id: "github",
-      title: "GitHub profile link missing or invalid",
-      description:
-        "For your role category, add a valid GitHub profile URL (github.com) so clients can review your work.",
-      actionLabel: "Add GitHub link",
-      href: "/dashboard/profile",
-    });
-  }
-  if (linkGaps.includes("behance")) {
-    issues.push({
-      id: "behance",
-      title: "Behance link missing or invalid",
-      description:
-        "Design roles need a Behance profile URL on behance.net.",
-      actionLabel: "Add Behance link",
-      href: "/dashboard/profile",
-    });
-  }
-  if (linkGaps.includes("linkedin_or_portfolio")) {
-    issues.push({
-      id: "professional_link",
-      title: "LinkedIn or portfolio required",
-      description:
-        "For your category, add a LinkedIn profile or a portfolio / website URL.",
-      actionLabel: "Update profile links",
-      href: "/dashboard/profile",
-    });
-  }
-
-  // Same gate as matching-skill-utils (covers edge cases if logic drifts)
-  if (
-    issues.length === 0 &&
-    !freelancerHasPhoneAndLinksForMatching(user as Parameters<typeof freelancerHasPhoneAndLinksForMatching>[0])
-  ) {
-    issues.push({
-      id: "profile_links",
-      title: "Profile links need attention",
-      description:
-        "Update your profile so phone and professional links meet platform requirements.",
-      actionLabel: "Open profile",
-      href: "/dashboard/profile",
-    });
-  }
-
   return issues;
 }
 
 export function isFreelancerMatchingReady(user: FreelancerUserLike): boolean {
   return getFreelancerMatchingReadinessIssues(user).length === 0;
+}
+
+/**
+ * Single source of truth for “is this freelancer eligible to appear in the client-matching pool”.
+ * Used server-side in matching actions and any admin surface that picks candidates. Skill/category fit
+ * is evaluated separately per project — this is the global account-level gate only.
+ */
+export function isFreelancerInMatchingPool(user: FreelancerUserLike): boolean {
+  if (user.role !== "freelancer") return false;
+  if (user.status !== "active") return false;
+  if (user.verificationStatus !== "approved") return false;
+  if (user.kycStatus !== "approved") return false;
+  if (user.phoneVerifiedAt == null) return false;
+  return true;
 }

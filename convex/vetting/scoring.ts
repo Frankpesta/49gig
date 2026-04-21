@@ -1,6 +1,20 @@
 import type { Doc } from "../_generated/dataModel";
 import { calculateOverallScore } from "./engine";
 
+/**
+ * Single source of truth for the pass threshold applied by
+ * `completeVerification` to both the English composite and the average skill
+ * score. UI copy and backend logic must import this — do NOT hardcode 50.
+ */
+export const MIN_PERCENT_TO_PASS = 50;
+
+/**
+ * Cooldown applied after a first-attempt failure before the retake can be
+ * submitted. Enforced server-side in `submitEnglishProficiency` and
+ * `startSkillTest`; surfaced to the client by `getVerificationStatus`.
+ */
+export const RETAKE_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+
 /** English composite: simple average of grammar, comprehension, written (each 0–100). */
 export function englishCompositeFromVetting(
   english: Doc<"vettingResults">["englishProficiency"]

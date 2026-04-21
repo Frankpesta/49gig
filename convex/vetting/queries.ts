@@ -88,6 +88,8 @@ export const getVerificationStatus = query({
             skillsAttemptRound: vettingResult.skillsAttemptRound ?? 0,
             englishFailedAttempts: vettingResult.englishFailedAttempts ?? 0,
             skillsFailedAttempts: vettingResult.skillsFailedAttempts ?? 0,
+            englishRetakeAvailableAt: vettingResult.englishRetakeAvailableAt,
+            skillsRetakeAvailableAt: vettingResult.skillsRetakeAvailableAt,
             usedMcqQuestionIds: vettingResult.usedMcqQuestionIds,
             usedCodingPromptIds: vettingResult.usedCodingPromptIds,
           }

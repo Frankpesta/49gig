@@ -99,7 +99,10 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
         addressDocType: addressDocType as "utility_bill" | "bank_statement" | "tenancy_agreement",
       });
       toast.success("KYC submitted. Review typically takes up to 2 business days.");
-      window.location.reload();
+      setIdFrontFileId(null);
+      setIdBackFileId(null);
+      setAddressFileId(null);
+      // `kycData` / `verificationStatus` are Convex subscriptions — they refresh automatically.
     } catch (err) {
       toast.error(getUserFriendlyError(err) ?? "Submission failed");
     } finally {

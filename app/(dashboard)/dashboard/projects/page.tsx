@@ -33,6 +33,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { useSearchParams } from "next/navigation";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
@@ -301,7 +302,7 @@ export default function ProjectsPage() {
                         $
                         {isClient
                           ? project.totalAmount.toLocaleString()
-                          : ((project.totalAmount * (100 - (project.platformFee ?? 25))) / 100).toLocaleString()}
+                          : ((project.totalAmount * (100 - (project.platformFee ?? DEFAULT_PLATFORM_FEE_PERCENT))) / 100).toLocaleString()}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-muted-foreground">

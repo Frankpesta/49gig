@@ -5,6 +5,8 @@ import {
   averageSkillScore,
   englishCompositeFromVetting,
   weightedVerificationOverall,
+  MIN_PERCENT_TO_PASS,
+  RETAKE_COOLDOWN_MS,
 } from "./scoring";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
@@ -283,6 +285,21 @@ export const submitEnglishProficiency = mutation({
     if (!vettingResult.proctoringSummary?.englishProctoringReadyAt) {
       throw new Error(
         "Enable your webcam for proctoring before submitting the English assessment."
+      );
+    }
+
+    const englishCooldownUntil = vettingResult.englishRetakeAvailableAt;
+    if (
+      englishCooldownUntil != null &&
+      Date.now() < englishCooldownUntil &&
+      (vettingResult.englishAttemptRound ?? 0) >= 1
+    ) {
+      const remainingMinutes = Math.max(
+        1,
+        Math.ceil((englishCooldownUntil - Date.now()) / 60000)
+      );
+      throw new Error(
+        `Your English retake will be available in about ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}. Please come back when the cooldown ends.`
       );
     }
 
@@ -627,7 +644,7 @@ export const completeVerification = mutation({
     }
 
     const avgSkillScore = averageSkillScore(vettingRow);
-    const MIN_PERCENT = 50;
+    const MIN_PERCENT = MIN_PERCENT_TO_PASS;
     const englishFailed = englishComposite < MIN_PERCENT;
     const skillsFailed = avgSkillScore < MIN_PERCENT;
 
@@ -685,6 +702,7 @@ export const completeVerification = mutation({
           skillScores: vettingRow.skillAssessments.map((a) => a.score),
         });
       const newStepsCompleted = vettingRow.stepsCompleted.filter((s) => s !== "english");
+      const englishCooldownUntil = Date.now() + RETAKE_COOLDOWN_MS;
       await ctx.db.patch(vettingRow._id, {
         overallScore,
         status: "pending",
@@ -692,6 +710,7 @@ export const completeVerification = mutation({
         stepsCompleted: newStepsCompleted,
         englishAttemptRound: 1,
         englishFailedAttempts: (vettingRow.englishFailedAttempts ?? 0) + 1,
+        englishRetakeAvailableAt: englishCooldownUntil,
         englishProficiency: {
           ...vettingRow.englishProficiency,
           grammarScore: undefined,
@@ -752,6 +771,7 @@ export const completeVerification = mutation({
           skillScores: vettingRow.skillAssessments.map((a) => a.score),
         });
       const newStepsCompleted = vettingRow.stepsCompleted.filter((s) => s !== "skills");
+      const skillsCooldownUntil = Date.now() + RETAKE_COOLDOWN_MS;
       await ctx.db.patch(vettingRow._id, {
         overallScore,
         status: "pending",
@@ -759,6 +779,7 @@ export const completeVerification = mutation({
         stepsCompleted: newStepsCompleted,
         skillsAttemptRound: 1,
         skillsFailedAttempts: (vettingRow.skillsFailedAttempts ?? 0) + 1,
+        skillsRetakeAvailableAt: skillsCooldownUntil,
         skillAssessments: [],
         updatedAt: Date.now(),
       });
@@ -1238,7 +1259,6 @@ export const adminOverrideFreelancerVerificationAndTests = mutation({
   },
 });
 
-const SKILL_TEST_PASS_THRESHOLD = 50;
 const GRACE_PERIOD_MS = 5 * 60 * 1000; // 5 minutes for auto-submit after time up
 
 /**

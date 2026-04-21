@@ -53,6 +53,7 @@ import { TeamSlotsEditor } from "@/components/hire/team-slots-editor";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
 import { getDurationMonths } from "@/lib/project-duration";
+import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 const PROJECT_DURATIONS = [
@@ -399,7 +400,7 @@ export default function EditProjectPage() {
     setIsSubmitting(true);
     try {
       const totalAmount = budgetCalculation.estimatedBudget;
-      const platformFee = platformFeePct ?? 25;
+      const platformFee = platformFeePct ?? DEFAULT_PLATFORM_FEE_PERCENT;
       const durationMonths = getDurationMonths(formData.projectDuration);
       const teamBudgetBreakdown =
         formData.hireType === "team" &&
