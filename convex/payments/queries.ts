@@ -92,6 +92,26 @@ export const getPaymentByRefundId = internalQuery({
 });
 
 /**
+ * Get an existing refund payment row for a project, if any.
+ * Used to make refund issuance idempotent: a second refund call for the same
+ * project short-circuits and returns the prior refund.
+ */
+export const getExistingRefundForProject = internalQuery({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const refund = await ctx.db
+      .query("payments")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("type"), "refund"))
+      .order("desc")
+      .first();
+    return refund ?? null;
+  },
+});
+
+/**
  * Verify user exists and is active
  * Internal query
  */

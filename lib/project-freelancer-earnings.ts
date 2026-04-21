@@ -4,6 +4,7 @@
 
 import { getDurationMonths } from "./project-duration";
 import { teamSlotsToMatchSpecs, type TeamSlotIntake } from "./team-slots";
+import { DEFAULT_PLATFORM_FEE_PERCENT } from "./platform-fee";
 
 function roundUsd2(n: number): number {
   return Math.round(Math.max(0, n) * 100) / 100;
@@ -46,7 +47,7 @@ export function freelancerEngagementNetTotalUsd(
   project: ProjectLikeForFreelancerEarnings,
   viewerTeamRole: string | undefined
 ): number {
-  const fee = project.platformFee ?? 25;
+  const fee = project.platformFee ?? DEFAULT_PLATFORM_FEE_PERCENT;
   const netTotal = (project.totalAmount * (100 - fee)) / 100;
   const months = Math.max(
     1,

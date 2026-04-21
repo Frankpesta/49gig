@@ -61,6 +61,8 @@ export default function ProfilePage() {
     companyName: "",
     companySize: "",
     industry: "",
+    workEmail: "",
+    companyWebsite: "",
     // Freelancer fields
     bio: "",
     techField: "",
@@ -69,6 +71,7 @@ export default function ProfilePage() {
     languagesWritten: [] as string[],
     softwareDevField: "",
     availability: "available" as "available" | "busy" | "unavailable",
+    country: "",
     timezone: "",
     portfolioUrl: "",
     githubUrl: "",
@@ -77,6 +80,7 @@ export default function ProfilePage() {
   });
   const [newSkill, setNewSkill] = useState("");
   const [phoneE164Input, setPhoneE164Input] = useState("");
+  const [phoneE164Prefilled, setPhoneE164Prefilled] = useState(false);
   const [smsCodeInput, setSmsCodeInput] = useState("");
   const [phoneVerifyBusy, setPhoneVerifyBusy] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -129,6 +133,8 @@ export default function ProfilePage() {
         companyName: source.profile?.companyName || "",
         companySize: source.profile?.companySize || "",
         industry: source.profile?.industry || "",
+        workEmail: source.profile?.workEmail || "",
+        companyWebsite: source.profile?.companyWebsite || "",
         bio: source.profile?.bio || "",
         techField: source.profile?.techField || "",
         experienceLevel: source.profile?.experienceLevel || "",
@@ -136,14 +142,30 @@ export default function ProfilePage() {
         languagesWritten: source.profile?.languagesWritten || [],
         softwareDevField: source.profile?.softwareDevFields?.[0] || "",
         availability: source.profile?.availability || "available",
+        country: source.profile?.country || "",
         timezone: source.profile?.timezone || "",
         portfolioUrl: source.profile?.portfolioUrl || "",
         githubUrl: source.profile?.githubUrl || "",
         behanceUrl: source.profile?.behanceUrl || "",
         linkedinUrl: source.profile?.linkedinUrl || "",
       });
+
+      // Seed the SMS verification field with the phone captured at signup so the
+      // user doesn't have to retype what they already gave us — but only
+      // once, and only until they verify. After verification we display `phoneE164`.
+      if (
+        !phoneE164Prefilled &&
+        (source.role === "freelancer" || source.role === "client") &&
+        source.phoneVerifiedAt == null
+      ) {
+        const draft = (source.profile as { phoneNumber?: string } | undefined)?.phoneNumber;
+        if (draft && draft.trim()) {
+          setPhoneE164Input(draft.trim());
+          setPhoneE164Prefilled(true);
+        }
+      }
     }
-  }, [displayUser, user]);
+  }, [displayUser, user, phoneE164Prefilled]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -189,6 +211,8 @@ export default function ProfilePage() {
           companyName: formData.companyName || undefined,
           companySize: formData.companySize || undefined,
           industry: formData.industry || undefined,
+          workEmail: formData.workEmail || undefined,
+          companyWebsite: formData.companyWebsite || undefined,
           bio: formData.bio || undefined,
           techField: (formData.techField || undefined) as TechFieldValue | undefined,
           experienceLevel: (formData.experienceLevel || undefined) as ExperienceLevelValue | undefined,
@@ -203,6 +227,7 @@ export default function ProfilePage() {
               }
             : {}),
           availability: formData.availability,
+          country: formData.country || undefined,
           timezone: formData.timezone || undefined,
           portfolioUrl: formData.portfolioUrl || undefined,
           ...(isFreelancerProfile
@@ -422,10 +447,23 @@ export default function ProfilePage() {
 
         <Card className="rounded-xl overflow-hidden border-border/60">
           <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent py-4">
-            <CardTitle className="text-base">Timezone</CardTitle>
+            <CardTitle className="text-base">Location & timezone</CardTitle>
             <CardDescription>Used for scheduling and client–freelancer matching.</CardDescription>
           </CardHeader>
-          <CardContent className="pt-2 pb-6">
+          <CardContent className="pt-2 pb-6 space-y-4">
+            <FormField
+              label="Country"
+              htmlFor="country"
+              description="Shown to clients on your match card."
+            >
+              <Input
+                id="country"
+                value={formData.country}
+                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                placeholder="e.g. Nigeria, Kenya, United Kingdom"
+                className="rounded-lg h-11 max-w-md"
+              />
+            </FormField>
             <FormField label="Your timezone" htmlFor="timezone">
               <Select
                 value={formData.timezone || "__none__"}
@@ -596,6 +634,30 @@ export default function ProfilePage() {
                       setFormData({ ...formData, industry: e.target.value })
                     }
                     placeholder="e.g., Technology, Healthcare, Finance"
+                    className="rounded-lg h-11"
+                  />
+                </FormField>
+                <FormField label="Work email" htmlFor="workEmail" description="Shown to freelancers once you hire them.">
+                  <Input
+                    id="workEmail"
+                    type="email"
+                    value={formData.workEmail}
+                    onChange={(e) =>
+                      setFormData({ ...formData, workEmail: e.target.value })
+                    }
+                    placeholder="work@company.com"
+                    className="rounded-lg h-11"
+                  />
+                </FormField>
+                <FormField label="Company website" htmlFor="companyWebsite">
+                  <Input
+                    id="companyWebsite"
+                    type="url"
+                    value={formData.companyWebsite}
+                    onChange={(e) =>
+                      setFormData({ ...formData, companyWebsite: e.target.value })
+                    }
+                    placeholder="https://company.com"
                     className="rounded-lg h-11"
                   />
                 </FormField>

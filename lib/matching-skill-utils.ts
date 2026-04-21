@@ -11,7 +11,7 @@ import {
   isLegacyCategoryLabel,
   SOFTWARE_DEV_FIELDS,
 } from "./platform-skills";
-import { freelancerHasPhoneAndLinksForMatching } from "./freelancer-profile-links";
+import { freelancerHasVerifiedPhoneForMatching } from "./freelancer-profile-links";
 
 function isSoftwareDevSubFieldId(value: string): boolean {
   return SOFTWARE_DEV_FIELDS.some((f) => f.id === value);
@@ -129,7 +129,8 @@ export function calculateSkillOverlapPercent(
 }
 
 /**
- * Hard gate: phone/links + techField category + skill match (when skills are specified).
+ * Hard gate: SMS-verified phone + techField category + skill match (when skills are specified).
+ * Portfolio links are enforced during onboarding / profile save, not here.
  *
  * techField is ALWAYS enforced as a category gate (when set), regardless of whether skills
  * are present. This prevents cross-category mismatches such as a data analyst matching a
@@ -153,7 +154,7 @@ export function isFreelancerEligibleForProjectMatch(
   normalizedRequired: string[],
   projectRoleId: string
 ): boolean {
-  if (!freelancerHasPhoneAndLinksForMatching(freelancer)) {
+  if (!freelancerHasVerifiedPhoneForMatching(freelancer)) {
     return false;
   }
 

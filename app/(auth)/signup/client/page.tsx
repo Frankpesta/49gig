@@ -275,6 +275,15 @@ export default function ClientSignupPage() {
             />
           </div>
           <div className="space-y-0.5">
+            <Label htmlFor="country" className="text-sm font-medium">Country / Region</Label>
+            <CountrySelector
+              value={formData.country}
+              onValueChange={(value) => setFormData({ ...formData, country: value })}
+              disabled={isLoading}
+              className="w-full"
+            />
+          </div>
+          <div className="space-y-0.5">
             <Label htmlFor="workEmail" className="text-sm font-medium">Work Email (optional)</Label>
             <Input
               id="workEmail"
@@ -288,16 +297,11 @@ export default function ClientSignupPage() {
           </div>
           <div className="space-y-0.5">
             <Label htmlFor="phoneNumber" className="text-sm font-medium">
-              Phone Number {selectedCountry && `(${selectedCountry.phoneCode})`}
+              Phone Number (optional)
             </Label>
             <div className="flex gap-2">
-              <div className="w-[140px]">
-                <CountrySelector
-                  value={formData.country}
-                  onValueChange={(value) => setFormData({ ...formData, country: value })}
-                  disabled={isLoading}
-                  className="w-full"
-                />
+              <div className="flex h-11 w-[90px] items-center justify-center rounded-lg border border-input bg-muted/40 text-sm text-muted-foreground">
+                {selectedCountry?.phoneCode || "+—"}
               </div>
               <Input
                 id="phoneNumber"
@@ -309,6 +313,9 @@ export default function ClientSignupPage() {
                 className="h-11 flex-1 rounded-lg"
               />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Dial code is derived from your country. You can verify this number later in your profile.
+            </p>
           </div>
           <div className="space-y-0.5">
             <Label htmlFor="companyWebsite" className="text-sm font-medium">Company Website (optional)</Label>
@@ -320,15 +327,6 @@ export default function ClientSignupPage() {
               onChange={(e) => setFormData({ ...formData, companyWebsite: e.target.value })}
               disabled={isLoading}
               className="h-11 rounded-lg"
-            />
-          </div>
-          <div className="space-y-0.5">
-            <Label htmlFor="country" className="text-sm font-medium">Country / Region</Label>
-            <CountrySelector
-              value={formData.country}
-              onValueChange={(value) => setFormData({ ...formData, country: value })}
-              disabled={isLoading}
-              className="w-full"
             />
           </div>
         </div>

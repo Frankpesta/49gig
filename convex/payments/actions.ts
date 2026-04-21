@@ -557,6 +557,34 @@ export const handleFlutterwaveWebhook = action({
         status: args.data?.status,
       });
 
+      // Webhook dedup: short-circuit if we've already processed this event id.
+      // Flutterwave does not guarantee the same envelope field for event id, so
+      // prefer `id`, fall back to `tx_ref`/`reference` for charge events.
+      const rawEventId =
+        (args.data && typeof args.data === "object"
+          ? (args.data.id ?? args.data.tx_ref ?? args.data.reference)
+          : undefined);
+      const webhookEventId =
+        rawEventId != null && rawEventId !== ""
+          ? String(rawEventId)
+          : "";
+      if (webhookEventId) {
+        const isNew: boolean = await ctx.runMutation(
+          internalAny.payments.mutations.recordWebhookEventIfNew,
+          {
+            provider: "flutterwave",
+            eventId: webhookEventId,
+            eventType: args.event,
+          }
+        );
+        if (!isNew) {
+          console.log(
+            `Flutterwave webhook: duplicate event ${args.event} (${webhookEventId}), skipping.`
+          );
+          return { processed: true, event: args.event, duplicate: true };
+        }
+      }
+
       switch (args.event) {
       case "charge.completed": {
         // Flutterwave may send tx_ref or reference; reference can be our tx_ref (49gig-*)
@@ -653,10 +681,24 @@ export const refundPaymentIntent = action({
     reason: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ success: true; refundId: string }> => {
+    // Idempotency: if we already issued a refund for this project, return it.
+    // Dispute-driven refunds are one-shot by design, so this gate protects
+    // against double-clicks, webhook replays into the resolve flow, and any
+    // caller retrying after a transient error.
+    const existingRefund = await ctx.runQuery(
+      internalAny.payments.queries.getExistingRefundForProject,
+      { projectId: args.projectId }
+    );
+    if (existingRefund) {
+      const refundId =
+        existingRefund.flutterwaveRefundId ?? String(existingRefund._id);
+      return { success: true, refundId };
+    }
+
     const payment = await ctx.runQuery(internalAny.payments.queries.getPaymentByProject, {
       projectId: args.projectId,
     });
-    
+
     if (!payment || !payment.flutterwaveTransactionId) {
       throw new Error("No payment transaction found for this project");
     }
@@ -666,7 +708,7 @@ export const refundPaymentIntent = action({
     // For now, we'll need to verify the payment to get the transaction ID
     // In production, store both tx_ref and transaction ID
     const verification = await flutterwave.verifyPayment(payment.flutterwaveTransactionId);
-    
+
     if (!verification.data.id) {
       throw new Error("Unable to retrieve transaction ID for refund");
     }
@@ -683,6 +725,16 @@ export const refundPaymentIntent = action({
       refundAmount,
       args.reason || "Customer refund request"
     );
+
+    // One more dedup pass: if another invocation won the race while we were
+    // waiting on Flutterwave, don't double-record / double-credit the wallet.
+    const dupAfterCall = await ctx.runQuery(
+      internalAny.payments.queries.getPaymentByRefundId,
+      { refundId: refundData.data.id.toString() }
+    );
+    if (dupAfterCall) {
+      return { success: true, refundId: refundData.data.id.toString() };
+    }
 
     // Get project to find clientId for the refund payment record
     const project = await ctx.runQuery(internalAny.payments.queries.getProject, {

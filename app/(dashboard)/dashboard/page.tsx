@@ -48,9 +48,14 @@ export default function DashboardPage() {
   const isFreelancer = user?.role === "freelancer";
   const isAdmin = user?.role === "admin";
 
+  // Stabilize the "now" used by time-windowed metrics so the query is
+  // cache-friendly. Snap to minute granularity on first render; this is
+  // plenty precise for 30-day windows.
+  const nowMs = useMemo(() => Math.floor(Date.now() / 60_000) * 60_000, []);
+
   const dashboardMetrics = useQuery(
     (api as any).dashboard.queries.getDashboardMetrics,
-    user?._id ? { userId: user._id } : "skip"
+    user?._id ? { userId: user._id, nowMs } : "skip"
   );
   const isLoading = dashboardMetrics === undefined;
 

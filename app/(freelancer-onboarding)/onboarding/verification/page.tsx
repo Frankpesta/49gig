@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
@@ -16,8 +16,6 @@ import { SkillTestPathFlow } from "@/components/vetting/skill-test-path-flow";
 import { KycStep } from "@/components/vetting/kyc-step";
 import { useRouter } from "next/navigation";
 
-const VERIFICATION_FAILED_KEY = "verification_failed_message";
-
 export default function OnboardingVerificationPage() {
   const { user, isAuthenticated } = useAuth();
   const verificationStatus = useQuery(
@@ -27,16 +25,7 @@ export default function OnboardingVerificationPage() {
   const initializeVerification = useMutation(api.vetting.mutations.initializeVerification);
   const completeVerification = useMutation(api.vetting.mutations.completeVerification);
   const [submitting, setSubmitting] = useState(false);
-  const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      const stored = sessionStorage.getItem(VERIFICATION_FAILED_KEY);
-      if (stored) {
-        sessionStorage.removeItem(VERIFICATION_FAILED_KEY);
-        return stored;
-      }
-    }
-    return null;
-  });
+  const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(null);
 
   if (verificationStatus === undefined) {
     return (
@@ -121,6 +110,17 @@ export default function OnboardingVerificationPage() {
     );
   }
 
+  const englishAttemptRound = (vettingResult as { englishAttemptRound?: number } | null | undefined)
+    ?.englishAttemptRound ?? 0;
+  const skillsAttemptRound = (vettingResult as { skillsAttemptRound?: number } | null | undefined)
+    ?.skillsAttemptRound ?? 0;
+  const englishRetakeAvailableAt =
+    (vettingResult as { englishRetakeAvailableAt?: number } | null | undefined)?.englishRetakeAvailableAt;
+  const skillsRetakeAvailableAt =
+    (vettingResult as { skillsRetakeAvailableAt?: number } | null | undefined)?.skillsRetakeAvailableAt;
+  const englishOnLastAttempt = englishAttemptRound >= 1 && !stepsCompleted.includes("english");
+  const skillsOnLastAttempt = skillsAttemptRound >= 1 && !stepsCompleted.includes("skills");
+
   const steps = [
     {
       id: "english",
@@ -128,6 +128,10 @@ export default function OnboardingVerificationPage() {
       description: "Complete English grammar, comprehension, and writing tests",
       completed: stepsCompleted.includes("english"),
       inProgress: currentStep === "english" && !stepsCompleted.includes("english"),
+      attemptLabel: !stepsCompleted.includes("english")
+        ? `Attempt ${englishAttemptRound + 1} of 2`
+        : undefined,
+      lastAttempt: englishOnLastAttempt,
     },
     {
       id: "skills",
@@ -135,6 +139,10 @@ export default function OnboardingVerificationPage() {
       description: "Demonstrate your skills through tests and challenges",
       completed: stepsCompleted.includes("skills"),
       inProgress: currentStep === "skills" && !stepsCompleted.includes("skills"),
+      attemptLabel: !stepsCompleted.includes("skills")
+        ? `Attempt ${skillsAttemptRound + 1} of 2`
+        : undefined,
+      lastAttempt: skillsOnLastAttempt,
     },
     {
       id: "kyc",
@@ -149,6 +157,8 @@ export default function OnboardingVerificationPage() {
           kycStatus === "pending_review" ||
           kycStatus === "id_rejected" ||
           kycStatus === "address_rejected"),
+      attemptLabel: undefined,
+      lastAttempt: false,
     },
   ];
 
@@ -181,19 +191,19 @@ export default function OnboardingVerificationPage() {
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
                 <span>
-                  <strong>English proficiency</strong> — grammar, comprehension, and writing (minimum 50% each area)
+                  <strong>English proficiency</strong> — grammar, comprehension, and writing. You need a 50% average across the three to pass.
                 </span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
                 <span>
-                  <strong>Skill assessments</strong> — tailored to your profile (minimum 50%)
+                  <strong>Skill assessments</strong> — tailored to your profile. You need a 50% average across your skill tests to pass.
                 </span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
                 <span>
-                  <strong>KYC</strong> — ID and proof of address (available once your overall score is 50%+)
+                  <strong>KYC</strong> — ID and proof of address (available once your weighted score is 50%+)
                 </span>
               </li>
             </ul>
@@ -201,6 +211,13 @@ export default function OnboardingVerificationPage() {
               An admin will approve your account after tests and KYC are submitted. You&apos;ll get email updates at
               each step.
             </p>
+            <div className="rounded-xl border border-amber-300/60 bg-amber-50/70 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/20 dark:text-amber-200">
+              <p className="font-medium">One retake per area</p>
+              <p className="text-amber-900/80 dark:text-amber-200/80 mt-1">
+                If you fall below 50% on a section you get a single retake. Falling below 50% on the retake closes
+                your account for this cycle.
+              </p>
+            </div>
             <Button onClick={handleInitialize} size="lg" className="w-full rounded-xl">
               Start verification
             </Button>
@@ -293,6 +310,18 @@ export default function OnboardingVerificationPage() {
                             In progress
                           </Badge>
                         )}
+                        {!step.completed && step.attemptLabel && (
+                          <Badge
+                            variant="outline"
+                            className={
+                              step.lastAttempt
+                                ? "shrink-0 border-destructive/50 bg-destructive/10 text-destructive"
+                                : "shrink-0 bg-muted"
+                            }
+                          >
+                            {step.attemptLabel}
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">{step.description}</p>
                       {step.id === "english" && vettingResult.englishProficiency.overallScore && (
@@ -357,38 +386,57 @@ export default function OnboardingVerificationPage() {
 
           {(canTakeTests || ((status === "in_progress" || status === "pending_review") && vettingComplete)) && (
             <div className="space-y-6">
-              {vettingResult &&
-                (vettingResult as { englishFailedAttempts?: number }).englishFailedAttempts &&
-                (vettingResult as { englishFailedAttempts?: number }).englishFailedAttempts! > 0 &&
-                currentStep === "english" && (
-                  <Card className="rounded-xl border-amber-200 bg-amber-50/80 dark:bg-amber-950/20">
-                    <CardContent className="p-4 text-sm">
-                      <p className="font-medium text-amber-900 dark:text-amber-200">Retake your English test</p>
-                      <p className="text-muted-foreground mt-1">
-                        You have one more attempt. Complete the section below — questions may differ from your first try.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              {vettingResult &&
-                (vettingResult as { skillsFailedAttempts?: number }).skillsFailedAttempts &&
-                (vettingResult as { skillsFailedAttempts?: number }).skillsFailedAttempts! > 0 &&
-                currentStep === "skills" && (
-                  <Card className="rounded-xl border-amber-200 bg-amber-50/80 dark:bg-amber-950/20">
-                    <CardContent className="p-4 text-sm">
-                      <p className="font-medium text-amber-900 dark:text-amber-200">Retake your skill test</p>
-                      <p className="text-muted-foreground mt-1">
-                        You have one more attempt. Start the skill test below — you should see different questions than before.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              {canTakeTests && currentStep === "english" && !stepsCompleted.includes("english") && (
-                <EnglishTest />
+              {englishOnLastAttempt && currentStep === "english" && (
+                <Card className="rounded-xl border-destructive/50 bg-destructive/5">
+                  <CardContent className="p-4 text-sm">
+                    <p className="font-semibold text-destructive">Last attempt on your English test</p>
+                    <p className="text-muted-foreground mt-1 leading-relaxed">
+                      You need an average of at least 50% across grammar, comprehension, and writing. If you score below
+                      50% again, your account will be closed for this cycle. Questions may differ from your first try.
+                    </p>
+                  </CardContent>
+                </Card>
               )}
-              {canTakeTests && currentStep === "skills" && !stepsCompleted.includes("skills") && user && (
-                <SkillTestPathFlow />
+              {skillsOnLastAttempt && currentStep === "skills" && (
+                <Card className="rounded-xl border-destructive/50 bg-destructive/5">
+                  <CardContent className="p-4 text-sm">
+                    <p className="font-semibold text-destructive">Last attempt on your skill test</p>
+                    <p className="text-muted-foreground mt-1 leading-relaxed">
+                      You need an average of at least 50% across your skill assessments. If you score below 50% again,
+                      your account will be closed for this cycle.
+                    </p>
+                  </CardContent>
+                </Card>
               )}
+              {canTakeTests &&
+                currentStep === "english" &&
+                !stepsCompleted.includes("english") &&
+                (englishOnLastAttempt && englishRetakeAvailableAt ? (
+                  <RetakeCooldownCard
+                    title="English retake cooling down"
+                    retakeAvailableAt={englishRetakeAvailableAt}
+                    body="Take a short break. Come back in an hour to start your retake — the clock below shows exactly when you can begin."
+                  >
+                    <EnglishTest />
+                  </RetakeCooldownCard>
+                ) : (
+                  <EnglishTest />
+                ))}
+              {canTakeTests &&
+                currentStep === "skills" &&
+                !stepsCompleted.includes("skills") &&
+                user &&
+                (skillsOnLastAttempt && skillsRetakeAvailableAt ? (
+                  <RetakeCooldownCard
+                    title="Skill-test retake cooling down"
+                    retakeAvailableAt={skillsRetakeAvailableAt}
+                    body="Take a short break. Come back in an hour to start your retake — the clock below shows exactly when you can begin."
+                  >
+                    <SkillTestPathFlow />
+                  </RetakeCooldownCard>
+                ) : (
+                  <SkillTestPathFlow />
+                ))}
               {canTakeTests &&
                 stepsCompleted.includes("english") &&
                 stepsCompleted.includes("skills") &&
@@ -397,8 +445,22 @@ export default function OnboardingVerificationPage() {
                     <CardContent className="p-4 sm:p-5 space-y-4">
                       <p className="text-sm text-muted-foreground leading-relaxed">
                         When you&apos;re ready, submit your verification for review. You&apos;ll need KYC uploaded first
-                        if you haven&apos;t already (50%+ overall required to submit KYC).
+                        if you haven&apos;t already (your weighted score must be 50%+ to submit KYC).
                       </p>
+                      {(englishAttemptRound >= 1 || skillsAttemptRound >= 1) && (
+                        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm">
+                          <p className="font-medium text-destructive">Heads up — this is your last attempt</p>
+                          <p className="text-muted-foreground mt-1 leading-relaxed">
+                            You&apos;ve already retaken the
+                            {englishAttemptRound >= 1 && skillsAttemptRound >= 1
+                              ? " English and skill sections"
+                              : englishAttemptRound >= 1
+                                ? " English section"
+                                : " skill section"}
+                            . If your score is below 50% when you submit, your account will be closed for this cycle.
+                          </p>
+                        </div>
+                      )}
                       <Button
                         className="rounded-xl"
                         onClick={async () => {
@@ -410,11 +472,9 @@ export default function OnboardingVerificationPage() {
                               setAccountDeletedMessage(result.message ?? "Your account has been removed.");
                               setTimeout(() => router.push("/login"), 4000);
                             } else if (!result.success && result.message) {
-                              sessionStorage.setItem(VERIFICATION_FAILED_KEY, result.message);
-                              window.location.reload();
-                            } else {
-                              window.location.reload();
+                              setAccountDeletedMessage(result.message);
                             }
+                            // The Convex subscription on getVerificationStatus refreshes the UI.
                           } catch (e) {
                             console.error(e);
                           } finally {
@@ -471,5 +531,69 @@ export default function OnboardingVerificationPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Gates a test UI behind the 1-hour retake cooldown. Ticks every second while
+ * locked, then renders `children` once `retakeAvailableAt` has passed.
+ */
+function RetakeCooldownCard({
+  title,
+  body,
+  retakeAvailableAt,
+  children,
+}: {
+  title: string;
+  body: string;
+  retakeAvailableAt: number;
+  children: React.ReactNode;
+}) {
+  const [now, setNow] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    if (now >= retakeAvailableAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [now, retakeAvailableAt]);
+
+  if (now >= retakeAvailableAt) {
+    return <>{children}</>;
+  }
+
+  const remainingMs = retakeAvailableAt - now;
+  const availableAtLabel = new Date(retakeAvailableAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return (
+    <Card className="rounded-xl border-amber-300/60 bg-amber-50/80 dark:bg-amber-950/20">
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-start gap-3">
+          <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-amber-900 dark:text-amber-200">{title}</p>
+            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">{body}</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1 rounded-lg border border-amber-300/50 bg-background/70 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-muted-foreground">Time remaining</span>
+          <span className="font-mono text-lg font-semibold tabular-nums text-amber-900 dark:text-amber-200">
+            {formatCountdown(remainingMs)}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Your retake unlocks at about {availableAtLabel}.
+        </p>
+      </CardContent>
+    </Card>
   );
 }

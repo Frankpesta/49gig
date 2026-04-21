@@ -1,6 +1,5 @@
 import { query, internalQuery } from "../_generated/server";
-
-const DEFAULT_PLATFORM_FEE = 25;
+import { DEFAULT_PLATFORM_FEE_PERCENT as DEFAULT_PLATFORM_FEE } from "../platformFeeResolve";
 
 /**
  * Get platform fee percentage (company share).

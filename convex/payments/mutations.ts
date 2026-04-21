@@ -653,6 +653,8 @@ export const handlePaymentFailure = internalMutation({
       throw new Error(`Payment not found for transaction: ${args.transactionId}`);
     }
 
+    const alreadyFailed = payment.status === "failed";
+
     const now = Date.now();
     const sendSystemNotification =
       api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
@@ -667,6 +669,12 @@ export const handlePaymentFailure = internalMutation({
       errorMessage: args.errorMessage,
       updatedAt: now,
     });
+
+    // Webhook retries can replay this event; run side effects only on the
+    // first transition into "failed".
+    if (alreadyFailed) {
+      return payment._id;
+    }
 
     // Get project to access clientId for audit log
     const projectId = payment.projectId;
@@ -727,6 +735,8 @@ export const handlePaymentCancellation = internalMutation({
       throw new Error(`Payment not found for transaction: ${args.transactionId}`);
     }
 
+    const alreadyCancelled = payment.status === "cancelled";
+
     const now = Date.now();
     const sendSystemNotification =
       api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
@@ -740,6 +750,12 @@ export const handlePaymentCancellation = internalMutation({
       webhookEventId: args.eventId,
       updatedAt: now,
     });
+
+    // Webhook retries can replay this event; run side effects only on the
+    // first transition into "cancelled".
+    if (alreadyCancelled) {
+      return payment._id;
+    }
 
     // Get project to access clientId for audit log
     const projectId = payment.projectId;
@@ -883,3 +899,41 @@ export const updateProjectStatus = internalMutation({
   },
 });
 
+/**
+ * Check + record a webhook event as processed.
+ * Returns `true` if this is the first time we've seen `{provider, eventId}`;
+ * returns `false` if already recorded (caller should short-circuit).
+ *
+ * Idempotency note: Convex serializes mutations touching the same row, but this
+ * uses an index lookup + insert so concurrent distinct mutations can race and
+ * both insert. That's fine — downstream handlers still have transition guards,
+ * and the dup row is harmless.
+ */
+export const recordWebhookEventIfNew = internalMutation({
+  args: {
+    provider: v.union(v.literal("flutterwave")),
+    eventId: v.string(),
+    eventType: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    if (!args.eventId.trim()) {
+      return true;
+    }
+    const existing = await ctx.db
+      .query("processedWebhookEvents")
+      .withIndex("by_provider_event", (q) =>
+        q.eq("provider", args.provider).eq("eventId", args.eventId)
+      )
+      .first();
+    if (existing) {
+      return false;
+    }
+    await ctx.db.insert("processedWebhookEvents", {
+      provider: args.provider,
+      eventId: args.eventId,
+      eventType: args.eventType,
+      processedAt: Date.now(),
+    });
+    return true;
+  },
+});

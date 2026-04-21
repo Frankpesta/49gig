@@ -7,6 +7,7 @@ import {
   grossClientFundsInflowOnPayment,
   platformFeeRecognizedOnPayment,
 } from "../platformRevenue";
+import { getDefaultPlatformFeePercent } from "../platformFeeResolve";
 
 const ACTIVE_PROJECT_STATUSES = new Set([
   "pending_funding",
@@ -187,6 +188,7 @@ export const searchByIdAdmin = query({
 export const getDashboardMetrics = query({
   args: {
     userId: v.optional(v.id("users")),
+    nowMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUserInQuery(ctx, args.userId);
@@ -194,7 +196,9 @@ export const getDashboardMetrics = query({
       throw new Error("Not authenticated");
     }
 
-    const now = Date.now();
+    // Accept caller-provided time so the query is deterministic w.r.t. its reads.
+    // Fallback preserves existing behavior for callers that don't pass it.
+    const now = args.nowMs ?? Date.now();
     const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
     if (user.role === "client") {
@@ -488,6 +492,7 @@ export const getDashboardMetrics = query({
 
     const allPayments = await ctx.db.query("payments").collect();
     const projectById = new Map(projects.map((p) => [String(p._id), p]));
+    const defaultPlatformFee = await getDefaultPlatformFeePercent(ctx);
 
     const monthStartMs = Date.UTC(
       new Date(now).getUTCFullYear(),
@@ -526,7 +531,7 @@ export const getDashboardMetrics = query({
     for (const payment of allPayments) {
       if (payment.type !== "refund" || payment.status !== "refunded") continue;
       const proj = payment.projectId ? projectById.get(String(payment.projectId)) : undefined;
-      const pct = proj?.platformFee ?? 25;
+      const pct = proj?.platformFee ?? defaultPlatformFee;
       const claw = estimatedPlatformFeeClawbackOnRefund(payment, pct);
       if (claw <= 0) continue;
       clawbackAllTime += claw;
@@ -590,12 +595,13 @@ export const getUpcomingMilestones = query({
   args: {
     userId: v.optional(v.id("users")),
     limit: v.optional(v.number()),
+    nowMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const user = await getCurrentUserInQuery(ctx, args.userId);
     if (!user) return [];
 
-    const now = Date.now();
+    const now = args.nowMs ?? Date.now();
     const limit = args.limit ?? 5;
 
     let projectIds: Set<Doc<"projects">["_id"]> = new Set();

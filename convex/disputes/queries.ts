@@ -4,6 +4,10 @@ import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import { clientLockedGrossToFreelancerEscrowPool } from "./amounts";
 import {
+  effectivePlatformFeePercentForProject,
+  getDefaultPlatformFeePercent,
+} from "../platformFeeResolve";
+import {
   computeTeamPoolShareCentsByFreelancerId,
   sumShareCentsForFreelancers,
   teamBasisUserIdsForDispute,
@@ -49,6 +53,7 @@ export const getDisputes = query({
       return [];
     }
 
+    const defaultPlatformFee = await getDefaultPlatformFeePercent(ctx);
     const enrichDisputes = async (rawDisputes: Doc<"disputes">[]) => {
       return Promise.all(
         rawDisputes.map(async (d) => {
@@ -75,7 +80,7 @@ export const getDisputes = query({
             if (isFreelancer && !isClient) {
               lockedAmount = clientLockedGrossToFreelancerEscrowPool(
                 d.lockedAmount,
-                project.platformFee ?? 15
+                project.platformFee ?? defaultPlatformFee
               );
             }
           }
@@ -255,6 +260,11 @@ export const getDispute = query({
       return null;
     }
 
+    const feePctForViews = await effectivePlatformFeePercentForProject(
+      ctx,
+      project.platformFee
+    );
+
     // Enrich evidence with file URLs
     const enrichedEvidence = await Promise.all(
       dispute.evidence.map(async (e) => {
@@ -276,7 +286,7 @@ export const getDispute = query({
     if (isFreelancerParty && !isAdminOrModerator) {
       visibleLockedAmount = clientLockedGrossToFreelancerEscrowPool(
         dispute.lockedAmount,
-        project.platformFee ?? 15
+        feePctForViews
       );
     }
 

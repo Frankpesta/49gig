@@ -51,6 +51,26 @@ export const startSkillTest = action({
       );
     }
 
+    const existingVetting = await ctx.runQuery(
+      internalAny.vetting.queries.getVettingResultByFreelancer,
+      { freelancerId: args.userId }
+    );
+    if (
+      existingVetting?.skillsRetakeAvailableAt != null &&
+      Date.now() < existingVetting.skillsRetakeAvailableAt &&
+      (existingVetting.skillsAttemptRound ?? 0) >= 1
+    ) {
+      const remainingMinutes = Math.max(
+        1,
+        Math.ceil(
+          (existingVetting.skillsRetakeAvailableAt - Date.now()) / 60000
+        )
+      );
+      throw new Error(
+        `Your skill test retake will be available in about ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}. Please come back when the cooldown ends.`
+      );
+    }
+
     const vettingResultId: Id<"vettingResults"> = await ctx.runMutation(
       internalAny.vetting.internalMutations.getOrCreateVettingResult,
       { freelancerId: args.userId }

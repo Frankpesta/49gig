@@ -78,8 +78,8 @@ export function SkillSelection({
     }
     setActiveAssessment(null);
     setSelectedSkill("");
-    // Refresh page to show updated status
-    window.location.reload();
+    // `completedAssessments` is sourced from a parent `useQuery`; the Convex subscription
+    // repopulates it after the mutation commits — no full reload needed.
   };
 
   if (activeAssessment) {

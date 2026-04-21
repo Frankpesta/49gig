@@ -56,6 +56,7 @@ import {
 import { TeamSlotsEditor } from "@/components/hire/team-slots-editor";
 import { toast } from "sonner";
 import { getDurationMonths } from "@/lib/project-duration";
+import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { EXPERIENCE_LEVEL_OPTIONS } from "@/lib/experience-level-labels";
 
@@ -474,7 +475,7 @@ export default function CreateProjectPage() {
       const endDate = derivedEndDate;
 
       const totalAmount = effectiveBudget ?? budgetCalculation.estimatedBudget;
-      const platformFee = platformFeePct ?? 25;
+      const platformFee = platformFeePct ?? DEFAULT_PLATFORM_FEE_PERCENT;
 
       const durationMonths = getDurationMonths(formData.projectDuration);
       const teamBudgetBreakdown =

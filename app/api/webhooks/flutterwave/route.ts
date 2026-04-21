@@ -123,17 +123,16 @@ export async function POST(request: NextRequest) {
       stack: errorStack,
       event: event,
     });
-    
-    // For most errors, return 200 to prevent Flutterwave from retrying
-    // Only return 500 for truly recoverable errors
-    const statusCode = errorMessage.includes("Invalid") || errorMessage.includes("Unknown") ? 200 : 500;
-    
+
+    // Return 500 so Flutterwave retries the delivery. The downstream action
+    // is idempotent (see `recordWebhookEventIfNew` + per-status transition
+    // guards), so retries are safe.
     return NextResponse.json(
-      { 
+      {
         error: "Webhook processing failed",
         message: errorMessage,
       },
-      { status: statusCode }
+      { status: 500 }
     );
   }
 }

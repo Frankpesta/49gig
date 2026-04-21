@@ -22,6 +22,7 @@ import {
   freelancerFitsSubField,
 } from "../../lib/matching-skill-utils";
 import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
+import { isFreelancerInMatchingPool } from "../../lib/freelancer-matching-readiness";
 
 function projectAllowsPostFundMatchGeneration(project: Doc<"projects">): boolean {
   if (project.status === "funded") return true;
@@ -300,15 +301,11 @@ export const generateMatches = action({
     // Get all verified freelancers directly from database (includes busy / on other hires — scored lower)
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
 
-    // Filter to verified freelancers (vetting + KYC approved)
-    const verifiedFreelancers = (allUsers || []).filter(
-      (u: any) =>
-        u.role === "freelancer" &&
-        u.status === "active" &&
-        u.verificationStatus === "approved" &&
-        u.kycStatus === "approved"
+    // Global matching-pool gate (active, platform + KYC approved, phone verified)
+    const verifiedFreelancers = (allUsers || []).filter((u: any) =>
+      isFreelancerInMatchingPool(u)
     );
-    
+
     // Get vetting results for each freelancer
     const approvedFreelancers = await Promise.all(
       verifiedFreelancers.map(async (freelancer: any) => {
@@ -486,12 +483,8 @@ export const generateTeamMatches = action({
 
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
 
-    const verifiedFreelancers = (allUsers || []).filter(
-      (u: any) =>
-        u.role === "freelancer" &&
-        u.status === "active" &&
-        u.verificationStatus === "approved" &&
-        u.kycStatus === "approved"
+    const verifiedFreelancers = (allUsers || []).filter((u: any) =>
+      isFreelancerInMatchingPool(u)
     );
 
     if (verifiedFreelancers.length === 0) {
@@ -847,12 +840,8 @@ export const generateMatchesForDraft = action({
     };
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
 
-    const verifiedFreelancers = (allUsers || []).filter(
-      (u: any) =>
-        u.role === "freelancer" &&
-        u.status === "active" &&
-        u.verificationStatus === "approved" &&
-        u.kycStatus === "approved"
+    const verifiedFreelancers = (allUsers || []).filter((u: any) =>
+      isFreelancerInMatchingPool(u)
     );
 
     const approvedFreelancers = await Promise.all(
