@@ -38,6 +38,15 @@ import {
 } from "@/lib/platform-skills";
 import { CountrySelector } from "@/components/ui/country-selector";
 import { getCountryByCode, splitE164ToCountryAndNational } from "@/lib/countries";
+import {
+  normalizeHttpUrl,
+  requiresBehanceUrl,
+  requiresGithubUrl,
+  requiresProfessionalLink,
+  validateBehanceHost,
+  validateGithubHost,
+  validateLinkedInHost,
+} from "@/lib/freelancer-profile-links";
 
 const EXPERIENCE_LEVELS = [
   { value: "junior", label: "Junior" },
@@ -62,8 +71,10 @@ const LEGACY_TECH_FIELD_TO_CATEGORY: Record<string, string> = {
 
 /**
  * OAuth signup completion form. Captures the same core fields as the email
- * direct-signup path so both flows end up in the same shape. Location/address,
- * timezone and professional links live on the profile page only.
+ * direct-signup path so both flows end up in the same shape. Location/address
+ * and timezone stay on the profile page; the one professional link required
+ * for your tech category (GitHub, Behance, or LinkedIn/portfolio) is collected
+ * here so `updateProfile` validation passes.
  */
 export default function FreelancerOnboardingPage() {
   const router = useRouter();
@@ -77,6 +88,10 @@ export default function FreelancerOnboardingPage() {
     otherLanguagesDetail: "",
     phoneCountryCode: "",
     phoneNumber: "",
+    githubUrl: "",
+    behanceUrl: "",
+    linkedinUrl: "",
+    portfolioUrl: "",
   });
   const [skillInput, setSkillInput] = useState("");
   const [error, setError] = useState("");
@@ -107,6 +122,10 @@ export default function FreelancerOnboardingPage() {
       otherLanguagesDetail: langInit.otherDetail,
       phoneCountryCode: e164?.countryCode ?? "",
       phoneNumber: e164?.nationalDigits ?? rawPhone.replace(/\D/g, ""),
+      githubUrl: String((user.profile as { githubUrl?: string }).githubUrl ?? "").trim(),
+      behanceUrl: String((user.profile as { behanceUrl?: string }).behanceUrl ?? "").trim(),
+      linkedinUrl: String((user.profile as { linkedinUrl?: string }).linkedinUrl ?? "").trim(),
+      portfolioUrl: String((user.profile as { portfolioUrl?: string }).portfolioUrl ?? "").trim(),
     });
   }, [user]);
 
@@ -196,6 +215,45 @@ export default function FreelancerOnboardingPage() {
       return;
     }
 
+    if (requiresGithubUrl(formData.techField)) {
+      const u = normalizeHttpUrl(formData.githubUrl);
+      if (!u || !validateGithubHost(u)) {
+        setError(
+          "Enter a valid GitHub profile URL (https://github.com/yourname). Required for your tech category."
+        );
+        return;
+      }
+    }
+    if (requiresBehanceUrl(formData.techField)) {
+      const u = normalizeHttpUrl(formData.behanceUrl);
+      if (!u || !validateBehanceHost(u)) {
+        setError(
+          "Enter a valid Behance profile URL (https://behance.net/…). Required for design roles."
+        );
+        return;
+      }
+    }
+    if (requiresProfessionalLink(formData.techField)) {
+      const li = normalizeHttpUrl(formData.linkedinUrl);
+      const liOk = !!li && validateLinkedInHost(li);
+      const po = normalizeHttpUrl(formData.portfolioUrl);
+      const poOk = !!po;
+      if (!liOk && !poOk) {
+        setError("Add a LinkedIn profile URL or a portfolio / website URL (at least one).");
+        return;
+      }
+      if (formData.linkedinUrl.trim() && !liOk) {
+        setError(
+          "LinkedIn must be a profile or company page (e.g. linkedin.com/in/… or linkedin.com/company/…)."
+        );
+        return;
+      }
+      if (formData.portfolioUrl.trim() && !poOk) {
+        setError("Portfolio URL must include a domain (e.g. https://your-site.com).");
+        return;
+      }
+    }
+
     // Phone is optional here — the verified number is captured via SMS on the profile page.
     const nationalDigits = formData.phoneNumber.replace(/\D/g, "");
     let signupPhoneE164: string | undefined;
@@ -220,6 +278,18 @@ export default function FreelancerOnboardingPage() {
     try {
       const sessionToken =
         typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null;
+      const linkPatch: Record<string, string> = {};
+      if (requiresGithubUrl(formData.techField)) {
+        linkPatch.githubUrl = formData.githubUrl.trim();
+      }
+      if (requiresBehanceUrl(formData.techField)) {
+        linkPatch.behanceUrl = formData.behanceUrl.trim();
+      }
+      if (requiresProfessionalLink(formData.techField)) {
+        if (formData.linkedinUrl.trim()) linkPatch.linkedinUrl = formData.linkedinUrl.trim();
+        if (formData.portfolioUrl.trim()) linkPatch.portfolioUrl = formData.portfolioUrl.trim();
+      }
+
       await updateProfile({
         profile: {
           techField: formData.techField,
@@ -230,6 +300,7 @@ export default function FreelancerOnboardingPage() {
             formData.techField === "software_development" && formData.softwareDevField
               ? [formData.softwareDevField]
               : [],
+          ...linkPatch,
           ...(signupPhoneE164 ? { phoneNumber: signupPhoneE164 } : {}),
         },
         sessionToken: sessionToken || undefined,
@@ -274,8 +345,8 @@ export default function FreelancerOnboardingPage() {
               Tell us about your work
             </h1>
             <p className="text-muted-foreground leading-relaxed">
-              Just the basics — you can add a portfolio, links, timezone and more from your profile
-              once you&apos;re in.
+              Just the basics — we ask for one professional link for your category here; you can add
+              more detail, timezone, and extra links from your profile later.
             </p>
           </div>
 
@@ -526,6 +597,101 @@ export default function FreelancerOnboardingPage() {
                     </div>
                   )}
                 </div>
+
+                {formData.techField && requiresGithubUrl(formData.techField) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="githubUrl" className="text-sm font-medium">
+                      GitHub profile URL <span className="text-destructive">*</span>
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Required for engineering and related categories. Use your profile or org on github.com.
+                    </p>
+                    <Input
+                      id="githubUrl"
+                      type="url"
+                      inputMode="url"
+                      autoComplete="url"
+                      placeholder="https://github.com/yourusername"
+                      value={formData.githubUrl}
+                      onChange={(e) =>
+                        setFormData({ ...formData, githubUrl: e.target.value })
+                      }
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                )}
+
+                {formData.techField && requiresBehanceUrl(formData.techField) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="behanceUrl" className="text-sm font-medium">
+                      Behance profile URL <span className="text-destructive">*</span>
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Required for design roles. Link to your work on behance.net.
+                    </p>
+                    <Input
+                      id="behanceUrl"
+                      type="url"
+                      inputMode="url"
+                      autoComplete="url"
+                      placeholder="https://www.behance.net/yourname"
+                      value={formData.behanceUrl}
+                      onChange={(e) =>
+                        setFormData({ ...formData, behanceUrl: e.target.value })
+                      }
+                      disabled={isLoading}
+                      className="h-11"
+                    />
+                  </div>
+                )}
+
+                {formData.techField && requiresProfessionalLink(formData.techField) && (
+                  <div className="space-y-4 rounded-lg border border-border/80 bg-muted/20 p-4">
+                    <p className="text-sm font-medium">
+                      LinkedIn or portfolio <span className="text-destructive">*</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      For your category, add at least one so clients can verify your work.
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="linkedinUrl" className="text-sm font-medium">
+                        LinkedIn URL
+                      </Label>
+                      <Input
+                        id="linkedinUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="url"
+                        placeholder="https://www.linkedin.com/in/…"
+                        value={formData.linkedinUrl}
+                        onChange={(e) =>
+                          setFormData({ ...formData, linkedinUrl: e.target.value })
+                        }
+                        disabled={isLoading}
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="portfolioUrl" className="text-sm font-medium">
+                        Portfolio / website
+                      </Label>
+                      <Input
+                        id="portfolioUrl"
+                        type="url"
+                        inputMode="url"
+                        autoComplete="url"
+                        placeholder="https://your-site.com"
+                        value={formData.portfolioUrl}
+                        onChange={(e) =>
+                          setFormData({ ...formData, portfolioUrl: e.target.value })
+                        }
+                        disabled={isLoading}
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="phoneNumber" className="text-sm font-medium">
