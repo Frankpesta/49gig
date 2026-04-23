@@ -78,10 +78,29 @@ export const getDisputes = query({
               (project.matchedFreelancerIds?.includes(user._id) ?? false);
             const isClient = project.clientId === user._id;
             if (isFreelancer && !isClient) {
-              lockedAmount = clientLockedGrossToFreelancerEscrowPool(
+              const feePct = project.platformFee ?? defaultPlatformFee;
+              const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
                 d.lockedAmount,
-                project.platformFee ?? defaultPlatformFee
+                feePct
               );
+              const teamBasis = teamBasisUserIdsForDispute(d, project);
+              const isTeamDispute = teamBasis.length > 1;
+
+              if (isTeamDispute) {
+                // Show only this freelancer's individual share of the net pool
+                const totalPoolCents = Math.round(fullNetPool * 100);
+                const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+                  ctx,
+                  d.projectId,
+                  teamBasis,
+                  project.teamBudgetBreakdown,
+                  totalPoolCents
+                );
+                const myShareCents = shareMap.get(String(user._id)) ?? 0;
+                lockedAmount = Math.round(myShareCents) / 100;
+              } else {
+                lockedAmount = fullNetPool;
+              }
             }
           }
           return {
@@ -276,18 +295,40 @@ export const getDispute = query({
       })
     );
 
-    // Task 9: Role-based visibility of resolution notes and locked amount
+    // Role-based visibility of resolution notes and locked amount
     let visibleResolution = dispute.resolution;
-    // Stored lockedAmount is client gross (includes platform fee). Freelancers see net escrow pool.
+    // Stored lockedAmount is client gross (includes platform fee).
+    // Freelancers see only their individual net share.
     let visibleLockedAmount = dispute.lockedAmount;
+
     const isFreelancerParty =
       user.role === "freelancer" &&
       viewerIsDisputeParty(user._id, project, dispute);
+
     if (isFreelancerParty && !isAdminOrModerator) {
-      visibleLockedAmount = clientLockedGrossToFreelancerEscrowPool(
+      const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
         dispute.lockedAmount,
         feePctForViews
       );
+      const teamBasis = teamBasisUserIdsForDispute(dispute, project);
+      const isTeamDispute = teamBasis.length > 1;
+
+      if (isTeamDispute) {
+        // Show only this freelancer's individual share of the net pool,
+        // using the same teamBudgetBreakdown logic as fund release.
+        const totalPoolCents = Math.round(fullNetPool * 100);
+        const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+          ctx,
+          dispute.projectId,
+          teamBasis,
+          project.teamBudgetBreakdown,
+          totalPoolCents
+        );
+        const myShareCents = shareMap.get(String(user._id)) ?? 0;
+        visibleLockedAmount = Math.round(myShareCents) / 100;
+      } else {
+        visibleLockedAmount = fullNetPool;
+      }
     }
 
     if (dispute.resolution && !isAdminOrModerator) {
@@ -565,7 +606,7 @@ export const computeDisputedTeamEscrowNetCentsFromDisputeInternal = internalQuer
   },
 });
 
-/** Disputed members’ share of a specific monthly cycle amount (team rules). */
+/** Disputed members' share of a specific monthly cycle amount (team rules). */
 export const computeDisputedMonthlyCycleShareCentsInternal = internalQuery({
   args: { disputeId: v.id("disputes") },
   handler: async (ctx, args) => {

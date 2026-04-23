@@ -52,6 +52,7 @@ type AdminChartData = {
     pending_funding: number;
     funded: number;
     matching: number;
+    awaiting_freelancer: number;
     matched: number;
     in_progress: number;
     completed: number;
@@ -189,7 +190,7 @@ export function AdminCharts({
         </CardHeader>
         <CardContent className="h-[280px] pt-6">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data.projectStatusByMonth}>
+            <AreaChart data={data.projectStatusByMonth ?? []}>
               <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
               <XAxis dataKey="month" tickLine={false} axisLine={false} />
               <YAxis tickLine={false} axisLine={false} />
@@ -199,6 +200,7 @@ export function AdminCharts({
               <Area type="monotone" dataKey="pending_funding" stackId="1" fill="#f59e0b" stroke="#f59e0b" />
               <Area type="monotone" dataKey="funded" stackId="1" fill="#22c55e" stroke="#22c55e" />
               <Area type="monotone" dataKey="matching" stackId="1" fill="#0ea5e9" stroke="#0ea5e9" />
+              <Area type="monotone" dataKey="awaiting_freelancer" stackId="1" fill="#a855f7" stroke="#a855f7" />
               <Area type="monotone" dataKey="matched" stackId="1" fill="#6366f1" stroke="#6366f1" />
               <Area type="monotone" dataKey="in_progress" stackId="1" fill="#14b8a6" stroke="#14b8a6" />
               <Area type="monotone" dataKey="completed" stackId="1" fill="#22c55e" stroke="#22c55e" />

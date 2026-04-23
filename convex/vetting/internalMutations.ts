@@ -179,3 +179,68 @@ export const updateSkillTestSessionIds = internalMutation({
     return { ok: true };
   },
 });
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+const internalAny = require("../_generated/api").internal as any;
+
+/**
+ * Remove freelancer after verification failure (same outcome as failing a retake).
+ * Invoked synchronously from other mutations or after a delayed scheduler run for weighted-score failure.
+ */
+export const terminateFreelancerVerificationFailure = internalMutation({
+  args: {
+    freelancerId: v.id("users"),
+    vettingResultId: v.id("vettingResults"),
+    reason: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const freelancer = await ctx.db.get(args.freelancerId);
+    if (!freelancer || freelancer.status !== "active") {
+      return { skipped: true as const };
+    }
+    const vettingRow = await ctx.db.get(args.vettingResultId);
+    if (!vettingRow || vettingRow.freelancerId !== args.freelancerId) {
+      return { skipped: true as const };
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.vettingResultId, {
+      status: "rejected",
+      weightedTerminationJobScheduled: undefined,
+      weightedFailureScheduledFor: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.patch(args.freelancerId, {
+      status: "deleted",
+      verificationStatus: "rejected",
+      updatedAt: now,
+    });
+
+    await ctx.runMutation(internalAny.auth.sessions.revokeAllSessionsForUserInternal, {
+      userId: args.freelancerId,
+      reason: "verification_terminated",
+    });
+
+    await ctx.scheduler.runAfter(
+      0,
+      internalAny.vetting.staffEmails.sendVerificationTerminatedEmailInternal,
+      {
+        email: freelancer.email ?? "",
+        name: freelancer.name ?? "there",
+      }
+    );
+
+    await ctx.db.insert("auditLogs", {
+      action: "freelancer_removed_failed_verification_twice",
+      actionType: "system",
+      actorId: args.freelancerId,
+      actorRole: freelancer.role,
+      targetType: "vettingResult",
+      targetId: args.vettingResultId,
+      details: { reason: args.reason },
+      createdAt: now,
+    });
+
+    return { skipped: false as const };
+  },
+});

@@ -221,6 +221,21 @@ export const updateProfile = mutation({
   },
 });
 
+/** Records that the incomplete-verification reminder cron emailed this user (cooldown). */
+export const markVerificationIncompleteReminderSentInternal = internalMutation({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return;
+    await ctx.db.patch(args.userId, {
+      verificationIncompleteReminderSentAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 /**
  * Called from Twilio Verify action after successful SMS code check.
  */

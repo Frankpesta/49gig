@@ -16,6 +16,10 @@ import { SkillTestPathFlow } from "@/components/vetting/skill-test-path-flow";
 import { KycStep } from "@/components/vetting/kyc-step";
 import { useRouter } from "next/navigation";
 
+/** Matches backend copy when weighted score stays below threshold after all attempts (see completeVerification). */
+const WEIGHTED_FAILURE_RESUME_COPY =
+  "Unfortunately you did not meet our minimum weighted score (50% across English and skills) after completing every attempt. You cannot join 49GIG as a freelancer at this time. Keep practicing your craft — when you're ready, you're welcome to try again in the future.";
+
 export default function OnboardingVerificationPage() {
   const { user, isAuthenticated } = useAuth();
   const verificationStatus = useQuery(
@@ -26,6 +30,17 @@ export default function OnboardingVerificationPage() {
   const completeVerification = useMutation(api.vetting.mutations.completeVerification);
   const [submitting, setSubmitting] = useState(false);
   const [accountDeletedMessage, setAccountDeletedMessage] = useState<string | null>(null);
+  const [weightedFailureNotice, setWeightedFailureNotice] = useState<string | null>(null);
+  /** Until Convex subscription returns weightedFailureScheduledFor, keep countdown from submit response. */
+  const [weightedLocalDeadline, setWeightedLocalDeadline] = useState<number | null>(null);
+
+  const router = useRouter();
+
+  useEffect(() => {
+    if (verificationStatus?.vettingResult?.weightedFailureScheduledFor != null) {
+      setWeightedLocalDeadline(null);
+    }
+  }, [verificationStatus?.vettingResult?.weightedFailureScheduledFor]);
 
   if (verificationStatus === undefined) {
     return (
@@ -56,7 +71,6 @@ export default function OnboardingVerificationPage() {
   const { verificationStatus: status, vettingResult, kycStatus } = verificationStatus;
   const stepsCompleted = vettingResult?.stepsCompleted || [];
   const currentStep = vettingResult?.currentStep || "english";
-  const router = useRouter();
   const vettingComplete = stepsCompleted.includes("english") && stepsCompleted.includes("skills");
   const kycComplete = kycStatus === "approved";
   const canTakeTests =
@@ -78,6 +92,25 @@ export default function OnboardingVerificationPage() {
     kycStatus === "pending_review" &&
     status === "pending_review" &&
     vettingResult?.status !== "rejected";
+
+  const weightedRemovalDeadline =
+    vettingResult?.weightedTerminationJobScheduled && vettingResult.weightedFailureScheduledFor != null
+      ? vettingResult.weightedFailureScheduledFor
+      : weightedLocalDeadline;
+
+  const weightedRemovalPending =
+    weightedRemovalDeadline != null && weightedRemovalDeadline > Date.now();
+
+  if (weightedRemovalPending && weightedRemovalDeadline != null) {
+    return (
+      <div className="mx-auto max-w-lg space-y-6 py-8">
+        <WeightedFailureFinalization
+          deadlineMs={weightedRemovalDeadline}
+          bodyText={weightedFailureNotice ?? WEIGHTED_FAILURE_RESUME_COPY}
+        />
+      </div>
+    );
+  }
 
   if (awaitingAdminAfterKyc) {
     return (
@@ -457,7 +490,8 @@ export default function OnboardingVerificationPage() {
                               : englishAttemptRound >= 1
                                 ? " English section"
                                 : " skill section"}
-                            . If your score is below 50% when you submit, your account will be closed for this cycle.
+                            . If any section is below 50% or your overall weighted score is below 50% when you submit,
+                            your account will be closed for this cycle.
                           </p>
                         </div>
                       )}
@@ -468,7 +502,15 @@ export default function OnboardingVerificationPage() {
                           setAccountDeletedMessage(null);
                           try {
                             const result = await completeVerification(user?._id ? { userId: user._id } : {});
-                            if (result.accountDeleted) {
+                            const r = result as {
+                              weightedFailurePending?: boolean;
+                              countdownSeconds?: number;
+                              message?: string;
+                            };
+                            if (r.weightedFailurePending) {
+                              if (r.message) setWeightedFailureNotice(r.message);
+                              setWeightedLocalDeadline(Date.now() + (r.countdownSeconds ?? 15) * 1000);
+                            } else if (result.accountDeleted) {
                               setAccountDeletedMessage(result.message ?? "Your account has been removed.");
                               setTimeout(() => router.push("/login"), 4000);
                             } else if (!result.success && result.message) {
@@ -531,6 +573,60 @@ export default function OnboardingVerificationPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function WeightedFailureFinalization({
+  deadlineMs,
+  bodyText,
+}: {
+  deadlineMs: number;
+  bodyText: string;
+}) {
+  const router = useRouter();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, []);
+
+  const remainingSec = Math.max(0, Math.ceil((deadlineMs - now) / 1000));
+
+  useEffect(() => {
+    if (remainingSec <= 0) {
+      router.replace("/login");
+    }
+  }, [remainingSec, router]);
+
+  return (
+    <Card className="rounded-2xl border-destructive/40 bg-destructive/5 shadow-sm">
+      <CardHeader>
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/15">
+          <XCircle className="h-6 w-6 text-destructive" />
+        </div>
+        <CardTitle className="text-center text-xl">Unable to meet verification requirements</CardTitle>
+        <CardDescription className="text-center text-base leading-relaxed">
+          Your weighted assessment score did not reach our minimum bar after all attempts.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5 pb-8">
+        <p className="text-sm text-muted-foreground leading-relaxed">{bodyText}</p>
+        <div className="rounded-xl border border-destructive/30 bg-background/80 p-4 text-center space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Closing your account in
+          </p>
+          <p className="font-mono text-3xl font-semibold tabular-nums text-destructive">{remainingSec}s</p>
+          <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+            We&apos;ll send you the same follow-up email as for other unsuccessful attempts, then remove your account
+            from the platform.
+          </p>
+        </div>
+        {remainingSec <= 0 && (
+          <p className="text-center text-sm text-muted-foreground">Redirecting…</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
