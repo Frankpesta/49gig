@@ -1,6 +1,6 @@
 import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import { getCurrentUser } from "../auth";
 import {
   getFreelancerMatchingReadinessIssues,
@@ -288,6 +288,54 @@ export const getModeratorsAndAdminsInternal = internalQuery({
         u.status === "active" &&
         (u.role === "moderator" || u.role === "admin")
     ).map((u) => ({ _id: u._id, name: u.name, email: u.email }));
+  },
+});
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Freelancers who signed up but have not finished verification (cron reminder emails).
+ */
+export const listFreelancersNeedingVerificationReminderInternal = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const minAccountAgeMs = 2 * DAY_MS;
+    const reminderCooldownMs = 7 * DAY_MS;
+
+    const freelancers = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "freelancer"))
+      .collect();
+
+    const eligible: Array<{ userId: Id<"users">; email: string; name: string }> = [];
+
+    for (const u of freelancers) {
+      if (u.status !== "active" || !u.email) continue;
+
+      const verification = u.verificationStatus ?? "not_started";
+      if (verification !== "not_started" && verification !== "in_progress") continue;
+
+      if (now - u.createdAt < minAccountAgeMs) continue;
+
+      const last = u.verificationIncompleteReminderSentAt ?? 0;
+      if (now - last < reminderCooldownMs) continue;
+
+      const vetting = await ctx.db
+        .query("vettingResults")
+        .withIndex("by_freelancer", (q) => q.eq("freelancerId", u._id))
+        .first();
+
+      if (vetting?.weightedTerminationJobScheduled) continue;
+
+      eligible.push({
+        userId: u._id,
+        email: u.email,
+        name: u.name ?? "there",
+      });
+    }
+
+    return eligible;
   },
 });
 

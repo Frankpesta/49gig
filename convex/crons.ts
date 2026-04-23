@@ -63,4 +63,11 @@ crons.interval(
   internal.referrals.internalMutations.creditDueReferralAccruals
 );
 
+// Nudge freelancers who have not finished verification (cooldown per user in DB)
+crons.daily(
+  "incomplete freelancer verification reminders",
+  { hourUTC: 11, minuteUTC: 30 },
+  internal["cron/vetting"].sendIncompleteVerificationReminders
+);
+
 export default crons;

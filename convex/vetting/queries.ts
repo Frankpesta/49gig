@@ -92,6 +92,8 @@ export const getVerificationStatus = query({
             skillsRetakeAvailableAt: vettingResult.skillsRetakeAvailableAt,
             usedMcqQuestionIds: vettingResult.usedMcqQuestionIds,
             usedCodingPromptIds: vettingResult.usedCodingPromptIds,
+            weightedTerminationJobScheduled: vettingResult.weightedTerminationJobScheduled ?? false,
+            weightedFailureScheduledFor: vettingResult.weightedFailureScheduledFor,
           }
         : null,
       kycSubmission: kycSubmission

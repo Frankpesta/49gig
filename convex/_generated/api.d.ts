@@ -38,6 +38,7 @@ import type * as cron_monthlyCycles from "../cron/monthlyCycles.js";
 import type * as cron_paymentFollowUp from "../cron/paymentFollowUp.js";
 import type * as cron_projects from "../cron/projects.js";
 import type * as cron_sessions from "../cron/sessions.js";
+import type * as cron_vetting from "../cron/vetting.js";
 import type * as crons from "../crons.js";
 import type * as currencyPolicy from "../currencyPolicy.js";
 import type * as dashboard_queries from "../dashboard/queries.js";
@@ -159,6 +160,7 @@ declare const fullApi: ApiFromModules<{
   "cron/paymentFollowUp": typeof cron_paymentFollowUp;
   "cron/projects": typeof cron_projects;
   "cron/sessions": typeof cron_sessions;
+  "cron/vetting": typeof cron_vetting;
   crons: typeof crons;
   currencyPolicy: typeof currencyPolicy;
   "dashboard/queries": typeof dashboard_queries;

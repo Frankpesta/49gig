@@ -15,6 +15,9 @@ export const MIN_PERCENT_TO_PASS = 50;
  */
 export const RETAKE_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
+/** After final submit, if weighted score is below minimum, UI shows a countdown before account removal + email. */
+export const WEIGHTED_FAILURE_COUNTDOWN_MS = 15_000;
+
 /** English composite: simple average of grammar, comprehension, written (each 0–100). */
 export function englishCompositeFromVetting(
   english: Doc<"vettingResults">["englishProficiency"]

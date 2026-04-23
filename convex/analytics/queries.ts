@@ -257,6 +257,33 @@ export const getAdminChartData = query({
       };
     });
 
+    const emptyStatusRow = () => ({
+      draft: 0,
+      pending_funding: 0,
+      funded: 0,
+      matching: 0,
+      awaiting_freelancer: 0,
+      matched: 0,
+      in_progress: 0,
+      completed: 0,
+      cancelled: 0,
+      disputed: 0,
+    });
+
+    const projectStatusByMonth = months.map((month) => {
+      const monthProjects = allProjects.filter(
+        (p) => p.createdAt >= month.start && p.createdAt < month.end
+      );
+      const row = emptyStatusRow();
+      for (const p of monthProjects) {
+        const k = p.status as keyof typeof row;
+        if (k in row) {
+          row[k] += 1;
+        }
+      }
+      return { month: month.label, ...row };
+    });
+
     const projectStatusCounts: Record<string, number> = {};
     for (const project of allProjects) {
       projectStatusCounts[project.status] =
@@ -273,6 +300,7 @@ export const getAdminChartData = query({
       usersByMonth,
       revenueByMonth,
       projectsByMonth,
+      projectStatusByMonth,
       projectStatus: Object.entries(projectStatusCounts).map(([name, value]) => ({
         name,
         value,

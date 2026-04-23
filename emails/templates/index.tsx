@@ -635,6 +635,39 @@ export function VerificationTerminatedEmail({
   );
 }
 
+export function VerificationIncompleteReminderEmail({
+  name = "there",
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps) {
+  const verifyUrl = `${appUrl}/onboarding/verification`;
+  return (
+    <EmailLayout
+      preview="Complete your freelancer verification on 49GIG to get matched with clients."
+      heroLabel="Verification"
+      heroTitle="Finish your verification"
+      heroAccent="Finish"
+      heroSubtitle={"You're almost set — complete the remaining steps so we can review your application."}
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>,
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        Your 49GIG freelancer account still has open verification steps. Log in and continue where you left off —
+        English and skills assessments, then KYC when tests are passed.
+      </Text>
+      <Text style={mutedTextStyle}>
+        Completing verification is required before you can be matched with client projects.
+      </Text>
+      <EmailButton href={verifyUrl}>Continue verification</EmailButton>
+    </EmailLayout>
+  );
+}
+
 export function DisputeUpdateEmail({
   name = "there",
   headline,

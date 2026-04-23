@@ -178,17 +178,22 @@ export function TeamCollaborationCard({
   members,
   isLoading,
   onAddHref,
+  title = "Team Collaboration",
+  emptyLabel = "No team members",
 }: {
   members?: Array<{ name: string; task: string; status: "completed" | "in_progress" | "pending" }>;
   isLoading?: boolean;
   onAddHref?: string;
+  /** e.g. admin dashboard: "Team hires" */
+  title?: string;
+  emptyLabel?: string;
 }) {
   const displayMembers = members ?? [];
 
   return (
     <Card className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
-        <CardTitle className="text-base font-semibold">Team Collaboration</CardTitle>
+        <CardTitle className="text-base font-semibold">{title}</CardTitle>
         {onAddHref && (
           <Button asChild variant="ghost" size="sm" className="h-7 rounded-lg text-xs">
             <Link href={onAddHref}>
@@ -206,7 +211,7 @@ export function TeamCollaborationCard({
             ))}
           </div>
         ) : displayMembers.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-4">No team members</p>
+          <p className="text-sm text-muted-foreground py-4">{emptyLabel}</p>
         ) : (
           <ul className="space-y-3">
             {displayMembers.map((member, i) => (
@@ -251,7 +256,7 @@ export function ProjectProgressCard({
   const completedPct = total > 0 ? Math.round((completed / total) * 100) : 0;
   const data = [
     { name: "Completed", value: completed, color: "var(--chart-1)" },
-    { name: "In Progress", value: inProgress, color: "var(--chart-2)" },
+    { name: "Active hires", value: inProgress, color: "var(--chart-2)" },
     { name: "Pending", value: pending, color: "var(--muted-foreground)" },
   ].filter((d) => d.value > 0);
 
@@ -304,7 +309,7 @@ export function ProjectProgressCard({
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-(--chart-2)" />
-                <span className="text-muted-foreground">In Progress</span>
+                <span className="text-muted-foreground">Active hires</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-muted-foreground" />

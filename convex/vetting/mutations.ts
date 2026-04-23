@@ -7,6 +7,7 @@ import {
   weightedVerificationOverall,
   MIN_PERCENT_TO_PASS,
   RETAKE_COOLDOWN_MS,
+  WEIGHTED_FAILURE_COUNTDOWN_MS,
 } from "./scoring";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
@@ -652,35 +653,10 @@ export const completeVerification = mutation({
     const skRound = vettingRow.skillsAttemptRound ?? 0;
 
     async function hardFailVerification(reason: string) {
-      const now = Date.now();
-      await ctx.db.patch(vettingRow._id, {
-        status: "rejected",
-        updatedAt: now,
-      });
-      await ctx.db.patch(freelancer._id, {
-        status: "deleted",
-        verificationStatus: "rejected",
-        updatedAt: now,
-      });
-      await ctx.runMutation(internalAny.auth.sessions.revokeAllSessionsForUserInternal, {
-        userId: freelancer._id,
-        reason: "verification_terminated",
-      });
-      await (
-        ctx.scheduler.runAfter as (d: number, fn: unknown, a: Record<string, unknown>) => Promise<unknown>
-      )(0, internalAny.vetting.staffEmails.sendVerificationTerminatedEmailInternal, {
-        email: freelancer.email ?? "",
-        name: freelancer.name ?? "there",
-      });
-      await ctx.db.insert("auditLogs", {
-        action: "freelancer_removed_failed_verification_twice",
-        actionType: "system",
-        actorId: freelancer._id,
-        actorRole: freelancer.role,
-        targetType: "vettingResult",
-        targetId: vettingRow._id,
-        details: { reason },
-        createdAt: now,
+      await ctx.runMutation(internalAny.vetting.internalMutations.terminateFreelancerVerificationFailure, {
+        freelancerId: freelancer._id,
+        vettingResultId: vettingRow._id,
+        reason,
       });
     }
 
@@ -813,13 +789,6 @@ export const completeVerification = mutation({
       };
     }
 
-    const proc = vettingRow.proctoringSummary;
-    if (!proc?.englishProctoringReadyAt || !proc?.skillsProctoringReadyAt) {
-      throw new Error(
-        "Enable your webcam for both the English and skill assessments before submitting. Open each section, allow camera access, then submit again."
-      );
-    }
-
     const overallScore =
       weightedVerificationOverall(vettingRow) ??
       calculateOverallScore({
@@ -828,7 +797,67 @@ export const completeVerification = mutation({
       });
 
     if (overallScore < MIN_PERCENT) {
-      throw new Error(`Your weighted verification score must be at least ${MIN_PERCENT}% to submit KYC.`);
+      const encouragingMessage =
+        `Unfortunately you did not meet our minimum weighted score (${MIN_PERCENT}% across English and skills) after completing every attempt. You cannot join 49GIG as a freelancer at this time. Keep practicing your craft — when you're ready, you're welcome to try again in the future.`;
+
+      if (vettingRow.weightedTerminationJobScheduled && vettingRow.weightedFailureScheduledFor != null) {
+        const remainingMs = vettingRow.weightedFailureScheduledFor - Date.now();
+        return {
+          success: false,
+          weightedFailurePending: true as const,
+          countdownSeconds: Math.max(0, Math.ceil(remainingMs / 1000)),
+          overallScore,
+          accountDeleted: false,
+          status: "rejected" as const,
+          message: encouragingMessage,
+        };
+      }
+
+      const deadline = Date.now() + WEIGHTED_FAILURE_COUNTDOWN_MS;
+      await ctx.db.patch(vettingRow._id, {
+        overallScore,
+        weightedTerminationJobScheduled: true,
+        weightedFailureScheduledFor: deadline,
+        updatedAt: Date.now(),
+      });
+
+      await ctx.scheduler.runAfter(
+        WEIGHTED_FAILURE_COUNTDOWN_MS,
+        internalAny.vetting.internalMutations.terminateFreelancerVerificationFailure,
+        {
+          freelancerId: freelancer._id,
+          vettingResultId: vettingRow._id,
+          reason: "weighted_below_minimum_final",
+        }
+      );
+
+      await ctx.db.insert("auditLogs", {
+        action: "verification_weighted_below_minimum_scheduled_removal",
+        actionType: "system",
+        actorId: freelancer._id,
+        actorRole: freelancer.role,
+        targetType: "vettingResult",
+        targetId: vettingRow._id,
+        details: { overallScore, minRequired: MIN_PERCENT, removalScheduledFor: deadline },
+        createdAt: Date.now(),
+      });
+
+      return {
+        success: false,
+        weightedFailurePending: true as const,
+        countdownSeconds: Math.ceil(WEIGHTED_FAILURE_COUNTDOWN_MS / 1000),
+        overallScore,
+        accountDeleted: false,
+        status: "rejected" as const,
+        message: encouragingMessage,
+      };
+    }
+
+    const proc = vettingRow.proctoringSummary;
+    if (!proc?.englishProctoringReadyAt || !proc?.skillsProctoringReadyAt) {
+      throw new Error(
+        "Enable your webcam for both the English and skill assessments before submitting. Open each section, allow camera access, then submit again."
+      );
     }
 
     const now = Date.now();

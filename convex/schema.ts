@@ -152,6 +152,8 @@ export default defineSchema({
       )
     ),
     verificationCompletedAt: v.optional(v.number()),
+    /** Last time we emailed a nudge to finish freelancer verification (cooldown between sends). */
+    verificationIncompleteReminderSentAt: v.optional(v.number()),
 
     // KYC (freelancers): required for matching; approved = can be matched
     kycStatus: v.optional(
@@ -803,6 +805,10 @@ export default defineSchema({
         lastMetricsAt: v.optional(v.number()),
       })
     ),
+
+    /** Weighted score failed on final submit; account deletion scheduled after WEIGHTED_FAILURE_COUNTDOWN_MS. */
+    weightedTerminationJobScheduled: v.optional(v.boolean()),
+    weightedFailureScheduledFor: v.optional(v.number()),
 
     // Immutable Audit
     createdAt: v.number(),

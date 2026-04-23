@@ -40,6 +40,14 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { Doc } from "@/convex/_generated/dataModel";
 
+/** Hire is active (work ongoing, acceptance pending, or under dispute) */
+const ACTIVE_HIRE_STATUSES = [
+  "matched",
+  "in_progress",
+  "awaiting_freelancer",
+  "disputed",
+] as const;
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [adminRangeDays, setAdminRangeDays] = useState(90);
@@ -105,31 +113,69 @@ export default function DashboardPage() {
     });
   }, [projects]);
 
-  // Project progress (completed, in progress, pending)
+  // Project progress (completed, active hires, pipeline — every status counted once)
   const projectProgress = useMemo(() => {
     if (!projects) return { completed: 0, inProgress: 0, pending: 0 };
-    const completed = projects.filter((p: any) => p.status === "completed").length;
-    const inProgress = projects.filter((p: any) =>
-      ["matched", "in_progress"].includes(p.status)
+    const completed = projects.filter((p: Doc<"projects">) => p.status === "completed").length;
+    const inProgress = projects.filter((p: Doc<"projects">) =>
+      (ACTIVE_HIRE_STATUSES as readonly string[]).includes(p.status)
     ).length;
-    const pending = projects.filter((p: any) =>
+    const pending = projects.filter((p: Doc<"projects">) =>
       ["draft", "pending_funding", "funded", "matching"].includes(p.status)
     ).length;
     return { completed, inProgress, pending };
   }, [projects]);
 
-  // Team collaboration - for clients: freelancers on active projects
+  // Team collaboration — clients: freelancers on active hires; admins: team hire projects
   const teamMembers = useMemo(() => {
-    if (!projects || !isClient) return [];
-    const active = projects.filter((p: any) =>
-      ["matched", "in_progress"].includes(p.status)
-    );
-    return active.slice(0, 4).map((p: any) => ({
-      name: p.matchedFreelancerName ?? "Freelancer",
-      task: p.intakeForm?.title ?? (isClient ? "Working on hire" : "Working on project"),
-      status: (p.status === "completed" ? "completed" : "in_progress") as "in_progress" | "completed" | "pending",
-    }));
-  }, [projects, isClient]);
+    if (!projects) return [];
+    if (isAdmin) {
+      const teamProjects = projects.filter((p: Doc<"projects">) => {
+        if (p.intakeForm?.hireType !== "team") return false;
+        if (
+          p.status === "completed" ||
+          p.status === "cancelled"
+        ) {
+          return false;
+        }
+        return true;
+      });
+      return teamProjects.slice(0, 8).map((p: Doc<"projects">) => {
+        const matchedCount =
+          (p.matchedFreelancerIds?.length ?? 0) ||
+          (p.matchedFreelancerId ? 1 : 0);
+        const task = `Team hire · ${matchedCount} freelancer${matchedCount === 1 ? "" : "s"} matched`;
+        let status: "completed" | "in_progress" | "pending" = "in_progress";
+        if (
+          ["draft", "pending_funding", "funded", "matching"].includes(p.status)
+        ) {
+          status = "pending";
+        } else if (p.status === "completed") {
+          status = "completed";
+        }
+        return {
+          name: p.intakeForm?.title ?? "Untitled team hire",
+          task,
+          status,
+        };
+      });
+    }
+    if (isClient) {
+      const active = projects.filter((p: Doc<"projects">) =>
+        (ACTIVE_HIRE_STATUSES as readonly string[]).includes(p.status)
+      );
+      return active.slice(0, 4).map((p: any) => ({
+        name: p.matchedFreelancerName ?? "Freelancer",
+        task:
+          p.intakeForm?.title ??
+          (isClient ? "Working on hire" : "Working on project"),
+        status: (p.status === "completed"
+          ? "completed"
+          : "in_progress") as "in_progress" | "completed" | "pending",
+      }));
+    }
+    return [];
+  }, [projects, isAdmin, isClient]);
 
   if (!user) {
     return null;
@@ -347,6 +393,8 @@ export default function DashboardPage() {
         />
 
         <TeamCollaborationCard
+          title={isAdmin ? "Team hires" : undefined}
+          emptyLabel={isAdmin ? "No team hires on the platform yet" : undefined}
           members={teamMembers}
           isLoading={projects === undefined}
           onAddHref={isClient ? "/dashboard/projects/create" : undefined}
