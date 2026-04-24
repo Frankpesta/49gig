@@ -184,6 +184,7 @@ export default function ProjectDetailPage() {
   );
 
   const teamHireIsClientOrStaff =
+    !!user &&
     !!project &&
     project.intakeForm.hireType === "team" &&
     (user._id === project.clientId ||
