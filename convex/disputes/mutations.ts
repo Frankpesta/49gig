@@ -340,6 +340,9 @@ export const initiateDispute = mutation({
       teamMemberIds.length > 0 &&
       disputedIdsUnique.length < teamMemberIds.length;
 
+    // Client gross that corresponds to all net escrow (cannot lock more than this for a partial team dispute).
+    const fullEscrowClientGross = escrowNetToClientLockedGross(escrowNet, platformFeePct);
+
     let lockedAmount: number;
     if (isPartialTeamDispute && disputedIdsUnique) {
       const totalPoolCents = Math.round(escrowNet * 100);
@@ -356,8 +359,9 @@ export const initiateDispute = mutation({
       );
       lockedAmount = escrowNetToClientLockedGross(disputedNetCents / 100, platformFeePct);
     } else {
-      lockedAmount = escrowNetToClientLockedGross(escrowNet, platformFeePct);
+      lockedAmount = fullEscrowClientGross;
     }
+    lockedAmount = Math.min(lockedAmount, fullEscrowClientGross);
 
     // Create dispute
     const disputeId = await ctx.db.insert("disputes", {

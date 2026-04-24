@@ -183,6 +183,19 @@ export default function ProjectDetailPage() {
     user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
 
+  const teamHireIsClientOrStaff =
+    !!project &&
+    project.intakeForm.hireType === "team" &&
+    (user._id === project.clientId ||
+      user.role === "admin" ||
+      user.role === "moderator");
+  const teamEscrowBudget = useQuery(
+    (api as any)["projects/queries"].getTeamHireEscrowBudgetBreakdown,
+    user?._id && projectId && teamHireIsClientOrStaff
+      ? { projectId: String(projectId), userId: user._id }
+      : "skip"
+  );
+
   const monthlyCycles = useQuery(
     api.monthlyBillingCycles.queries.getCyclesByProjectId,
     projectId ? { projectId } : "skip"
@@ -1335,28 +1348,83 @@ export default function ProjectDetailPage() {
               </div>
               <Separator />
               <div>
-                <div className="text-sm font-medium">
-                  {isClient || isStaff ? "Budget" : "Your earnings (this hire)"}
-                </div>
-                <div className="text-lg font-semibold">
-                  {isClient || isStaff
-                    ? `$${project.totalAmount.toLocaleString()}`
-                    : freelancerNetEngagementTotalUsd != null
-                      ? `$${freelancerNetEngagementTotalUsd.toLocaleString(undefined, {
+                <div className="text-sm font-medium">Budget</div>
+                {isTeamHire && (isClient || isStaff) ? (
+                  teamEscrowBudget === undefined ? (
+                    <Skeleton className="h-8 w-36 mt-1" />
+                  ) : teamEscrowBudget == null ? (
+                    <p className="text-xs text-muted-foreground mt-1">Budget details unavailable.</p>
+                  ) : (
+                    <>
+                      <div className="text-lg font-semibold mt-0.5">
+                        $
+                        {teamEscrowBudget.totalGross.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
-                        })}`
-                      : `$${((project.totalAmount * (100 - (project.platformFee ?? DEFAULT_PLATFORM_FEE_PERCENT))) / 100).toLocaleString()}`}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {isClient
-                    ? "Total amount for this hire"
-                    : isStaff
-                      ? "Hire total (staff view)"
-                      : isTeamHire
-                        ? "Estimated total you'll earn over the engagement (your seat's share of this team hire, net of fees)."
-                        : "Estimated total you'll earn over the engagement (net of platform fee)."}
-                </div>
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Total gross (funded in escrow, incl. {teamEscrowBudget.platformFeePercent}%
+                        platform fee)
+                      </p>
+                      {teamEscrowBudget.rows.length > 0 && (
+                        <ul className="mt-3 space-y-3 border-t border-border pt-3">
+                          {teamEscrowBudget.rows.map((row) => (
+                            <li key={String(row.freelancerId)} className="text-xs space-y-0.5">
+                              <div className="font-medium text-foreground">
+                                {row.name}
+                                {row.teamRole ? (
+                                  <span className="text-muted-foreground font-normal">
+                                    {" "}
+                                    · {humanizeTeamRoleKey(row.teamRole)}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="text-muted-foreground">
+                                Net (to freelancer):{" "}
+                                <span className="text-foreground">
+                                  $
+                                  {row.netInEscrow.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </div>
+                              <div className="text-muted-foreground">
+                                Gross (from you):{" "}
+                                <span className="text-foreground">
+                                  $
+                                  {row.grossToClient.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )
+                ) : (
+                  <>
+                    <div className="text-lg font-semibold mt-0.5">
+                      {isClient || isStaff
+                        ? `$${project.totalAmount.toLocaleString()}`
+                        : freelancerNetEngagementTotalUsd != null
+                          ? `$${freelancerNetEngagementTotalUsd.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}`
+                          : `$${((project.totalAmount * (100 - (project.platformFee ?? DEFAULT_PLATFORM_FEE_PERCENT))) / 100).toLocaleString()}`}
+                    </div>
+                    {(isClient || isStaff) && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {isClient ? "Total amount for this hire" : "Hire total (staff view)"}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
               <Separator />
               <div>
@@ -1411,26 +1479,47 @@ export default function ProjectDetailPage() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <User className="h-4 w-4" />
-                      {confirmedTeamMembers.length === 1 ? "Freelancer" : "Team"}
+                      {isMatchedFreelancer && !isClient && !isStaff
+                        ? "You"
+                        : confirmedTeamMembers.length === 1
+                          ? "Freelancer"
+                          : "Team"}
                     </div>
-                    {teamSeatTotal != null && teamSeatTotal > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        {confirmedTeamMembers.length} of {teamSeatTotal} seat
-                        {teamSeatTotal === 1 ? "" : "s"} confirmed
-                      </p>
-                    )}
+                    {(!isMatchedFreelancer || isClient || isStaff) &&
+                      teamSeatTotal != null &&
+                      teamSeatTotal > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {confirmedTeamMembers.length} of {teamSeatTotal} seat
+                          {teamSeatTotal === 1 ? "" : "s"} confirmed
+                        </p>
+                      )}
                     <ul className="space-y-2 text-sm text-muted-foreground">
-                      {confirmedTeamMembers.map((member) => (
-                        <li key={member._id}>
-                          <span className="font-medium text-foreground">{member.name}</span>
-                          {member.teamRole ? (
-                            <span className="text-muted-foreground">
-                              {" "}
-                              · {humanizeTeamRoleKey(member.teamRole)}
-                            </span>
-                          ) : null}
-                        </li>
-                      ))}
+                      {(() => {
+                        const list =
+                          isMatchedFreelancer && !isClient && !isStaff
+                            ? confirmedTeamMembers.filter((m) => m._id === user._id)
+                            : confirmedTeamMembers;
+                        if (list.length === 0 && isMatchedFreelancer && !isClient && !isStaff) {
+                          return (
+                            <li>
+                              <span className="font-medium text-foreground">
+                                {user.name ?? "You"}
+                              </span>
+                            </li>
+                          );
+                        }
+                        return list.map((member) => (
+                          <li key={member._id}>
+                            <span className="font-medium text-foreground">{member.name}</span>
+                            {member.teamRole ? (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                · {humanizeTeamRoleKey(member.teamRole)}
+                              </span>
+                            ) : null}
+                          </li>
+                        ));
+                      })()}
                     </ul>
                   </div>
                 </>
