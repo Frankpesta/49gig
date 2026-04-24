@@ -237,6 +237,108 @@ export const getProjectChat = query({
 });
 
 /**
+ * Project chat messages for dispute evidence: display names and optional
+ * "partial team" filter (client + only disputed freelancers, plus system messages).
+ */
+export const getProjectChatMessagesForDisputeEvidence = query({
+  args: {
+    projectId: v.string(),
+    userId: v.optional(v.id("users")),
+    limit: v.optional(v.number()),
+    evidenceFilter: v.union(
+      v.object({ kind: v.literal("all") }),
+      v.object({
+        kind: v.literal("partial"),
+        disputedFreelancerIds: v.array(v.id("users")),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const projectId = ctx.db.normalizeId("projects", args.projectId);
+    if (!projectId) {
+      return null;
+    }
+
+    const user = args.userId
+      ? await ctx.db.get(args.userId)
+      : await getCurrentUser(ctx);
+
+    if (!user || user.status !== "active") {
+      return null;
+    }
+
+    const project = await ctx.db.get(projectId);
+    if (!project) {
+      return null;
+    }
+
+    const isClient = project.clientId === user._id;
+    const isFreelancer =
+      project.matchedFreelancerId === user._id ||
+      (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
+    const isAdminOrModerator =
+      user.role === "admin" || user.role === "moderator";
+
+    if (!isClient && !isFreelancer && !isAdminOrModerator) {
+      return null;
+    }
+
+    const existingChat = await ctx.db
+      .query("chats")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .first();
+
+    if (!existingChat) {
+      return null;
+    }
+
+    if (args.evidenceFilter.kind === "partial" && args.evidenceFilter.disputedFreelancerIds.length === 0) {
+      return { chatId: existingChat._id, messages: [] };
+    }
+
+    const limit = args.limit ?? 100;
+    const raw = await ctx.db
+      .query("messages")
+      .withIndex("by_chat", (q) => q.eq("chatId", existingChat._id))
+      .order("desc")
+      .take(limit);
+
+    const visible =
+      isAdminOrModerator ? raw : raw.filter((msg) => !msg.isDeleted);
+    const chronological = visible.slice().reverse();
+
+    let toProcess = chronological;
+    if (args.evidenceFilter.kind === "partial") {
+      const allow = new Set<Id<"users">>([
+        project.clientId,
+        ...args.evidenceFilter.disputedFreelancerIds,
+      ]);
+      toProcess = chronological.filter((m) => {
+        if (m.senderRole === "system") {
+          return true;
+        }
+        return allow.has(m.senderId);
+      });
+    }
+
+    const uniqueIds = [...new Set(toProcess.map((m) => m.senderId))];
+    const userDocs = await Promise.all(uniqueIds.map((id) => ctx.db.get(id)));
+    const nameById = new Map<Id<"users">, string>();
+    for (let i = 0; i < uniqueIds.length; i++) {
+      const u = userDocs[i];
+      nameById.set(uniqueIds[i] as Id<"users">, u?.name ?? "Unknown");
+    }
+
+    const messages = toProcess.map((m) => {
+      const senderDisplayName = nameById.get(m.senderId) ?? "Unknown";
+      return { ...m, senderDisplayName };
+    });
+
+    return { chatId: existingChat._id, messages };
+  },
+});
+
+/**
  * Get all project chats (client–freelancer) for admin/moderator.
  * Allows admin to view and separate project communication from support chats.
  */

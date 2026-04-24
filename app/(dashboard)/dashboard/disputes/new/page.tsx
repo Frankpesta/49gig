@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Doc } from "@/convex/_generated/dataModel";
+import { Doc, type Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -492,10 +492,21 @@ export default function NewDisputePage() {
               <div className="space-y-2">
                 <Label>Evidence from Chat</Label>
                 <ChatEvidenceSelector
-                  projectId={formData.projectId as any}
+                  projectId={formData.projectId as Id<"projects">}
                   userId={user._id}
-                  selectedMessages={selectedMessages as any}
+                  selectedMessages={selectedMessages as Id<"messages">[]}
                   onSelectionChange={(ids) => setSelectedMessages(ids as string[])}
+                  teamDisputeMode={
+                    user.role === "client" &&
+                    ((project as { matchedFreelancerIds?: string[] }).matchedFreelancerIds
+                      ?.length ?? 0) > 0
+                      ? {
+                          isTeamHire: true,
+                          scope: disputeScope,
+                          disputedFreelancerIds: disputedFreelancerIds as Id<"users">[],
+                        }
+                      : undefined
+                  }
                 />
               </div>
             )}
