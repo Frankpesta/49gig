@@ -810,6 +810,11 @@ export default defineSchema({
     weightedTerminationJobScheduled: v.optional(v.boolean()),
     weightedFailureScheduledFor: v.optional(v.number()),
 
+    /** Set when a complete verification evaluation finishes (pass, per-section retake, or weighted fail). */
+    verificationEvaluatedAt: v.optional(v.number()),
+    /** If automatic finalization (post–skill test) failed; user can call completeVerification again. */
+    autoFinalizeError: v.optional(v.string()),
+
     // Immutable Audit
     createdAt: v.number(),
     updatedAt: v.number(),
