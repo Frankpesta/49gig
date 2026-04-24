@@ -1,13 +1,16 @@
 import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import {
   openTeamRoleLabelsForProject,
   projectEligibleForAdminManualMatch,
   isTeamProject,
 } from "./manualMatchEligibility";
 import { viewerIsDisputeParty } from "../disputes/partyAccess";
+import { computeTeamPoolShareCentsByFreelancerId } from "../teamEscrowShares";
+import { escrowNetToClientLockedGross } from "../disputes/amounts";
+import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 
 /**
  * Helper function to get current user in queries
@@ -511,6 +514,108 @@ export const getProject = query({
             viewerIsDisputePartyOnHire,
           }
         : {}),
+    };
+  },
+});
+
+function roundMoney2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Team hires: funded escrow as client gross + per-seat net (freelancer) / gross (client) using the same
+ * pool split as disputes. Client and staff only (matches project detail budget card).
+ */
+export const getTeamHireEscrowBudgetBreakdown = query({
+  args: {
+    projectId: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const projectId = ctx.db.normalizeId("projects", args.projectId);
+    if (!projectId) return null;
+
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user) return null;
+
+    const project = await ctx.db.get(projectId);
+    if (!project) return null;
+    if (project.intakeForm.hireType !== "team") return null;
+
+    const isClient = project.clientId === user._id;
+    const isStaff = user.role === "admin" || user.role === "moderator";
+    if (!isClient && !isStaff) return null;
+
+    const platformFeePercent = await effectivePlatformFeePercentForProject(
+      ctx,
+      project.platformFee
+    );
+    const escrowNet = Math.max(0, project.escrowedAmount ?? 0);
+    const totalGross = escrowNetToClientLockedGross(escrowNet, platformFeePercent);
+
+    const teamIds = project.matchedFreelancerIds ?? [];
+    if (teamIds.length === 0) {
+      return {
+        platformFeePercent,
+        totalNetInEscrow: roundMoney2(escrowNet),
+        totalGross: roundMoney2(totalGross),
+        rows: [] as Array<{
+          freelancerId: Id<"users">;
+          name: string;
+          teamRole: string | undefined;
+          netInEscrow: number;
+          grossToClient: number;
+        }>,
+      };
+    }
+
+    const matchRows = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .collect();
+    const teamRoleByFreelancer = new Map<string, string | undefined>();
+    for (const m of matchRows) {
+      if (m.status === "accepted" && m.freelancerId) {
+        teamRoleByFreelancer.set(String(m.freelancerId), m.teamRole);
+      }
+    }
+
+    const totalPoolCents = Math.round(escrowNet * 100);
+    const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+      ctx,
+      projectId,
+      teamIds as Id<"users">[],
+      project.teamBudgetBreakdown,
+      totalPoolCents
+    );
+
+    const rows: Array<{
+      freelancerId: Id<"users">;
+      name: string;
+      teamRole: string | undefined;
+      netInEscrow: number;
+      grossToClient: number;
+    }> = [];
+
+    for (const fid of teamIds) {
+      const u = await ctx.db.get(fid);
+      const netCents = shareMap.get(String(fid)) ?? 0;
+      const netInEscrow = netCents / 100;
+      const grossToClient = escrowNetToClientLockedGross(netInEscrow, platformFeePercent);
+      rows.push({
+        freelancerId: fid,
+        name: u?.name ?? "Freelancer",
+        teamRole: teamRoleByFreelancer.get(String(fid)),
+        netInEscrow: roundMoney2(netInEscrow),
+        grossToClient: roundMoney2(grossToClient),
+      });
+    }
+
+    return {
+      platformFeePercent,
+      totalNetInEscrow: roundMoney2(escrowNet),
+      totalGross: roundMoney2(totalGross),
+      rows,
     };
   },
 });
