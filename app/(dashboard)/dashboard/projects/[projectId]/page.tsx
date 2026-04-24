@@ -116,6 +116,15 @@ function getActualSkills(requiredSkills: string[]): string[] {
   );
 }
 
+/** Row shape from `getTeamHireEscrowBudgetBreakdown` (client project sidebar). */
+type TeamEscrowBudgetRow = {
+  freelancerId: Id<"users">;
+  name: string;
+  teamRole: string | undefined;
+  netInEscrow: number;
+  grossToClient: number;
+};
+
 // Helper function to validate Convex ID format
 function isValidConvexId(id: string | string[] | undefined): id is Id<"projects"> {
   if (typeof id !== "string") return false;
@@ -1370,7 +1379,7 @@ export default function ProjectDetailPage() {
                       </p>
                       {teamEscrowBudget.rows.length > 0 && (
                         <ul className="mt-3 space-y-3 border-t border-border pt-3">
-                          {teamEscrowBudget.rows.map((row) => (
+                          {teamEscrowBudget.rows.map((row: TeamEscrowBudgetRow) => (
                             <li key={String(row.freelancerId)} className="text-xs space-y-0.5">
                               <div className="font-medium text-foreground">
                                 {row.name}
