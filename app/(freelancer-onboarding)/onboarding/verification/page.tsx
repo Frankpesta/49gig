@@ -72,6 +72,9 @@ export default function OnboardingVerificationPage() {
   const stepsCompleted = vettingResult?.stepsCompleted || [];
   const currentStep = vettingResult?.currentStep || "english";
   const vettingComplete = stepsCompleted.includes("english") && stepsCompleted.includes("skills");
+  const verificationEvaluatedAt = vettingResult?.verificationEvaluatedAt;
+  const autoFinalizeError = vettingResult?.autoFinalizeError;
+  const showWeightedComposite = Boolean(verificationEvaluatedAt && vettingComplete);
   const kycComplete = kycStatus === "approved";
   const canTakeTests =
     (status === "in_progress" || vettingResult?.status === "pending") &&
@@ -299,10 +302,10 @@ export default function OnboardingVerificationPage() {
             <Progress value={progress} className="h-2" />
           </div>
 
-          {vettingResult.overallScore > 0 && (
+          {showWeightedComposite && vettingResult.overallScore > 0 && (
             <div className="rounded-xl border bg-muted/30 p-4">
               <div className="flex items-center justify-between">
-                <span className="font-medium">Weighted score (preview)</span>
+                <span className="font-medium">Weighted score</span>
                 <span className="text-2xl font-bold">{vettingResult.overallScore}%</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -473,70 +476,64 @@ export default function OnboardingVerificationPage() {
               {canTakeTests &&
                 stepsCompleted.includes("english") &&
                 stepsCompleted.includes("skills") &&
-                currentStep === "complete" && (
+                currentStep === "complete" &&
+                !verificationEvaluatedAt &&
+                !autoFinalizeError && (
                   <Card className="rounded-xl">
-                    <CardContent className="p-4 sm:p-5 space-y-4">
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        When you&apos;re ready, submit your verification for review. You&apos;ll need KYC uploaded first
-                        if you haven&apos;t already (your weighted score must be 50%+ to submit KYC).
+                    <CardContent className="p-4 sm:p-5 flex items-center gap-3">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary shrink-0" />
+                      <p className="text-sm text-muted-foreground">
+                        Finalizing your verification. This only takes a moment.
                       </p>
-                      {(englishAttemptRound >= 1 || skillsAttemptRound >= 1) && (
-                        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm">
-                          <p className="font-medium text-destructive">Heads up — this is your last attempt</p>
-                          <p className="text-muted-foreground mt-1 leading-relaxed">
-                            You&apos;ve already retaken the
-                            {englishAttemptRound >= 1 && skillsAttemptRound >= 1
-                              ? " English and skill sections"
-                              : englishAttemptRound >= 1
-                                ? " English section"
-                                : " skill section"}
-                            . If any section is below 50% or your overall weighted score is below 50% when you submit,
-                            your account will be closed for this cycle.
-                          </p>
-                        </div>
-                      )}
-                      <Button
-                        className="rounded-xl"
-                        onClick={async () => {
-                          setSubmitting(true);
-                          setAccountDeletedMessage(null);
-                          try {
-                            const result = await completeVerification(user?._id ? { userId: user._id } : {});
-                            const r = result as {
-                              weightedFailurePending?: boolean;
-                              countdownSeconds?: number;
-                              message?: string;
-                            };
-                            if (r.weightedFailurePending) {
-                              if (r.message) setWeightedFailureNotice(r.message);
-                              setWeightedLocalDeadline(Date.now() + (r.countdownSeconds ?? 15) * 1000);
-                            } else if (result.accountDeleted) {
-                              setAccountDeletedMessage(result.message ?? "Your account has been removed.");
-                              setTimeout(() => router.push("/login"), 4000);
-                            } else if (!result.success && result.message) {
-                              setAccountDeletedMessage(result.message);
-                            }
-                            // The Convex subscription on getVerificationStatus refreshes the UI.
-                          } catch (e) {
-                            console.error(e);
-                          } finally {
-                            setSubmitting(false);
-                          }
-                        }}
-                        disabled={submitting}
-                      >
-                        {submitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Submitting...
-                          </>
-                        ) : (
-                          "Submit for review"
-                        )}
-                      </Button>
                     </CardContent>
                   </Card>
                 )}
+              {canTakeTests && autoFinalizeError && (
+                <Card className="rounded-xl border-destructive/40">
+                  <CardContent className="p-4 sm:p-5 space-y-3">
+                    <p className="text-sm text-destructive font-medium">Could not finalize automatically</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{autoFinalizeError}</p>
+                    <Button
+                      className="rounded-xl"
+                      onClick={async () => {
+                        setSubmitting(true);
+                        setAccountDeletedMessage(null);
+                        try {
+                          const result = await completeVerification(user?._id ? { userId: user._id } : {});
+                          const r = result as {
+                            weightedFailurePending?: boolean;
+                            countdownSeconds?: number;
+                            message?: string;
+                          };
+                          if (r.weightedFailurePending) {
+                            if (r.message) setWeightedFailureNotice(r.message);
+                            setWeightedLocalDeadline(Date.now() + (r.countdownSeconds ?? 15) * 1000);
+                          } else if (result.accountDeleted) {
+                            setAccountDeletedMessage(result.message ?? "Your account has been removed.");
+                            setTimeout(() => router.push("/login"), 4000);
+                          } else if (!result.success && result.message) {
+                            setAccountDeletedMessage(result.message);
+                          }
+                        } catch (e) {
+                          console.error(e);
+                        } finally {
+                          setSubmitting(false);
+                        }
+                      }}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Retrying…
+                        </>
+                      ) : (
+                        "Try again"
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
               {vettingComplete && user?._id && !kycComplete && <KycStep userId={user._id} />}
             </div>
           )}

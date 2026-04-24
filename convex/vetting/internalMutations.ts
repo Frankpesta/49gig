@@ -5,6 +5,7 @@
 
 import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
+import { runCompleteVerificationForFreelancer } from "./completeVerificationCore";
 
 const experienceLevelValidator = v.union(
   v.literal("junior"),
@@ -242,5 +243,30 @@ export const terminateFreelancerVerificationFailure = internalMutation({
     });
 
     return { skipped: false as const };
+  },
+});
+
+/**
+ * After the skill test is fully submitted, automatically runs the same logic as
+ * the former "Submit for review" (completeVerification).
+ */
+export const runAutoCompleteVerification = internalMutation({
+  args: { freelancerId: v.id("users") },
+  handler: async (ctx, args) => {
+    try {
+      await runCompleteVerificationForFreelancer(ctx, args.freelancerId);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      const row = await ctx.db
+        .query("vettingResults")
+        .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
+        .first();
+      if (row) {
+        await ctx.db.patch(row._id, {
+          autoFinalizeError: message,
+          updatedAt: Date.now(),
+        });
+      }
+    }
   },
 });

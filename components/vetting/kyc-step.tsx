@@ -116,6 +116,7 @@ export function KycStep({ userId }: { userId: Id<"users"> }) {
   const isRejected = status === "id_rejected" || status === "address_rejected";
   const weightedOk =
     verificationStatus?.vettingResult &&
+    verificationStatus.vettingResult.verificationEvaluatedAt != null &&
     (verificationStatus.vettingResult.overallScore ?? 0) >= 50;
 
   return (
