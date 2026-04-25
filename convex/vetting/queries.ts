@@ -305,8 +305,26 @@ export const getVettingResultByFreelancer = internalQuery({
   },
 });
 
+/** Aligned with submit mutations: submissions allowed shortly after timer hits zero. */
+const SKILL_TEST_SUBMIT_GRACE_MS = 5 * 60 * 1000;
+const DEFAULT_SKILL_TEST_DURATION_MS = 30 * 60 * 1000;
+
+function skillSessionExpiresAt(session: Doc<"vettingSkillTestSessions">): number {
+  return session.expiresAt ?? session.startedAt + DEFAULT_SKILL_TEST_DURATION_MS;
+}
+
 /**
- * Get current skill test session for a freelancer (most recent in-progress or completed).
+ * Whether this row is an in-flight session the client should resume (not a finished attempt).
+ */
+function isResumableSkillSession(session: Doc<"vettingSkillTestSessions">, now: number): boolean {
+  if (session.status === "completed") return false;
+  return now <= skillSessionExpiresAt(session) + SKILL_TEST_SUBMIT_GRACE_MS;
+}
+
+/**
+ * Get the active skill test session for a freelancer (in-progress, still within expiry + grace).
+ * Completed sessions are omitted so a failed first attempt does not trap the UI on the score card
+ * when vetting has already cleared the skills step for retake; the client then shows "Start skill test".
  */
 export const getSkillTestSession = query({
   args: {
@@ -324,13 +342,15 @@ export const getSkillTestSession = query({
       if (!user || user.role !== "freelancer") return null;
       userId = user._id;
     }
-    const session = await ctx.db
+    const now = Date.now();
+    const sessions = await ctx.db
       .query("vettingSkillTestSessions")
       .withIndex("by_freelancer_created", (q) => q.eq("freelancerId", userId!))
       .order("desc")
-      .first();
+      .take(40);
+    const session = sessions.find((s) => isResumableSkillSession(s, now));
     if (!session) return null;
-    const expiresAt = session.expiresAt ?? session.startedAt + 30 * 60 * 1000;
+    const expiresAt = skillSessionExpiresAt(session);
     return {
       _id: session._id,
       status: session.status,
