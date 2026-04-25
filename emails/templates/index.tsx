@@ -615,10 +615,10 @@ export function VerificationTerminatedEmail({
 }: BaseEmailProps) {
   return (
     <EmailLayout
-      preview="Update on your 49GIG freelancer application"
-      heroLabel="Application"
-      heroTitle="We’re unable to proceed right now"
-      heroSubtitle="Thank you for your interest in 49GIG."
+      preview="Your 49GIG freelancer verification was not successful"
+      heroLabel="Verification"
+      heroTitle="You did not pass verification"
+      heroSubtitle="Your freelancer application is closed for this cycle."
       logoUrl={logoUrl}
       appUrl={appUrl}
       date={date}
@@ -627,10 +627,18 @@ export function VerificationTerminatedEmail({
         Hi <strong>{name}</strong>,
       </Text>
       <Text style={{ ...textStyle, marginTop: "12px" }}>
-        After reviewing your verification attempts, we&apos;re sorry we can&apos;t move forward with your application
-        at this time. You&apos;re welcome to try again later with a new signup if our requirements change.
+        We&apos;re writing to let you know that you <strong>did not pass</strong> our freelancer verification process
+        (for example: English and/or skills assessments fell below our minimum bar after your allowed attempts, or your
+        overall verification outcome did not meet our requirements). Because of that, we cannot approve your
+        application at this time and your access to the verification flow has ended.
       </Text>
-      <Text style={mutedTextStyle}>If you have questions, contact support from our website.</Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        You&apos;re welcome to try again in the future if our requirements work for you. If you have questions, contact
+        support from our website.
+      </Text>
+      <Text style={mutedTextStyle}>
+        This message was sent on {date}. You can always visit {appUrl} for general information about 49GIG.
+      </Text>
     </EmailLayout>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
@@ -15,13 +15,23 @@ import { EnglishTest } from "@/components/vetting/english-test";
 import { SkillTestPathFlow } from "@/components/vetting/skill-test-path-flow";
 import { KycStep } from "@/components/vetting/kyc-step";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+/** After failed verification, sessions are revoked — `getVerificationStatus` is skipped and would otherwise look like endless loading. */
+const VERIFICATION_FAILURE_REDIRECT_SEC = 8;
 
 /** Matches backend copy when weighted score stays below threshold after all attempts (see completeVerification). */
 const WEIGHTED_FAILURE_RESUME_COPY =
   "Unfortunately you did not meet our minimum weighted score (50% across English and skills) after completing every attempt. You cannot join 49GIG as a freelancer at this time. Keep practicing your craft — when you're ready, you're welcome to try again in the future.";
 
 export default function OnboardingVerificationPage() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isInitializing } = useAuth();
+  /** True once the user was signed in on this page (detects session revoke after verification failure). */
+  const hadAuthenticatedSession = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated) hadAuthenticatedSession.current = true;
+  }, [isAuthenticated]);
+
   const verificationStatus = useQuery(
     api.vetting.queries.getVerificationStatus,
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
@@ -42,6 +52,43 @@ export default function OnboardingVerificationPage() {
     }
   }, [verificationStatus?.vettingResult?.weightedFailureScheduledFor]);
 
+  if (isInitializing) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !user?._id) {
+    if (hadAuthenticatedSession.current) {
+      return <VerificationSessionRevokedScreen redirectSeconds={VERIFICATION_FAILURE_REDIRECT_SEC} />;
+    }
+    return (
+      <div className="mx-auto max-w-lg py-8">
+        <Card className="rounded-2xl border-border/80 shadow-sm">
+          <CardHeader>
+            <CardTitle>Sign in required</CardTitle>
+            <CardDescription>
+              Freelancer verification needs an active session. Sign in or create a freelancer account to continue.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild className="rounded-xl">
+              <Link href="/login">Sign in</Link>
+            </Button>
+            <Button variant="outline" asChild className="rounded-xl">
+              <Link href="/">Home</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (verificationStatus === undefined) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -55,14 +102,23 @@ export default function OnboardingVerificationPage() {
 
   if (verificationStatus === null) {
     return (
-      <div className="mx-auto max-w-lg">
+      <div className="mx-auto max-w-lg py-8">
         <Card className="rounded-2xl border-border/80 shadow-sm">
           <CardHeader>
-            <CardTitle>Access Denied</CardTitle>
+            <CardTitle>Unable to load verification</CardTitle>
             <CardDescription>
-              This flow is only for freelancer accounts. Please sign in with a freelancer account.
+              This account can&apos;t access freelancer verification right now. If you just finished a test, check
+              your email — we may have sent an update. Otherwise sign in with an active freelancer account.
             </CardDescription>
           </CardHeader>
+          <CardContent className="flex flex-col gap-2 sm:flex-row">
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link href="/">Home</Link>
+            </Button>
+            <Button asChild className="rounded-xl">
+              <Link href="/login">Sign in</Link>
+            </Button>
+          </CardContent>
         </Card>
       </div>
     );
@@ -567,6 +623,64 @@ export default function OnboardingVerificationPage() {
               </CardContent>
             </Card>
           )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Shown when the client was signed in but auth dropped (typical: verification failed twice, account soft-deleted,
+ * sessions revoked). Avoids an infinite loading state because `getVerificationStatus` is skipped without `userId`.
+ */
+function VerificationSessionRevokedScreen({ redirectSeconds }: { redirectSeconds: number }) {
+  const router = useRouter();
+  const [remaining, setRemaining] = useState(redirectSeconds);
+  const didRedirect = useRef(false);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setRemaining((s) => {
+        const next = s - 1;
+        if (next <= 0 && !didRedirect.current) {
+          didRedirect.current = true;
+          router.replace("/");
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [router]);
+
+  return (
+    <div className="mx-auto max-w-lg py-8">
+      <Card className="rounded-2xl border-destructive/30 bg-destructive/5 shadow-sm">
+        <CardHeader>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/15">
+            <XCircle className="h-6 w-6 text-destructive" />
+          </div>
+          <CardTitle className="text-center text-xl">Verification unsuccessful</CardTitle>
+          <CardDescription className="text-center text-base leading-relaxed">
+            Your verification tests did not meet our minimum requirements after your allowed attempts, or your
+            application was closed for this cycle. Your session has been ended.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5 pb-2">
+          <div className="flex items-start gap-3 rounded-xl border border-border/80 bg-background/80 p-4">
+            <Mail className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              We sent you an email explaining that you did not pass verification and what it means for your account.
+              Please check your inbox and spam folder.
+            </p>
+          </div>
+          <div className="rounded-xl border border-destructive/25 bg-background/80 p-4 text-center space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Redirecting to home</p>
+            <p className="font-mono text-3xl font-semibold tabular-nums text-destructive">{Math.max(0, remaining)}s</p>
+          </div>
+          <Button variant="outline" className="w-full rounded-xl" type="button" onClick={() => router.replace("/")}>
+            Go to home now
+          </Button>
         </CardContent>
       </Card>
     </div>
