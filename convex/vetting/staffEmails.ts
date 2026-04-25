@@ -25,7 +25,7 @@ export const sendVerificationTerminatedEmailInternal = internalAction({
     if (!args.email) return { sent: false };
     await sendEmail({
       to: args.email,
-      subject: "[49GIG] Freelancer application update",
+      subject: "[49GIG] Verification unsuccessful — application not approved",
       react: React.createElement(VerificationTerminatedEmail, {
         name: args.name,
         appUrl,
