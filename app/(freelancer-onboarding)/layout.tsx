@@ -89,7 +89,7 @@ export default function FreelancerOnboardingLayout({
             </span>
           </Link>
           <Button variant="ghost" size="sm" asChild className="text-muted-foreground">
-            <Link href="/support">Help</Link>
+            <Link href="/contact">Help</Link>
           </Button>
         </div>
       </header>
