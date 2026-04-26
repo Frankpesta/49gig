@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 type MatchRequest = {
   _id: string;
@@ -66,11 +67,11 @@ export default function MatchRequestsPage() {
   const [detailMatch, setDetailMatch] = useState<MatchRequest | null>(null);
 
   const pendingMatches = useQuery(
-    (api as any).matching.queries.getPendingFreelancerMatches,
+    api.matching.queries.getPendingFreelancerMatches,
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
 
-  const respond = useMutation((api as any).matching.mutations.respondToMatchAsFreelancer);
+  const respond = useMutation(api.matching.mutations.respondToMatchAsFreelancer);
   const didScrollToMatchRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -122,8 +123,8 @@ export default function MatchRequestsPage() {
           router.push(`/dashboard/projects/${projectId}`);
         }
       }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to accept");
+    } catch (e: unknown) {
+      toast.error(getUserFriendlyError(e) || "Failed to accept");
     } finally {
       setResponding(null);
     }
@@ -142,8 +143,8 @@ export default function MatchRequestsPage() {
       toast.success("You've declined this opportunity.");
       setDeclineMatchId(null);
       setDeclineReason("");
-    } catch (e: any) {
-      toast.error(e.message || "Failed to decline");
+    } catch (e: unknown) {
+      toast.error(getUserFriendlyError(e) || "Failed to decline");
     } finally {
       setResponding(null);
     }
