@@ -2,7 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,20 +26,63 @@ import {
   Building2,
   AlertCircle,
   RefreshCw,
+  Wallet,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 
 const TYPE_LABELS: Record<string, string> = {
   pre_funding: "Project Funding",
+  top_up: "Add payment (months)",
   milestone_release: "Milestone Release",
+  monthly_release: "Monthly Release",
   refund: "Refund",
   platform_fee: "Included services",
   payout: "Payout",
 };
 
+type TxWithFunding = {
+  type: string;
+  amount: number;
+  currency: string;
+  netAmount?: number;
+  platformFee?: number;
+  fundingGrossAmount?: number;
+  clientWalletCreditApplied?: number;
+  flutterwaveTransactionId?: string;
+  webhookEventId?: string;
+  walletFunding?: {
+    fundingGrossAmount: number;
+    walletAppliedDollars: number;
+    gatewayChargedDollars: number;
+    summary: string;
+    isFullWalletFunding: boolean;
+    isPartialWalletFunding: boolean;
+    isGatewayOnly: boolean;
+  } | null;
+};
+
+function detailComparableGross(tx: TxWithFunding): number {
+  if (tx.walletFunding) return tx.walletFunding.fundingGrossAmount;
+  if ((tx.type === "pre_funding" || tx.type === "top_up") && tx.fundingGrossAmount != null) {
+    return tx.fundingGrossAmount;
+  }
+  if (tx.type === "pre_funding" || tx.type === "top_up") {
+    return (tx.amount ?? 0) + (tx.clientWalletCreditApplied ?? 0);
+  }
+  return tx.amount ?? 0;
+}
+
+function fmtDetailMoney(n: number, currency: string): string {
+  return `$${n.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ${currency.toUpperCase()}`;
+}
+
 const STATUS_CONFIG: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: LucideIcon }
 > = {
   pending: { label: "Pending", variant: "outline", icon: Clock },
   processing: { label: "Processing", variant: "secondary", icon: Clock },
@@ -51,7 +94,6 @@ const STATUS_CONFIG: Record<
 
 export default function TransactionDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { user } = useAuth();
   const transactionId = params.transactionId as Id<"payments">;
 
@@ -92,7 +134,8 @@ export default function TransactionDetailPage() {
             <AlertCircle className="mb-4 h-12 w-12 text-destructive" />
             <h3 className="mb-2 text-lg font-semibold">Transaction not found</h3>
             <p className="mb-4 text-center text-sm text-muted-foreground">
-              The transaction you're looking for doesn't exist or you don't have access to it.
+              The transaction you&apos;re looking for doesn&apos;t exist or you don&apos;t have access
+              to it.
             </p>
             <Button asChild>
               <Link href="/dashboard/transactions">Back to Transactions</Link>
@@ -105,6 +148,9 @@ export default function TransactionDetailPage() {
 
   const statusConfig = STATUS_CONFIG[transaction.status] || STATUS_CONFIG.pending;
   const StatusIcon = statusConfig.icon;
+  const txFunding = transaction as TxWithFunding;
+  const isHireFundingType = txFunding.type === "pre_funding" || txFunding.type === "top_up";
+  const clientGrossShown = detailComparableGross(txFunding);
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
@@ -158,18 +204,121 @@ export default function TransactionDetailPage() {
                 </div>
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
                   <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    {user.role === "client" ? "Amount paid" : "Amount received"}
+                    {isHireFundingType
+                      ? "Client gross (wallet + checkout)"
+                      : user.role === "client"
+                        ? "Amount paid"
+                        : "Amount received"}
                   </div>
                   <div className="text-xl font-bold text-primary">
                     $
-                    {(user.role === "client"
-                      ? transaction.amount
-                      : (transaction.netAmount ?? transaction.amount)
-                    ).toLocaleString()}{" "}
+                    {(isHireFundingType
+                      ? clientGrossShown
+                      : user.role === "client"
+                        ? transaction.amount
+                        : (transaction.netAmount ?? transaction.amount)
+                    ).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
                     {transaction.currency.toUpperCase()}
                   </div>
                 </div>
               </div>
+
+              {isHireFundingType && (
+                <>
+                  <Separator />
+                  <div className="rounded-lg border border-border/60 bg-muted/10 p-4 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Wallet className="h-4 w-4 text-primary shrink-0" />
+                      <span className="text-sm font-semibold">Hire funding breakdown</span>
+                      {txFunding.walletFunding && (
+                        <>
+                          {txFunding.walletFunding.isFullWalletFunding && (
+                            <Badge variant="secondary">Fully from wallet</Badge>
+                          )}
+                          {txFunding.walletFunding.isPartialWalletFunding && (
+                            <Badge variant="secondary">Wallet + checkout</Badge>
+                          )}
+                          {txFunding.walletFunding.isGatewayOnly && (
+                            <Badge variant="outline">Checkout only</Badge>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {txFunding.walletFunding ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">{txFunding.walletFunding.summary}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                          <div className="rounded-md border border-border/40 bg-background/80 p-3">
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              From client wallet
+                            </div>
+                            <div className="mt-1 font-semibold tabular-nums">
+                              {fmtDetailMoney(
+                                txFunding.walletFunding.walletAppliedDollars,
+                                transaction.currency
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-md border border-border/40 bg-background/80 p-3">
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Via checkout (gateway)
+                            </div>
+                            <div className="mt-1 font-semibold tabular-nums">
+                              {fmtDetailMoney(
+                                txFunding.walletFunding.gatewayChargedDollars,
+                                transaction.currency
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-md border border-primary/20 bg-primary/5 p-3">
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Client gross total
+                            </div>
+                            <div className="mt-1 font-semibold tabular-nums text-primary">
+                              {fmtDetailMoney(
+                                txFunding.walletFunding.fundingGrossAmount,
+                                transaction.currency
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No wallet vs checkout split is recorded for this row yet (amounts may still be zero or
+                        pending).
+                      </p>
+                    )}
+                    {(transaction.netAmount != null || transaction.platformFee != null) && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-border/40 text-sm">
+                        {transaction.netAmount != null && (
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Net to escrow (after platform fee)
+                            </div>
+                            <div className="mt-1 font-medium tabular-nums">
+                              {fmtDetailMoney(transaction.netAmount, transaction.currency)}
+                            </div>
+                          </div>
+                        )}
+                        {transaction.platformFee != null && (
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                              Platform fee (included services)
+                            </div>
+                            <div className="mt-1 font-medium tabular-nums">
+                              {fmtDetailMoney(transaction.platformFee, transaction.currency)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               <Separator />
 
@@ -296,6 +445,51 @@ export default function TransactionDetailPage() {
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Connected Account ID</div>
                     <div className="font-mono text-sm">{transaction.stripeAccountId}</div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {(transaction.flutterwaveTransactionId ||
+            transaction.flutterwaveTransferId ||
+            transaction.flutterwaveRefundId ||
+            transaction.flutterwaveCustomerEmail ||
+            transaction.flutterwaveSubaccountId) && (
+            <Card className="rounded-xl overflow-hidden border-border/60">
+              <CardHeader className="bg-linear-to-r from-primary/5 via-transparent to-transparent">
+                <CardTitle>Flutterwave</CardTitle>
+                <CardDescription>Gateway references for this payment</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {transaction.flutterwaveTransactionId && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Transaction reference</div>
+                    <div className="font-mono text-sm break-all">{transaction.flutterwaveTransactionId}</div>
+                  </div>
+                )}
+                {transaction.flutterwaveTransferId && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Transfer reference</div>
+                    <div className="font-mono text-sm break-all">{transaction.flutterwaveTransferId}</div>
+                  </div>
+                )}
+                {transaction.flutterwaveRefundId && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Refund reference</div>
+                    <div className="font-mono text-sm break-all">{transaction.flutterwaveRefundId}</div>
+                  </div>
+                )}
+                {transaction.flutterwaveCustomerEmail && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Customer email</div>
+                    <div className="text-sm">{transaction.flutterwaveCustomerEmail}</div>
+                  </div>
+                )}
+                {transaction.flutterwaveSubaccountId && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Subaccount ID</div>
+                    <div className="font-mono text-sm break-all">{transaction.flutterwaveSubaccountId}</div>
                   </div>
                 )}
               </CardContent>

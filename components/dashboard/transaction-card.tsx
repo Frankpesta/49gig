@@ -10,12 +10,15 @@ import {
   DollarSign,
   Calendar,
   FileText,
+  Wallet,
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 
 const TYPE_LABELS: Record<string, string> = {
   pre_funding: "Project Funding",
+  top_up: "Add payment",
   milestone_release: "Milestone Release",
+  monthly_release: "Monthly Release",
   refund: "Refund",
   platform_fee: "Included services",
   payout: "Payout",
@@ -38,9 +41,28 @@ export type TransactionCardData = {
   status: string;
   createdAt: number;
   netAmount?: number;
+  fundingGrossAmount?: number;
+  clientWalletCreditApplied?: number;
   project: { _id: Id<"projects">; title: string } | null;
   milestone: { _id: Id<"milestones">; title: string } | null;
+  walletFunding?: {
+    fundingGrossAmount: number;
+    walletAppliedDollars: number;
+    gatewayChargedDollars: number;
+    summary: string;
+  } | null;
 };
+
+function cardComparableAmount(t: TransactionCardData): number {
+  if (t.walletFunding) return t.walletFunding.fundingGrossAmount;
+  if ((t.type === "pre_funding" || t.type === "top_up") && t.fundingGrossAmount != null) {
+    return t.fundingGrossAmount;
+  }
+  if (t.type === "pre_funding" || t.type === "top_up") {
+    return (t.amount ?? 0) + (t.clientWalletCreditApplied ?? 0);
+  }
+  return t.amount ?? 0;
+}
 
 const STATUS_ACCENT: Record<string, { border: string; icon: string; amount: string }> = {
   succeeded: {
@@ -138,12 +160,22 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
               <div className="flex items-baseline gap-2">
                 <DollarSign className={cn("h-4 w-4 shrink-0", accent.icon)} />
                 <span className={cn("text-lg font-bold tabular-nums", accent.amount)}>
-                  ${transaction.amount.toLocaleString()}
+                  $
+                  {cardComparableAmount(transaction).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
                 <span className="text-xs text-muted-foreground uppercase">
                   {transaction.currency}
                 </span>
               </div>
+              {transaction.walletFunding && (
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 max-w-[200px]">
+                  <Wallet className="h-3 w-3 shrink-0" />
+                  <span className="line-clamp-2">{transaction.walletFunding.summary}</span>
+                </span>
+              )}
               {(transaction.type === "milestone_release" ||
                 transaction.type === "payout") &&
                 transaction.netAmount != null && (
