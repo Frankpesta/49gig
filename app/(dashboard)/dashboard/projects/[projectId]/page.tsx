@@ -1373,10 +1373,6 @@ export default function ProjectDetailPage() {
                           maximumFractionDigits: 2,
                         })}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Total gross (funded in escrow, incl. {teamEscrowBudget.platformFeePercent}%
-                        platform fee)
-                      </p>
                       {teamEscrowBudget.rows.length > 0 && (
                         <ul className="mt-3 space-y-3 border-t border-border pt-3">
                           {teamEscrowBudget.rows.map((row: TeamEscrowBudgetRow) => (
@@ -1391,17 +1387,7 @@ export default function ProjectDetailPage() {
                                 ) : null}
                               </div>
                               <div className="text-muted-foreground">
-                                Net (to freelancer):{" "}
-                                <span className="text-foreground">
-                                  $
-                                  {row.netInEscrow.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </span>
-                              </div>
-                              <div className="text-muted-foreground">
-                                Gross (from you):{" "}
+                                Your cost for this seat:{" "}
                                 <span className="text-foreground">
                                   $
                                   {row.grossToClient.toLocaleString(undefined, {
