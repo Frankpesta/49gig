@@ -50,8 +50,24 @@ export type TransactionCardData = {
     walletAppliedDollars: number;
     gatewayChargedDollars: number;
     summary: string;
+    isFullWalletFunding?: boolean;
+    isPartialWalletFunding?: boolean;
+    isGatewayOnly?: boolean;
   } | null;
 };
+
+function walletFundingModeLabel(
+  wf: NonNullable<TransactionCardData["walletFunding"]>
+): string {
+  if (wf.isFullWalletFunding) return "Wallet only";
+  if (wf.isPartialWalletFunding) return "Wallet + checkout";
+  if (wf.isGatewayOnly) return "Checkout only";
+  const w = wf.walletAppliedDollars >= 0.01;
+  const g = wf.gatewayChargedDollars >= 0.01;
+  if (w && !g) return "Wallet only";
+  if (w && g) return "Wallet + checkout";
+  return "Checkout only";
+}
 
 function cardComparableAmount(t: TransactionCardData): number {
   if (t.walletFunding) return t.walletFunding.fundingGrossAmount;
@@ -171,9 +187,11 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
                 </span>
               </div>
               {transaction.walletFunding && (
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 max-w-[200px]">
+                <span className="mt-0.5 inline-flex max-w-[220px] flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Wallet className="h-3 w-3 shrink-0" />
-                  <span className="line-clamp-2">{transaction.walletFunding.summary}</span>
+                  <span className="rounded-md border border-border/60 bg-muted/40 px-1.5 py-0.5 font-medium text-foreground">
+                    {walletFundingModeLabel(transaction.walletFunding)}
+                  </span>
                 </span>
               )}
               {(transaction.type === "milestone_release" ||

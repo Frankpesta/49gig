@@ -2,14 +2,17 @@ import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
-import { clientLockedGrossToFreelancerEscrowPool } from "./amounts";
+import {
+  clientLockedGrossToFreelancerEscrowPool,
+  escrowNetToClientLockedGross,
+} from "./amounts";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 import {
   computeTeamPoolShareCentsByFreelancerId,
   sumShareCentsForFreelancers,
   teamBasisUserIdsForDispute,
 } from "../teamEscrowShares";
-import { getDisputePartyUserIds, viewerIsDisputeParty } from "./partyAccess";
+import { viewerIsDisputeParty } from "./partyAccess";
 async function getCurrentUserInQuery(
   ctx: QueryCtx,
   userId?: string
@@ -25,11 +28,12 @@ async function getCurrentUserInQuery(
 }
 
 /**
- * Clients and staff see freelancer-net dollars: for open disputes, the current escrow
- * pool (or disputed members' slice on partial-team disputes). For closed disputes, derive
- * net from the stored client-gross snapshot on the dispute row.
+ * Clients and staff see client-gross USD (what sits on the client side of escrow, incl. fee):
+ * - Open / under review: gross equivalent of the current freelancer-net pool in scope
+ *   (full pool or disputed members’ slice for partial-team disputes).
+ * - Otherwise: `dispute.lockedAmount` (snapshot at filing / resolution path — already gross).
  */
-async function nonFreelancerVisibleLockedNetUsd(
+async function clientOrStaffVisibleLockedGrossUsd(
   ctx: QueryCtx,
   dispute: Doc<"disputes">,
   project: Doc<"projects">,
@@ -49,6 +53,7 @@ async function nonFreelancerVisibleLockedNetUsd(
 
   let out: number;
   if (openish) {
+    let relevantNetUsd: number;
     if (isPartialTeam) {
       const teamBasis = teamBasisUserIdsForDispute(dispute, project);
       const totalPoolCents = Math.round(escrowNetNow * 100);
@@ -60,12 +65,13 @@ async function nonFreelancerVisibleLockedNetUsd(
         totalPoolCents
       );
       const disputedNetCents = sumShareCentsForFreelancers(shareMap, disputed);
-      out = disputedNetCents / 100;
+      relevantNetUsd = disputedNetCents / 100;
     } else {
-      out = escrowNetNow;
+      relevantNetUsd = escrowNetNow;
     }
+    out = escrowNetToClientLockedGross(relevantNetUsd, feePct);
   } else {
-    out = clientLockedGrossToFreelancerEscrowPool(dispute.lockedAmount, feePct);
+    out = dispute.lockedAmount;
   }
   return Math.round(out * 100) / 100;
 }
@@ -171,7 +177,7 @@ export const getDisputes = query({
               user.role === "admin" ||
               user.role === "moderator"
             ) {
-              lockedAmount = await nonFreelancerVisibleLockedNetUsd(
+              lockedAmount = await clientOrStaffVisibleLockedGrossUsd(
                 ctx,
                 d,
                 project,
@@ -397,7 +403,7 @@ export const getDispute = query({
     // Role-based visibility of resolution notes and locked amount
     let visibleResolution = dispute.resolution;
     // Stored lockedAmount is client gross (includes platform fee).
-    // Freelancers see only their individual net share.
+    // Freelancers see only their individual net share; clients/staff see client gross.
     let visibleLockedAmount = dispute.lockedAmount;
 
     const isFreelancerParty =
@@ -429,7 +435,7 @@ export const getDispute = query({
         visibleLockedAmount = fullNetPool;
       }
     } else if (isClient || isAdminOrModerator || isAssignedModerator) {
-      visibleLockedAmount = await nonFreelancerVisibleLockedNetUsd(
+      visibleLockedAmount = await clientOrStaffVisibleLockedGrossUsd(
         ctx,
         dispute,
         project,
