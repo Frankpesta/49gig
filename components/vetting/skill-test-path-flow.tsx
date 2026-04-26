@@ -20,6 +20,7 @@ import { Code, FileQuestion, Loader2, CheckCircle2, ChevronLeft, ChevronRight, P
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ErrorHandler } from "./error-handler";
+import { VerificationFreelancerEndedCard } from "./verification-freelancer-ended";
 import { TestProctoringGate, useSkillProctoringTelemetry } from "./test-proctoring";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -97,6 +98,11 @@ function SkillTestPathFlowInner() {
 
   const session = useQuery(
     api.vetting.queries.getSkillTestSession,
+    userId ? { userId } : "skip"
+  );
+
+  const verificationOverview = useQuery(
+    api.vetting.queries.getVerificationStatus,
     userId ? { userId } : "skip"
   );
 
@@ -219,6 +225,10 @@ function SkillTestPathFlowInner() {
   useSkillProctoringTelemetry(userId ?? undefined, proctoringTelemetryActive);
 
   if (!userId) return null;
+
+  if (verificationOverview === null) {
+    return <VerificationFreelancerEndedCard variant="failed_or_removed" redirectSeconds={12} />;
+  }
 
   const handleStartTest = async () => {
     if (!userId) return;
