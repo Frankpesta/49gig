@@ -859,11 +859,17 @@ export default function DisputeDetailPage() {
           <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
             <CardHeader className="border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
               <CardTitle className="text-base font-semibold sm:text-lg">Financial details</CardTitle>
-              <CardDescription>Funds held for this dispute</CardDescription>
+              <CardDescription>
+                {user.role === "freelancer"
+                  ? "Your portion of escrow in this dispute (net of platform fee)."
+                  : "Client-side funds in dispute, including platform fee (gross)."}
+              </CardDescription>
             </CardHeader>
             <CardContent className="px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/10 px-4 py-3">
-                <span className="text-sm text-muted-foreground">Amount locked</span>
+                <span className="text-sm text-muted-foreground">
+                  {user.role === "freelancer" ? "Your share (net)" : "Amount locked (gross)"}
+                </span>
                 <span className="font-mono text-sm font-semibold tabular-nums">
                   ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                 </span>

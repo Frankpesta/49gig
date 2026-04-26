@@ -90,11 +90,57 @@ function comparableTransactionAmount(t: Transaction): number {
 }
 
 function fmtMoney(n: number, currency: string) {
-  return `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency.toUpperCase()}`;
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency.toUpperCase()}`;
+}
+
+/** Short label for how hire funding was split (avoid long `summary` strings in dense tables). */
+function walletFundingModeLabel(wf: WalletFunding): string {
+  if (wf.isFullWalletFunding) return "Wallet only";
+  if (wf.isPartialWalletFunding) return "Wallet + checkout";
+  return "Checkout only";
 }
 
 type SortField = "date" | "amount" | "status" | "type";
 type SortDirection = "asc" | "desc";
+
+type PaymentTypeArg =
+  | "pre_funding"
+  | "top_up"
+  | "milestone_release"
+  | "monthly_release"
+  | "refund"
+  | "platform_fee"
+  | "payout";
+type PaymentStatusArg =
+  | "pending"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "refunded"
+  | "cancelled";
+
+function TransactionSortIcon({
+  field,
+  sortField,
+  sortDirection,
+}: {
+  field: SortField;
+  sortField: SortField;
+  sortDirection: SortDirection;
+}) {
+  if (sortField !== field) {
+    return <ArrowUpDown className="ml-2 h-4 w-4" />;
+  }
+  return sortDirection === "asc" ? (
+    <ArrowUp className="ml-2 h-4 w-4" />
+  ) : (
+    <ArrowDown className="ml-2 h-4 w-4" />
+  );
+}
+
+/** Convex nested module `convex/transactions/queries.ts` (see `api.d.ts`). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const transactionsQueries = (api as any)["transactions/queries"];
 
 const TYPE_LABELS: Record<string, string> = {
   pre_funding: "Project Funding",
@@ -156,13 +202,12 @@ export default function TransactionsPage() {
 
   // Fetch transactions
   const transactions = useQuery(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (api as any)["transactions/queries"].getTransactions,
+    transactionsQueries.getTransactions,
     user?._id
       ? {
           userId: user._id,
-          ...(typeFilter !== "all" ? { type: typeFilter as any } : {}),
-          ...(statusFilter !== "all" ? { status: statusFilter as any } : {}),
+          ...(typeFilter !== "all" ? { type: typeFilter as PaymentTypeArg } : {}),
+          ...(statusFilter !== "all" ? { status: statusFilter as PaymentStatusArg } : {}),
         }
       : "skip"
   );
@@ -182,7 +227,9 @@ export default function TransactionsPage() {
           t.milestone?.title.toLowerCase().includes(query) ||
           t._id.toLowerCase().includes(query) ||
           TYPE_LABELS[t.type]?.toLowerCase().includes(query) ||
-          (t.walletFunding?.summary && t.walletFunding.summary.toLowerCase().includes(query))
+          (t.walletFunding?.summary && t.walletFunding.summary.toLowerCase().includes(query)) ||
+          (t.walletFunding &&
+            walletFundingModeLabel(t.walletFunding).toLowerCase().includes(query))
       );
     }
 
@@ -262,17 +309,6 @@ export default function TransactionsPage() {
       setSortField(field);
       setSortDirection("desc");
     }
-  };
-
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    }
-    return sortDirection === "asc" ? (
-      <ArrowUp className="ml-2 h-4 w-4" />
-    ) : (
-      <ArrowDown className="ml-2 h-4 w-4" />
-    );
   };
 
   if (!user) {
@@ -476,12 +512,12 @@ export default function TransactionsPage() {
                   >
                     <span className="inline-flex items-center">
                       Date
-                      <SortIcon field="date" />
+                      <TransactionSortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
                     </span>
                   </DataTableHead>
                   <DataTableHead>Type</DataTableHead>
                   <DataTableHead>Project</DataTableHead>
-                  <DataTableHead className="min-w-[200px]">
+                  <DataTableHead className="min-w-[10rem] w-[11rem] max-w-[13rem] sm:min-w-[12rem] sm:w-[13rem]">
                     <span className="inline-flex items-center gap-1.5">
                       <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       Hire funding
@@ -493,7 +529,7 @@ export default function TransactionsPage() {
                   >
                     <span className="inline-flex items-center">
                       Client gross
-                      <SortIcon field="amount" />
+                      <TransactionSortIcon field="amount" sortField={sortField} sortDirection={sortDirection} />
                     </span>
                   </DataTableHead>
                   <DataTableHead
@@ -502,7 +538,7 @@ export default function TransactionsPage() {
                   >
                     <span className="inline-flex items-center">
                       Status
-                      <SortIcon field="status" />
+                      <TransactionSortIcon field="status" sortField={sortField} sortDirection={sortDirection} />
                     </span>
                   </DataTableHead>
                   <DataTableHead className="text-right">Actions</DataTableHead>
@@ -541,19 +577,37 @@ export default function TransactionsPage() {
                             <span className="text-muted-foreground">N/A</span>
                           )}
                         </DataTableCell>
-                        <DataTableCell>
+                        <DataTableCell className="align-top">
                           {transaction.type === "pre_funding" || transaction.type === "top_up" ? (
                             transaction.walletFunding ? (
-                              <div className="text-xs space-y-1 max-w-[240px]">
-                                <p className="font-medium text-foreground leading-snug">
-                                  {transaction.walletFunding.summary}
-                                </p>
-                                <p className="text-muted-foreground tabular-nums">
-                                  Wallet {fmtMoney(transaction.walletFunding.walletAppliedDollars, transaction.currency)}
-                                  {" · "}
-                                  Checkout{" "}
-                                  {fmtMoney(transaction.walletFunding.gatewayChargedDollars, transaction.currency)}
-                                </p>
+                              <div className="flex flex-col gap-1.5 py-0.5">
+                                <Badge variant="secondary" className="w-fit px-2 py-0 text-[10px] font-medium">
+                                  {walletFundingModeLabel(transaction.walletFunding)}
+                                </Badge>
+                                <dl className="space-y-0.5 text-[11px] leading-tight">
+                                  {transaction.walletFunding.walletAppliedDollars >= 0.01 ? (
+                                    <div className="flex items-baseline justify-between gap-3 tabular-nums">
+                                      <dt className="shrink-0 text-muted-foreground">Wallet</dt>
+                                      <dd className="min-w-0 truncate text-right font-medium text-foreground">
+                                        {fmtMoney(
+                                          transaction.walletFunding.walletAppliedDollars,
+                                          transaction.currency
+                                        )}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                  {transaction.walletFunding.gatewayChargedDollars >= 0.01 ? (
+                                    <div className="flex items-baseline justify-between gap-3 tabular-nums">
+                                      <dt className="shrink-0 text-muted-foreground">Checkout</dt>
+                                      <dd className="min-w-0 truncate text-right font-medium text-foreground">
+                                        {fmtMoney(
+                                          transaction.walletFunding.gatewayChargedDollars,
+                                          transaction.currency
+                                        )}
+                                      </dd>
+                                    </div>
+                                  ) : null}
+                                </dl>
                               </div>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>

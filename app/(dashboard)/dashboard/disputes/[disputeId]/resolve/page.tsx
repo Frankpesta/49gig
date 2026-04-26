@@ -21,6 +21,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
 import { useState } from "react";
+import type { Id } from "@/convex/_generated/dataModel";
+
+type ResolveDecision = "client_favor" | "freelancer_favor" | "partial" | "replacement";
 
 export default function ResolveDisputePage() {
   const params = useParams();
@@ -29,12 +32,7 @@ export default function ResolveDisputePage() {
   const disputeId = params.disputeId as string;
 
   const [formData, setFormData] = useState({
-    decision: "" as
-      | "client_favor"
-      | "freelancer_favor"
-      | "partial"
-      | "replacement"
-      | "",
+    decision: "" as ResolveDecision | "",
     resolutionAmount: "",
     notes: "",
     clientMessage: "",
@@ -46,7 +44,7 @@ export default function ResolveDisputePage() {
   const dispute = useQuery(
     api.disputes.queries.getDispute,
     isAuthenticated && user?._id && disputeId
-      ? { disputeId: disputeId as any, userId: user._id }
+      ? { disputeId: disputeId as Id<"disputes">, userId: user._id }
       : "skip"
   );
 
@@ -75,8 +73,8 @@ export default function ResolveDisputePage() {
 
     try {
       await resolveDispute({
-        disputeId: disputeId as any,
-        decision: formData.decision as any,
+        disputeId: disputeId as Id<"disputes">,
+        decision: formData.decision as ResolveDecision,
         resolutionAmount: formData.resolutionAmount
           ? parseFloat(formData.resolutionAmount) * 100
           : undefined,
@@ -87,7 +85,7 @@ export default function ResolveDisputePage() {
       });
 
       router.push(`/dashboard/disputes/${disputeId}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(getUserFriendlyError(err) || "Failed to resolve dispute");
     } finally {
       setIsSubmitting(false);
@@ -202,7 +200,7 @@ export default function ResolveDisputePage() {
               <Select
                 value={formData.decision}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, decision: value as any })
+                  setFormData({ ...formData, decision: value as ResolveDecision })
                 }
                 required
               >
@@ -310,7 +308,7 @@ export default function ResolveDisputePage() {
                   {dispute.type.replace("_", " ")}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Escrow locked (USD):</span>{" "}
+                  <span className="text-muted-foreground">Escrow locked (client gross, USD):</span>{" "}
                   ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                 </div>
                 <div>

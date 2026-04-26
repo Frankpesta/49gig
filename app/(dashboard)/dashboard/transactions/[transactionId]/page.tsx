@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -292,59 +293,59 @@ export default function TransactionDetailPage() {
                         pending).
                       </p>
                     )}
-                    {(transaction.netAmount != null || transaction.platformFee != null) && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-border/40 text-sm">
-                        {transaction.netAmount != null && (
-                          <div>
-                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                              Net to escrow (after platform fee)
-                            </div>
-                            <div className="mt-1 font-medium tabular-nums">
-                              {fmtDetailMoney(transaction.netAmount, transaction.currency)}
-                            </div>
-                          </div>
-                        )}
-                        {transaction.platformFee != null && (
-                          <div>
-                            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                              Platform fee (included services)
-                            </div>
-                            <div className="mt-1 font-medium tabular-nums">
-                              {fmtDetailMoney(transaction.platformFee, transaction.currency)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </>
               )}
 
               <Separator />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Created At</div>
-                  <div className="text-sm">
-                    {new Date(transaction.createdAt).toLocaleString()}
-                  </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Timeline
+                </p>
+                <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+                  <Table>
+                    <TableBody>
+                      <TableRow className="border-border/60 hover:bg-transparent">
+                        <TableCell className="w-[min(11rem,42%)] py-3 pl-4 pr-2 text-sm font-medium text-muted-foreground sm:py-3.5 sm:pl-5">
+                          Created at
+                        </TableCell>
+                        <TableCell className="whitespace-normal py-3 pr-4 pl-2 text-sm tabular-nums text-foreground sm:py-3.5 sm:pr-5">
+                          {new Date(transaction.createdAt).toLocaleString(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: "medium",
+                          })}
+                        </TableCell>
+                      </TableRow>
+                      {transaction.processedAt ? (
+                        <TableRow className="border-border/60 hover:bg-transparent">
+                          <TableCell className="py-3 pl-4 pr-2 text-sm font-medium text-muted-foreground sm:py-3.5 sm:pl-5">
+                            Processed at
+                          </TableCell>
+                          <TableCell className="whitespace-normal py-3 pr-4 pl-2 text-sm tabular-nums text-foreground sm:py-3.5 sm:pr-5">
+                            {new Date(transaction.processedAt).toLocaleString(undefined, {
+                              dateStyle: "medium",
+                              timeStyle: "medium",
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                      {transaction.webhookReceivedAt ? (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell className="py-3 pl-4 pr-2 text-sm font-medium text-muted-foreground sm:py-3.5 sm:pl-5">
+                            Webhook received
+                          </TableCell>
+                          <TableCell className="whitespace-normal py-3 pr-4 pl-2 text-sm tabular-nums text-foreground sm:py-3.5 sm:pr-5">
+                            {new Date(transaction.webhookReceivedAt).toLocaleString(undefined, {
+                              dateStyle: "medium",
+                              timeStyle: "medium",
+                            })}
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </TableBody>
+                  </Table>
                 </div>
-                {transaction.processedAt && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Processed At</div>
-                    <div className="text-sm">
-                      {new Date(transaction.processedAt).toLocaleString()}
-                    </div>
-                  </div>
-                )}
-                {transaction.webhookReceivedAt && (
-                  <div>
-                    <div className="text-sm font-medium text-muted-foreground">Webhook Received</div>
-                    <div className="text-sm">
-                      {new Date(transaction.webhookReceivedAt).toLocaleString()}
-                    </div>
-                  </div>
-                )}
               </div>
 
               {transaction.errorMessage && (

@@ -59,6 +59,13 @@ type StatusFilter =
   | "closed"
   | undefined;
 
+/** Row shape from `getDisputes` (document + list enrichments). */
+type DisputeListRow = Doc<"disputes"> & {
+  projectTitle?: string | null;
+  initiatorName?: string | null;
+  respondentName?: string | null;
+};
+
 export default function DisputesPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -289,12 +296,14 @@ export default function DisputesPage() {
                 <DataTableHead className="w-[110px]">Status</DataTableHead>
                 <DataTableHead>Parties</DataTableHead>
                 {isStaff && <DataTableHead className="w-[100px]">Assigned</DataTableHead>}
-                <DataTableHead className="w-[100px]">Locked</DataTableHead>
+                <DataTableHead className="w-[100px]">
+                  {user.role === "freelancer" ? "Locked (net)" : "Locked (gross)"}
+                </DataTableHead>
                 <DataTableHead className="w-[100px]">Date</DataTableHead>
                 <DataTableHead className="w-[120px] text-right">Actions</DataTableHead>
               </DataTableHeader>
               <DataTableBody>
-                {paginatedDisputes.map((dispute: any) => (
+                {paginatedDisputes.map((dispute: DisputeListRow) => (
                   <DataTableRow key={dispute._id}>
                     <DataTableCell>
                       <div className="space-y-0.5">

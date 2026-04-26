@@ -171,9 +171,15 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
                 </span>
               </div>
               {transaction.walletFunding && (
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5 max-w-[200px]">
+                <span className="mt-0.5 inline-flex max-w-[220px] flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                   <Wallet className="h-3 w-3 shrink-0" />
-                  <span className="line-clamp-2">{transaction.walletFunding.summary}</span>
+                  <span className="rounded-md border border-border/60 bg-muted/40 px-1.5 py-0.5 font-medium text-foreground">
+                    {transaction.walletFunding.isFullWalletFunding
+                      ? "Wallet only"
+                      : transaction.walletFunding.isPartialWalletFunding
+                        ? "Wallet + checkout"
+                        : "Checkout only"}
+                  </span>
                 </span>
               )}
               {(transaction.type === "milestone_release" ||
