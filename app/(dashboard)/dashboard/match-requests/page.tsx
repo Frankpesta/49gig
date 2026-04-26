@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
+import { getUserFriendlyError } from "@/lib/error-handling";
 
 type MatchRequest = {
   _id: string;
@@ -32,14 +33,18 @@ type MatchRequest = {
   projectDescription?: string | null;
   clientName?: string | null;
   projectDuration?: string | null;
-  totalAmount?: number | null;
+  /** Full engagement, USD, net of platform fee; team = this seat’s share. */
+  freelancerNetTotalUsd: number;
   score: number;
   confidence: "low" | "medium" | "high";
   teamRole?: string | null;
   hireType?: string | null;
   experienceLevel?: string | null;
   roleType?: string | null;
+  /** Shown to freelancer: team seat skills only when hire is team + per-seat intake; else project skills. */
   requiredSkills?: string[];
+  /** When `seat`, `requiredSkills` are for this match's team seat only. */
+  freelancerSkillsScope?: "seat" | "project";
   specialRequirements?: string | null;
   startDate?: string | null;
 };
@@ -62,11 +67,11 @@ export default function MatchRequestsPage() {
   const [detailMatch, setDetailMatch] = useState<MatchRequest | null>(null);
 
   const pendingMatches = useQuery(
-    (api as any).matching.queries.getPendingFreelancerMatches,
+    api.matching.queries.getPendingFreelancerMatches,
     isAuthenticated && user?._id ? { userId: user._id } : "skip"
   );
 
-  const respond = useMutation((api as any).matching.mutations.respondToMatchAsFreelancer);
+  const respond = useMutation(api.matching.mutations.respondToMatchAsFreelancer);
   const didScrollToMatchRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -118,8 +123,8 @@ export default function MatchRequestsPage() {
           router.push(`/dashboard/projects/${projectId}`);
         }
       }
-    } catch (e: any) {
-      toast.error(e.message || "Failed to accept");
+    } catch (e: unknown) {
+      toast.error(getUserFriendlyError(e) || "Failed to accept");
     } finally {
       setResponding(null);
     }
@@ -138,8 +143,8 @@ export default function MatchRequestsPage() {
       toast.success("You've declined this opportunity.");
       setDeclineMatchId(null);
       setDeclineReason("");
-    } catch (e: any) {
-      toast.error(e.message || "Failed to decline");
+    } catch (e: unknown) {
+      toast.error(getUserFriendlyError(e) || "Failed to decline");
     } finally {
       setResponding(null);
     }
@@ -191,7 +196,9 @@ export default function MatchRequestsPage() {
                 <div className="flex flex-wrap gap-3 text-sm">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <DollarSign className="h-3.5 w-3.5" />
-                    {match.totalAmount ? `$${match.totalAmount.toLocaleString()}` : "Budget TBD"}
+                    {match.freelancerNetTotalUsd > 0
+                      ? `$${match.freelancerNetTotalUsd.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} net`
+                      : "Pay TBD"}
                   </div>
                   {match.projectDuration && (
                     <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -276,12 +283,21 @@ export default function MatchRequestsPage() {
 
             {/* Key details grid */}
             <div className="grid grid-cols-2 gap-3">
-              {detailMatch?.totalAmount && (
+              {detailMatch && detailMatch.freelancerNetTotalUsd > 0 && (
                 <div className="rounded-lg border bg-muted/30 p-3">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
-                    <DollarSign className="h-3.5 w-3.5" /> Total Budget
+                    <DollarSign className="h-3.5 w-3.5" /> Your pay (net)
                   </div>
-                  <p className="font-semibold text-sm">${detailMatch.totalAmount.toLocaleString()}</p>
+                  <p className="font-semibold text-sm tabular-nums">
+                    $
+                    {detailMatch.freelancerNetTotalUsd.toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
+                  </p>
+                  <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                    After platform fee. For team hires, this is your seat only—not the client&apos;s full spend.
+                  </p>
                 </div>
               )}
               {detailMatch?.projectDuration && (
@@ -330,13 +346,19 @@ export default function MatchRequestsPage() {
               )}
             </div>
 
-            {/* Required skills */}
+            {/* Skills (per seat for team + slot intake; otherwise project list) */}
             {detailMatch?.requiredSkills && detailMatch.requiredSkills.length > 0 && (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Skills Required</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                  {detailMatch.freelancerSkillsScope === "seat"
+                    ? "Skills for this seat"
+                    : "Skills required"}
+                </p>
                 <div className="flex flex-wrap gap-1.5">
                   {detailMatch.requiredSkills.map((skill) => (
-                    <Badge key={skill} variant="secondary" className="text-xs">{skill}</Badge>
+                    <Badge key={skill} variant="secondary" className="text-xs">
+                      {skill}
+                    </Badge>
                   ))}
                 </div>
               </div>
