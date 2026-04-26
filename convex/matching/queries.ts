@@ -2,6 +2,8 @@ import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
+import { freelancerEngagementNetTotalUsd } from "../../lib/project-freelancer-earnings";
+import { skillsForTeamRoleLabel, type TeamSlotIntake } from "../../lib/team-slots";
 
 /** Client-safe display name: first name + last initial (e.g. "Daniel O.") */
 function toDisplayName(fullName: string): string {
@@ -323,22 +325,65 @@ export const getPendingFreelancerMatches = query({
     );
 
     return Promise.all(
-      pendingSelection.map(async (match: any) => {
-        const rawProject = await ctx.db.get(match.projectId);
-        const project = rawProject as any;
-        const client = project ? await ctx.db.get(project.clientId) : null;
-        const intake = project?.intakeForm ?? {};
+      pendingSelection.map(async (match) => {
+        const project = await ctx.db.get(match.projectId);
+        if (!project) {
+          return {
+            ...match,
+            projectTitle: null,
+            projectDescription: null,
+            clientName: null,
+            projectDuration: null,
+            freelancerNetTotalUsd: 0,
+            hireType: null,
+            experienceLevel: null,
+            roleType: null,
+            requiredSkills: [] as string[],
+            freelancerSkillsScope: "project" as const,
+            specialRequirements: null,
+            startDate: null,
+          };
+        }
+
+        const intake = project.intakeForm;
+        const client = await ctx.db.get(project.clientId);
+        const teamSlots = (Array.isArray(intake.teamSlots) ? intake.teamSlots : []) as TeamSlotIntake[];
+        const hasSeatRows = teamSlots.some((s) => !!s.roleId);
+        const hireType = intake.hireType ?? null;
+        const useSeatSkills = hireType === "team" && hasSeatRows && !!match.teamRole;
+        const displaySkills = useSeatSkills
+          ? skillsForTeamRoleLabel(match.teamRole, teamSlots)
+          : (intake.requiredSkills ?? []);
+
+        const freelancerNetTotalUsd = freelancerEngagementNetTotalUsd(
+          {
+            totalAmount: project.totalAmount,
+            platformFee: project.platformFee,
+            teamBudgetBreakdown: project.teamBudgetBreakdown,
+            intakeForm: {
+              hireType: intake.hireType,
+              teamSlots,
+              projectDuration: intake.projectDuration,
+              teamMemberCount: intake.teamMemberCount,
+            },
+            matchedFreelancerIds: project.matchedFreelancerIds,
+            matchedFreelancerId: project.matchedFreelancerId,
+          },
+          match.teamRole
+        );
+
         return {
           ...match,
           projectTitle: intake.title ?? null,
           projectDescription: intake.description ?? null,
-          clientName: (client as any)?.name ?? null,
+          clientName: client?.name ?? null,
           projectDuration: intake.projectDuration ?? null,
-          totalAmount: project?.totalAmount ?? null,
-          hireType: intake.hireType ?? null,
+          freelancerNetTotalUsd,
+          hireType,
           experienceLevel: intake.experienceLevel ?? null,
           roleType: intake.roleType ?? null,
-          requiredSkills: intake.requiredSkills ?? [],
+          requiredSkills: displaySkills,
+          freelancerSkillsScope: useSeatSkills ? ("seat" as const) : ("project" as const),
           specialRequirements: intake.specialRequirements ?? null,
           startDate: intake.startDate ?? null,
         };

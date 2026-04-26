@@ -213,6 +213,19 @@ export function teamSlotsToMatchSpecs(
   return specs;
 }
 
+/**
+ * Skills for the team seat that matches `teamRoleLabel` (e.g. "UI Designer #1").
+ * Returns [] if the label does not match any filled slot.
+ */
+export function skillsForTeamRoleLabel(
+  teamRoleLabel: string | undefined,
+  slots: TeamSlotIntake[]
+): string[] {
+  if (!teamRoleLabel?.trim() || !slots.length) return [];
+  const spec = teamSlotsToMatchSpecs(slots).find((s) => s.teamRoleLabel === teamRoleLabel);
+  return spec?.skills?.length ? [...spec.skills] : [];
+}
+
 /** Role labels for partial team / UI when intake uses per-seat rows. */
 export function getTeamSlotDisplayLabelsFromSlots(slots: TeamSlotIntake[]): string[] {
   return teamSlotsToMatchSpecs(slots).map((s) => s.teamRoleLabel);
