@@ -6,6 +6,7 @@
 import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { runCompleteVerificationForFreelancer } from "./completeVerificationCore";
+import { hardDeleteUserAccount } from "../users/hardDeleteUser";
 
 const experienceLevelValidator = v.union(
   v.literal("junior"),
@@ -196,7 +197,7 @@ export const terminateFreelancerVerificationFailure = internalMutation({
   },
   handler: async (ctx, args) => {
     const freelancer = await ctx.db.get(args.freelancerId);
-    if (!freelancer || freelancer.status !== "active") {
+    if (!freelancer || freelancer.role !== "freelancer" || freelancer.status !== "active") {
       return { skipped: true as const };
     }
     const vettingRow = await ctx.db.get(args.vettingResultId);
@@ -205,44 +206,54 @@ export const terminateFreelancerVerificationFailure = internalMutation({
     }
 
     const now = Date.now();
-    await ctx.db.patch(args.vettingResultId, {
-      status: "rejected",
-      weightedTerminationJobScheduled: undefined,
-      weightedFailureScheduledFor: undefined,
-      updatedAt: now,
-    });
-    await ctx.db.patch(args.freelancerId, {
-      status: "deleted",
-      verificationStatus: "rejected",
-      updatedAt: now,
-    });
-
-    await ctx.runMutation(internalAny.auth.sessions.revokeAllSessionsForUserInternal, {
-      userId: args.freelancerId,
-      reason: "verification_terminated",
-    });
+    const email = freelancer.email ?? "";
+    const name = freelancer.name ?? "there";
 
     await ctx.scheduler.runAfter(
       0,
       internalAny.vetting.staffEmails.sendVerificationTerminatedEmailInternal,
-      {
-        email: freelancer.email ?? "",
-        name: freelancer.name ?? "there",
-      }
+      { email, name }
     );
 
-    await ctx.db.insert("auditLogs", {
-      action: "freelancer_removed_failed_verification_twice",
-      actionType: "system",
-      actorId: args.freelancerId,
-      actorRole: freelancer.role,
-      targetType: "vettingResult",
-      targetId: args.vettingResultId,
-      details: { reason: args.reason },
-      createdAt: now,
-    });
+    try {
+      await hardDeleteUserAccount(ctx, {
+        targetUserId: args.freelancerId,
+        auditActorId: args.freelancerId,
+        auditActorRole: "system",
+        auditActionType: "system",
+        reason: `verification_failure:${args.reason}`,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await ctx.db.patch(args.vettingResultId, {
+        status: "rejected",
+        weightedTerminationJobScheduled: undefined,
+        weightedFailureScheduledFor: undefined,
+        updatedAt: Date.now(),
+      });
+      await ctx.db.patch(args.freelancerId, {
+        status: "deleted",
+        verificationStatus: "rejected",
+        updatedAt: Date.now(),
+      });
+      await ctx.runMutation(internalAny.auth.sessions.revokeAllSessionsForUserInternal, {
+        userId: args.freelancerId,
+        reason: "verification_terminated",
+      });
+      await ctx.db.insert("auditLogs", {
+        action: "freelancer_verification_failure_hard_delete_blocked",
+        actionType: "system",
+        actorId: args.freelancerId,
+        actorRole: freelancer.role,
+        targetType: "vettingResult",
+        targetId: args.vettingResultId,
+        details: { reason: args.reason, error: message },
+        createdAt: now,
+      });
+      return { skipped: false as const, hardDeleteFailed: true as const };
+    }
 
-    return { skipped: false as const };
+    return { skipped: false as const, hardDeleteFailed: false as const };
   },
 });
 

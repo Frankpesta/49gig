@@ -5,6 +5,7 @@ import { Doc, Id } from "../_generated/dataModel";
 import {
   weightedVerificationOverall,
 } from "../vetting/scoring";
+import { hardDeleteUserAccount } from "../users/hardDeleteUser";
 
 const internalAny = require("../_generated/api").internal as any;
 
@@ -312,15 +313,40 @@ export const rejectKyc = mutation({
     const name = freelancer?.name ?? "there";
 
     if (newIdCount >= 2 || newAddressCount >= 2) {
-      await ctx.db.patch(args.freelancerId, {
-        status: "deleted",
-        updatedAt: now,
-      });
       await ctx.scheduler.runAfter(0, internalAny.kyc.actions.sendKycAccountRemovedEmail, {
         email,
         name,
         reason: args.reason,
       });
+      try {
+        await hardDeleteUserAccount(ctx, {
+          targetUserId: args.freelancerId,
+          auditActorId: args.freelancerId,
+          auditActorRole: "system",
+          auditActionType: "system",
+          reason: "kyc_rejected_max_attempts",
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await ctx.db.patch(args.freelancerId, {
+          status: "deleted",
+          updatedAt: Date.now(),
+        });
+        await ctx.runMutation(internalAny.auth.sessions.revokeAllSessionsForUserInternal, {
+          userId: args.freelancerId,
+          reason: "kyc_rejected_max_attempts",
+        });
+        await ctx.db.insert("auditLogs", {
+          action: "kyc_removal_hard_delete_blocked",
+          actionType: "system",
+          actorId: args.freelancerId,
+          actorRole: "freelancer",
+          targetType: "user",
+          targetId: args.freelancerId as string,
+          details: { reason: args.reason, error: message },
+          createdAt: Date.now(),
+        });
+      }
     } else {
       await ctx.scheduler.runAfter(0, internalAny.kyc.actions.sendKycRejectedEmail, {
         email,

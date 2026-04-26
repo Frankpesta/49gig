@@ -45,8 +45,6 @@ import {
   ShieldCheck,
   ShieldAlert,
   Ban,
-  CheckCircle2,
-  XCircle,
   ArrowLeft,
   Wallet,
   Briefcase,
@@ -86,10 +84,43 @@ function StatusBadge({ status }: { status: string }) {
     in_progress: "secondary",
     not_started: "outline",
     not_submitted: "outline",
+    id_rejected: "destructive",
+    address_rejected: "destructive",
   };
   return (
     <Badge variant={variants[status] ?? "outline"} className="capitalize">
       {status.replace(/_/g, " ")}
+    </Badge>
+  );
+}
+
+/** Freelancer skill/English tests + admin gate — not email verification. */
+function PlatformVerificationBadge({ status }: { status?: string }) {
+  const s = status ?? "not_started";
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    not_started: "outline",
+    in_progress: "secondary",
+    pending_review: "secondary",
+    approved: "default",
+    rejected: "destructive",
+    suspended: "destructive",
+  };
+  const label: Record<string, string> = {
+    not_started: "Not started",
+    in_progress: "Tests in progress",
+    pending_review: "Awaiting admin review",
+    approved: "Tests passed · Admin approved",
+    rejected: "Rejected / failed tests",
+    suspended: "Suspended",
+  };
+  return (
+    <Badge
+      variant={variants[s] ?? "outline"}
+      className="text-xs font-medium"
+      title="English & skill assessments, then admin approval — separate from email verification"
+    >
+      <ShieldCheck className="h-3 w-3 mr-1 shrink-0" />
+      {label[s] ?? s.replace(/_/g, " ")}
     </Badge>
   );
 }
@@ -369,10 +400,17 @@ export default function UserDetailPage() {
                   <Badge variant="outline" className="capitalize">{profileData.role}</Badge>
                   <StatusBadge status={profileData.status} />
                   {profileData.emailVerified && (
-                    <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/20">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Verified
+                    <Badge
+                      variant="outline"
+                      className="text-muted-foreground border-border"
+                      title="Login email has been confirmed — not the same as freelancer platform verification"
+                    >
+                      <Mail className="h-3 w-3 mr-1 shrink-0" />
+                      Email verified
                     </Badge>
+                  )}
+                  {isFreelancer && (
+                    <PlatformVerificationBadge status={profileData.verificationStatus} />
                   )}
                 </div>
               </div>
