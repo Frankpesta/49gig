@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSignupDraftStore } from "@/stores/signupDraftStore";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,6 @@ import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client"
 import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
 import { useOAuth } from "@/hooks/use-oauth";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
-import { clientSignupFeatures } from "@/components/auth/auth-icons";
 import { CountrySelector } from "@/components/ui/country-selector";
 import { getCountryByCode } from "@/lib/countries";
 import { getUserFriendlyError } from "@/lib/error-handling";
@@ -22,19 +22,13 @@ import { Eye, EyeOff } from "lucide-react";
 export default function ClientSignupPage() {
   const router = useRouter();
   const { trackEvent } = useAnalytics();
+  const clientDraft = useSignupDraftStore((s) => s.client);
+  const setClientDraft = useSignupDraftStore((s) => s.setClientDraft);
+  const resetClientDraft = useSignupDraftStore((s) => s.resetClientDraft);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    workEmail: "",
-    password: "",
-    confirmPassword: "",
-    companyName: "",
-    phoneNumber: "",
-    companyWebsite: "",
-    country: "",
-  });
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const signupWithRecaptcha = useAction(api.auth.actions.signupWithRecaptcha);
@@ -48,8 +42,8 @@ export default function ClientSignupPage() {
     }
   }, []);
 
-  const selectedCountry = formData.country
-    ? getCountryByCode(formData.country)
+  const selectedCountry = clientDraft.country
+    ? getCountryByCode(clientDraft.country)
     : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -57,22 +51,22 @@ export default function ClientSignupPage() {
     setError("");
 
     // Validation
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (formData.password.length < 8) {
+    if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
     }
 
-    if (!formData.companyName) {
+    if (!clientDraft.companyName) {
       setError("Company name is required");
       return;
     }
 
-    if (!formData.country) {
+    if (!clientDraft.country) {
       setError("Country is required");
       return;
     }
@@ -92,35 +86,38 @@ export default function ClientSignupPage() {
       const recaptchaToken = await executeRecaptcha("signup");
       const result = await signupWithRecaptcha({
         recaptchaToken,
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
+        email: clientDraft.email,
+        password,
+        name: clientDraft.name,
         role: "client",
         referralCode,
         profile: {
-          companyName: formData.companyName,
-          workEmail: formData.workEmail || formData.email,
-          phoneNumber: formData.phoneNumber
-            ? `${selectedCountry?.phoneCode || ""}${formData.phoneNumber}`
+          companyName: clientDraft.companyName,
+          workEmail: clientDraft.workEmail || clientDraft.email,
+          phoneNumber: clientDraft.phoneNumber
+            ? `${selectedCountry?.phoneCode || ""}${clientDraft.phoneNumber}`
             : undefined,
-          companyWebsite: formData.companyWebsite || undefined,
-          country: formData.country,
+          companyWebsite: clientDraft.companyWebsite || undefined,
+          country: clientDraft.country,
         },
       });
 
       if (result.success) {
         trackEvent("sign_up", { method: "email", role: "client" });
+        resetClientDraft();
+        setPassword("");
+        setConfirmPassword("");
         if (result.emailVerificationRequired) {
           if (result.sessionToken) {
             localStorage.setItem("sessionToken", result.sessionToken);
           }
-          sessionStorage.setItem("pending_verify_email", formData.email);
+          sessionStorage.setItem("pending_verify_email", clientDraft.email);
           router.push("/verify-email");
         } else {
           router.push("/dashboard");
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(getUserFriendlyError(err) || "Failed to create account");
     } finally {
       setIsLoading(false);
@@ -187,8 +184,8 @@ export default function ClientSignupPage() {
             id="name"
             type="text"
             placeholder="eg. John Doe"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            value={clientDraft.name}
+            onChange={(e) => setClientDraft({ name: e.target.value })}
             required
             disabled={isLoading}
             className="h-11 rounded-lg"
@@ -201,8 +198,8 @@ export default function ClientSignupPage() {
             id="email"
             type="email"
             placeholder="eg. john@example.com"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            value={clientDraft.email}
+            onChange={(e) => setClientDraft({ email: e.target.value })}
             required
             disabled={isLoading}
             className="h-11 rounded-lg"
@@ -216,8 +213,8 @@ export default function ClientSignupPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading}
               minLength={8}
@@ -242,8 +239,8 @@ export default function ClientSignupPage() {
               id="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirm your password"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
               disabled={isLoading}
               className="h-11 rounded-lg pr-10"
@@ -267,8 +264,8 @@ export default function ClientSignupPage() {
               id="companyName"
               type="text"
               placeholder="eg. Acme Inc."
-              value={formData.companyName}
-              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+              value={clientDraft.companyName}
+              onChange={(e) => setClientDraft({ companyName: e.target.value })}
               required
               disabled={isLoading}
               className="h-11 rounded-lg"
@@ -277,8 +274,8 @@ export default function ClientSignupPage() {
           <div className="space-y-0.5">
             <Label htmlFor="country" className="text-sm font-medium">Country / Region</Label>
             <CountrySelector
-              value={formData.country}
-              onValueChange={(value) => setFormData({ ...formData, country: value })}
+              value={clientDraft.country}
+              onValueChange={(value) => setClientDraft({ country: value })}
               disabled={isLoading}
               className="w-full"
             />
@@ -289,8 +286,8 @@ export default function ClientSignupPage() {
               id="workEmail"
               type="email"
               placeholder="eg. work@company.com"
-              value={formData.workEmail}
-              onChange={(e) => setFormData({ ...formData, workEmail: e.target.value })}
+              value={clientDraft.workEmail}
+              onChange={(e) => setClientDraft({ workEmail: e.target.value })}
               disabled={isLoading}
               className="h-11 rounded-lg"
             />
@@ -307,9 +304,11 @@ export default function ClientSignupPage() {
                 id="phoneNumber"
                 type="tel"
                 placeholder="eg. 1234567890"
-                value={formData.phoneNumber}
-                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value.replace(/\D/g, "") })}
-                disabled={isLoading || !formData.country}
+                value={clientDraft.phoneNumber}
+                onChange={(e) =>
+                  setClientDraft({ phoneNumber: e.target.value.replace(/\D/g, "") })
+                }
+                disabled={isLoading || !clientDraft.country}
                 className="h-11 flex-1 rounded-lg"
               />
             </div>
@@ -323,8 +322,8 @@ export default function ClientSignupPage() {
               id="companyWebsite"
               type="url"
               placeholder="eg. https://company.com"
-              value={formData.companyWebsite}
-              onChange={(e) => setFormData({ ...formData, companyWebsite: e.target.value })}
+              value={clientDraft.companyWebsite}
+              onChange={(e) => setClientDraft({ companyWebsite: e.target.value })}
               disabled={isLoading}
               className="h-11 rounded-lg"
             />

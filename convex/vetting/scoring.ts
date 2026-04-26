@@ -9,11 +9,12 @@ import { calculateOverallScore } from "./engine";
 export const MIN_PERCENT_TO_PASS = 50;
 
 /**
- * Cooldown applied after a first-attempt failure before the retake can be
- * submitted. Enforced server-side in `submitEnglishProficiency` and
- * `startSkillTest`; surfaced to the client by `getVerificationStatus`.
+ * Cooldown after a first-attempt failure before the retake can be submitted.
+ * Enforced server-side in `submitEnglishProficiency` and `startSkillTest`;
+ * freelancers may clear it early via `clearVerificationRetakeCooldown`.
+ * Client copy: `lib/verification-retake.ts` (same minute length).
  */
-export const RETAKE_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+export const RETAKE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
 
 /** After final submit, if weighted score is below minimum, UI shows a countdown before account removal + email. */
 export const WEIGHTED_FAILURE_COUNTDOWN_MS = 15_000;

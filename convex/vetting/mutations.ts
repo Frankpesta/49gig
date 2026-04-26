@@ -243,6 +243,78 @@ export const initializeVerification = mutation({
 });
 
 /**
+ * Freelancer opts out of the post-failure retake wait and may start the retake immediately.
+ * Only valid while the corresponding cooldown timestamp is still in the future.
+ */
+export const clearVerificationRetakeCooldown = mutation({
+  args: {
+    section: v.union(v.literal("english"), v.literal("skills")),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "freelancer") {
+      throw new Error("Only freelancers can clear a retake cooldown");
+    }
+
+    const vettingResult = await ctx.db
+      .query("vettingResults")
+      .withIndex("by_freelancer", (q) => q.eq("freelancerId", user._id))
+      .first();
+
+    if (!vettingResult) {
+      throw new Error("Verification not initialized");
+    }
+
+    const now = Date.now();
+
+    if (args.section === "english") {
+      if ((vettingResult.englishAttemptRound ?? 0) < 1) {
+        throw new Error("English retake cooldown does not apply yet.");
+      }
+      const until = vettingResult.englishRetakeAvailableAt;
+      if (until == null || now >= until) {
+        throw new Error("Your English retake is already available — refresh the page if the button still appears.");
+      }
+      await ctx.db.patch(vettingResult._id, {
+        englishRetakeAvailableAt: undefined,
+        updatedAt: now,
+      });
+    } else {
+      if ((vettingResult.skillsAttemptRound ?? 0) < 1) {
+        throw new Error("Skill test retake cooldown does not apply yet.");
+      }
+      const until = vettingResult.skillsRetakeAvailableAt;
+      if (until == null || now >= until) {
+        throw new Error(
+          "Your skill test retake is already available — refresh the page if the button still appears."
+        );
+      }
+      await ctx.db.patch(vettingResult._id, {
+        skillsRetakeAvailableAt: undefined,
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.insert("auditLogs", {
+      action: "verification_retake_cooldown_cleared",
+      actionType: "auth",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "vettingResult",
+      targetId: vettingResult._id,
+      details: { section: args.section },
+      createdAt: now,
+    });
+
+    return { success: true as const };
+  },
+});
+
+/**
  * Submit English proficiency test results
  */
 export const submitEnglishProficiency = mutation({
