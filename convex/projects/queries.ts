@@ -396,6 +396,21 @@ export const getProject = query({
       }
     }
 
+    // Hire roster can change during disputes; anyone who is (or was) a named party on a non-cancelled dispute may open the hire from dispute UI.
+    if (!canView) {
+      const disputesOnProject = await ctx.db
+        .query("disputes")
+        .withIndex("by_project", (q) => q.eq("projectId", projectId))
+        .collect();
+      for (const d of disputesOnProject) {
+        if (d.status === "cancelled") continue;
+        if (viewerIsDisputeParty(user._id, project, d)) {
+          canView = true;
+          break;
+        }
+      }
+    }
+
     if (!canView) {
       return null;
     }

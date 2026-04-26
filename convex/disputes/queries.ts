@@ -1,12 +1,9 @@
 import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import { clientLockedGrossToFreelancerEscrowPool } from "./amounts";
-import {
-  effectivePlatformFeePercentForProject,
-  getDefaultPlatformFeePercent,
-} from "../platformFeeResolve";
+import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 import {
   computeTeamPoolShareCentsByFreelancerId,
   sumShareCentsForFreelancers,
@@ -25,6 +22,94 @@ async function getCurrentUserInQuery(
   const user = await getCurrentUser(ctx);
   if (!user || (user as Doc<"users">).status !== "active") return null;
   return user as Doc<"users">;
+}
+
+/**
+ * Clients and staff see freelancer-net dollars: for open disputes, the current escrow
+ * pool (or disputed members' slice on partial-team disputes). For closed disputes, derive
+ * net from the stored client-gross snapshot on the dispute row.
+ */
+async function nonFreelancerVisibleLockedNetUsd(
+  ctx: QueryCtx,
+  dispute: Doc<"disputes">,
+  project: Doc<"projects">,
+  feePct: number
+): Promise<number> {
+  const teamIds: Id<"users">[] = project.matchedFreelancerId
+    ? [project.matchedFreelancerId]
+    : [...(project.matchedFreelancerIds ?? [])];
+  const disputed = dispute.disputedFreelancerIds ?? [];
+  const isPartialTeam =
+    teamIds.length > 1 &&
+    disputed.length > 0 &&
+    disputed.length < teamIds.length;
+
+  const escrowNetNow = Math.max(0, project.escrowedAmount ?? 0);
+  const openish = dispute.status === "open" || dispute.status === "under_review";
+
+  let out: number;
+  if (openish) {
+    if (isPartialTeam) {
+      const teamBasis = teamBasisUserIdsForDispute(dispute, project);
+      const totalPoolCents = Math.round(escrowNetNow * 100);
+      const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+        ctx,
+        dispute.projectId,
+        teamBasis,
+        project.teamBudgetBreakdown,
+        totalPoolCents
+      );
+      const disputedNetCents = sumShareCentsForFreelancers(shareMap, disputed);
+      out = disputedNetCents / 100;
+    } else {
+      out = escrowNetNow;
+    }
+  } else {
+    out = clientLockedGrossToFreelancerEscrowPool(dispute.lockedAmount, feePct);
+  }
+  return Math.round(out * 100) / 100;
+}
+
+/** Full names for disputor and disputed party/parties (for dispute detail UI). */
+async function disputePartyDisplayNames(
+  ctx: QueryCtx,
+  dispute: Doc<"disputes">,
+  project: Doc<"projects">
+): Promise<{ initiatorFullName: string; disputedPartyNames: string[] }> {
+  const initiator = await ctx.db.get(dispute.initiatorId);
+  const initiatorFullName = initiator?.name?.trim() || "Unknown";
+
+  const teamIds: Id<"users">[] = project.matchedFreelancerId
+    ? [project.matchedFreelancerId]
+    : [...(project.matchedFreelancerIds ?? [])];
+  const disputedIds = dispute.disputedFreelancerIds ?? [];
+  const isPartialTeam =
+    teamIds.length > 1 &&
+    disputedIds.length > 0 &&
+    disputedIds.length < teamIds.length;
+
+  let disputedUserIds: Id<"users">[] = [];
+  if (dispute.initiatorRole === "client") {
+    if (isPartialTeam) {
+      disputedUserIds = [...disputedIds];
+    } else if (teamIds.length > 0) {
+      disputedUserIds = [...teamIds];
+    }
+  } else {
+    disputedUserIds = [project.clientId];
+  }
+
+  const disputedPartyNames: string[] = [];
+  const seen = new Set<string>();
+  for (const id of disputedUserIds) {
+    const key = String(id);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const u = await ctx.db.get(id);
+    disputedPartyNames.push(u?.name?.trim() || "Unknown");
+  }
+
+  return { initiatorFullName, disputedPartyNames };
 }
 
 /**
@@ -53,7 +138,6 @@ export const getDisputes = query({
       return [];
     }
 
-    const defaultPlatformFee = await getDefaultPlatformFeePercent(ctx);
     const enrichDisputes = async (rawDisputes: Doc<"disputes">[]) => {
       return Promise.all(
         rawDisputes.map(async (d) => {
@@ -72,13 +156,28 @@ export const getDisputes = query({
             }
           }
           let lockedAmount = d.lockedAmount;
-          if (project && user.role !== "admin" && user.role !== "moderator") {
-            const isFreelancer =
+          if (project) {
+            const feePct = await effectivePlatformFeePercentForProject(
+              ctx,
+              project.platformFee
+            );
+            const isFreelancerOnProject =
               project.matchedFreelancerId === user._id ||
               (project.matchedFreelancerIds?.includes(user._id) ?? false);
-            const isClient = project.clientId === user._id;
-            if (isFreelancer && !isClient) {
-              const feePct = project.platformFee ?? defaultPlatformFee;
+            const isProjectClient = project.clientId === user._id;
+
+            if (
+              isProjectClient ||
+              user.role === "admin" ||
+              user.role === "moderator"
+            ) {
+              lockedAmount = await nonFreelancerVisibleLockedNetUsd(
+                ctx,
+                d,
+                project,
+                feePct
+              );
+            } else if (isFreelancerOnProject) {
               const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
                 d.lockedAmount,
                 feePct
@@ -329,6 +428,13 @@ export const getDispute = query({
       } else {
         visibleLockedAmount = fullNetPool;
       }
+    } else if (isClient || isAdminOrModerator || isAssignedModerator) {
+      visibleLockedAmount = await nonFreelancerVisibleLockedNetUsd(
+        ctx,
+        dispute,
+        project,
+        feePctForViews
+      );
     }
 
     if (dispute.resolution && !isAdminOrModerator) {
@@ -352,11 +458,19 @@ export const getDispute = query({
       }
     }
 
+    const { initiatorFullName, disputedPartyNames } = await disputePartyDisplayNames(
+      ctx,
+      dispute,
+      project
+    );
+
     return {
       ...dispute,
       evidence: enrichedEvidence,
       resolution: visibleResolution,
       lockedAmount: visibleLockedAmount,
+      initiatorFullName,
+      disputedPartyNames,
     };
   },
 });

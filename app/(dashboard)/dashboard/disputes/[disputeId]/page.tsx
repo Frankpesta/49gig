@@ -317,11 +317,40 @@ export default function DisputeDetailPage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Description</label>
-                <p className="mt-1 whitespace-pre-wrap">{dispute.description}</p>
+                {"initiatorFullName" in dispute && dispute.initiatorFullName ? (
+                  <div className="mt-2 rounded-md border border-border/60 bg-muted/30 px-3 py-2.5 text-sm space-y-1.5">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Parties
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Disputor: </span>
+                      <span className="font-medium text-foreground">{dispute.initiatorFullName}</span>
+                      <span className="text-muted-foreground"> ({dispute.initiatorRole})</span>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Disputed: </span>
+                      <span className="font-medium text-foreground">
+                        {Array.isArray(dispute.disputedPartyNames) && dispute.disputedPartyNames.length > 0
+                          ? dispute.disputedPartyNames.join(", ")
+                          : "—"}
+                      </span>
+                    </p>
+                  </div>
+                ) : null}
+                <p className="mt-2 whitespace-pre-wrap text-sm">{dispute.description}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Initiator</label>
-                <p className="mt-1 capitalize">{dispute.initiatorRole}</p>
+                <p className="mt-1">
+                  {"initiatorFullName" in dispute && dispute.initiatorFullName ? (
+                    <>
+                      <span className="font-medium">{dispute.initiatorFullName}</span>
+                      <span className="text-muted-foreground capitalize"> · {dispute.initiatorRole}</span>
+                    </>
+                  ) : (
+                    <span className="capitalize">{dispute.initiatorRole}</span>
+                  )}
+                </p>
               </div>
               {(dispute.monthlyCycleId || dispute.milestoneId) && (
                 <div>
@@ -330,8 +359,14 @@ export default function DisputeDetailPage() {
                   </label>
                   <p className="mt-1">
                     <Link
-                      href={`/dashboard/projects/${dispute.projectId}${dispute.monthlyCycleId ? "?cycle=" + dispute.monthlyCycleId : "?milestone=" + dispute.milestoneId}`}
-                      className="text-primary hover:underline"
+                      href={`/dashboard/projects/${String(dispute.projectId)}${
+                        dispute.monthlyCycleId
+                          ? "?cycle=" + String(dispute.monthlyCycleId)
+                          : dispute.milestoneId
+                            ? "?milestone=" + String(dispute.milestoneId)
+                            : ""
+                      }`}
+                      className="text-primary hover:underline cursor-pointer"
                     >
                       {dispute.monthlyCycleId ? "View Monthly Payment" : "View Milestone"}
                     </Link>
@@ -735,8 +770,8 @@ export default function DisputeDetailPage() {
             </CardHeader>
             <CardContent>
               <Link
-                href={`/dashboard/projects/${dispute.projectId}`}
-                className="text-primary hover:underline font-medium"
+                href={`/dashboard/projects/${String(dispute.projectId)}`}
+                className="text-primary hover:underline font-medium inline-flex cursor-pointer"
               >
                 View Project
               </Link>
