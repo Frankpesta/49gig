@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSignupDraftStore } from "@/stores/signupDraftStore";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,14 @@ import { useAnalytics } from "@/hooks/use-analytics";
 import { CountrySelector } from "@/components/ui/country-selector";
 import { getCountryByCode } from "@/lib/countries";
 import { Eye, EyeOff } from "lucide-react";
+import type { User } from "@/stores/authStore";
+
+type FreelancerSignupTechField = NonNullable<
+  NonNullable<User["profile"]>["techField"]
+>;
+type FreelancerSignupExperienceLevel = NonNullable<
+  NonNullable<User["profile"]>["experienceLevel"]
+>;
 
 const EXPERIENCE_LEVELS = [
   { value: "junior", label: "Junior" },
@@ -45,59 +54,51 @@ const EXPERIENCE_LEVELS = [
 export default function FreelancerSignupPage() {
   const router = useRouter();
   const { trackEvent } = useAnalytics();
+  const freelancerDraft = useSignupDraftStore((s) => s.freelancer);
+  const setFreelancerDraft = useSignupDraftStore((s) => s.setFreelancerDraft);
+  const resetFreelancerDraft = useSignupDraftStore((s) => s.resetFreelancerDraft);
+  const skillInput = useSignupDraftStore((s) => s.freelancerSkillInput);
+  const setFreelancerSkillInput = useSignupDraftStore((s) => s.setFreelancerSkillInput);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
-    techField: "",
-    softwareDevField: "",
-    experienceLevel: "",
-    skills: [] as string[],
-    languagesWritten: [] as string[],
-    otherLanguagesDetail: "",
-    phoneCountryCode: "",
-    phoneNational: "",
-  });
-  const [skillInput, setSkillInput] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const signupWithRecaptcha = useAction(api.auth.actions.signupWithRecaptcha);
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
 
   const categorySkills =
-    formData.techField === "software_development"
-      ? formData.softwareDevField
-        ? getSoftwareDevFieldSkills([formData.softwareDevField])
+    freelancerDraft.techField === "software_development"
+      ? freelancerDraft.softwareDevField
+        ? getSoftwareDevFieldSkills([freelancerDraft.softwareDevField])
         : []
-      : formData.techField
-        ? getSkillsForCategory(formData.techField)
+      : freelancerDraft.techField
+        ? getSkillsForCategory(freelancerDraft.techField)
         : [];
 
   const handleAddSkill = () => {
-    if (skillInput.trim() && !formData.skills.includes(skillInput.trim())) {
-      setFormData({
-        ...formData,
-        skills: [...formData.skills, skillInput.trim()],
+    if (
+      skillInput.trim() &&
+      !freelancerDraft.skills.includes(skillInput.trim())
+    ) {
+      setFreelancerDraft({
+        skills: [...freelancerDraft.skills, skillInput.trim()],
       });
-      setSkillInput("");
+      setFreelancerSkillInput("");
     }
   };
 
   const handleRemoveSkill = (skill: string) => {
-    setFormData({
-      ...formData,
-      skills: formData.skills.filter((s) => s !== skill),
+    setFreelancerDraft({
+      skills: freelancerDraft.skills.filter((s) => s !== skill),
     });
   };
 
   const handleToggleLanguage = (language: string) => {
-    if (formData.languagesWritten.includes(language)) {
-      setFormData({
-        ...formData,
-        languagesWritten: formData.languagesWritten.filter(
+    if (freelancerDraft.languagesWritten.includes(language)) {
+      setFreelancerDraft({
+        languagesWritten: freelancerDraft.languagesWritten.filter(
           (l) => l !== language
         ),
         ...(language === PROGRAMMING_LANGUAGE_OTHER
@@ -105,9 +106,8 @@ export default function FreelancerSignupPage() {
           : {}),
       });
     } else {
-      setFormData({
-        ...formData,
-        languagesWritten: [...formData.languagesWritten, language],
+      setFreelancerDraft({
+        languagesWritten: [...freelancerDraft.languagesWritten, language],
       });
     }
   };
@@ -117,32 +117,35 @@ export default function FreelancerSignupPage() {
     setError("");
 
     // Validation
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
-    if (formData.password.length < 8) {
+    if (password.length < 8) {
       setError("Password must be at least 8 characters");
       return;
     }
 
-    if (!formData.techField) {
+    if (!freelancerDraft.techField) {
       setError("Please select a tech field");
       return;
     }
 
-    if (formData.techField === "software_development" && !formData.softwareDevField) {
+    if (
+      freelancerDraft.techField === "software_development" &&
+      !freelancerDraft.softwareDevField
+    ) {
       setError("Please select your software development focus (e.g. frontend, backend)");
       return;
     }
 
-    if (!formData.experienceLevel) {
+    if (!freelancerDraft.experienceLevel) {
       setError("Please select your experience level");
       return;
     }
 
-    if (formData.skills.length === 0) {
+    if (freelancerDraft.skills.length === 0) {
       setError("Please add at least one skill");
       return;
     }
@@ -152,23 +155,23 @@ export default function FreelancerSignupPage() {
       return;
     }
 
-    const checklistOnly = formData.languagesWritten.filter(
+    const checklistOnly = freelancerDraft.languagesWritten.filter(
       (l) => l !== PROGRAMMING_LANGUAGE_OTHER
     );
-    const otherOn = formData.languagesWritten.includes(
+    const otherOn = freelancerDraft.languagesWritten.includes(
       PROGRAMMING_LANGUAGE_OTHER
     );
     const builtLanguages = buildLanguagesWrittenFromSelection(
       checklistOnly,
       otherOn,
-      formData.otherLanguagesDetail
+      freelancerDraft.otherLanguagesDetail
     );
     if (builtLanguages.error) {
       setError(builtLanguages.error);
       return;
     }
     if (
-      formData.techField === "software_development" &&
+      freelancerDraft.techField === "software_development" &&
       builtLanguages.languages.length === 0
     ) {
       setError(
@@ -177,20 +180,20 @@ export default function FreelancerSignupPage() {
       return;
     }
 
-    const nationalDigits = formData.phoneNational.replace(/\D/g, "");
+    const nationalDigits = freelancerDraft.phoneNational.replace(/\D/g, "");
     let signupPhoneE164: string | undefined;
     if (nationalDigits) {
-      if (!formData.phoneCountryCode) {
+      if (!freelancerDraft.phoneCountryCode) {
         setError("Select your phone country code, or leave the phone field empty.");
         return;
       }
-      const pc = getCountryByCode(formData.phoneCountryCode);
+      const pc = getCountryByCode(freelancerDraft.phoneCountryCode);
       if (!pc) {
         setError("Invalid phone country code.");
         return;
       }
       signupPhoneE164 = `${pc.phoneCode}${nationalDigits}`;
-    } else if (formData.phoneCountryCode) {
+    } else if (freelancerDraft.phoneCountryCode) {
       setError("Enter your phone number after the country code, or clear the country selector.");
       return;
     }
@@ -201,14 +204,15 @@ export default function FreelancerSignupPage() {
       const recaptchaToken = await executeRecaptcha("signup");
       const result = await signupWithRecaptcha({
         recaptchaToken,
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
+        email: freelancerDraft.email,
+        password,
+        name: freelancerDraft.name,
         role: "freelancer",
         profile: {
-          techField: formData.techField as any,
-          experienceLevel: formData.experienceLevel as any,
-          skills: formData.skills,
+          techField: freelancerDraft.techField as FreelancerSignupTechField,
+          experienceLevel:
+            freelancerDraft.experienceLevel as FreelancerSignupExperienceLevel,
+          skills: freelancerDraft.skills,
           languagesWritten: builtLanguages.languages,
           ...(signupPhoneE164 ? { phoneNumber: signupPhoneE164 } : {}),
         },
@@ -216,18 +220,21 @@ export default function FreelancerSignupPage() {
 
       if (result.success) {
         trackEvent("sign_up", { method: "email", role: "freelancer" });
+        resetFreelancerDraft();
+        setPassword("");
+        setConfirmPassword("");
         localStorage.setItem("pending_resume_upload", "freelancer");
         if (result.sessionToken) {
           localStorage.setItem("sessionToken", result.sessionToken);
         }
         if (result.emailVerificationRequired) {
-          sessionStorage.setItem("pending_verify_email", formData.email);
+          sessionStorage.setItem("pending_verify_email", freelancerDraft.email);
           router.push("/verify-email");
         } else {
           router.replace("/resume-upload");
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(getUserFriendlyError(err) || "Failed to create account");
     } finally {
       setIsLoading(false);
@@ -294,8 +301,8 @@ export default function FreelancerSignupPage() {
             id="name"
             type="text"
             placeholder="eg. John Doe"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            value={freelancerDraft.name}
+            onChange={(e) => setFreelancerDraft({ name: e.target.value })}
             required
             disabled={isLoading}
             className="h-11 rounded-lg"
@@ -307,8 +314,8 @@ export default function FreelancerSignupPage() {
             id="email"
             type="email"
             placeholder="eg. john@example.com"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            value={freelancerDraft.email}
+            onChange={(e) => setFreelancerDraft({ email: e.target.value })}
             required
             disabled={isLoading}
             className="h-11 rounded-lg"
@@ -321,8 +328,8 @@ export default function FreelancerSignupPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading}
               minLength={8}
@@ -346,8 +353,8 @@ export default function FreelancerSignupPage() {
               id="confirmPassword"
               type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirm your password"
-              value={formData.confirmPassword}
-              onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
               disabled={isLoading}
               className="h-11 rounded-lg pr-10"
@@ -373,10 +380,8 @@ export default function FreelancerSignupPage() {
           <div className="flex gap-2">
             <div className="w-[min(100%,10rem)] shrink-0">
               <CountrySelector
-                value={formData.phoneCountryCode}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, phoneCountryCode: value })
-                }
+                value={freelancerDraft.phoneCountryCode}
+                onValueChange={(value) => setFreelancerDraft({ phoneCountryCode: value })}
                 disabled={isLoading}
                 className="h-11 w-full"
               />
@@ -387,14 +392,13 @@ export default function FreelancerSignupPage() {
               inputMode="numeric"
               autoComplete="tel-national"
               placeholder="Local number"
-              value={formData.phoneNational}
+              value={freelancerDraft.phoneNational}
               onChange={(e) =>
-                setFormData({
-                  ...formData,
+                setFreelancerDraft({
                   phoneNational: e.target.value.replace(/\D/g, ""),
                 })
               }
-              disabled={isLoading || !formData.phoneCountryCode}
+              disabled={isLoading || !freelancerDraft.phoneCountryCode}
               className="h-11 flex-1 min-w-0 rounded-lg"
             />
           </div>
@@ -409,10 +413,9 @@ export default function FreelancerSignupPage() {
                         Tech Field
                       </Label>
                       <Select
-                        value={formData.techField}
+                        value={freelancerDraft.techField}
                         onValueChange={(value) => {
-                          setFormData({
-                            ...formData,
+                          setFreelancerDraft({
                             techField: value,
                             softwareDevField: "",
                             experienceLevel: "",
@@ -433,16 +436,15 @@ export default function FreelancerSignupPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {formData.techField === "software_development" && (
+                    {freelancerDraft.techField === "software_development" && (
                       <div className="space-y-0.5">
                         <Label htmlFor="softwareDevField" className="text-sm font-medium">
                           Software focus
                         </Label>
                         <Select
-                          value={formData.softwareDevField || "__none__"}
+                          value={freelancerDraft.softwareDevField || "__none__"}
                           onValueChange={(value) =>
-                            setFormData({
-                              ...formData,
+                            setFreelancerDraft({
                               softwareDevField: value === "__none__" ? "" : value,
                               skills: [],
                             })
@@ -463,7 +465,7 @@ export default function FreelancerSignupPage() {
                         </Select>
                       </div>
                     )}
-                    {formData.techField && (
+                    {freelancerDraft.techField && (
                       <div className="space-y-0.5">
                         <Label
                           htmlFor="experienceLevel"
@@ -472,12 +474,9 @@ export default function FreelancerSignupPage() {
                           Experience Level
                         </Label>
                         <Select
-                          value={formData.experienceLevel}
+                          value={freelancerDraft.experienceLevel}
                           onValueChange={(value) =>
-                            setFormData({
-                              ...formData,
-                              experienceLevel: value,
-                            })
+                            setFreelancerDraft({ experienceLevel: value })
                           }
                           disabled={isLoading}
                         >
@@ -501,22 +500,21 @@ export default function FreelancerSignupPage() {
                       <p className="text-xs text-muted-foreground">
                         Skills for your category (used for verification):
                       </p>
-                      {formData.techField && (
+                      {freelancerDraft.techField && (
                         <div className="flex flex-wrap gap-2">
                           {categorySkills.map((skill) => (
                             <Button
                               key={skill}
                               type="button"
-                              variant={formData.skills.includes(skill) ? "default" : "outline"}
+                              variant={freelancerDraft.skills.includes(skill) ? "default" : "outline"}
                               size="sm"
                               className="rounded-full"
                               onClick={() => {
-                                if (formData.skills.includes(skill)) {
+                                if (freelancerDraft.skills.includes(skill)) {
                                   handleRemoveSkill(skill);
                                 } else {
-                                  setFormData({
-                                    ...formData,
-                                    skills: [...formData.skills, skill],
+                                  setFreelancerDraft({
+                                    skills: [...freelancerDraft.skills, skill],
                                   });
                                 }
                               }}
@@ -533,7 +531,7 @@ export default function FreelancerSignupPage() {
                           type="text"
                           placeholder="Add more skills..."
                           value={skillInput}
-                          onChange={(e) => setSkillInput(e.target.value)}
+                          onChange={(e) => setFreelancerSkillInput(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.preventDefault();
@@ -553,9 +551,9 @@ export default function FreelancerSignupPage() {
                           Add
                         </Button>
                       </div>
-                      {formData.skills.length > 0 && (
+                      {freelancerDraft.skills.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {formData.skills.map((skill) => (
+                          {freelancerDraft.skills.map((skill) => (
                             <span
                               key={skill}
                               className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm"
@@ -586,7 +584,7 @@ export default function FreelancerSignupPage() {
                           >
                             <input
                               type="checkbox"
-                              checked={formData.languagesWritten.includes(
+                              checked={freelancerDraft.languagesWritten.includes(
                                 language
                               )}
                               onChange={() => handleToggleLanguage(language)}
@@ -597,7 +595,7 @@ export default function FreelancerSignupPage() {
                           </label>
                         ))}
                       </div>
-                      {formData.languagesWritten.includes(
+                      {freelancerDraft.languagesWritten.includes(
                         PROGRAMMING_LANGUAGE_OTHER
                       ) && (
                         <div className="space-y-2 mt-2">
@@ -614,12 +612,9 @@ export default function FreelancerSignupPage() {
                           </p>
                           <Textarea
                             id="signup-other-languages"
-                            value={formData.otherLanguagesDetail}
+                            value={freelancerDraft.otherLanguagesDetail}
                             onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                otherLanguagesDetail: e.target.value,
-                              })
+                              setFreelancerDraft({ otherLanguagesDetail: e.target.value })
                             }
                             disabled={isLoading}
                             placeholder="e.g. Dart, Elixir, Perl"
