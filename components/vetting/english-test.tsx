@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -18,13 +18,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Clock, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  getBrowserFingerprint,
-  getClientIP,
-  generateSessionId,
-} from "@/lib/browser-fingerprint";
-import { handleApiCall, getUserFriendlyError } from "@/lib/error-handling";
+import { getBrowserFingerprint, getClientIP } from "@/lib/browser-fingerprint";
+import { getUserFriendlyError } from "@/lib/error-handling";
 import { ErrorHandler } from "./error-handler";
+import { VerificationFreelancerEndedCard } from "./verification-freelancer-ended";
 import { TestProctoringGate } from "./test-proctoring";
 
 interface EnglishTestProps {
@@ -32,6 +29,61 @@ interface EnglishTestProps {
 }
 
 type TestPhase = "grammar" | "comprehension" | "written" | "completed";
+
+/** Matches Convex `vetting/testSessions` trackTestActivity activity union */
+type TrackedTestActivity =
+  | "tab_switch"
+  | "window_blur"
+  | "copy_attempt"
+  | "paste_attempt"
+  | "right_click"
+  | "fullscreen_exit";
+
+type EnglishMcqQuestion = {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation?: string;
+  difficulty?: string;
+  category?: string;
+};
+
+type EnglishComprehensionPassage = {
+  id: string;
+  title: string;
+  passage: string;
+  questions: EnglishMcqQuestion[];
+  difficulty?: string;
+  wordCount: number;
+};
+
+function getFullscreenElement(): Element | null {
+  const d = document as Document & {
+    webkitFullscreenElement?: Element | null;
+    mozFullScreenElement?: Element | null;
+  };
+  return (
+    document.fullscreenElement ?? d.webkitFullscreenElement ?? d.mozFullScreenElement ?? null
+  );
+}
+
+async function requestDocumentFullscreen(): Promise<void> {
+  const element = document.documentElement;
+  if (element.requestFullscreen) {
+    await element.requestFullscreen();
+    return;
+  }
+  const el = element as HTMLElement & {
+    webkitRequestFullscreen?: () => Promise<void>;
+    mozRequestFullScreen?: () => Promise<void>;
+  };
+  if (el.webkitRequestFullscreen) {
+    await el.webkitRequestFullscreen();
+  } else if (el.mozRequestFullScreen) {
+    await el.mozRequestFullScreen();
+  }
+}
 
 function EnglishTestInner({ onComplete }: EnglishTestProps) {
   const { user } = useAuth();
@@ -44,16 +96,17 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
   const [startTime, setStartTime] = useState<number>(0);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [suspiciousActivities, setSuspiciousActivities] = useState<string[]>([]);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   // Grammar test state
-  const [grammarQuestions, setGrammarQuestions] = useState<any[]>([]);
+  const [grammarQuestions, setGrammarQuestions] = useState<EnglishMcqQuestion[]>([]);
   const [grammarAnswers, setGrammarAnswers] = useState<Record<string, number>>({});
   const [grammarScore, setGrammarScore] = useState<number | null>(null);
 
   // Comprehension test state
-  const [comprehensionPassage, setComprehensionPassage] = useState<any | null>(null);
+  const [comprehensionPassage, setComprehensionPassage] = useState<EnglishComprehensionPassage | null>(
+    null
+  );
   const [comprehensionAnswers, setComprehensionAnswers] = useState<Record<string, number>>({});
   const [comprehensionScore, setComprehensionScore] = useState<number | null>(null);
 
@@ -77,8 +130,12 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
   const trackActivity = useMutation(api.vetting.testSessions.trackTestActivity);
   const createSession = useMutation(api.vetting.testSessions.createTestSession);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const fullscreenRef = useRef<boolean>(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const trackedActivitiesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    trackedActivitiesRef.current = new Set();
+  }, [sessionId]);
 
   // Initialize test session
   useEffect(() => {
@@ -89,26 +146,25 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
             getBrowserFingerprint(),
             getClientIP(),
           ]);
-          
+
           const session = await createSession({
             testType: "english_grammar",
             browserFingerprint: fingerprint,
             ipAddress,
             userId: user._id,
           });
-          
+
           setSessionId(session.sessionId);
           setStartTime(Date.now());
           setTimeRemaining(30 * 60); // 30 minutes for grammar
 
-          // Request fullscreen
-          requestFullscreen();
-        } catch (error) {
-          console.error("Failed to create test session:", error);
+          void requestDocumentFullscreen();
+        } catch (err) {
+          console.error("Failed to create test session:", err);
         }
       };
-      
-      initializeSession();
+
+      void initializeSession();
     }
   }, [phase, sessionId, user?._id, createSession]);
 
@@ -129,6 +185,113 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
     }
   }, [getComprehension, phase]);
 
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const trackSuspiciousActivity = useCallback(
+    async (activity: TrackedTestActivity) => {
+      if (trackedActivitiesRef.current.has(activity)) return;
+      trackedActivitiesRef.current.add(activity);
+      setSuspiciousActivities((prev) => (prev.includes(activity) ? prev : [...prev, activity]));
+      try {
+        await trackActivity({
+          sessionId,
+          activity,
+          timestamp: Date.now(),
+          userId: user?._id,
+        });
+      } catch (err) {
+        console.error("Failed to track activity:", err);
+      }
+    },
+    [sessionId, trackActivity, user?._id]
+  );
+
+  const handleGrammarSubmit = useCallback(async () => {
+    if (grammarQuestions.length === 0) return;
+    let correct = 0;
+    grammarQuestions.forEach((q) => {
+      if (grammarAnswers[q.id] === q.correctAnswer) {
+        correct++;
+      }
+    });
+    const score = Math.round((correct / grammarQuestions.length) * 100);
+    setGrammarScore(score);
+    setPhase("comprehension");
+    setTimeRemaining(20 * 60);
+  }, [grammarQuestions, grammarAnswers]);
+
+  const handleComprehensionSubmit = useCallback(async () => {
+    if (!comprehensionPassage || comprehensionPassage.questions.length === 0) return;
+    let correct = 0;
+    comprehensionPassage.questions.forEach((q) => {
+      if (comprehensionAnswers[q.id] === q.correctAnswer) {
+        correct++;
+      }
+    });
+    const score = Math.round((correct / comprehensionPassage.questions.length) * 100);
+    setComprehensionScore(score);
+    setPhase("written");
+    setTimeRemaining(15 * 60);
+  }, [comprehensionPassage, comprehensionAnswers]);
+
+  const handleWrittenSubmit = useCallback(async () => {
+    if (writtenResponse.trim().length < 100) {
+      alert("Please write at least 100 words");
+      return;
+    }
+
+    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
+
+    try {
+      const [fingerprint, ipAddress] = await Promise.all([
+        getBrowserFingerprint(),
+        getClientIP(),
+      ]);
+
+      await submitEnglish({
+        grammarScore: grammarScore ?? 0,
+        comprehensionScore: comprehensionScore ?? 0,
+        writtenResponse,
+        timeSpent,
+        testSessionId: sessionId,
+        browserFingerprint: fingerprint,
+        ipAddress,
+        userId: user?._id,
+      });
+
+      setPhase("completed");
+    } catch (err: unknown) {
+      setError(
+        new Error(
+          getUserFriendlyError(err) ||
+            (err instanceof Error ? err.message : "Could not submit your English test. Please try again.")
+        )
+      );
+    }
+  }, [
+    writtenResponse,
+    grammarScore,
+    comprehensionScore,
+    sessionId,
+    startTime,
+    user?._id,
+    submitEnglish,
+  ]);
+
+  const handleTimeUp = useCallback(() => {
+    if (phase === "grammar") {
+      void handleGrammarSubmit();
+    } else if (phase === "comprehension") {
+      void handleComprehensionSubmit();
+    } else if (phase === "written") {
+      void handleWrittenSubmit();
+    }
+  }, [phase, handleGrammarSubmit, handleComprehensionSubmit, handleWrittenSubmit]);
+
   // Timer
   useEffect(() => {
     if (timeRemaining > 0 && phase !== "completed") {
@@ -148,46 +311,42 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
         }
       };
     }
-  }, [timeRemaining, phase]);
+  }, [timeRemaining, phase, handleTimeUp]);
 
   // Proctoring: Detect tab/window switches
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        trackSuspiciousActivity("tab_switch");
+        void trackSuspiciousActivity("tab_switch");
       }
     };
 
     const handleBlur = () => {
-      trackSuspiciousActivity("window_blur");
+      void trackSuspiciousActivity("window_blur");
     };
 
     const handleCopy = (e: ClipboardEvent) => {
       e.preventDefault();
-      trackSuspiciousActivity("copy_attempt");
+      void trackSuspiciousActivity("copy_attempt");
     };
 
     const handlePaste = (e: ClipboardEvent) => {
       e.preventDefault();
-      trackSuspiciousActivity("paste_attempt");
+      void trackSuspiciousActivity("paste_attempt");
     };
 
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault();
-      trackSuspiciousActivity("right_click");
+      void trackSuspiciousActivity("right_click");
     };
 
     const handleFullscreenChange = () => {
-      const isFull = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement
-      );
-      setIsFullscreen(isFull);
+      const isFull = !!getFullscreenElement();
       if (!isFull && phase !== "completed") {
-        trackSuspiciousActivity("fullscreen_exit");
-        // Re-request fullscreen
-        setTimeout(() => requestFullscreen(), 100);
+        void trackSuspiciousActivity("fullscreen_exit");
+        setTimeout(() => {
+          void requestDocumentFullscreen();
+        }, 100);
       }
     };
 
@@ -210,123 +369,7 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
       document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
     };
-  }, [phase]);
-
-  const requestFullscreen = async () => {
-    try {
-      const element = document.documentElement;
-      if (element.requestFullscreen) {
-        await element.requestFullscreen();
-      } else if ((element as any).webkitRequestFullscreen) {
-        await (element as any).webkitRequestFullscreen();
-      } else if ((element as any).mozRequestFullScreen) {
-        await (element as any).mozRequestFullScreen();
-      }
-      setIsFullscreen(true);
-    } catch (error) {
-      console.error("Failed to enter fullscreen:", error);
-    }
-  };
-
-  const trackSuspiciousActivity = async (activity: string) => {
-    if (!suspiciousActivities.includes(activity)) {
-      setSuspiciousActivities((prev) => [...prev, activity]);
-      try {
-        await trackActivity({
-          sessionId,
-          activity: activity as any,
-          timestamp: Date.now(),
-          userId: user?._id,
-        });
-      } catch (error) {
-        console.error("Failed to track activity:", error);
-      }
-    }
-  };
-
-  const handleTimeUp = () => {
-    if (phase === "grammar") {
-      handleGrammarSubmit();
-    } else if (phase === "comprehension") {
-      handleComprehensionSubmit();
-    } else if (phase === "written") {
-      handleWrittenSubmit();
-    }
-  };
-
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const handleGrammarSubmit = async () => {
-    // Calculate score (in production, this would be done server-side)
-    let correct = 0;
-    grammarQuestions.forEach((q) => {
-      if (grammarAnswers[q.id] === q.correctAnswer) {
-        correct++;
-      }
-    });
-    const score = Math.round((correct / grammarQuestions.length) * 100);
-    setGrammarScore(score);
-
-    // Move to comprehension
-    setPhase("comprehension");
-    setTimeRemaining(20 * 60);
-  };
-
-  const handleComprehensionSubmit = async () => {
-    // Calculate score
-    let correct = 0;
-    if (comprehensionPassage) {
-      comprehensionPassage.questions.forEach((q: any) => {
-        if (comprehensionAnswers[q.id] === q.correctAnswer) {
-          correct++;
-        }
-      });
-      const score = Math.round(
-        (correct / comprehensionPassage.questions.length) * 100
-      );
-      setComprehensionScore(score);
-    }
-
-    // Move to written
-    setPhase("written");
-    setTimeRemaining(15 * 60); // 15 minutes for written
-  };
-
-  const handleWrittenSubmit = async () => {
-    if (writtenResponse.trim().length < 100) {
-      alert("Please write at least 100 words");
-      return;
-    }
-
-    const timeSpent = Math.floor((Date.now() - startTime) / 1000);
-
-    try {
-      const [fingerprint, ipAddress] = await Promise.all([
-        getBrowserFingerprint(),
-        getClientIP(),
-      ]);
-
-      await submitEnglish({
-        grammarScore: grammarScore || 0,
-        comprehensionScore: comprehensionScore || 0,
-        writtenResponse,
-        timeSpent,
-        testSessionId: sessionId,
-        browserFingerprint: fingerprint,
-        ipAddress,
-        userId: user?._id,
-      });
-
-      setPhase("completed");
-    } catch (err: any) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      setError(error);
-    }
-  };
+  }, [phase, trackSuspiciousActivity]);
 
   const handleRetry = () => {
     setError(null);
@@ -379,6 +422,10 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
     }
   }, [phase, englishGraded, onComplete]);
 
+  if (user?._id && verificationStatus === null) {
+    return <VerificationFreelancerEndedCard variant="failed_or_removed" redirectSeconds={12} />;
+  }
+
   if (phase === "grammar") {
     return (
       <Card>
@@ -416,7 +463,7 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
 
           <Progress
             value={
-              (Object.keys(grammarAnswers).length / grammarQuestions.length) * 100
+              (Object.keys(grammarAnswers).length / Math.max(1, grammarQuestions.length)) * 100
             }
           />
 
@@ -503,7 +550,7 @@ function EnglishTestInner({ onComplete }: EnglishTestProps) {
               </div>
 
               <div className="space-y-6">
-                {comprehensionPassage.questions.map((question: any, index: number) => (
+                {comprehensionPassage.questions.map((question: EnglishMcqQuestion, index: number) => (
                   <div key={question.id} className="space-y-3">
                     <div className="flex items-start gap-2">
                       <span className="font-semibold">{index + 1}.</span>
