@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import type { Doc } from "@/convex/_generated/dataModel";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { SkillTestPathFlow } from "@/components/vetting/skill-test-path-flow";
 import { KycStep } from "@/components/vetting/kyc-step";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { VERIFICATION_RETAKE_COOLDOWN_MINUTES } from "@/lib/verification-retake";
 
 /** After failed verification, sessions are revoked — `getVerificationStatus` is skipped and would otherwise look like endless loading. */
 const VERIFICATION_FAILURE_REDIRECT_SEC = 8;
@@ -503,11 +504,14 @@ export default function OnboardingVerificationPage() {
               {canTakeTests &&
                 currentStep === "english" &&
                 !stepsCompleted.includes("english") &&
+                user &&
                 (englishOnLastAttempt && englishRetakeAvailableAt ? (
                   <RetakeCooldownCard
-                    title="English retake cooling down"
+                    title="English retake — short break"
                     retakeAvailableAt={englishRetakeAvailableAt}
-                    body="Take a short break. Come back in an hour to start your retake — the clock below shows exactly when you can begin."
+                    section="english"
+                    userId={user._id}
+                    body={`After a first-attempt miss we ask for a ${VERIFICATION_RETAKE_COOLDOWN_MINUTES}-minute pause before your final English try. You can wait for the timer or start immediately when you feel ready.`}
                   >
                     <EnglishTest />
                   </RetakeCooldownCard>
@@ -520,9 +524,11 @@ export default function OnboardingVerificationPage() {
                 user &&
                 (skillsOnLastAttempt && skillsRetakeAvailableAt ? (
                   <RetakeCooldownCard
-                    title="Skill-test retake cooling down"
+                    title="Skill test retake — short break"
                     retakeAvailableAt={skillsRetakeAvailableAt}
-                    body="Take a short break. Come back in an hour to start your retake — the clock below shows exactly when you can begin."
+                    section="skills"
+                    userId={user._id}
+                    body={`After a first-attempt miss we ask for a ${VERIFICATION_RETAKE_COOLDOWN_MINUTES}-minute pause before your final skill test. You can wait for the timer or start immediately when you feel ready.`}
                   >
                     <SkillTestPathFlow />
                   </RetakeCooldownCard>
@@ -749,21 +755,29 @@ function formatCountdown(ms: number): string {
 }
 
 /**
- * Gates a test UI behind the 1-hour retake cooldown. Ticks every second while
- * locked, then renders `children` once `retakeAvailableAt` has passed.
+ * Gates a test UI behind the post-failure retake cooldown. Ticks every second while
+ * locked, then renders `children` once `retakeAvailableAt` has passed. Freelancers may
+ * clear the wait server-side and begin the retake immediately.
  */
 function RetakeCooldownCard({
   title,
   body,
   retakeAvailableAt,
+  section,
+  userId,
   children,
 }: {
   title: string;
   body: string;
   retakeAvailableAt: number;
+  section: "english" | "skills";
+  userId: Id<"users">;
   children: React.ReactNode;
 }) {
+  const clearCooldown = useMutation(api.vetting.mutations.clearVerificationRetakeCooldown);
   const [now, setNow] = useState<number>(() => Date.now());
+  const [skipBusy, setSkipBusy] = useState(false);
+  const [skipError, setSkipError] = useState<string | null>(null);
 
   useEffect(() => {
     if (now >= retakeAvailableAt) return;
@@ -781,9 +795,21 @@ function RetakeCooldownCard({
     minute: "2-digit",
   });
 
+  const handleStartRetakeNow = async () => {
+    setSkipError(null);
+    setSkipBusy(true);
+    try {
+      await clearCooldown({ section, userId });
+    } catch (e) {
+      setSkipError(e instanceof Error ? e.message : "Could not unlock your retake. Try again.");
+    } finally {
+      setSkipBusy(false);
+    }
+  };
+
   return (
     <Card className="rounded-xl border-amber-300/60 bg-amber-50/80 dark:bg-amber-950/20">
-      <CardContent className="p-5 space-y-3">
+      <CardContent className="p-5 space-y-4">
         <div className="flex items-start gap-3">
           <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <div className="min-w-0 flex-1">
@@ -792,14 +818,41 @@ function RetakeCooldownCard({
           </div>
         </div>
         <div className="flex flex-col gap-1 rounded-lg border border-amber-300/50 bg-background/70 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-muted-foreground">Time remaining</span>
+          <span className="text-muted-foreground">Time remaining if you wait</span>
           <span className="font-mono text-lg font-semibold tabular-nums text-amber-900 dark:text-amber-200">
             {formatCountdown(remainingMs)}
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Your retake unlocks at about {availableAtLabel}.
+          Unlocks automatically at about {availableAtLabel} ({VERIFICATION_RETAKE_COOLDOWN_MINUTES} min after your last
+          result).
         </p>
+        {skipError && (
+          <p className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+            {skipError}
+          </p>
+        )}
+        <div className="space-y-2 pt-1">
+          <Button
+            type="button"
+            className="w-full rounded-lg font-semibold"
+            onClick={handleStartRetakeNow}
+            disabled={skipBusy}
+          >
+            {skipBusy ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                Unlocking…
+              </span>
+            ) : (
+              "Start retake now (skip wait)"
+            )}
+          </Button>
+          <p className="text-xs text-center text-muted-foreground leading-relaxed">
+            This is your <span className="font-medium text-foreground">final attempt</span> on this section. Only use
+            skip when you are ready to focus.
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

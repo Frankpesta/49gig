@@ -688,17 +688,16 @@ export default defineSchema({
     englishAttemptRound: v.optional(v.number()),
     englishFailedAttempts: v.optional(v.number()),
     /**
-     * Timestamp (ms) before which an English retake must not be accepted.
-     * Set when `completeVerification` fails the English composite for the
-     * first time; `submitEnglishProficiency` enforces it.
+     * Timestamp (ms) before which an English retake must not be accepted (short cooldown).
+     * Set on first English failure; `submitEnglishProficiency` enforces it. Cleared early if the freelancer skips wait.
      */
     englishRetakeAvailableAt: v.optional(v.number()),
     /** Skills composite attempt round for 50% gate + retake. */
     skillsAttemptRound: v.optional(v.number()),
     skillsFailedAttempts: v.optional(v.number()),
     /**
-     * Timestamp (ms) before which a skill-test retake must not be accepted.
-     * Set on the first skills failure; `startSkillTest` enforces it.
+     * Timestamp (ms) before which a skill-test retake must not be accepted (short cooldown).
+     * Set on first skills failure; `startSkillTest` enforces it. Cleared early if the freelancer skips wait.
      */
     skillsRetakeAvailableAt: v.optional(v.number()),
     /** MCQ / coding IDs already shown (retakes must not repeat). */
