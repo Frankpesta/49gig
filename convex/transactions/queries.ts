@@ -1,6 +1,7 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
+import { walletFundingBreakdown } from "./walletFundingBreakdown";
 
 /**
  * Helper function to get current user in queries
@@ -35,6 +36,7 @@ export const getTransactions = query({
     type: v.optional(
       v.union(
         v.literal("pre_funding"),
+        v.literal("top_up"),
         v.literal("milestone_release"),
         v.literal("monthly_release"),
         v.literal("refund"),
@@ -165,6 +167,7 @@ export const getTransactions = query({
           ? (await ctx.db.get(payment.milestoneId) as Doc<"milestones"> | null)
           : null;
 
+        const walletFunding = walletFundingBreakdown(payment);
         return {
           ...payment,
           project: project
@@ -180,6 +183,7 @@ export const getTransactions = query({
                 title: milestone.title,
               }
             : null,
+          walletFunding,
         };
       })
     );
@@ -217,6 +221,7 @@ export const getTransaction = query({
           ...payment,
           project: null,
           milestone: null,
+          walletFunding: walletFundingBreakdown(payment),
         };
       }
       return null;
@@ -249,8 +254,11 @@ export const getTransaction = query({
       ? await ctx.db.get(project.matchedFreelancerId)
       : null;
 
+    const walletFunding = walletFundingBreakdown(payment);
+
     return {
       ...payment,
+      walletFunding,
       project: {
         _id: project._id,
         title: project.intakeForm.title,

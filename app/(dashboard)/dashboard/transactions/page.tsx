@@ -43,17 +43,30 @@ import {
   LayoutGrid,
   List,
   Receipt,
+  Wallet,
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 
+type WalletFunding = {
+  fundingGrossAmount: number;
+  walletAppliedDollars: number;
+  gatewayChargedDollars: number;
+  summary: string;
+  isFullWalletFunding: boolean;
+  isPartialWalletFunding: boolean;
+  isGatewayOnly: boolean;
+};
+
 type Transaction = {
   _id: Id<"payments">;
-  type: "pre_funding" | "milestone_release" | "monthly_release" | "refund" | "platform_fee" | "payout";
+  type: string;
   amount: number;
   currency: string;
   status: "pending" | "processing" | "succeeded" | "failed" | "refunded" | "cancelled";
   createdAt: number;
   netAmount?: number;
+  fundingGrossAmount?: number;
+  clientWalletCreditApplied?: number;
   project: {
     _id: Id<"projects">;
     title: string;
@@ -62,13 +75,30 @@ type Transaction = {
     _id: Id<"milestones">;
     title: string;
   } | null;
+  walletFunding?: WalletFunding | null;
 };
+
+function comparableTransactionAmount(t: Transaction): number {
+  if (t.walletFunding) return t.walletFunding.fundingGrossAmount;
+  if ((t.type === "pre_funding" || t.type === "top_up") && t.fundingGrossAmount != null) {
+    return t.fundingGrossAmount;
+  }
+  if (t.type === "pre_funding" || t.type === "top_up") {
+    return (t.amount ?? 0) + (t.clientWalletCreditApplied ?? 0);
+  }
+  return t.amount ?? 0;
+}
+
+function fmtMoney(n: number, currency: string) {
+  return `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency.toUpperCase()}`;
+}
 
 type SortField = "date" | "amount" | "status" | "type";
 type SortDirection = "asc" | "desc";
 
 const TYPE_LABELS: Record<string, string> = {
   pre_funding: "Project Funding",
+  top_up: "Add payment (months)",
   milestone_release: "Payment Release",
   monthly_release: "Monthly Release",
   refund: "Refund",
@@ -151,7 +181,8 @@ export default function TransactionsPage() {
           t.project?.title.toLowerCase().includes(query) ||
           t.milestone?.title.toLowerCase().includes(query) ||
           t._id.toLowerCase().includes(query) ||
-          TYPE_LABELS[t.type]?.toLowerCase().includes(query)
+          TYPE_LABELS[t.type]?.toLowerCase().includes(query) ||
+          (t.walletFunding?.summary && t.walletFunding.summary.toLowerCase().includes(query))
       );
     }
 
@@ -166,8 +197,8 @@ export default function TransactionsPage() {
           bValue = b.createdAt;
           break;
         case "amount":
-          aValue = a.amount;
-          bValue = b.amount;
+          aValue = comparableTransactionAmount(a);
+          bValue = comparableTransactionAmount(b);
           break;
         case "status":
           aValue = a.status;
@@ -207,7 +238,10 @@ export default function TransactionsPage() {
     return {
       total: transactions.length,
       succeeded: succeeded.length,
-      totalAmount: succeeded.reduce((sum: number, t: Transaction) => sum + t.amount, 0),
+      totalAmount: succeeded.reduce(
+        (sum: number, t: Transaction) => sum + comparableTransactionAmount(t),
+        0
+      ),
       totalReceived: isFreelancer
         ? succeeded
             .filter((t: Transaction) => t.type === "milestone_release" || t.type === "monthly_release" || t.type === "payout")
@@ -215,8 +249,8 @@ export default function TransactionsPage() {
         : 0,
       totalPaid: isClient
         ? succeeded
-            .filter((t: Transaction) => t.type === "pre_funding")
-            .reduce((sum: number, t: Transaction) => sum + t.amount, 0)
+            .filter((t: Transaction) => t.type === "pre_funding" || t.type === "top_up")
+            .reduce((sum: number, t: Transaction) => sum + comparableTransactionAmount(t), 0)
         : 0,
     };
   }, [transactions, user?.role]);
@@ -447,12 +481,18 @@ export default function TransactionsPage() {
                   </DataTableHead>
                   <DataTableHead>Type</DataTableHead>
                   <DataTableHead>Project</DataTableHead>
+                  <DataTableHead className="min-w-[200px]">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Wallet className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      Hire funding
+                    </span>
+                  </DataTableHead>
                   <DataTableHead
                     sortable
                     onSort={() => handleSort("amount")}
                   >
                     <span className="inline-flex items-center">
-                      Amount
+                      Client gross
                       <SortIcon field="amount" />
                     </span>
                   </DataTableHead>
@@ -502,12 +542,57 @@ export default function TransactionsPage() {
                           )}
                         </DataTableCell>
                         <DataTableCell>
-                          <div className="font-semibold">
-                            ${transaction.amount.toLocaleString()} {transaction.currency.toUpperCase()}
+                          {transaction.type === "pre_funding" || transaction.type === "top_up" ? (
+                            transaction.walletFunding ? (
+                              <div className="text-xs space-y-1 max-w-[240px]">
+                                <p className="font-medium text-foreground leading-snug">
+                                  {transaction.walletFunding.summary}
+                                </p>
+                                <p className="text-muted-foreground tabular-nums">
+                                  Wallet {fmtMoney(transaction.walletFunding.walletAppliedDollars, transaction.currency)}
+                                  {" · "}
+                                  Checkout{" "}
+                                  {fmtMoney(transaction.walletFunding.gatewayChargedDollars, transaction.currency)}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </DataTableCell>
+                        <DataTableCell>
+                          <div className="font-semibold tabular-nums">
+                            {transaction.type === "pre_funding" || transaction.type === "top_up"
+                              ? `$${comparableTransactionAmount(transaction).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`
+                              : `$${transaction.amount.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}`}{" "}
+                            {transaction.currency.toUpperCase()}
+                            {transaction.type === "pre_funding" || transaction.type === "top_up" ? (
+                              <span className="block text-[10px] font-normal text-muted-foreground normal-case">
+                                total client gross
+                              </span>
+                            ) : null}
                           </div>
                           {transaction.type === "milestone_release" || transaction.type === "payout" ? (
                             <div className="text-xs text-muted-foreground">
                               Net: ${transaction.netAmount?.toLocaleString() || transaction.amount.toLocaleString()}
+                            </div>
+                          ) : null}
+                          {(transaction.type === "pre_funding" || transaction.type === "top_up") &&
+                          transaction.netAmount != null ? (
+                            <div className="text-xs text-muted-foreground">
+                              Net to escrow: $
+                              {transaction.netAmount.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </div>
                           ) : null}
                         </DataTableCell>
