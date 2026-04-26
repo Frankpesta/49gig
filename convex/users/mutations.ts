@@ -301,7 +301,7 @@ export const updateNotificationPreferences = mutation({
 });
 
 /**
- * Soft-delete a user by ID (internal - for system use e.g. verification failure)
+ * Permanently remove a user and purge related rows (internal — e.g. verification failure).
  */
 export const deleteUserAccountInternal = internalMutation({
   args: {
