@@ -13,6 +13,53 @@ import {
   teamBasisUserIdsForDispute,
 } from "../teamEscrowShares";
 import { viewerIsDisputeParty } from "./partyAccess";
+import { freelancerEngagementNetTotalUsd } from "../../lib/project-freelancer-earnings";
+
+function isPartialTeamDispute(
+  teamIds: Id<"users">[],
+  disputedIds: Id<"users">[]
+): boolean {
+  return (
+    teamIds.length > 1 &&
+    disputedIds.length > 0 &&
+    disputedIds.length < teamIds.length
+  );
+}
+
+/** Accepted match `teamRole` for a freelancer on this project (team hires). */
+async function acceptedMatchTeamRoleForFreelancer(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+  freelancerId: Id<"users">
+): Promise<string | undefined> {
+  const rows = await ctx.db
+    .query("matches")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .collect();
+  for (const m of rows) {
+    if (String(m.freelancerId) !== String(freelancerId)) continue;
+    if (m.status === "accepted" && m.teamRole?.trim()) return m.teamRole;
+  }
+  return undefined;
+}
+
+/** Sum of each disputed freelancer’s full-engagement net (this hire), for client gross display. */
+async function sumDisputedFreelancersEngagementNetUsd(
+  ctx: QueryCtx,
+  project: Doc<"projects">,
+  disputedIds: Id<"users">[]
+): Promise<number> {
+  let sum = 0;
+  for (const id of disputedIds) {
+    const role = await acceptedMatchTeamRoleForFreelancer(
+      ctx,
+      project._id,
+      id
+    );
+    sum += freelancerEngagementNetTotalUsd(project, role);
+  }
+  return Math.round(Math.max(0, sum) * 100) / 100;
+}
 async function getCurrentUserInQuery(
   ctx: QueryCtx,
   userId?: string
@@ -29,8 +76,9 @@ async function getCurrentUserInQuery(
 
 /**
  * Clients and staff see client-gross USD (what sits on the client side of escrow, incl. fee):
- * - Open / under review: gross equivalent of the current freelancer-net pool in scope
- *   (full pool or disputed members’ slice for partial-team disputes).
+ * - Open / under review: gross equivalent of the freelancer-net pool in scope (full team),
+ *   or for **partial** team disputes, gross of each **disputed** member’s full-engagement net
+ *   (what that seat earns from the hire — matches the disputed freelancer’s “locked amount” net).
  * - Otherwise: `dispute.lockedAmount` (snapshot at filing / resolution path — already gross).
  */
 async function clientOrStaffVisibleLockedGrossUsd(
@@ -43,10 +91,7 @@ async function clientOrStaffVisibleLockedGrossUsd(
     ? [project.matchedFreelancerId]
     : [...(project.matchedFreelancerIds ?? [])];
   const disputed = dispute.disputedFreelancerIds ?? [];
-  const isPartialTeam =
-    teamIds.length > 1 &&
-    disputed.length > 0 &&
-    disputed.length < teamIds.length;
+  const isPartialTeam = isPartialTeamDispute(teamIds, disputed);
 
   const escrowNetNow = Math.max(0, project.escrowedAmount ?? 0);
   const openish = dispute.status === "open" || dispute.status === "under_review";
@@ -55,17 +100,11 @@ async function clientOrStaffVisibleLockedGrossUsd(
   if (openish) {
     let relevantNetUsd: number;
     if (isPartialTeam) {
-      const teamBasis = teamBasisUserIdsForDispute(dispute, project);
-      const totalPoolCents = Math.round(escrowNetNow * 100);
-      const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+      relevantNetUsd = await sumDisputedFreelancersEngagementNetUsd(
         ctx,
-        dispute.projectId,
-        teamBasis,
-        project.teamBudgetBreakdown,
-        totalPoolCents
+        project,
+        disputed
       );
-      const disputedNetCents = sumShareCentsForFreelancers(shareMap, disputed);
-      relevantNetUsd = disputedNetCents / 100;
     } else {
       relevantNetUsd = escrowNetNow;
     }
@@ -184,27 +223,47 @@ export const getDisputes = query({
                 feePct
               );
             } else if (isFreelancerOnProject) {
-              const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
-                d.lockedAmount,
-                feePct
+              const teamIds: Id<"users">[] = project.matchedFreelancerId
+                ? [project.matchedFreelancerId]
+                : [...(project.matchedFreelancerIds ?? [])];
+              const disputedIds = d.disputedFreelancerIds ?? [];
+              const partial = isPartialTeamDispute(teamIds, disputedIds);
+              const viewerDisputed = disputedIds.some(
+                (id) => String(id) === String(user._id)
               );
-              const teamBasis = teamBasisUserIdsForDispute(d, project);
-              const isTeamDispute = teamBasis.length > 1;
 
-              if (isTeamDispute) {
-                // Show only this freelancer's individual share of the net pool
-                const totalPoolCents = Math.round(fullNetPool * 100);
-                const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+              if (partial && viewerDisputed) {
+                const teamRole = await acceptedMatchTeamRoleForFreelancer(
                   ctx,
                   d.projectId,
-                  teamBasis,
-                  project.teamBudgetBreakdown,
-                  totalPoolCents
+                  user._id
                 );
-                const myShareCents = shareMap.get(String(user._id)) ?? 0;
-                lockedAmount = Math.round(myShareCents) / 100;
+                lockedAmount = freelancerEngagementNetTotalUsd(
+                  project,
+                  teamRole
+                );
               } else {
-                lockedAmount = fullNetPool;
+                const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
+                  d.lockedAmount,
+                  feePct
+                );
+                const teamBasis = teamBasisUserIdsForDispute(d, project);
+                const isTeamDispute = teamBasis.length > 1;
+
+                if (isTeamDispute) {
+                  const totalPoolCents = Math.round(fullNetPool * 100);
+                  const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+                    ctx,
+                    d.projectId,
+                    teamBasis,
+                    project.teamBudgetBreakdown,
+                    totalPoolCents
+                  );
+                  const myShareCents = shareMap.get(String(user._id)) ?? 0;
+                  lockedAmount = Math.round(myShareCents) / 100;
+                } else {
+                  lockedAmount = fullNetPool;
+                }
               }
             }
           }
@@ -411,28 +470,47 @@ export const getDispute = query({
       viewerIsDisputeParty(user._id, project, dispute);
 
     if (isFreelancerParty && !isAdminOrModerator) {
-      const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
-        dispute.lockedAmount,
-        feePctForViews
+      const teamIds: Id<"users">[] = project.matchedFreelancerId
+        ? [project.matchedFreelancerId]
+        : [...(project.matchedFreelancerIds ?? [])];
+      const disputedIds = dispute.disputedFreelancerIds ?? [];
+      const partial = isPartialTeamDispute(teamIds, disputedIds);
+      const viewerDisputed = disputedIds.some(
+        (id) => String(id) === String(user._id)
       );
-      const teamBasis = teamBasisUserIdsForDispute(dispute, project);
-      const isTeamDispute = teamBasis.length > 1;
 
-      if (isTeamDispute) {
-        // Show only this freelancer's individual share of the net pool,
-        // using the same teamBudgetBreakdown logic as fund release.
-        const totalPoolCents = Math.round(fullNetPool * 100);
-        const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+      if (partial && viewerDisputed) {
+        const teamRole = await acceptedMatchTeamRoleForFreelancer(
           ctx,
           dispute.projectId,
-          teamBasis,
-          project.teamBudgetBreakdown,
-          totalPoolCents
+          user._id
         );
-        const myShareCents = shareMap.get(String(user._id)) ?? 0;
-        visibleLockedAmount = Math.round(myShareCents) / 100;
+        visibleLockedAmount = freelancerEngagementNetTotalUsd(
+          project,
+          teamRole
+        );
       } else {
-        visibleLockedAmount = fullNetPool;
+        const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
+          dispute.lockedAmount,
+          feePctForViews
+        );
+        const teamBasis = teamBasisUserIdsForDispute(dispute, project);
+        const isTeamDispute = teamBasis.length > 1;
+
+        if (isTeamDispute) {
+          const totalPoolCents = Math.round(fullNetPool * 100);
+          const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+            ctx,
+            dispute.projectId,
+            teamBasis,
+            project.teamBudgetBreakdown,
+            totalPoolCents
+          );
+          const myShareCents = shareMap.get(String(user._id)) ?? 0;
+          visibleLockedAmount = Math.round(myShareCents) / 100;
+        } else {
+          visibleLockedAmount = fullNetPool;
+        }
       }
     } else if (isClient || isAdminOrModerator || isAssignedModerator) {
       visibleLockedAmount = await clientOrStaffVisibleLockedGrossUsd(

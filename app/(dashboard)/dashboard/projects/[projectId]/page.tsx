@@ -36,7 +36,7 @@ import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { getDurationMonths } from "@/lib/project-duration";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -66,7 +66,9 @@ import {
   isCategoryLabel,
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
-import { getRoleLabelsForProjectIntake } from "@/lib/team-slots";
+import { getRoleLabelsForProjectIntake, type TeamSlotIntake } from "@/lib/team-slots";
+import type { RoleType } from "@/lib/budget-calculator";
+import { teamHireBudgetFromPricingConfig } from "@/lib/team-hire-pricing-breakdown";
 import { freelancerEngagementNetTotalUsd } from "@/lib/project-freelancer-earnings";
 import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
 
@@ -205,6 +207,34 @@ export default function ProjectDetailPage() {
       ? { projectId: String(projectId), userId: user._id }
       : "skip"
   );
+
+  const pricingConfig = useQuery(api.pricing.queries.getPricingConfig);
+
+  const teamPlatformPricing = useMemo(() => {
+    if (!project || project.intakeForm.hireType !== "team" || pricingConfig === undefined) {
+      return null;
+    }
+    const intake = project.intakeForm;
+    const slots = (intake.teamSlots ?? []) as TeamSlotIntake[];
+    const n = intake.teamMemberCount ?? slots.length;
+    const start =
+      intake.startDate != null ? new Date(intake.startDate) : null;
+    const end = intake.endDate != null ? new Date(intake.endDate) : null;
+    if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return null;
+    }
+    const roleType = (intake.roleType ?? "full_time") as RoleType;
+    return teamHireBudgetFromPricingConfig({
+      teamMemberCount: n,
+      teamSlots: slots,
+      experienceLevel: intake.experienceLevel,
+      roleType,
+      startDate: start,
+      endDate: end,
+      intakeProjectType: intake.projectType,
+      pricingConfig,
+    });
+  }, [project, pricingConfig]);
 
   const monthlyCycles = useQuery(
     api.monthlyBillingCycles.queries.getCyclesByProjectId,
@@ -1366,6 +1396,47 @@ export default function ProjectDetailPage() {
                     <p className="text-xs text-muted-foreground mt-1">Budget details unavailable.</p>
                   ) : (
                     <>
+                      {pricingConfig === undefined ? (
+                        <Skeleton className="mt-2 h-14 w-full rounded-md" />
+                      ) : teamPlatformPricing?.breakdown?.teamMembers &&
+                        teamPlatformPricing.breakdown.teamMembers.length > 0 ? (
+                        <div className="mt-2 space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Per seat (platform pricing)
+                          </p>
+                          <ul className="space-y-2 rounded-md border border-border/50 bg-muted/20 p-2.5 text-xs">
+                            {teamPlatformPricing.breakdown.teamMembers.map((m, idx) => (
+                              <li key={`${m.role}-${m.category}-${idx}`} className="space-y-0.5">
+                                <div className="font-medium text-foreground">{m.roleDisplayName}</div>
+                                <div className="tabular-nums text-muted-foreground">
+                                  <span className="text-foreground">
+                                    $
+                                    {m.monthlyTotal.toLocaleString(undefined, {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
+                                  </span>
+                                  /mo gross
+                                  <span className="text-[10px]">
+                                    {" "}
+                                    · ${m.hourlyRate}/hr × {m.hoursPerMonth} hrs
+                                  </span>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="text-[10px] leading-snug text-muted-foreground">
+                            Uses the admin rate card in the database (same as hire intake). Escrow figures below
+                            reflect cash currently held; split weights come from{" "}
+                            <span className="font-medium">teamBudgetBreakdown</span> saved at funding.
+                          </p>
+                          <Separator className="my-3" />
+                        </div>
+                      ) : null}
+
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Escrow (client gross)
+                      </p>
                       <div className="text-lg font-semibold mt-0.5">
                         $
                         {teamEscrowBudget.totalGross.toLocaleString(undefined, {
