@@ -540,6 +540,10 @@ function roundMoney2(n: number): number {
 /**
  * Team hires: funded escrow as client gross + per-seat net (freelancer) / gross (client) using the same
  * pool split as disputes. Client and staff only (matches project detail budget card).
+ *
+ * This uses **live escrow** and the stored `teamBudgetBreakdown` (set at funding from intake pricing).
+ * It does **not** re-query `pricingConfig`; for the live admin rate card the client UI calls
+ * `getPricingConfig` + `teamHireBudgetFromPricingConfig` alongside this query.
  */
 export const getTeamHireEscrowBudgetBreakdown = query({
   args: {

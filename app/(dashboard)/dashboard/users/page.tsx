@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Doc, Id } from "@/convex/_generated/dataModel";
@@ -70,13 +70,17 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-heade
 import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { FreelancerSignupApprovalManageBlock } from "@/components/dashboard/freelancer-signup-approval-manage-block";
 
-export default function UsersPage() {
+function UsersPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  /** Admin: filter list to freelancers awaiting one-step signup approval (tests + KYC). */
+  const [freelancerQueueFilter, setFreelancerQueueFilter] = useState<"all" | "pending_signup">("all");
   const [selectedUser, setSelectedUser] = useState<Doc<"users"> | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -106,15 +110,40 @@ export default function UsersPage() {
     }
   }, [isAuthenticated, user?.role, router]);
 
+  useEffect(() => {
+    if (searchParams.get("signup") === "1") {
+      setFreelancerQueueFilter("pending_signup");
+      setRoleFilter("freelancer");
+    }
+  }, [searchParams]);
+
+  const signupQueueOnly =
+    user?.role === "admin" && freelancerQueueFilter === "pending_signup";
+
   const users = useQuery(
     api.users.queries.getAllUsersAdmin,
     isAuthenticated && user?._id && user.role === "admin"
       ? {
           userId: user._id,
-          role: roleFilter !== "all" ? (roleFilter as "client" | "freelancer" | "moderator" | "admin") : undefined,
+          role:
+            signupQueueOnly
+              ? "freelancer"
+              : roleFilter !== "all"
+                ? (roleFilter as "client" | "freelancer" | "moderator" | "admin")
+                : undefined,
           status: statusFilter !== "all" ? (statusFilter as "active" | "suspended" | "deleted") : undefined,
+          signupApprovalQueueOnly: signupQueueOnly,
         }
       : "skip"
+  );
+
+  const pendingSignupRows = useQuery(
+    api.kyc.queries.getPendingSignupApprovals,
+    isAuthenticated && user?.role === "admin" && user._id ? { userId: user._id } : "skip"
+  );
+  const pendingSignupIdSet = useMemo(
+    () => new Set((pendingSignupRows ?? []).map((r) => String(r.freelancerId))),
+    [pendingSignupRows]
   );
 
   const profileDetail = useQuery(
@@ -149,7 +178,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, roleFilter, statusFilter]);
+  }, [searchTerm, roleFilter, statusFilter, freelancerQueueFilter]);
 
   const usersList = users != null && Array.isArray(users) ? users : [];
   const filteredUsers = usersList.filter((u: Doc<"users">) => {
@@ -443,7 +472,11 @@ export default function UsersPage() {
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       <DashboardPageHeader
         title="User Management"
-        description="Manage users, roles, and account status."
+        description={
+          signupQueueOnly
+            ? "Showing freelancers awaiting signup approval (submitted tests and KYC). Open Manage to review documents and approve or reject."
+            : "Manage users, roles, and account status. Filter freelancers awaiting signup approval to process the queue from here."
+        }
         icon={Users}
       />
 
@@ -461,7 +494,11 @@ export default function UsersPage() {
                 />
               </div>
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <Select
+              value={roleFilter}
+              onValueChange={setRoleFilter}
+              disabled={signupQueueOnly}
+            >
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
@@ -471,6 +508,22 @@ export default function UsersPage() {
                 <SelectItem value="freelancer">Freelancer</SelectItem>
                 <SelectItem value="moderator">Moderator</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={freelancerQueueFilter}
+              onValueChange={(v) => {
+                const next = v as "all" | "pending_signup";
+                setFreelancerQueueFilter(next);
+                if (next === "pending_signup") setRoleFilter("freelancer");
+              }}
+            >
+              <SelectTrigger className="w-full md:w-[260px]">
+                <SelectValue placeholder="Freelancer queue" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All users (no queue filter)</SelectItem>
+                <SelectItem value="pending_signup">Awaiting signup approval</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -498,6 +551,11 @@ export default function UsersPage() {
         <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
           <span className="font-semibold text-orange-600">{usersList.filter((u: Doc<"users">) => u.status === "suspended").length}</span> suspended
         </span>
+        {pendingSignupRows && pendingSignupRows.length > 0 && (
+          <span className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5">
+            <span className="font-semibold text-foreground">{pendingSignupRows.length}</span> awaiting signup approval
+          </span>
+        )}
       </div>
 
       {/* Users Table */}
@@ -556,19 +614,26 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell>
                         {u.role === "freelancer" ? (
-                          <Badge
-                            variant={
-                              u.verificationStatus === "approved"
-                                ? "default"
-                                : u.verificationStatus === "rejected"
-                                ? "destructive"
-                                : u.verificationStatus === "pending_review"
-                                ? "outline"
-                                : "secondary"
-                            }
-                          >
-                            {u.verificationStatus || "not_started"}
-                          </Badge>
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge
+                              variant={
+                                u.verificationStatus === "approved"
+                                  ? "default"
+                                  : u.verificationStatus === "rejected"
+                                  ? "destructive"
+                                  : u.verificationStatus === "pending_review"
+                                  ? "outline"
+                                  : "secondary"
+                              }
+                            >
+                              {u.verificationStatus || "not_started"}
+                            </Badge>
+                            {pendingSignupIdSet.has(String(u._id)) && (
+                              <Badge variant="secondary" className="text-[10px] font-normal">
+                                Signup queue
+                              </Badge>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
@@ -591,7 +656,12 @@ export default function UsersPage() {
                               View details
                             </Link>
                           </Button>
-                        <Dialog>
+                        <Dialog
+                          open={!!selectedUser && selectedUser._id === u._id}
+                          onOpenChange={(open) => {
+                            if (!open) setSelectedUser(null);
+                          }}
+                        >
                           <DialogTrigger asChild>
                             <Button
                               variant="outline"
@@ -612,7 +682,7 @@ export default function UsersPage() {
                               Manage
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="flex max-h-[min(90dvh,calc(100dvh-2rem))] flex-col overflow-hidden sm:max-w-lg">
+                          <DialogContent className="flex max-h-[min(90dvh,calc(100dvh-2rem))] flex-col overflow-hidden sm:max-w-2xl">
                             <DialogHeader className="shrink-0">
                               <DialogTitle>Manage User: {selectedUser?.name}</DialogTitle>
                               <DialogDescription>
@@ -621,6 +691,14 @@ export default function UsersPage() {
                             </DialogHeader>
                             {selectedUser && (
                               <div className="flex-1 space-y-4 overflow-y-auto py-4 pr-1">
+                                {user.role === "admin" && selectedUser.role === "freelancer" && user._id && (
+                                  <FreelancerSignupApprovalManageBlock
+                                    freelancerId={selectedUser._id}
+                                    adminUserId={user._id}
+                                    enabled
+                                    onAfterAction={() => setSelectedUser(null)}
+                                  />
+                                )}
                                 <div className="space-y-2">
                                   <Label>Role</Label>
                                   <Select
@@ -1345,3 +1423,10 @@ export default function UsersPage() {
   );
 }
 
+export default function UsersPage() {
+  return (
+    <Suspense fallback={<DashboardLoadingState label="Loading users" />}>
+      <UsersPageContent />
+    </Suspense>
+  );
+}

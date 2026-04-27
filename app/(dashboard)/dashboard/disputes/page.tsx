@@ -296,9 +296,7 @@ export default function DisputesPage() {
                 <DataTableHead className="w-[110px]">Status</DataTableHead>
                 <DataTableHead>Parties</DataTableHead>
                 {isStaff && <DataTableHead className="w-[100px]">Assigned</DataTableHead>}
-                <DataTableHead className="w-[100px]">
-                  {user.role === "freelancer" ? "Locked (net)" : "Locked (gross)"}
-                </DataTableHead>
+                <DataTableHead className="w-[100px]">Locked amount</DataTableHead>
                 <DataTableHead className="w-[100px]">Date</DataTableHead>
                 <DataTableHead className="w-[120px] text-right">Actions</DataTableHead>
               </DataTableHeader>

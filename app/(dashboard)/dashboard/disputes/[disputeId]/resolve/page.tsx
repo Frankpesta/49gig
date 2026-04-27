@@ -308,7 +308,7 @@ export default function ResolveDisputePage() {
                   {dispute.type.replace("_", " ")}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Escrow locked (client gross, USD):</span>{" "}
+                  <span className="text-muted-foreground">Locked amount:</span>{" "}
                   ${Number(dispute.lockedAmount ?? 0).toFixed(2)}
                 </div>
                 <div>

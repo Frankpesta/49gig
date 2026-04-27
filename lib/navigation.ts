@@ -25,7 +25,6 @@ import {
   Wallet,
   CalendarCheck,
   BookOpen,
-  ShieldCheck,
   Gift,
   Headphones,
   Handshake,
@@ -207,15 +206,6 @@ export const navigationItems: NavItem[] = [
     title: "Blog",
     url: "/dashboard/blog",
     icon: BookOpen,
-    section: "menu",
-    roles: ["admin"],
-  },
-
-  // Admin: Freelancer signup approvals (tests + KYC)
-  {
-    title: "Freelancer approvals",
-    url: "/dashboard/freelancer-approvals",
-    icon: ShieldCheck,
     section: "menu",
     roles: ["admin"],
   },

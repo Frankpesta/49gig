@@ -131,6 +131,8 @@ export const getAllUsersAdmin = query({
         v.literal("deleted")
       )
     ),
+    /** Admin only: restrict the list to freelancers in the signup queue (tests pending_admin + KYC pending_review). */
+    signupApprovalQueueOnly: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -182,6 +184,36 @@ export const getAllUsersAdmin = query({
           .collect();
       } else {
         list = await ctx.db.query("users").collect();
+      }
+
+      if (args.signupApprovalQueueOnly === true && currentUser.role === "admin") {
+        const kycRows = await ctx.db
+          .query("kycSubmissions")
+          .withIndex("by_status", (q) => q.eq("status", "pending_review"))
+          .collect();
+        const pendingIds = new Set<string>();
+        const submittedAtByUser = new Map<string, number>();
+        for (const k of kycRows) {
+          const f = await ctx.db.get(k.freelancerId);
+          if (!f || f.role !== "freelancer" || f.status !== "active") continue;
+          if (f.verificationStatus === "approved" && f.kycStatus === "approved")
+            continue;
+          const vetting = await ctx.db
+            .query("vettingResults")
+            .withIndex("by_freelancer", (q) =>
+              q.eq("freelancerId", k.freelancerId)
+            )
+            .first();
+          if (!vetting || vetting.status !== "pending_admin") continue;
+          pendingIds.add(String(k.freelancerId));
+          submittedAtByUser.set(String(k.freelancerId), k.submittedAt);
+        }
+        list = list.filter((u) => pendingIds.has(String(u._id)));
+        list.sort(
+          (a, b) =>
+            (submittedAtByUser.get(String(b._id)) ?? 0) -
+            (submittedAtByUser.get(String(a._id)) ?? 0)
+        );
       }
 
       return list.map((u) => {
