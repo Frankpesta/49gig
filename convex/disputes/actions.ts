@@ -2,7 +2,7 @@
 import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "../_generated/api";
-import { escrowNetToClientLockedGross } from "./amounts";
+import { clientRefundGrossAndNetEscrowRemoval } from "./amounts";
 import { assertUsdCurrency } from "../currencyPolicy";
 
 /**
@@ -202,85 +202,94 @@ export const releaseDisputeFunds = action({
       disputedIds.every((id) => teamBasis.includes(String(id))) &&
       disputedIds.length < teamBasis.length;
 
-    if (decision === "client_favor" && !isPartialTeam) {
-      // Pending refund equals escrow net (freelancer pool) only — never gross-funded amount,
-      // so the hold never exceeds what we zero from escrow.
-      const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
-      const pendingRefundCents = escrowCents;
-      if (pendingRefundCents > 0) {
-        await ctx.runMutation(internal.wallets.mutations.recordPendingRefund, {
-          userId: project.clientId,
-          amountCents: pendingRefundCents,
-          currency,
-          description: `Pending dispute refund hold for ${project.intakeForm.title}`,
-          projectId: dispute.projectId,
-        });
-      }
-      const netEscrowDollars = Math.max(0, (project as any).escrowedAmount ?? 0);
-      if (netEscrowDollars > 0) {
-        await ctx.runMutation(internal.projects.mutations.adjustProjectEscrowInternal, {
-          projectId: dispute.projectId,
-          deltaDollars: -netEscrowDollars,
-        });
-      }
-      if (dispute.monthlyCycleId) {
-        await ctx.runMutation(
-          internal.monthlyBillingCycles.mutations.cancelDisputedMonthlyCycleInternal,
-          { monthlyCycleId: dispute.monthlyCycleId }
-        );
-      }
-    } else if (decision === "client_favor" && isPartialTeam) {
-      let disputedNetCents = 0;
-      if (dispute.monthlyCycleId) {
-        const c = await ctx.runQuery(
-          internal.disputes.queries.computeDisputedMonthlyCycleShareCentsInternal,
-          { disputeId: args.disputeId }
-        );
-        disputedNetCents = c.disputedNetCents;
-      } else {
-        const c = await ctx.runQuery(
-          internal.disputes.queries.computeDisputedTeamEscrowNetCentsFromDisputeInternal,
-          { disputeId: args.disputeId }
-        );
-        disputedNetCents = c.disputedNetCents;
-      }
+    if (decision === "client_favor") {
       const defaultFee = await ctx.runQuery(
         internal.platformSettings.queries.getPlatformFeePercentageInternal,
         {}
       );
       const feePct = (project as any).platformFee ?? defaultFee;
-      const pendingRefundCents = Math.round(
-        escrowNetToClientLockedGross(disputedNetCents / 100, feePct) * 100
-      );
+      const escrowNetNow = Math.max(0, (project as any).escrowedAmount ?? 0);
 
+      let disputedNetCentsForPartial = 0;
+      if (isPartialTeam) {
+        if (dispute.monthlyCycleId) {
+          const c = await ctx.runQuery(
+            internal.disputes.queries.computeDisputedMonthlyCycleShareCentsInternal,
+            { disputeId: args.disputeId }
+          );
+          disputedNetCentsForPartial = c.disputedNetCents;
+        } else {
+          const c = await ctx.runQuery(
+            internal.disputes.queries.computeDisputedTeamEscrowNetCentsFromDisputeInternal,
+            { disputeId: args.disputeId }
+          );
+          disputedNetCentsForPartial = c.disputedNetCents;
+        }
+      }
+
+      const disputedSliceNetUsd = isPartialTeam
+        ? disputedNetCentsForPartial / 100
+        : undefined;
+
+      const { appliedRefundGrossUsd, netRemovalFromEscrowUsd, cappedVsSnapshot } =
+        clientRefundGrossAndNetEscrowRemoval({
+          lockedSnapshotGrossUsd: Math.max(0, dispute.lockedAmount ?? 0),
+          escrowNetUsdNow: escrowNetNow,
+          platformFeePercentEffective: feePct,
+          disputedEscrowNetUsdMax: disputedSliceNetUsd,
+        });
+
+      const pendingRefundCents = Math.round(appliedRefundGrossUsd * 100);
       if (pendingRefundCents > 0) {
         await ctx.runMutation(internal.wallets.mutations.recordPendingRefund, {
           userId: project.clientId,
           amountCents: pendingRefundCents,
           currency,
-          description: `Pending dispute refund hold for ${disputedIds.length} removed team member(s) on ${project.intakeForm.title}`,
+          description: isPartialTeam
+            ? `Pending dispute refund — locked amount (${String(disputedIds.length)} seat(s)) for ${project.intakeForm.title}`
+            : `Pending dispute refund — locked amount for ${project.intakeForm.title}`,
           projectId: dispute.projectId,
         });
       }
 
-      const netDollarsToRelease = disputedNetCents / 100;
-      if (netDollarsToRelease > 0) {
+      if (netRemovalFromEscrowUsd > 0) {
         await ctx.runMutation(internal.projects.mutations.adjustProjectEscrowInternal, {
           projectId: dispute.projectId,
-          deltaDollars: -netDollarsToRelease,
+          deltaDollars: -netRemovalFromEscrowUsd,
         });
       }
 
-      if (dispute.monthlyCycleId && disputedNetCents > 0) {
-        await ctx.runMutation(
-          internal.monthlyBillingCycles.mutations.applyPartialDisputeCycleReductionInternal,
-          {
-            monthlyCycleId: dispute.monthlyCycleId,
-            removeCents: disputedNetCents,
-          }
-        );
+      if (cappedVsSnapshot) {
+        await ctx.runMutation(internal.disputes.mutations.logDisputeClientRefundCapInternal, {
+          disputeId: args.disputeId,
+          projectId: dispute.projectId,
+          clientId: project.clientId,
+          snapshotLockedGrossUsd: dispute.lockedAmount ?? 0,
+          appliedRefundGrossUsd,
+        });
       }
-    } // end partial team client_favor
+
+      if (!isPartialTeam && dispute.monthlyCycleId) {
+        await ctx.runMutation(
+          internal.monthlyBillingCycles.mutations.cancelDisputedMonthlyCycleInternal,
+          { monthlyCycleId: dispute.monthlyCycleId }
+        );
+      } else if (isPartialTeam && dispute.monthlyCycleId) {
+        const removeCents = Math.min(
+          disputedNetCentsForPartial,
+          Math.round(netRemovalFromEscrowUsd * 100)
+        );
+        if (removeCents > 0) {
+          await ctx.runMutation(
+            internal.monthlyBillingCycles.mutations.applyPartialDisputeCycleReductionInternal,
+            {
+              monthlyCycleId: dispute.monthlyCycleId,
+              removeCents,
+            }
+          );
+        }
+      }
+    }
     
     if (decision === "freelancer_favor") {
       // Unblock work only — escrow stays until normal monthly approval / auto-release.

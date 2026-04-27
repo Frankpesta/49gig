@@ -49,9 +49,14 @@ export function FreelancerSignupApprovalManageBlock({
   enabled,
   onAfterAction,
 }: Props) {
+  // Convex infers very deep types for this query (TS2589); keep call site shallow.
   const detail = useQuery(
-    api.kyc.queries.getSignupApprovalDetail,
-    enabled ? { freelancerId, reviewerUserId: adminUserId } : "skip"
+    api.kyc.queries.getSignupApprovalDetail as typeof api.kyc.queries.getSignupApprovalDetail,
+    (enabled
+      ? { freelancerId, reviewerUserId: adminUserId }
+      : "skip") as
+      | { freelancerId: Id<"users">; reviewerUserId: Id<"users"> }
+      | "skip"
   );
   const approve = useMutation(api.kyc.mutations.approveFreelancerSignup);
   const rejectKyc = useMutation(api.kyc.mutations.rejectKyc);

@@ -46,7 +46,8 @@ type MatchRequest = {
   /** When `seat`, `requiredSkills` are for this match's team seat only. */
   freelancerSkillsScope?: "seat" | "project";
   specialRequirements?: string | null;
-  startDate?: string | null;
+  /** Intake may store epoch ms or ISO string depending on form version. */
+  startDate?: string | number | null;
 };
 
 const CONFIDENCE_STYLES = {

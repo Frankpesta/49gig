@@ -76,7 +76,13 @@ async function ensureReplacementMatchingProjectFields(
   }
 ) {
   const p = await ctx.db.get(args.projectId);
-  if (!p || p.status !== "matching") return;
+  if (!p) return;
+  const partialReplacement =
+    !!args.partialDisputedFreelancerIds &&
+    args.partialDisputedFreelancerIds.length > 0;
+  if (p.status !== "matching" && !(p.status === "in_progress" && partialReplacement)) {
+    return;
+  }
 
   const patch: Record<string, unknown> = {
     replacementMatchingAt: p.replacementMatchingAt ?? args.now,
@@ -104,6 +110,40 @@ async function ensureReplacementMatchingProjectFields(
 
   await ctx.db.patch(args.projectId, patch as any);
 }
+
+/** Audit when client refund gross is below dispute.lockedAmount because escrow could not cover it. */
+export const logDisputeClientRefundCapInternal = internalMutation({
+  args: {
+    disputeId: v.id("disputes"),
+    projectId: v.id("projects"),
+    clientId: v.id("users"),
+    snapshotLockedGrossUsd: v.number(),
+    appliedRefundGrossUsd: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const snapC = Math.round(args.snapshotLockedGrossUsd * 100);
+    const appC = Math.round(args.appliedRefundGrossUsd * 100);
+    if (appC >= snapC) return { logged: false as const };
+    const shortfall =
+      Math.round((args.snapshotLockedGrossUsd - args.appliedRefundGrossUsd) * 100) / 100;
+    await ctx.db.insert("auditLogs", {
+      action: "dispute_client_refund_capped_by_escrow",
+      actionType: "system",
+      actorId: args.clientId,
+      actorRole: "system",
+      targetType: "dispute",
+      targetId: String(args.disputeId),
+      details: {
+        projectId: args.projectId,
+        snapshotLockedGrossUsd: args.snapshotLockedGrossUsd,
+        appliedRefundGrossUsd: args.appliedRefundGrossUsd,
+        shortfallGrossUsd: shortfall,
+      },
+      createdAt: Date.now(),
+    });
+    return { logged: true as const };
+  },
+});
 
 /**
  * Helper to get current user in mutations
@@ -810,11 +850,18 @@ export const resolveDispute = mutation({
     });
 
     // Update project status
+    const isPartialTeamClientFavor =
+      args.decision === "client_favor" &&
+      (project.matchedFreelancerIds?.length ?? 0) > 0 &&
+      !!dispute.disputedFreelancerIds &&
+      dispute.disputedFreelancerIds.length > 0 &&
+      dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
+
     let newProjectStatus: Doc<"projects">["status"] = "disputed";
     if (args.decision === "replacement") {
       newProjectStatus = "matching";
     } else if (args.decision === "client_favor") {
-      newProjectStatus = "matching";
+      newProjectStatus = isPartialTeamClientFavor ? "in_progress" : "matching";
     } else if (args.decision === "partial") {
       newProjectStatus = "in_progress";
     } else {
@@ -865,7 +912,7 @@ export const resolveDispute = mutation({
         );
         await ctx.db.patch(dispute.projectId, {
           matchedFreelancerIds: remainingIds,
-          status: "matching",
+          status: "in_progress",
           selectedFreelancerIds:
             nextSelected.length > 0 ? nextSelected : undefined,
           updatedAt: now,
@@ -1063,11 +1110,18 @@ export const resolveDisputeInternal = internalMutation({
       updatedAt: now,
     });
 
+    const isPartialTeamClientFavorInternal =
+      args.decision === "client_favor" &&
+      (project.matchedFreelancerIds?.length ?? 0) > 0 &&
+      !!dispute.disputedFreelancerIds &&
+      dispute.disputedFreelancerIds.length > 0 &&
+      dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
+
     let newProjectStatus: Doc<"projects">["status"] = "disputed";
     if (args.decision === "replacement") {
       newProjectStatus = "matching";
     } else if (args.decision === "client_favor") {
-      newProjectStatus = "matching";
+      newProjectStatus = isPartialTeamClientFavorInternal ? "in_progress" : "matching";
     } else if (args.decision === "partial") {
       newProjectStatus = "in_progress";
     } else {
@@ -1115,7 +1169,7 @@ export const resolveDisputeInternal = internalMutation({
         );
         await ctx.db.patch(dispute.projectId, {
           matchedFreelancerIds: remainingIds,
-          status: "matching",
+          status: "in_progress",
           selectedFreelancerIds:
             nextSelected.length > 0 ? nextSelected : undefined,
           updatedAt: now,
