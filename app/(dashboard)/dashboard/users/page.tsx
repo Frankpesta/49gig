@@ -141,10 +141,12 @@ function UsersPageContent() {
     api.kyc.queries.getPendingSignupApprovals,
     isAuthenticated && user?.role === "admin" && user._id ? { userId: user._id } : "skip"
   );
-  const pendingSignupIdSet = useMemo(
-    () => new Set((pendingSignupRows ?? []).map((r) => String(r.freelancerId))),
-    [pendingSignupRows]
-  );
+  const pendingSignupIdSet = useMemo(() => {
+    const rows = pendingSignupRows ?? [];
+    return new Set(
+      rows.map((r: { freelancerId: Id<"users"> }) => String(r.freelancerId))
+    );
+  }, [pendingSignupRows]);
 
   const profileDetail = useQuery(
     api.users.queries.getUserProfileForAdmin,
