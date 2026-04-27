@@ -28,3 +28,42 @@ export function clientLockedGrossToFreelancerEscrowPool(
   );
   return Math.round(gross * (1 - platformFeeRate) * 100) / 100;
 }
+
+/**
+ * Client-favor refund: use stored dispute locked gross (snapshot), never above what escrow can represent,
+ * and for partial disputes never above the disputed slice’s gross equivalent.
+ */
+export function clientRefundGrossAndNetEscrowRemoval(opts: {
+  lockedSnapshotGrossUsd: number;
+  escrowNetUsdNow: number;
+  platformFeePercentEffective: number;
+  /** Partial team: max freelancer-net USD attributable to disputed members (current escrow slice). */
+  disputedEscrowNetUsdMax?: number;
+}): {
+  appliedRefundGrossUsd: number;
+  netRemovalFromEscrowUsd: number;
+  cappedVsSnapshot: boolean;
+} {
+  const fee = opts.platformFeePercentEffective;
+  const snapshot = Math.max(0, opts.lockedSnapshotGrossUsd);
+  const escrowNet = Math.max(0, opts.escrowNetUsdNow);
+  const maxGrossFromFullPool = escrowNetToClientLockedGross(escrowNet, fee);
+  let capGross = maxGrossFromFullPool;
+  if (
+    opts.disputedEscrowNetUsdMax != null &&
+    Number.isFinite(opts.disputedEscrowNetUsdMax)
+  ) {
+    const sliceNet = Math.max(0, opts.disputedEscrowNetUsdMax);
+    const maxGrossFromSlice = escrowNetToClientLockedGross(sliceNet, fee);
+    capGross = Math.min(maxGrossFromFullPool, maxGrossFromSlice);
+  }
+  const appliedRefundGrossUsd =
+    Math.round(Math.min(snapshot, capGross) * 100) / 100;
+  const cappedVsSnapshot =
+    Math.round(appliedRefundGrossUsd * 100) < Math.round(snapshot * 100);
+  const netRemovalFromEscrowUsd = clientLockedGrossToFreelancerEscrowPool(
+    appliedRefundGrossUsd,
+    fee
+  );
+  return { appliedRefundGrossUsd, netRemovalFromEscrowUsd, cappedVsSnapshot };
+}
