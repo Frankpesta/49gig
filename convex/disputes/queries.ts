@@ -98,10 +98,18 @@ export const getDisputes = query({
     status: v.optional(
       v.union(
         v.literal("open"),
+        v.literal("negotiation"),
+        v.literal("platform_intervention_requested"),
+        v.literal("awaiting_party_evidence"),
         v.literal("under_review"),
+        v.literal("judgment_issued"),
+        v.literal("objection_window"),
+        v.literal("appeal_review"),
+        v.literal("enforcing_resolution"),
         v.literal("resolved"),
         v.literal("escalated"),
-        v.literal("closed")
+        v.literal("closed"),
+        v.literal("cancelled")
       )
     ),
     userId: v.optional(v.id("users")),
@@ -434,10 +442,26 @@ export const getDispute = query({
       dispute,
       project
     );
+    const structuredEvidence = await ctx.db
+      .query("disputeEvidence")
+      .withIndex("by_dispute", (q) => q.eq("disputeId", args.disputeId))
+      .collect();
+    const enrichedStructuredEvidence = await Promise.all(
+      structuredEvidence.map(async (e) => ({
+        ...e,
+        fileUrl: e.fileId ? await ctx.storage.getUrl(e.fileId) : null,
+      }))
+    );
+    const stageEvents = await ctx.db
+      .query("disputeStageEvents")
+      .withIndex("by_dispute", (q) => q.eq("disputeId", args.disputeId))
+      .collect();
 
     return {
       ...dispute,
       evidence: enrichedEvidence,
+      structuredEvidence: enrichedStructuredEvidence,
+      stageEvents,
       resolution: visibleResolution,
       lockedAmount: visibleLockedAmount,
       initiatorFullName,
@@ -455,10 +479,18 @@ export const getModeratorDisputes = query({
     status: v.optional(
       v.union(
         v.literal("open"),
+        v.literal("negotiation"),
+        v.literal("platform_intervention_requested"),
+        v.literal("awaiting_party_evidence"),
         v.literal("under_review"),
+        v.literal("judgment_issued"),
+        v.literal("objection_window"),
+        v.literal("appeal_review"),
+        v.literal("enforcing_resolution"),
         v.literal("resolved"),
         v.literal("escalated"),
-        v.literal("closed")
+        v.literal("closed"),
+        v.literal("cancelled")
       )
     ),
     userId: v.optional(v.id("users")),
@@ -510,17 +542,28 @@ export const getPendingDisputes = query({
       return [];
     }
 
-    const openDisputes = await ctx.db
-      .query("disputes")
-      .withIndex("by_status", (q) => q.eq("status", "open"))
-      .collect();
-
-    const underReviewDisputes = await ctx.db
-      .query("disputes")
-      .withIndex("by_status", (q) => q.eq("status", "under_review"))
-      .collect();
-
-    const allPending = [...openDisputes, ...underReviewDisputes];
+    const pendingStatuses = [
+      "open",
+      "negotiation",
+      "platform_intervention_requested",
+      "awaiting_party_evidence",
+      "under_review",
+      "judgment_issued",
+      "objection_window",
+      "appeal_review",
+      "enforcing_resolution",
+      "escalated",
+    ] as const;
+    const allPending = (
+      await Promise.all(
+        pendingStatuses.map((status) =>
+          ctx.db
+            .query("disputes")
+            .withIndex("by_status", (q) => q.eq("status", status))
+            .collect()
+        )
+      )
+    ).flat();
 
     return allPending.sort((a, b) => a.createdAt - b.createdAt); // Oldest first
   },
@@ -648,6 +691,44 @@ export const getDisputeDocInternal = internalQuery({
   args: { disputeId: v.id("disputes") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.disputeId);
+  },
+});
+
+export const getDisputesDueForDeadlineInternal = internalQuery({
+  args: { now: v.number(), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = Math.min(args.limit ?? 50, 100);
+    const statuses = [
+      "negotiation",
+      "awaiting_party_evidence",
+      "objection_window",
+      "appeal_review",
+    ] as const;
+    const rows = (
+      await Promise.all(
+        statuses.map((status) =>
+          ctx.db
+            .query("disputes")
+            .withIndex("by_status", (q) => q.eq("status", status))
+            .collect()
+        )
+      )
+    )
+      .flat()
+      .filter((d) => {
+        const deadline =
+          d.status === "objection_window"
+            ? d.objectionWindowEndsAt ?? d.stageDeadlineAt
+            : d.status === "awaiting_party_evidence"
+              ? d.evidenceDeadlineAt ?? d.stageDeadlineAt
+              : d.status === "negotiation"
+                ? d.negotiationDeadlineAt ?? d.stageDeadlineAt
+                : d.appealWindowEndsAt ?? d.stageDeadlineAt;
+        return typeof deadline === "number" && deadline <= args.now;
+      })
+      .sort((a, b) => (a.stageDeadlineAt ?? 0) - (b.stageDeadlineAt ?? 0));
+
+    return rows.slice(0, limit).map((d) => d._id);
   },
 });
 

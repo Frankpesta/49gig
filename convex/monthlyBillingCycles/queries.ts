@@ -1,7 +1,17 @@
-import { query, internalQuery } from "../_generated/server";
+import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
+
+async function projectHasActiveProjectPause(ctx: QueryCtx, projectId: Doc<"projects">["_id"]) {
+  const pauses = await ctx.db
+    .query("projectBillingPauses")
+    .withIndex("by_project_status", (q) =>
+      q.eq("projectId", projectId).eq("status", "active")
+    )
+    .collect();
+  return pauses.some((p: Doc<"projectBillingPauses">) => p.scope === "project");
+}
 
 /**
  * Get a single monthly cycle by ID (for dispute resolution).
@@ -121,6 +131,7 @@ export const getPendingCyclesForReminderInternal = internalQuery({
       const project = await ctx.db.get(c.projectId);
       if (!project) continue;
       if (project.status !== "in_progress") continue;
+      if (await projectHasActiveProjectPause(ctx, c.projectId)) continue;
 
       const last = c.clientApprovalReminderSentAt ?? 0;
       if (now - last < REMINDER_THROTTLE_MS) continue;
@@ -188,6 +199,7 @@ export const getCyclesReadyForAutoReleaseInternal = internalQuery({
       if (releaseAt > now) continue;
       const project = await ctx.db.get(c.projectId);
       if (!project || project.status !== "in_progress") continue;
+      if (await projectHasActiveProjectPause(ctx, c.projectId)) continue;
       ready.push(c);
     }
     return ready;

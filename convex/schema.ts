@@ -978,6 +978,8 @@ export default defineSchema({
     autoReleaseAt: v.optional(v.number()), // 48h after monthEndDate; auto-approve if client hasn't
     /** Last time we emailed the client a pending-approval reminder for this cycle (throttles spam). */
     clientApprovalReminderSentAt: v.optional(v.number()),
+    /** Per-freelancer cents already released for this cycle; supports admin holds on one team member. */
+    releasedFreelancerCents: v.optional(v.record(v.string(), v.number())),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -985,6 +987,22 @@ export default defineSchema({
     .index("by_project_month", ["projectId", "monthIndex"])
     .index("by_status", ["status"])
     .index("by_auto_release", ["autoReleaseAt"]),
+
+  projectBillingPauses: defineTable({
+    projectId: v.id("projects"),
+    freelancerId: v.optional(v.id("users")),
+    scope: v.union(v.literal("project"), v.literal("freelancer")),
+    status: v.union(v.literal("active"), v.literal("resumed")),
+    reason: v.string(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    resumedBy: v.optional(v.id("users")),
+    resumedAt: v.optional(v.number()),
+    updatedAt: v.number(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_freelancer", ["freelancerId", "status"]),
 
   // Client ratings of freelancers (one per project)
   reviews: defineTable({
@@ -1078,11 +1096,81 @@ export default defineSchema({
     // Status
     status: v.union(
       v.literal("open"),
+      v.literal("negotiation"),
+      v.literal("platform_intervention_requested"),
+      v.literal("awaiting_party_evidence"),
       v.literal("under_review"),
+      v.literal("judgment_issued"),
+      v.literal("objection_window"),
+      v.literal("appeal_review"),
+      v.literal("enforcing_resolution"),
       v.literal("resolved"),
       v.literal("escalated"),
       v.literal("closed"),
       v.literal("cancelled")
+    ),
+
+    // Professional P2P-style lifecycle (new disputes use this; legacy disputes may omit)
+    track: v.optional(v.union(v.literal("normal"), v.literal("fast_track"))),
+    stage: v.optional(
+      v.union(
+        v.literal("negotiation"),
+        v.literal("platform_intervention_requested"),
+        v.literal("awaiting_party_evidence"),
+        v.literal("under_review"),
+        v.literal("judgment_issued"),
+        v.literal("objection_window"),
+        v.literal("appeal_review"),
+        v.literal("enforcing_resolution"),
+        v.literal("resolved"),
+        v.literal("closed")
+      )
+    ),
+    stageStartedAt: v.optional(v.number()),
+    stageDeadlineAt: v.optional(v.number()),
+    negotiationDeadlineAt: v.optional(v.number()),
+    evidenceDeadlineAt: v.optional(v.number()),
+    objectionWindowEndsAt: v.optional(v.number()),
+    appealWindowEndsAt: v.optional(v.number()),
+    platformInterventionRequestedAt: v.optional(v.number()),
+    platformInterventionRequestedBy: v.optional(v.id("users")),
+    judgmentIssuedAt: v.optional(v.number()),
+    enforcementStartedAt: v.optional(v.number()),
+    enforcedAt: v.optional(v.number()),
+    fastTrackEligible: v.optional(v.boolean()),
+    policyReasonLabel: v.optional(v.string()),
+    requiredEvidenceChecklist: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          owner: v.union(
+            v.literal("client"),
+            v.literal("freelancer"),
+            v.literal("both")
+          ),
+          label: v.string(),
+          description: v.string(),
+          satisfiedAt: v.optional(v.number()),
+        })
+      )
+    ),
+    nonCooperationFlags: v.optional(v.array(v.string())),
+    policyFlags: v.optional(v.array(v.string())),
+    objection: v.optional(
+      v.object({
+        raisedBy: v.id("users"),
+        raisedAt: v.number(),
+        reason: v.string(),
+        evidenceIds: v.optional(v.array(v.id("_storage"))),
+        status: v.union(
+          v.literal("pending"),
+          v.literal("accepted"),
+          v.literal("rejected")
+        ),
+        reviewedBy: v.optional(v.id("users")),
+        reviewedAt: v.optional(v.number()),
+        reviewNotes: v.optional(v.string()),
+      })
     ),
 
     // Cancellation (when initiator withdraws the dispute)
@@ -1122,6 +1210,9 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_status", ["status"])
+    .index("by_stage_deadline", ["status", "stageDeadlineAt"])
+    .index("by_evidence_deadline", ["status", "evidenceDeadlineAt"])
+    .index("by_objection_deadline", ["status", "objectionWindowEndsAt"])
     .index("by_initiator", ["initiatorId"])
     .index("by_moderator", ["assignedModeratorId"]),
 
@@ -1152,6 +1243,69 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_dispute", ["disputeId", "createdAt"]),
+
+  /** Structured dispute evidence records reviewed by moderators. */
+  disputeEvidence: defineTable({
+    disputeId: v.id("disputes"),
+    projectId: v.id("projects"),
+    submittedBy: v.id("users"),
+    submittedByRole: v.union(
+      v.literal("client"),
+      v.literal("freelancer"),
+      v.literal("moderator"),
+      v.literal("admin")
+    ),
+    checklistItemId: v.optional(v.string()),
+    title: v.string(),
+    description: v.optional(v.string()),
+    evidenceType: v.union(
+      v.literal("message"),
+      v.literal("file"),
+      v.literal("link"),
+      v.literal("deliverable"),
+      v.literal("payment_record"),
+      v.literal("other")
+    ),
+    messageId: v.optional(v.id("messages")),
+    fileId: v.optional(v.id("_storage")),
+    url: v.optional(v.string()),
+    status: v.union(
+      v.literal("submitted"),
+      v.literal("accepted"),
+      v.literal("rejected")
+    ),
+    reviewNotes: v.optional(v.string()),
+    reviewedBy: v.optional(v.id("users")),
+    reviewedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_dispute", ["disputeId", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"])
+    .index("by_status", ["status"]),
+
+  /** Immutable dispute timeline events for a case-center audit trail. */
+  disputeStageEvents: defineTable({
+    disputeId: v.id("disputes"),
+    projectId: v.id("projects"),
+    actorId: v.optional(v.id("users")),
+    actorRole: v.union(
+      v.literal("client"),
+      v.literal("freelancer"),
+      v.literal("moderator"),
+      v.literal("admin"),
+      v.literal("system")
+    ),
+    eventType: v.string(),
+    fromStatus: v.optional(v.string()),
+    toStatus: v.optional(v.string()),
+    title: v.string(),
+    description: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_dispute", ["disputeId", "createdAt"])
+    .index("by_project", ["projectId", "createdAt"]),
 
   /** Client referral cash withdrawal requests (PayPal or crypto — manually processed by admin). */
   clientReferralPayoutRequests: defineTable({

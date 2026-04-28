@@ -27,6 +27,41 @@ async function getCurrentUserInMutation(
   return user as Doc<"users">;
 }
 
+async function getActiveBillingPauseState(
+  ctx: MutationCtx,
+  projectId: Doc<"projects">["_id"]
+) {
+  const pauses = await ctx.db
+    .query("projectBillingPauses")
+    .withIndex("by_project_status", (q) =>
+      q.eq("projectId", projectId).eq("status", "active")
+    )
+    .collect();
+  return {
+    projectPaused: pauses.some((p) => p.scope === "project"),
+    pausedFreelancerIds: new Set(
+      pauses
+        .filter((p) => p.scope === "freelancer" && p.freelancerId)
+        .map((p) => String(p.freelancerId))
+    ),
+  };
+}
+
+function releasedCentsMap(cycle: Doc<"monthlyBillingCycles">): Record<string, number> {
+  return { ...(cycle.releasedFreelancerCents ?? {}) };
+}
+
+function allRosterSharesReleased(
+  freelancerIds: Doc<"users">["_id"][],
+  shareCentsByFreelancer: number[],
+  released: Record<string, number>
+) {
+  return freelancerIds.every((fid, i) => {
+    const expected = Math.max(0, shareCentsByFreelancer[i] ?? 0);
+    return expected <= 0 || (released[String(fid)] ?? 0) >= expected;
+  });
+}
+
 /** Credit wallet inline (no scheduler) - ensures immediate balance update */
 async function creditWalletInline(
   ctx: MutationCtx,
@@ -332,11 +367,22 @@ export const approveMonthlyCycle = mutation({
       );
     }
 
+    const pauseState = await getActiveBillingPauseState(ctx, cycle.projectId);
+    if (pauseState.projectPaused) {
+      throw new Error("Payment release is paused by an admin for this hire.");
+    }
+    const released = releasedCentsMap(cycle);
+
     // Credit each freelancer's wallet (creates wallet if needed) - inline for immediate balance update
+    let totalReleasedThisRun = 0;
     for (let i = 0; i < freelancerIds.length; i++) {
       const fid = freelancerIds[i];
       const shareCents = shareCentsByFreelancer[i] ?? 0;
       if (shareCents <= 0) continue;
+      if (pauseState.pausedFreelancerIds.has(String(fid))) continue;
+      const alreadyReleased = released[String(fid)] ?? 0;
+      const remainingCents = Math.max(0, shareCents - alreadyReleased);
+      if (remainingCents <= 0) continue;
 
       const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
         month: "short",
@@ -344,12 +390,18 @@ export const approveMonthlyCycle = mutation({
       });
       await creditWalletInline(ctx, {
         userId: fid,
-        amountCents: shareCents,
+        amountCents: remainingCents,
         currency: cycle.currency,
         description: `Monthly approval: ${project.intakeForm.title} - ${monthLabel}`,
         projectId: cycle.projectId,
         monthlyCycleId: args.monthlyCycleId,
       });
+      released[String(fid)] = alreadyReleased + remainingCents;
+      totalReleasedThisRun += remainingCents;
+    }
+
+    if (totalReleasedThisRun <= 0) {
+      throw new Error("No releasable payment remains. It may be paused by an admin.");
     }
 
     // Create payment record(s) for audit - one per freelancer
@@ -357,15 +409,19 @@ export const approveMonthlyCycle = mutation({
       const fid = freelancerIds[i];
       const shareCents = shareCentsByFreelancer[i] ?? 0;
       if (shareCents <= 0) continue;
+      if (pauseState.pausedFreelancerIds.has(String(fid))) continue;
+      const amountAlreadyRecorded = (cycle.releasedFreelancerCents ?? {})[String(fid)] ?? 0;
+      const paymentCents = Math.max(0, (released[String(fid)] ?? 0) - amountAlreadyRecorded);
+      if (paymentCents <= 0) continue;
 
       await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
         projectId: cycle.projectId,
         monthlyCycleId: args.monthlyCycleId,
         type: "monthly_release",
-        amount: shareCents / 100,
+        amount: paymentCents / 100,
         currency: cycle.currency,
         platformFee: 0,
-        netAmount: shareCents / 100,
+        netAmount: paymentCents / 100,
         userId: project.clientId,
         recipientId: fid,
         status: "succeeded",
@@ -374,16 +430,22 @@ export const approveMonthlyCycle = mutation({
 
     // Update cycle status
     await ctx.db.patch(args.monthlyCycleId, {
-      status: "approved",
-      approvedBy: (user as Doc<"users">)._id,
-      approvedAt: now,
+      status: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+        ? "approved"
+        : "pending",
+      approvedBy: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+        ? (user as Doc<"users">)._id
+        : undefined,
+      approvedAt: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+        ? now
+        : undefined,
+      releasedFreelancerCents: released,
       updatedAt: now,
     });
 
     // Decrease project escrowed amount
-    const totalReleased = cycle.amountCents;
     await ctx.db.patch(cycle.projectId, {
-      escrowedAmount: Math.max(0, project.escrowedAmount - totalReleased / 100),
+      escrowedAmount: Math.max(0, project.escrowedAmount - totalReleasedThisRun / 100),
       updatedAt: now,
     });
 
@@ -397,7 +459,7 @@ export const approveMonthlyCycle = mutation({
       year: "numeric",
     });
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: freelancerIds,
+      userIds: freelancerIds.filter((fid) => !pauseState.pausedFreelancerIds.has(String(fid))),
       title: "Monthly payment approved",
       message: `Client approved ${monthLabel} payment for ${project.intakeForm.title}. Funds have been added to your wallet.`,
       type: "payment",
@@ -623,47 +685,68 @@ export const autoReleaseMonthlyCycleInternal = internalMutation({
       );
     }
 
+    const pauseState = await getActiveBillingPauseState(ctx, cycle.projectId);
+    if (pauseState.projectPaused) {
+      return { released: false };
+    }
+    const released = releasedCentsMap(cycle);
+
     const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
       month: "short",
       year: "numeric",
     });
 
+    let totalReleasedThisRun = 0;
+    const releasedFreelancerIds: Doc<"users">["_id"][] = [];
     for (let i = 0; i < freelancerIds.length; i++) {
       const fid = freelancerIds[i];
       const shareCents = shareCentsByFreelancer[i] ?? 0;
       if (shareCents <= 0) continue;
+      if (pauseState.pausedFreelancerIds.has(String(fid))) continue;
+      const alreadyReleased = released[String(fid)] ?? 0;
+      const remainingCents = Math.max(0, shareCents - alreadyReleased);
+      if (remainingCents <= 0) continue;
 
       await creditWalletInline(ctx, {
         userId: fid,
-        amountCents: shareCents,
+        amountCents: remainingCents,
         currency: cycle.currency,
         description: `Auto-release: ${project.intakeForm.title} - ${monthLabel}`,
         projectId: cycle.projectId,
         monthlyCycleId: args.monthlyCycleId,
       });
+      released[String(fid)] = alreadyReleased + remainingCents;
+      totalReleasedThisRun += remainingCents;
+      releasedFreelancerIds.push(fid);
 
       await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
         projectId: cycle.projectId,
         monthlyCycleId: args.monthlyCycleId,
         type: "monthly_release",
-        amount: shareCents / 100,
+        amount: remainingCents / 100,
         currency: cycle.currency,
         platformFee: 0,
-        netAmount: shareCents / 100,
+        netAmount: remainingCents / 100,
         userId: fid,
         status: "succeeded",
       });
     }
 
+    if (totalReleasedThisRun <= 0) return { released: false };
+
     await ctx.db.patch(args.monthlyCycleId, {
-      status: "approved",
-      approvedAt: now,
+      status: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+        ? "approved"
+        : "pending",
+      approvedAt: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+        ? now
+        : undefined,
+      releasedFreelancerCents: released,
       updatedAt: now,
     });
 
-    const totalReleased = cycle.amountCents;
     await ctx.db.patch(cycle.projectId, {
-      escrowedAmount: Math.max(0, project.escrowedAmount - totalReleased / 100),
+      escrowedAmount: Math.max(0, project.escrowedAmount - totalReleasedThisRun / 100),
       updatedAt: now,
     });
 
@@ -673,7 +756,7 @@ export const autoReleaseMonthlyCycleInternal = internalMutation({
         "internal"
       >;
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: freelancerIds,
+      userIds: releasedFreelancerIds,
       title: "Monthly payment auto-released",
       message: `${monthLabel} payment for ${project.intakeForm.title} was automatically released. Funds have been added to your wallet.`,
       type: "payment",
@@ -823,6 +906,9 @@ export const releaseAllPendingCyclesForProjectInternal = internalMutation({
     ).filter((id): id is Doc<"users">["_id"] => id != null);
     if (freelancerIds.length === 0) return { released: 0 };
 
+    const pauseState = await getActiveBillingPauseState(ctx, args.projectId);
+    if (pauseState.projectPaused) return { released: 0 };
+
     const cycles = await ctx.db
       .query("monthlyBillingCycles")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -871,10 +957,16 @@ export const releaseAllPendingCyclesForProjectInternal = internalMutation({
         );
       }
 
+      const released = releasedCentsMap(cycle);
+      let releasedThisCycle = 0;
       for (let j = 0; j < freelancerIds.length; j++) {
         const fid = freelancerIds[j];
         const shareCents = shareCentsByFreelancer[j] ?? 0;
         if (shareCents <= 0) continue;
+        if (pauseState.pausedFreelancerIds.has(String(fid))) continue;
+        const alreadyReleased = released[String(fid)] ?? 0;
+        const remainingCents = Math.max(0, shareCents - alreadyReleased);
+        if (remainingCents <= 0) continue;
 
         const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
           month: "short",
@@ -882,34 +974,46 @@ export const releaseAllPendingCyclesForProjectInternal = internalMutation({
         });
         await creditWalletInline(ctx, {
           userId: fid,
-          amountCents: shareCents,
+          amountCents: remainingCents,
           currency: cycle.currency,
           description: `Project completion: ${project.intakeForm.title} - ${monthLabel}`,
           projectId: cycle.projectId,
           monthlyCycleId: cycle._id,
         });
+        released[String(fid)] = alreadyReleased + remainingCents;
+        releasedThisCycle += remainingCents;
         await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
           projectId: cycle.projectId,
           monthlyCycleId: cycle._id,
           type: "monthly_release",
-          amount: shareCents / 100,
+          amount: remainingCents / 100,
           currency: cycle.currency,
           platformFee: 0,
-          netAmount: shareCents / 100,
+          netAmount: remainingCents / 100,
           userId: project.clientId,
           recipientId: fid,
           status: "succeeded",
         });
       }
 
-      totalReleasedCents += cycle.amountCents;
+      if (releasedThisCycle <= 0) continue;
+      totalReleasedCents += releasedThisCycle;
       await ctx.db.patch(cycle._id, {
-        status: "approved",
-        approvedBy: project.clientId,
-        approvedAt: now,
+        status: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+          ? "approved"
+          : "pending",
+        approvedBy: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+          ? project.clientId
+          : undefined,
+        approvedAt: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
+          ? now
+          : undefined,
+        releasedFreelancerCents: released,
         updatedAt: now,
       });
     }
+
+    if (totalReleasedCents <= 0) return { released: 0 };
 
     await ctx.db.patch(args.projectId, {
       escrowedAmount: Math.max(0, project.escrowedAmount - totalReleasedCents / 100),
@@ -925,7 +1029,7 @@ export const releaseAllPendingCyclesForProjectInternal = internalMutation({
       ? new Date(toRelease[0].monthStartDate).toLocaleString("default", { month: "short", year: "numeric" })
       : `${toRelease.length} months`;
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: freelancerIds,
+      userIds: freelancerIds.filter((fid) => !pauseState.pausedFreelancerIds.has(String(fid))),
       title: "Remaining payments released",
       message: `${monthLabel} for ${project.intakeForm.title} has been released to your wallet (project completed).`,
       type: "payment",

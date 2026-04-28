@@ -11,6 +11,14 @@ import { viewerIsDisputeParty } from "../disputes/partyAccess";
 import { computeTeamPoolShareCentsByFreelancerId } from "../teamEscrowShares";
 import { escrowNetToClientLockedGross } from "../disputes/amounts";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
+import { isFreelancerInMatchingPool } from "../../lib/freelancer-matching-readiness";
+import {
+  calculateSkillOverlapPercent,
+  freelancerHasExactSoftwareSubField,
+  isFreelancerEligibleForProjectMatch,
+  normalizeRequiredSkillsForMatching,
+  projectPrimaryRoleId,
+} from "../../lib/matching-skill-utils";
 
 /**
  * Helper function to get current user in queries
@@ -1121,5 +1129,98 @@ export const getProjectMoneyAuditForAdmin = query({
         }))
         .sort((a, b) => a.monthIndex - b.monthIndex),
     };
+  },
+});
+
+export const getProjectBillingPausesForAdmin = query({
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user || user.role !== "admin") return [];
+    const pauses = await ctx.db
+      .query("projectBillingPauses")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    return await Promise.all(
+      pauses
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(async (pause) => {
+          const freelancer = pause.freelancerId
+            ? await ctx.db.get(pause.freelancerId)
+            : null;
+          const createdBy = await ctx.db.get(pause.createdBy);
+          const resumedBy = pause.resumedBy ? await ctx.db.get(pause.resumedBy) : null;
+          return {
+            ...pause,
+            freelancerName: freelancer?.name ?? null,
+            createdByName: createdBy?.name ?? null,
+            resumedByName: resumedBy?.name ?? null,
+          };
+        })
+    );
+  },
+});
+
+export const getAdminReplacementCandidates = query({
+  args: {
+    projectId: v.id("projects"),
+    oldFreelancerId: v.optional(v.id("users")),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user || user.role !== "admin") return [];
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return [];
+
+    const roster = new Set([
+      ...(project.matchedFreelancerId ? [String(project.matchedFreelancerId)] : []),
+      ...(project.matchedFreelancerIds ?? []).map(String),
+    ]);
+    const excluded = new Set((project.permanentlyExcludedFreelancerIds ?? []).map(String));
+    const normalizedSkills = normalizeRequiredSkillsForMatching(project.intakeForm);
+    const projectRoleId = projectPrimaryRoleId(project.intakeForm);
+    const requestedSoftwareSubField = project.intakeForm.softwareDevFields?.[0];
+
+    const users = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "freelancer")).collect();
+    return users
+      .filter((freelancer) => {
+        if (!isFreelancerInMatchingPool(freelancer)) return false;
+        if (roster.has(String(freelancer._id))) return false;
+        if (excluded.has(String(freelancer._id))) return false;
+        if (
+          !isFreelancerEligibleForProjectMatch(
+            freelancer,
+            normalizedSkills,
+            projectRoleId
+          )
+        ) {
+          return false;
+        }
+        if (
+          requestedSoftwareSubField &&
+          !freelancerHasExactSoftwareSubField(freelancer, requestedSoftwareSubField)
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((freelancer) => ({
+        _id: freelancer._id,
+        name: freelancer.name,
+        email: freelancer.email,
+        primaryRole: freelancer.profile?.primaryRole,
+        experienceLevel: freelancer.profile?.experienceLevel,
+        skills: freelancer.profile?.skills ?? [],
+        skillOverlap: calculateSkillOverlapPercent(
+          normalizedSkills,
+          freelancer.profile?.skills ?? []
+        ),
+      }))
+      .sort((a, b) => b.skillOverlap - a.skillOverlap || a.name.localeCompare(b.name))
+      .slice(0, 50);
   },
 });

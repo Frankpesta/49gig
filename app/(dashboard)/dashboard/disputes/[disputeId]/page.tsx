@@ -53,8 +53,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DISPUTE_STAGE_ORDER,
+  disputeStageIndex,
+  disputeStatusLabel,
+  getDisputeReasonPolicy,
+} from "@/lib/dispute-flow";
 
 type DisputeEvidenceItem = Doc<"disputes">["evidence"][number] & { fileUrl?: string | null };
+type RequiredEvidenceChecklistItem = {
+  id: string;
+  owner: "client" | "freelancer" | "both";
+  label: string;
+  description: string;
+  satisfiedAt?: number;
+};
 
 function DetailField({
   label,
@@ -95,10 +108,20 @@ export default function DisputeDetailPage() {
   const sendDisputeChatMessage = useMutation(api.disputes.mutations.sendDisputeChatMessage);
   const generateUploadUrl = useMutation(api.disputes.mutations.generateDisputeUploadUrl);
   const cancelDisputeMutation = useMutation(api.disputes.mutations.cancelDispute);
+  const requestPlatformIntervention = useMutation(api.disputes.mutations.requestPlatformIntervention);
+  const raiseDisputeObjection = useMutation(api.disputes.mutations.raiseDisputeObjection);
+  const enforceDisputeJudgment = useMutation(api.disputes.mutations.enforceDisputeJudgment);
+  const reviewDisputeEvidence = useMutation(api.disputes.mutations.reviewDisputeEvidence);
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
+  const [interventionDialogOpen, setInterventionDialogOpen] = useState(false);
+  const [interventionReason, setInterventionReason] = useState("");
+  const [isRequestingIntervention, setIsRequestingIntervention] = useState(false);
+  const [objectionDialogOpen, setObjectionDialogOpen] = useState(false);
+  const [objectionReason, setObjectionReason] = useState("");
+  const [isObjecting, setIsObjecting] = useState(false);
 
   const dispute = useQuery(
     api.disputes.queries.getDispute,
@@ -176,17 +199,34 @@ export default function DisputeDetailPage() {
     );
   }
 
-  const canCancel =
-    dispute.initiatorId === user._id &&
-    (dispute.status === "open" || dispute.status === "under_review");
-
-  const formatStatusLabel = (status: string) =>
-    status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  const activeDisputeStatuses = new Set([
+    "open",
+    "negotiation",
+    "platform_intervention_requested",
+    "awaiting_party_evidence",
+    "under_review",
+    "judgment_issued",
+    "objection_window",
+    "appeal_review",
+    "enforcing_resolution",
+    "escalated",
+  ]);
+  const isActiveDispute = activeDisputeStatuses.has(dispute.status);
+  const canCancel = dispute.initiatorId === user._id && isActiveDispute;
+  const policy = getDisputeReasonPolicy(dispute.type);
+  const stageProgress = disputeStageIndex(dispute.stage ?? dispute.status);
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       open: "destructive",
+      negotiation: "secondary",
+      platform_intervention_requested: "secondary",
+      awaiting_party_evidence: "secondary",
       under_review: "secondary",
+      judgment_issued: "secondary",
+      objection_window: "destructive",
+      appeal_review: "secondary",
+      enforcing_resolution: "secondary",
       resolved: "default",
       escalated: "destructive",
       closed: "outline",
@@ -194,7 +234,7 @@ export default function DisputeDetailPage() {
     };
     return (
       <Badge variant={variants[status] || "outline"} className="font-medium tracking-tight">
-        {formatStatusLabel(status)}
+        {disputeStatusLabel(status)}
       </Badge>
     );
   };
@@ -220,24 +260,29 @@ export default function DisputeDetailPage() {
 
   const canAddEvidence =
     (user.role === "client" || user.role === "freelancer") &&
-    (dispute.status === "open" || dispute.status === "under_review");
+    isActiveDispute;
 
   const isModerator = user.role === "moderator" || user.role === "admin";
   const canClaimOrAssignDispute =
     isModerator &&
-    dispute.status === "open" &&
+    (dispute.status === "open" || dispute.status === "negotiation" || dispute.status === "awaiting_party_evidence") &&
     !dispute.assignedModeratorId;
   const canAdminPickModerator = user.role === "admin" && canClaimOrAssignDispute;
   const canModeratorSelfAssign = user.role === "moderator" && canClaimOrAssignDispute;
   const canResolve =
     isModerator &&
-    dispute.status !== "resolved" &&
-    dispute.status !== "closed" &&
-    dispute.status !== "cancelled";
+    isActiveDispute;
+  const canRequestIntervention =
+    (user.role === "client" || user.role === "freelancer") &&
+    (dispute.status === "negotiation" || dispute.status === "open");
+  const canObject =
+    (user.role === "client" || user.role === "freelancer") &&
+    dispute.status === "objection_window";
+  const canEnforceJudgment = isModerator && dispute.status === "objection_window";
 
   const canPostInDisputeChat =
     (user.role === "client" || user.role === "freelancer" || isModerator) &&
-    (dispute.status === "open" || dispute.status === "under_review");
+    isActiveDispute;
 
   const handleSendDisputeChat = async () => {
     if (!user?._id || (!disputeChatText.trim() && pendingFiles.length === 0)) return;
@@ -284,6 +329,76 @@ export default function DisputeDetailPage() {
     }
   };
 
+  const handleRequestIntervention = async () => {
+    if (!user?._id || !interventionReason.trim()) return;
+    setIsRequestingIntervention(true);
+    try {
+      await requestPlatformIntervention({
+        disputeId: dispute._id,
+        reason: interventionReason.trim(),
+        userId: user._id,
+      });
+      toast.success("Platform intervention requested.");
+      setInterventionDialogOpen(false);
+      setInterventionReason("");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not request intervention.");
+    } finally {
+      setIsRequestingIntervention(false);
+    }
+  };
+
+  const handleRaiseObjection = async () => {
+    if (!user?._id || !objectionReason.trim()) return;
+    setIsObjecting(true);
+    try {
+      await raiseDisputeObjection({
+        disputeId: dispute._id,
+        reason: objectionReason.trim(),
+        userId: user._id,
+      });
+      toast.success("Objection submitted for review.");
+      setObjectionDialogOpen(false);
+      setObjectionReason("");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not submit objection.");
+    } finally {
+      setIsObjecting(false);
+    }
+  };
+
+  const handleEnforceJudgment = async () => {
+    if (!user?._id) return;
+    try {
+      await enforceDisputeJudgment({
+        disputeId: dispute._id,
+        notes: "Judgment enforced by staff.",
+        userId: user._id,
+      });
+      toast.success("Judgment enforced.");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not enforce judgment.");
+    }
+  };
+
+  const handleReviewEvidence = async (
+    evidenceId: Id<"disputeEvidence">,
+    status: "accepted" | "rejected"
+  ) => {
+    if (!user?._id) return;
+    try {
+      await reviewDisputeEvidence({
+        evidenceId,
+        status,
+        reviewNotes: status === "accepted" ? "Accepted for review." : "Rejected as not relevant.",
+        userId: user._id,
+      });
+      toast.success(`Evidence ${status}.`);
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not review evidence.");
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length || !user?._id) return;
@@ -316,7 +431,7 @@ export default function DisputeDetailPage() {
   };
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-gradient-to-b from-muted/30 via-background to-background pb-10 pt-4 sm:pb-12 sm:pt-6">
+    <div className="min-h-[calc(100dvh-4rem)] bg-linear-to-b from-muted/30 via-background to-background pb-10 pt-4 sm:pb-12 sm:pt-6">
       <div className="container mx-auto max-w-7xl px-4 sm:px-6">
         {/* Hero */}
         <div className="relative mb-6 overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm sm:mb-8">
@@ -379,7 +494,7 @@ export default function DisputeDetailPage() {
                 </div>
 
                 {"initiatorFullName" in dispute && dispute.initiatorFullName ? (
-                  <div className="rounded-xl border border-primary/15 bg-primary/[0.04] p-4 sm:p-5">
+                  <div className="rounded-xl border border-primary/15 bg-primary/4 p-4 sm:p-5">
                     <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-primary">
                       <Users className="h-4 w-4" />
                       Parties
@@ -438,6 +553,86 @@ export default function DisputeDetailPage() {
                     </DetailField>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
+              <CardHeader className="space-y-1 border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
+                <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                  <Scale className="h-5 w-5 shrink-0 text-primary" />
+                  Case progress
+                </CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Current stage, deadlines, evidence expectations, and the professional review trail.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+                <div className="grid gap-2 sm:grid-cols-5">
+                  {DISPUTE_STAGE_ORDER.slice(0, 9).map((stage, index) => (
+                    <div
+                      key={stage}
+                      className={`rounded-xl border px-3 py-2 text-xs ${
+                        index <= stageProgress
+                          ? "border-primary/30 bg-primary/6 text-foreground"
+                          : "border-border/50 bg-muted/10 text-muted-foreground"
+                      }`}
+                    >
+                      <p className="font-medium">{disputeStatusLabel(stage)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <DetailField label="Track">
+                    <span className="capitalize">{dispute.track ?? (policy.fastTrackEligible ? "fast track" : "normal")}</span>
+                  </DetailField>
+                  <DetailField label="Current deadline">
+                    {dispute.stageDeadlineAt ? new Date(dispute.stageDeadlineAt).toLocaleString() : "No active deadline"}
+                  </DetailField>
+                  <DetailField label="Policy">
+                    {dispute.policyReasonLabel ?? policy.label}
+                  </DetailField>
+                </div>
+
+                {(dispute.requiredEvidenceChecklist?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Evidence checklist</p>
+                    <div className="grid gap-2">
+                      {(dispute.requiredEvidenceChecklist as RequiredEvidenceChecklistItem[]).map((item) => (
+                        <div key={item.id} className="rounded-lg border border-border/50 bg-muted/10 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium">{item.label}</p>
+                            <Badge variant={item.satisfiedAt ? "default" : "outline"}>
+                              {item.satisfiedAt ? "Submitted" : item.owner === "both" ? "Both parties" : item.owner}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {Array.isArray(dispute.stageEvents) && dispute.stageEvents.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold">Timeline</p>
+                    <div className="space-y-2">
+                      {dispute.stageEvents.slice(-8).reverse().map((event: { _id: string; title: string; description?: string; createdAt: number }) => (
+                        <div key={event._id} className="rounded-lg border border-border/50 bg-background/70 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium">{event.title}</p>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(event.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          {event.description && (
+                            <p className="mt-1 text-xs text-muted-foreground">{event.description}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -576,7 +771,7 @@ export default function DisputeDetailPage() {
                       onKeyDown={handleChatKeyDown}
                       rows={2}
                       disabled={sendingChat}
-                      className="min-h-[2.75rem] max-h-32 flex-1 resize-none rounded-2xl border-border/80 bg-background px-4 py-2.5 text-sm leading-relaxed sm:min-h-10 sm:py-2.5"
+                      className="min-h-11 max-h-32 flex-1 resize-none rounded-2xl border-border/80 bg-background px-4 py-2.5 text-sm leading-relaxed sm:min-h-10 sm:py-2.5"
                     />
                   </div>
                   <Button
@@ -632,7 +827,68 @@ export default function DisputeDetailPage() {
                 )}
               </div>
             </CardHeader>
-            <CardContent className="px-4 py-5 sm:px-6 sm:py-6">
+            <CardContent className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+              {Array.isArray(dispute.structuredEvidence) && dispute.structuredEvidence.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm font-semibold">Structured evidence review</p>
+                  {dispute.structuredEvidence.map((evidence: {
+                    _id: Id<"disputeEvidence">;
+                    title: string;
+                    description?: string;
+                    evidenceType: string;
+                    status: "submitted" | "accepted" | "rejected";
+                    fileUrl?: string | null;
+                    url?: string;
+                  }) => (
+                    <div key={evidence._id} className="rounded-xl border border-border/50 bg-muted/10 p-3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold">{evidence.title}</p>
+                            <Badge variant={evidence.status === "accepted" ? "default" : evidence.status === "rejected" ? "destructive" : "outline"}>
+                              {evidence.status}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-muted-foreground capitalize">
+                            {evidence.evidenceType.replace(/_/g, " ")}
+                          </p>
+                          {evidence.description && (
+                            <p className="mt-2 text-sm text-muted-foreground">{evidence.description}</p>
+                          )}
+                          {(evidence.fileUrl || evidence.url) && (
+                            <a
+                              href={evidence.fileUrl ?? evidence.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
+                            >
+                              Open evidence
+                            </a>
+                          )}
+                        </div>
+                        {isModerator && evidence.status === "submitted" && (
+                          <div className="flex shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleReviewEvidence(evidence._id, "accepted")}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleReviewEvidence(evidence._id, "rejected")}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {dispute.evidence.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/10 py-10 text-center">
                   <FileText className="h-8 w-8 text-muted-foreground/40" />
@@ -737,7 +993,7 @@ export default function DisputeDetailPage() {
         <div className="space-y-6 lg:col-span-4 lg:sticky lg:top-4 lg:self-start">
           {adminContext && (
             <Card className="overflow-hidden rounded-2xl border-primary/25 shadow-sm">
-              <CardHeader className="border-b border-border/50 bg-primary/[0.04] px-4 py-4 sm:px-6 sm:py-5">
+              <CardHeader className="border-b border-border/50 bg-primary/4 px-4 py-4 sm:px-6 sm:py-5">
                 <CardTitle className="text-base font-semibold sm:text-lg">Case overview (staff)</CardTitle>
                 <CardDescription>Hire, parties, and billing context</CardDescription>
               </CardHeader>
@@ -873,19 +1129,45 @@ export default function DisputeDetailPage() {
             </CardContent>
           </Card>
 
+          {(canRequestIntervention || canObject) && (
+            <Card className="overflow-hidden rounded-2xl border-primary/25 shadow-sm">
+              <CardHeader className="border-b border-border/50 bg-primary/4 px-4 py-4 sm:px-6 sm:py-5">
+                <CardTitle className="text-base font-semibold sm:text-lg">Party actions</CardTitle>
+                <CardDescription>Use these only when the current stage requires escalation.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
+                {canRequestIntervention && (
+                  <Button className="w-full" onClick={() => setInterventionDialogOpen(true)}>
+                    Request 49GIG intervention
+                  </Button>
+                )}
+                {canObject && (
+                  <Button variant="outline" className="w-full" onClick={() => setObjectionDialogOpen(true)}>
+                    Object to judgment
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Actions (Moderator/Admin) */}
           {canResolve && (
             <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
               <CardHeader className="border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
                 <CardTitle className="text-base font-semibold sm:text-lg">Moderator actions</CardTitle>
-                <CardDescription>Resolve or escalate this case</CardDescription>
+                <CardDescription>Review evidence, issue judgment, or enforce after objection window</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
                 <Button className="w-full" asChild>
                   <Link href={`/dashboard/disputes/${disputeId}/resolve`}>
-                    Resolve Dispute
+                    Issue judgment
                   </Link>
                 </Button>
+                {canEnforceJudgment && (
+                  <Button variant="secondary" className="w-full" onClick={handleEnforceJudgment}>
+                    Enforce judgment now
+                  </Button>
+                )}
                 {user.role === "moderator" && (
                   <Button variant="outline" className="w-full" asChild>
                     <Link href={`/dashboard/disputes/${disputeId}/escalate`}>
@@ -900,7 +1182,7 @@ export default function DisputeDetailPage() {
           {/* Cancel dispute (initiator only, while open/under_review) */}
           {canCancel && (
             <Card className="overflow-hidden rounded-2xl border-orange-500/30 shadow-sm">
-              <CardHeader className="border-b border-orange-500/15 bg-orange-500/[0.06] px-4 py-4 sm:px-6 sm:py-5">
+              <CardHeader className="border-b border-orange-500/15 bg-orange-500/6 px-4 py-4 sm:px-6 sm:py-5">
                 <CardTitle className="text-base font-semibold">Withdraw dispute</CardTitle>
                 <CardDescription>
                   If you and the other party have resolved the issue, you can cancel this dispute.
@@ -1010,6 +1292,87 @@ export default function DisputeDetailPage() {
               }}
             >
               Assign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={interventionDialogOpen}
+        onOpenChange={(open) => {
+          setInterventionDialogOpen(open);
+          if (!open) setInterventionReason("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request 49GIG intervention</DialogTitle>
+            <DialogDescription>
+              Move this case from direct negotiation into a formal evidence window for platform review.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="intervention-reason">Why should the platform intervene?</Label>
+            <Textarea
+              id="intervention-reason"
+              value={interventionReason}
+              onChange={(e) => setInterventionReason(e.target.value)}
+              rows={4}
+              placeholder="Explain what you tried to resolve directly and what still needs review."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setInterventionDialogOpen(false)}>
+              Not now
+            </Button>
+            <Button
+              onClick={() => void handleRequestIntervention()}
+              disabled={isRequestingIntervention || !interventionReason.trim()}
+            >
+              {isRequestingIntervention ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Request intervention
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={objectionDialogOpen}
+        onOpenChange={(open) => {
+          setObjectionDialogOpen(open);
+          if (!open) setObjectionReason("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Object to judgment</DialogTitle>
+            <DialogDescription>
+              Submit a focused objection if the judgment missed material evidence or contains a clear error.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="objection-reason">Objection reason</Label>
+            <Textarea
+              id="objection-reason"
+              value={objectionReason}
+              onChange={(e) => setObjectionReason(e.target.value)}
+              rows={4}
+              placeholder="State the specific error and refer to the evidence already in the case."
+            />
+            <p className="text-xs text-muted-foreground">
+              Objections are reviewed by staff before a final settlement is enforced.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setObjectionDialogOpen(false)}>
+              Not now
+            </Button>
+            <Button
+              onClick={() => void handleRaiseObjection()}
+              disabled={isObjecting || !objectionReason.trim()}
+            >
+              {isObjecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Submit objection
             </Button>
           </DialogFooter>
         </DialogContent>
