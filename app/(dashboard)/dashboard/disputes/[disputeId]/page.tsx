@@ -24,6 +24,7 @@ import {
   User,
   Users,
   Calendar,
+  Clock,
   Hash,
   Briefcase,
   Scale,
@@ -54,8 +55,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  DISPUTE_STAGE_ORDER,
-  disputeStageIndex,
   disputeStatusLabel,
   getDisputeReasonPolicy,
 } from "@/lib/dispute-flow";
@@ -214,7 +213,39 @@ export default function DisputeDetailPage() {
   const isActiveDispute = activeDisputeStatuses.has(dispute.status);
   const canCancel = dispute.initiatorId === user._id && isActiveDispute;
   const policy = getDisputeReasonPolicy(dispute.type);
-  const stageProgress = disputeStageIndex(dispute.stage ?? dispute.status);
+  const progressSteps = [
+    {
+      label: "Negotiation",
+      description: "Parties try to resolve directly.",
+      statuses: ["open", "negotiation"],
+    },
+    {
+      label: "Evidence",
+      description: "Both sides submit proof.",
+      statuses: ["platform_intervention_requested", "awaiting_party_evidence"],
+    },
+    {
+      label: "Review",
+      description: "49GIG reviews the case file.",
+      statuses: ["under_review", "escalated"],
+    },
+    {
+      label: "Judgment",
+      description: "Decision is issued for objection.",
+      statuses: ["judgment_issued", "objection_window", "appeal_review"],
+    },
+    {
+      label: "Settlement",
+      description: "Funds and hire status are enforced.",
+      statuses: ["enforcing_resolution", "resolved", "closed", "cancelled"],
+    },
+  ];
+  const activeProgressIndex = Math.max(
+    0,
+    progressSteps.findIndex((step) =>
+      step.statuses.includes(dispute.stage ?? dispute.status)
+    )
+  );
 
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -567,31 +598,77 @@ export default function DisputeDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
-                <div className="grid gap-2 sm:grid-cols-5">
-                  {DISPUTE_STAGE_ORDER.slice(0, 9).map((stage, index) => (
-                    <div
-                      key={stage}
-                      className={`rounded-xl border px-3 py-2 text-xs ${
-                        index <= stageProgress
-                          ? "border-primary/30 bg-primary/6 text-foreground"
-                          : "border-border/50 bg-muted/10 text-muted-foreground"
-                      }`}
-                    >
-                      <p className="font-medium">{disputeStatusLabel(stage)}</p>
-                    </div>
-                  ))}
+                <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                    {progressSteps.map((step, index) => {
+                      const isDone = index < activeProgressIndex;
+                      const isActive = index === activeProgressIndex;
+                      return (
+                        <div key={step.label} className="relative flex flex-1 gap-3 md:block">
+                          {index < progressSteps.length - 1 && (
+                            <div
+                              className={`absolute left-4 top-8 h-[calc(100%+1rem)] w-px md:left-[calc(50%+1rem)] md:top-4 md:h-px md:w-[calc(100%-2rem)] ${
+                                isDone ? "bg-primary" : "bg-border"
+                              }`}
+                            />
+                          )}
+                          <div className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-background md:mx-auto">
+                            {isDone ? (
+                              <CheckCircle2 className="h-4 w-4 text-primary" />
+                            ) : isActive ? (
+                              <Clock className="h-4 w-4 text-primary" />
+                            ) : (
+                              <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                            )}
+                          </div>
+                          <div
+                            className={`rounded-xl px-3 pb-1 md:mt-3 md:text-center ${
+                              isActive
+                                ? "bg-primary/6 py-2 ring-1 ring-primary/20"
+                                : "py-1"
+                            }`}
+                          >
+                            <p className="text-sm font-semibold">{step.label}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                              {step.description}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <DetailField label="Track">
-                    <span className="capitalize">{dispute.track ?? (policy.fastTrackEligible ? "fast track" : "normal")}</span>
-                  </DetailField>
-                  <DetailField label="Current deadline">
-                    {dispute.stageDeadlineAt ? new Date(dispute.stageDeadlineAt).toLocaleString() : "No active deadline"}
-                  </DetailField>
-                  <DetailField label="Policy">
-                    {dispute.policyReasonLabel ?? policy.label}
-                  </DetailField>
+                  <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Current stage
+                    </p>
+                    <p className="mt-2 text-sm font-semibold">
+                      {disputeStatusLabel(dispute.stage ?? dispute.status)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Deadline
+                    </p>
+                    <p className="mt-2 text-sm font-semibold">
+                      {dispute.stageDeadlineAt
+                        ? new Date(dispute.stageDeadlineAt).toLocaleString()
+                        : "No active deadline"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Track
+                    </p>
+                    <p className="mt-2 text-sm font-semibold capitalize">
+                      {dispute.track ?? (policy.fastTrackEligible ? "fast track" : "normal")}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {dispute.policyReasonLabel ?? policy.label}
+                    </p>
+                  </div>
                 </div>
 
                 {(dispute.requiredEvidenceChecklist?.length ?? 0) > 0 && (
