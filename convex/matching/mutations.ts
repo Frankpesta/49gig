@@ -4,12 +4,15 @@ import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { clearReplacementFlowFieldsOnProject } from "../projects/replacement";
 import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
+import { getDurationMonths } from "../../lib/project-duration";
+import { budgetRoleKeyForMatchTeamRole } from "../../lib/project-freelancer-earnings";
 import {
   isTeamProject,
   openTeamRoleLabelsForProject,
   projectEligibleForAdminManualMatch,
 } from "../projects/manualMatchEligibility";
 import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
+import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 
 const api = require("../_generated/api") as {
   api: {
@@ -425,6 +428,70 @@ export const respondToMatchAsFreelancer = mutation({
       "mutation",
       "internal"
     >;
+    const continuationCreditCentsForAcceptedMatch = async (): Promise<number> => {
+      if (project.intakeForm.hireType !== "team") {
+        return Math.round(Math.max(0, project.totalAmount) * 100);
+      }
+
+      const months = Math.max(
+        1,
+        getDurationMonths(project.intakeForm.projectDuration)
+      );
+      const budgetKey = budgetRoleKeyForMatchTeamRole(
+        match.teamRole,
+        project.intakeForm.teamSlots
+      );
+      const monthlyNetCents =
+        budgetKey && project.teamBudgetBreakdown
+          ? project.teamBudgetBreakdown[budgetKey]
+          : undefined;
+      if (
+        monthlyNetCents != null &&
+        Number.isFinite(monthlyNetCents) &&
+        monthlyNetCents > 0
+      ) {
+        const feePct = await effectivePlatformFeePercentForProject(
+          ctx,
+          project.platformFee
+        );
+        const netPercent = Math.max(0.0001, 1 - feePct / 100);
+        return Math.round((monthlyNetCents * months) / netPercent);
+      }
+
+      const teamSize = Math.max(
+        1,
+        project.intakeForm.teamMemberCount ??
+          project.intakeForm.teamSlots?.length ??
+          project.matchedFreelancerIds?.length ??
+          1
+      );
+      return Math.round((Math.max(0, project.totalAmount) * 100) / teamSize);
+    };
+    const applyContinuationCreditIfNeeded = async () => {
+      if (!project.replacementMatchingAt && !project.replacementFlowDisputeId) {
+        return { totalAppliedCents: 0 };
+      }
+      const amountCents = await continuationCreditCentsForAcceptedMatch();
+      return await ctx.runMutation(clearPendingRefundsForProject, {
+        userId: project.clientId,
+        projectId: match.projectId,
+        amountCents,
+      });
+    };
+    const notifyContinuationCreditApplied = async (totalAppliedCents?: number) => {
+      if (!totalAppliedCents || totalAppliedCents <= 0) return;
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: [project.clientId],
+        title: "Continuation credit applied",
+        message: `Your dispute refund for "${project.intakeForm.title}" has been applied to continue with your new freelancer.`,
+        type: "payment",
+        data: {
+          projectId: match.projectId,
+          continuationCreditApplied: true,
+          amountCents: totalAppliedCents,
+        },
+      });
+    };
 
     if (args.response === "accepted") {
       await ctx.db.patch(args.matchId, {
@@ -468,6 +535,7 @@ export const respondToMatchAsFreelancer = mutation({
                 : undefined,
             updatedAt: now,
           } as any);
+          const continuationCredit = await applyContinuationCreditIfNeeded();
 
           await ctx.db.insert("auditLogs", {
             action: "match_freelancer_accepted",
@@ -489,6 +557,9 @@ export const respondToMatchAsFreelancer = mutation({
             type: "match",
             data: { matchId: args.matchId, projectId: match.projectId },
           });
+          await notifyContinuationCreditApplied(
+            (continuationCredit as { totalAppliedCents?: number }).totalAppliedCents
+          );
 
           return {
             success: true,
@@ -506,6 +577,7 @@ export const respondToMatchAsFreelancer = mutation({
                 : undefined,
             updatedAt: now,
           } as any);
+          const continuationCredit = await applyContinuationCreditIfNeeded();
 
           await ctx.db.insert("auditLogs", {
             action: "match_freelancer_accepted",
@@ -525,6 +597,9 @@ export const respondToMatchAsFreelancer = mutation({
             type: "match",
             data: { matchId: args.matchId, projectId: match.projectId },
           });
+          await notifyContinuationCreditApplied(
+            (continuationCredit as { totalAppliedCents?: number }).totalAppliedCents
+          );
 
           return {
             success: true,
@@ -544,10 +619,7 @@ export const respondToMatchAsFreelancer = mutation({
         };
         clearReplacementFlowFieldsOnProject(teamFinalPatch);
         await ctx.db.patch(match.projectId, teamFinalPatch as any);
-        await ctx.runMutation(clearPendingRefundsForProject, {
-          userId: project.clientId,
-          projectId: match.projectId,
-        });
+        const continuationCredit = await applyContinuationCreditIfNeeded();
 
         for (const m of allProjectMatches) {
           if (m._id === args.matchId) continue;
@@ -574,13 +646,9 @@ export const respondToMatchAsFreelancer = mutation({
           type: "match",
           data: { matchId: args.matchId, projectId: match.projectId },
         });
-        await ctx.scheduler.runAfter(0, sendSystemNotification, {
-          userIds: [project.clientId],
-          title: "Continuation credit applied",
-          message: `Your pending dispute refund hold for "${project.intakeForm.title}" has been applied to continuation with your new freelancer.`,
-          type: "payment",
-          data: { projectId: match.projectId, continuationCreditApplied: true },
-        });
+        await notifyContinuationCreditApplied(
+          (continuationCredit as { totalAppliedCents?: number }).totalAppliedCents
+        );
 
         await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendMatchSuccessEmails, {
           projectId: match.projectId,
@@ -596,10 +664,7 @@ export const respondToMatchAsFreelancer = mutation({
         };
         clearReplacementFlowFieldsOnProject(projectPatch);
         await ctx.db.patch(match.projectId, projectPatch as any);
-        await ctx.runMutation(clearPendingRefundsForProject, {
-          userId: project.clientId,
-          projectId: match.projectId,
-        });
+        const continuationCredit = await applyContinuationCreditIfNeeded();
 
         const others = await ctx.db
           .query("matches")
@@ -630,13 +695,9 @@ export const respondToMatchAsFreelancer = mutation({
           type: "match",
           data: { matchId: args.matchId, projectId: match.projectId },
         });
-        await ctx.scheduler.runAfter(0, sendSystemNotification, {
-          userIds: [project.clientId],
-          title: "Continuation credit applied",
-          message: `Your pending dispute refund hold for "${project.intakeForm.title}" has been applied to continuation with your new freelancer.`,
-          type: "payment",
-          data: { projectId: match.projectId, continuationCreditApplied: true },
-        });
+        await notifyContinuationCreditApplied(
+          (continuationCredit as { totalAppliedCents?: number }).totalAppliedCents
+        );
 
         await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendMatchSuccessEmails, {
           projectId: match.projectId,
