@@ -24,6 +24,7 @@ import { useState, useEffect, useRef } from "react";
 import { ChatEvidenceSelector } from "@/components/disputes/chat-evidence-selector";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { DISPUTE_REASON_POLICIES, getDisputeReasonPolicy } from "@/lib/dispute-flow";
 
 export default function NewDisputePage() {
   const router = useRouter();
@@ -63,6 +64,10 @@ export default function NewDisputePage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [disputeClockMs, setDisputeClockMs] = useState(() => Date.now());
+  const selectedPolicy = formData.type ? getDisputeReasonPolicy(formData.type) : null;
+  const availableReasonPolicies = DISPUTE_REASON_POLICIES.filter(
+    (policy) => policy.openedBy === user?.role || policy.openedBy === "both"
+  );
   useEffect(() => {
     const id = window.setInterval(() => setDisputeClockMs(Date.now()), 60_000);
     return () => window.clearInterval(id);
@@ -256,18 +261,18 @@ export default function NewDisputePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Initiate Dispute</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Open an Appeal</h1>
           <p className="text-muted-foreground mt-1">
-            File a dispute for a project
+            Start with direct negotiation, then move to 49GIG review if both parties cannot agree.
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Dispute Details</CardTitle>
+          <CardTitle>Guided Dispute Intake</CardTitle>
           <CardDescription>
-            Provide details about the issue you're disputing
+            Follow the same structure every professional case needs: scope, reason, evidence, and requested intervention.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -278,6 +283,22 @@ export default function NewDisputePage() {
                 <span>{error}</span>
               </div>
             )}
+
+            <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 text-sm sm:grid-cols-4">
+              {[
+                ["1", "Select hire"],
+                ["2", "Choose reason"],
+                ["3", "Attach evidence"],
+                ["4", "Negotiation opens"],
+              ].map(([step, label]) => (
+                <div key={step} className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                    {step}
+                  </span>
+                  <span className="font-medium">{label}</span>
+                </div>
+              ))}
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="project">Project *</Label>
@@ -412,7 +433,11 @@ export default function NewDisputePage() {
               <Select
                 value={formData.type}
                 onValueChange={(value) =>
-                  setFormData({ ...formData, type: value as any })
+                  setFormData({
+                    ...formData,
+                    type: value as any,
+                    reason: getDisputeReasonPolicy(value).label,
+                  })
                 }
                 required
               >
@@ -420,47 +445,23 @@ export default function NewDisputePage() {
                   <SelectValue placeholder="Select dispute type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {user.role === "client" ? (
-                    <>
-                      <SelectItem value="client_deliverable_quality">
-                        Deliverable quality or work not meeting agreement
-                      </SelectItem>
-                      <SelectItem value="client_timeline_scope">
-                        Timeline delays or scope issues
-                      </SelectItem>
-                      <SelectItem value="client_payment_billing">
-                        Payment, invoice, or billing dispute
-                      </SelectItem>
-                      <SelectItem value="client_communication_conduct">
-                        Communication or professional conduct
-                      </SelectItem>
-                      <SelectItem value="client_request_replacement">
-                        Request a different freelancer / team member
-                      </SelectItem>
-                    </>
-                  ) : (
-                    <>
-                      <SelectItem value="freelancer_payment_issue">
-                        Late or missing payment from client
-                      </SelectItem>
-                      <SelectItem value="freelancer_scope_requirements">
-                        Scope creep or unclear requirements
-                      </SelectItem>
-                      <SelectItem value="freelancer_communication">
-                        Client communication issues
-                      </SelectItem>
-                      <SelectItem value="freelancer_platform_policy">
-                        Platform, contract, or policy concern
-                      </SelectItem>
-                      <SelectItem value="milestone_quality">
-                        Deliverable / quality (legacy category)
-                      </SelectItem>
-                      <SelectItem value="payment">Payment (legacy)</SelectItem>
-                      <SelectItem value="communication">Communication (legacy)</SelectItem>
-                    </>
-                  )}
+                  {availableReasonPolicies.map((policy) => (
+                    <SelectItem key={policy.id} value={policy.id}>
+                      {policy.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {selectedPolicy && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">{selectedPolicy.summary}</p>
+                  <p className="mt-1">
+                    Timeline: {selectedPolicy.negotiationHours}h negotiation,{" "}
+                    {selectedPolicy.evidenceHours}h evidence window,{" "}
+                    {selectedPolicy.objectionHours}h objection window.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -487,6 +488,30 @@ export default function NewDisputePage() {
                 required
               />
             </div>
+
+            {selectedPolicy && (
+              <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-4">
+                <div>
+                  <Label>Required evidence checklist</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Submit as much of this proof as possible now. Missing items can be added during the evidence window.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {selectedPolicy.requiredEvidence.map((item) => (
+                    <div key={item.id} className="rounded-lg border border-border/50 bg-background/70 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">{item.label}</span>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {item.owner === "both" ? "Both parties" : item.owner}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {formData.projectId && project && user?._id && (
               <div className="space-y-2">

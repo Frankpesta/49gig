@@ -23,6 +23,7 @@ import {
   getDisputeRecipientFreelancerIds,
   viewerIsDisputeParty,
 } from "./partyAccess";
+import { getDisputeReasonPolicy } from "../../lib/dispute-flow";
 
 const api = require("../_generated/api") as {
   api: {
@@ -42,6 +43,114 @@ const internalAny = require("../_generated/api").internal as {
   };
 };
 const internalApi = require("../_generated/api").internal as any;
+
+const ACTIVE_DISPUTE_STATUSES = new Set<string>([
+  "open",
+  "negotiation",
+  "platform_intervention_requested",
+  "awaiting_party_evidence",
+  "under_review",
+  "judgment_issued",
+  "objection_window",
+  "appeal_review",
+  "enforcing_resolution",
+  "escalated",
+]);
+
+function disputeIsActive(status: string) {
+  return ACTIVE_DISPUTE_STATUSES.has(status);
+}
+
+function deadlineFromHours(now: number, hours: number) {
+  return now + Math.max(1, hours) * 60 * 60 * 1000;
+}
+
+async function recordDisputeStageEvent(
+  ctx: MutationCtx,
+  args: {
+    disputeId: Id<"disputes">;
+    projectId: Id<"projects">;
+    actorId?: Id<"users">;
+    actorRole: "client" | "freelancer" | "moderator" | "admin" | "system";
+    eventType: string;
+    fromStatus?: string;
+    toStatus?: string;
+    title: string;
+    description?: string;
+    metadata?: unknown;
+    createdAt: number;
+  }
+) {
+  await ctx.db.insert("disputeStageEvents", {
+    disputeId: args.disputeId,
+    projectId: args.projectId,
+    actorId: args.actorId,
+    actorRole: args.actorRole,
+    eventType: args.eventType,
+    fromStatus: args.fromStatus,
+    toStatus: args.toStatus,
+    title: args.title,
+    description: args.description,
+    metadata: args.metadata,
+    createdAt: args.createdAt,
+  });
+}
+
+async function transitionDisputeStage(
+  ctx: MutationCtx,
+  args: {
+    dispute: Doc<"disputes">;
+    actor?: Doc<"users">;
+    toStatus:
+      | "negotiation"
+      | "platform_intervention_requested"
+      | "awaiting_party_evidence"
+      | "under_review"
+      | "judgment_issued"
+      | "objection_window"
+      | "appeal_review"
+      | "enforcing_resolution"
+      | "resolved"
+      | "closed"
+      | "cancelled";
+    title: string;
+    description?: string;
+    stageDeadlineAt?: number;
+    extraPatch?: Record<string, unknown>;
+    metadata?: unknown;
+  }
+) {
+  const now = Date.now();
+  const actorRole =
+    args.actor?.role === "admin" || args.actor?.role === "moderator"
+      ? args.actor.role
+      : args.actor?.role === "freelancer"
+        ? "freelancer"
+        : args.actor?.role === "client"
+          ? "client"
+          : "system";
+  await ctx.db.patch(args.dispute._id, {
+    status: args.toStatus,
+    stage: args.toStatus === "cancelled" ? args.dispute.stage : args.toStatus,
+    stageStartedAt: now,
+    stageDeadlineAt: args.stageDeadlineAt,
+    updatedAt: now,
+    ...(args.extraPatch ?? {}),
+  });
+  await recordDisputeStageEvent(ctx, {
+    disputeId: args.dispute._id,
+    projectId: args.dispute.projectId,
+    actorId: args.actor?._id,
+    actorRole,
+    eventType: `dispute_${args.toStatus}`,
+    fromStatus: args.dispute.status,
+    toStatus: args.toStatus,
+    title: args.title,
+    description: args.description,
+    metadata: args.metadata,
+    createdAt: now,
+  });
+}
 
 /** Role labels for disputed members (accepted match rows only), before sweep rejects them. */
 async function teamRoleLabelsForDisputedFreelancers(
@@ -335,7 +444,15 @@ export const initiateDispute = mutation({
       .filter((q) =>
         q.or(
           q.eq(q.field("status"), "open"),
-          q.eq(q.field("status"), "under_review")
+          q.eq(q.field("status"), "negotiation"),
+          q.eq(q.field("status"), "platform_intervention_requested"),
+          q.eq(q.field("status"), "awaiting_party_evidence"),
+          q.eq(q.field("status"), "under_review"),
+          q.eq(q.field("status"), "judgment_issued"),
+          q.eq(q.field("status"), "objection_window"),
+          q.eq(q.field("status"), "appeal_review"),
+          q.eq(q.field("status"), "enforcing_resolution"),
+          q.eq(q.field("status"), "escalated")
         )
       )
       .collect();
@@ -439,6 +556,12 @@ export const initiateDispute = mutation({
     }
     lockedAmount = Math.min(lockedAmount, fullEscrowClientGross);
 
+    const now = Date.now();
+    const policy = getDisputeReasonPolicy(args.type);
+    const negotiationDeadlineAt = deadlineFromHours(now, policy.negotiationHours);
+    const evidenceDeadlineAt = deadlineFromHours(now, policy.evidenceHours);
+    const track = policy.fastTrackEligible ? "fast_track" : "normal";
+
     // Create dispute
     const disputeId = await ctx.db.insert("disputes", {
       projectId,
@@ -450,7 +573,21 @@ export const initiateDispute = mutation({
       reason: args.reason,
       description: args.description,
       evidence: args.evidence || [],
-      status: "open",
+      status: "negotiation",
+      track,
+      stage: "negotiation",
+      stageStartedAt: now,
+      stageDeadlineAt: negotiationDeadlineAt,
+      negotiationDeadlineAt,
+      evidenceDeadlineAt,
+      fastTrackEligible: policy.fastTrackEligible,
+      policyReasonLabel: policy.label,
+      requiredEvidenceChecklist: policy.requiredEvidence.map((item) => ({
+        id: item.id,
+        owner: item.owner,
+        label: item.label,
+        description: item.description,
+      })),
       lockedAmount,
       disputedFreelancerIds:
         disputedIdsUnique && disputedIdsUnique.length > 0
@@ -458,9 +595,50 @@ export const initiateDispute = mutation({
           : undefined,
       teamEscrowBasisFreelancerIds:
         teamMemberIds.length > 0 ? [...teamMemberIds] : undefined,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     });
+
+    await recordDisputeStageEvent(ctx, {
+      disputeId,
+      projectId,
+      actorId: user._id,
+      actorRole: user.role === "client" ? "client" : "freelancer",
+      eventType: "dispute_opened",
+      toStatus: "negotiation",
+      title: "Dispute opened",
+      description:
+        "The case is in the direct negotiation window. Either party can request platform intervention when negotiation fails.",
+      metadata: {
+        reasonType: args.type,
+        reasonLabel: policy.label,
+        track,
+        requiredEvidence: policy.requiredEvidence.map((item) => item.id),
+      },
+      createdAt: now,
+    });
+
+    for (const evidence of args.evidence ?? []) {
+      await ctx.db.insert("disputeEvidence", {
+        disputeId,
+        projectId,
+        submittedBy: user._id,
+        submittedByRole: user.role === "client" ? "client" : "freelancer",
+        title: evidence.description?.trim() || "Initial evidence",
+        description: evidence.description,
+        evidenceType:
+          evidence.type === "file"
+            ? "file"
+            : evidence.type === "message"
+              ? "message"
+              : "deliverable",
+        messageId: evidence.messageId,
+        fileId: evidence.fileId,
+        status: "submitted",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
 
     if (monthlyCycleId) {
       await ctx.db.patch(monthlyCycleId, {
@@ -675,15 +853,55 @@ export const addEvidence = mutation({
 
     assertDisputeThreadAccess(user, project, dispute);
 
-    // Check if dispute is still open
-    if (dispute.status !== "open" && dispute.status !== "under_review") {
+    // Check if dispute is still active
+    if (!disputeIsActive(dispute.status)) {
       throw new Error("Cannot add evidence to closed dispute");
     }
 
     // Add evidence
+    const now = Date.now();
     await ctx.db.patch(args.disputeId, {
       evidence: [...dispute.evidence, args.evidence],
-      updatedAt: Date.now(),
+      updatedAt: now,
+    });
+    await ctx.db.insert("disputeEvidence", {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      submittedBy: user._id,
+      submittedByRole:
+        user.role === "admin" || user.role === "moderator"
+          ? user.role
+          : user.role === "freelancer"
+            ? "freelancer"
+            : "client",
+      title: args.evidence.description?.trim() || "Additional evidence",
+      description: args.evidence.description,
+      evidenceType:
+        args.evidence.type === "file"
+          ? "file"
+          : args.evidence.type === "message"
+            ? "message"
+            : "deliverable",
+      messageId: args.evidence.messageId,
+      fileId: args.evidence.fileId,
+      status: "submitted",
+      createdAt: now,
+      updatedAt: now,
+    });
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      actorRole:
+        user.role === "admin" || user.role === "moderator"
+          ? user.role
+          : user.role === "freelancer"
+            ? "freelancer"
+            : "client",
+      eventType: "dispute_evidence_submitted",
+      title: "Evidence submitted",
+      description: args.evidence.description,
+      createdAt: now,
     });
 
     // Create audit log
@@ -697,7 +915,422 @@ export const addEvidence = mutation({
       details: {
         evidenceType: args.evidence.type,
       },
-      createdAt: Date.now(),
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+export const submitStructuredEvidence = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    checklistItemId: v.optional(v.string()),
+    title: v.string(),
+    description: v.optional(v.string()),
+    evidenceType: v.union(
+      v.literal("message"),
+      v.literal("file"),
+      v.literal("link"),
+      v.literal("deliverable"),
+      v.literal("payment_record"),
+      v.literal("other")
+    ),
+    messageId: v.optional(v.id("messages")),
+    fileId: v.optional(v.id("_storage")),
+    url: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (!disputeIsActive(dispute.status)) {
+      throw new Error("Cannot submit evidence to a closed dispute.");
+    }
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) throw new Error("Project not found");
+    assertDisputeThreadAccess(user, project, dispute);
+
+    const title = args.title.trim();
+    if (!title) throw new Error("Evidence title is required.");
+    if (args.evidenceType === "file" && !args.fileId) {
+      throw new Error("A file is required for file evidence.");
+    }
+    if (args.evidenceType === "link" && !args.url?.trim()) {
+      throw new Error("A URL is required for link evidence.");
+    }
+
+    const now = Date.now();
+    const evidenceId = await ctx.db.insert("disputeEvidence", {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      submittedBy: user._id,
+      submittedByRole:
+        user.role === "admin" || user.role === "moderator"
+          ? user.role
+          : user.role === "freelancer"
+            ? "freelancer"
+            : "client",
+      checklistItemId: args.checklistItemId,
+      title,
+      description: args.description,
+      evidenceType: args.evidenceType,
+      messageId: args.messageId,
+      fileId: args.fileId,
+      url: args.url?.trim(),
+      status: "submitted",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (args.checklistItemId && dispute.requiredEvidenceChecklist) {
+      await ctx.db.patch(args.disputeId, {
+        requiredEvidenceChecklist: dispute.requiredEvidenceChecklist.map((item) =>
+          item.id === args.checklistItemId && !item.satisfiedAt
+            ? { ...item, satisfiedAt: now }
+            : item
+        ),
+        updatedAt: now,
+      });
+    }
+
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      actorRole:
+        user.role === "admin" || user.role === "moderator"
+          ? user.role
+          : user.role === "freelancer"
+            ? "freelancer"
+            : "client",
+      eventType: "dispute_structured_evidence_submitted",
+      title: "Evidence submitted",
+      description: title,
+      metadata: { evidenceId, checklistItemId: args.checklistItemId },
+      createdAt: now,
+    });
+
+    return { success: true, evidenceId };
+  },
+});
+
+export const requestPlatformIntervention = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    reason: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (!disputeIsActive(dispute.status)) throw new Error("This dispute is closed.");
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) throw new Error("Project not found");
+    assertDisputeThreadAccess(user, project, dispute);
+
+    const now = Date.now();
+    const policy = getDisputeReasonPolicy(dispute.type);
+    await transitionDisputeStage(ctx, {
+      dispute,
+      actor: user,
+      toStatus: "awaiting_party_evidence",
+      title: "Platform intervention requested",
+      description:
+        args.reason.trim() ||
+        "A party requested platform intervention because direct negotiation did not resolve the case.",
+      stageDeadlineAt: deadlineFromHours(now, policy.evidenceHours),
+      extraPatch: {
+        platformInterventionRequestedAt: now,
+        platformInterventionRequestedBy: user._id,
+        evidenceDeadlineAt: deadlineFromHours(now, policy.evidenceHours),
+      },
+    });
+
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    const recipientIds = getDisputePartyUserIds(project, dispute).filter(
+      (id) => String(id) !== String(user._id)
+    );
+    if (recipientIds.length > 0) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: recipientIds,
+        title: "Platform intervention requested",
+        message: `A party requested 49GIG review for ${project.intakeForm.title}. Please submit evidence before the deadline.`,
+        type: "dispute",
+        data: { disputeId: args.disputeId, projectId: dispute.projectId },
+      });
+      await (
+        ctx.scheduler.runAfter as (
+          delayMs: number,
+          fn: unknown,
+          fnArgs: Record<string, unknown>
+        ) => Promise<unknown>
+      )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+        userIds: recipientIds,
+        subject: `[49GIG] Platform intervention requested: ${project.intakeForm.title ?? "Hire"}`,
+        headline: "Platform intervention requested",
+        bodyText: `A party requested 49GIG intervention on "${project.intakeForm.title}". Please submit evidence before the deadline so staff can review the case fairly.`,
+        disputeId: args.disputeId,
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+export const reviewDisputeEvidence = mutation({
+  args: {
+    evidenceId: v.id("disputeEvidence"),
+    status: v.union(v.literal("accepted"), v.literal("rejected")),
+    reviewNotes: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    if (user.role !== "admin" && user.role !== "moderator") {
+      throw new Error("Only staff can review dispute evidence.");
+    }
+
+    const evidence = await ctx.db.get(args.evidenceId);
+    if (!evidence) throw new Error("Evidence not found");
+    const now = Date.now();
+    await ctx.db.patch(args.evidenceId, {
+      status: args.status,
+      reviewNotes: args.reviewNotes,
+      reviewedBy: user._id,
+      reviewedAt: now,
+      updatedAt: now,
+    });
+    await recordDisputeStageEvent(ctx, {
+      disputeId: evidence.disputeId,
+      projectId: evidence.projectId,
+      actorId: user._id,
+      actorRole: user.role,
+      eventType: "dispute_evidence_reviewed",
+      title: `Evidence ${args.status}`,
+      description: evidence.title,
+      metadata: { evidenceId: args.evidenceId, reviewNotes: args.reviewNotes },
+      createdAt: now,
+    });
+    return { success: true };
+  },
+});
+
+export const issueDisputeJudgment = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    decision: v.union(
+      v.literal("client_favor"),
+      v.literal("freelancer_favor"),
+      v.literal("partial"),
+      v.literal("replacement")
+    ),
+    resolutionAmount: v.optional(v.number()),
+    notes: v.string(),
+    clientMessage: v.optional(v.string()),
+    freelancerMessage: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    if (user.role !== "admin" && user.role !== "moderator") {
+      throw new Error("Only staff can issue a dispute judgment.");
+    }
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (!disputeIsActive(dispute.status)) {
+      throw new Error("Cannot issue judgment for a closed dispute.");
+    }
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) throw new Error("Project not found");
+
+    const policy = getDisputeReasonPolicy(dispute.type);
+    if (!policy.outcomes.includes(args.decision)) {
+      throw new Error("This outcome is not allowed for the selected dispute reason.");
+    }
+
+    const notes = args.notes.trim();
+    if (!notes) throw new Error("Judgment notes are required.");
+
+    const scopeCents = await disputeNetScopeCents(ctx, project, dispute);
+    let resolutionAmount = args.resolutionAmount;
+    if (args.decision === "partial") {
+      if (typeof resolutionAmount !== "number") {
+        throw new Error("Partial judgments require a client refund amount in cents.");
+      }
+      assertNonNegativeIntegerCents(resolutionAmount, "resolutionAmount");
+      if (resolutionAmount > scopeCents) {
+        throw new Error("Resolution amount cannot exceed the disputed escrow scope.");
+      }
+    } else if (resolutionAmount !== undefined) {
+      assertNonNegativeIntegerCents(resolutionAmount, "resolutionAmount");
+    }
+
+    const now = Date.now();
+    const objectionWindowEndsAt = deadlineFromHours(now, policy.objectionHours);
+    await transitionDisputeStage(ctx, {
+      dispute,
+      actor: user,
+      toStatus: "objection_window",
+      title: "Judgment issued",
+      description: notes,
+      stageDeadlineAt: objectionWindowEndsAt,
+      extraPatch: {
+        judgmentIssuedAt: now,
+        objectionWindowEndsAt,
+        resolution: {
+          decision: args.decision,
+          resolutionAmount,
+          notes,
+          clientMessage: args.clientMessage,
+          freelancerMessage: args.freelancerMessage,
+          resolvedBy: user._id,
+          resolvedAt: now,
+        },
+      },
+      metadata: {
+        decision: args.decision,
+        resolutionAmount,
+        objectionWindowEndsAt,
+      },
+    });
+
+    const recipients = getDisputePartyUserIds(project, dispute);
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    if (recipients.length > 0) {
+      await ctx.scheduler.runAfter(0, sendSystemNotification, {
+        userIds: recipients,
+        title: "Dispute judgment issued",
+        message: `49GIG has issued a judgment for ${project.intakeForm.title}. You can object before the window closes.`,
+        type: "dispute",
+        data: { disputeId: args.disputeId, projectId: dispute.projectId },
+      });
+      await (
+        ctx.scheduler.runAfter as (
+          delayMs: number,
+          fn: unknown,
+          fnArgs: Record<string, unknown>
+        ) => Promise<unknown>
+      )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+        userIds: recipients,
+        subject: `[49GIG] Dispute judgment issued: ${project.intakeForm.title ?? "Hire"}`,
+        headline: "Dispute judgment issued",
+        bodyText: `49GIG has issued a judgment for "${project.intakeForm.title}". Review the decision in your dashboard. If there is a material error, submit an objection before the window closes.`,
+        disputeId: args.disputeId,
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+export const raiseDisputeObjection = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    reason: v.string(),
+    evidenceIds: v.optional(v.array(v.id("_storage"))),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (dispute.status !== "objection_window") {
+      throw new Error("Objections can only be raised during the objection window.");
+    }
+    if (dispute.objectionWindowEndsAt && Date.now() > dispute.objectionWindowEndsAt) {
+      throw new Error("The objection window has closed.");
+    }
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) throw new Error("Project not found");
+    assertDisputeThreadAccess(user, project, dispute);
+
+    const reason = args.reason.trim();
+    if (!reason) throw new Error("Objection reason is required.");
+
+    const now = Date.now();
+    await transitionDisputeStage(ctx, {
+      dispute,
+      actor: user,
+      toStatus: "appeal_review",
+      title: "Objection raised",
+      description: reason,
+      extraPatch: {
+        appealWindowEndsAt: deadlineFromHours(now, 24),
+        objection: {
+          raisedBy: user._id,
+          raisedAt: now,
+          reason,
+          evidenceIds: args.evidenceIds,
+          status: "pending",
+        },
+      },
+    });
+
+    return { success: true };
+  },
+});
+
+export const enforceDisputeJudgment = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    notes: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    if (user.role !== "admin" && user.role !== "moderator") {
+      throw new Error("Only staff can enforce a dispute judgment.");
+    }
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (!dispute.resolution) throw new Error("No judgment has been issued.");
+    if (dispute.status === "resolved" || dispute.status === "closed") {
+      throw new Error("This dispute is already closed.");
+    }
+
+    const now = Date.now();
+    await transitionDisputeStage(ctx, {
+      dispute,
+      actor: user,
+      toStatus: "resolved",
+      title: "Judgment enforced",
+      description: args.notes,
+      extraPatch: {
+        resolvedAt: now,
+        enforcedAt: now,
+        stageDeadlineAt: undefined,
+      },
+    });
+
+    const releaseDisputeFunds =
+      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
+    await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
+      disputeId: args.disputeId,
     });
 
     return { success: true };
@@ -740,11 +1373,27 @@ export const assignModerator = mutation({
     }
 
     // Assign moderator
+    const now = Date.now();
     await ctx.db.patch(args.disputeId, {
       assignedModeratorId: args.moderatorId,
-      assignedAt: Date.now(),
+      assignedAt: now,
       status: "under_review",
-      updatedAt: Date.now(),
+      stage: "under_review",
+      stageStartedAt: now,
+      stageDeadlineAt: undefined,
+      updatedAt: now,
+    });
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      actorRole: user.role,
+      eventType: "dispute_assigned",
+      fromStatus: dispute.status,
+      toStatus: "under_review",
+      title: "Case assigned for platform review",
+      description: `Assigned to ${assignee.name ?? "a moderator"}.`,
+      createdAt: now,
     });
 
     const sendSystemNotification =
@@ -765,7 +1414,7 @@ export const assignModerator = mutation({
         moderatorId: args.moderatorId,
         assigneeRole: assignee.role,
       },
-      createdAt: Date.now(),
+      createdAt: now,
     });
 
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
@@ -890,6 +1539,9 @@ export const resolveDispute = mutation({
     // Update dispute
     await ctx.db.patch(args.disputeId, {
       status: "resolved",
+      stage: "resolved",
+      stageStartedAt: now,
+      stageDeadlineAt: undefined,
       resolution: {
         decision: args.decision,
         resolutionAmount: resolutionAmountCents,
@@ -900,7 +1552,21 @@ export const resolveDispute = mutation({
         resolvedAt: now,
       },
       resolvedAt: now,
+      enforcedAt: now,
       updatedAt: now,
+    });
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      actorRole: user.role,
+      eventType: "dispute_resolved",
+      fromStatus: dispute.status,
+      toStatus: "resolved",
+      title: "Dispute resolved",
+      description: args.notes,
+      metadata: { decision: args.decision, resolutionAmount: resolutionAmountCents },
+      createdAt: now,
     });
 
     // Update project status
@@ -1212,6 +1878,9 @@ export const resolveDisputeInternal = internalMutation({
 
     await ctx.db.patch(args.disputeId, {
       status: "resolved",
+      stage: "resolved",
+      stageStartedAt: now,
+      stageDeadlineAt: undefined,
       resolution: {
         decision: args.decision,
         resolutionAmount: resolutionAmountCents,
@@ -1219,7 +1888,20 @@ export const resolveDisputeInternal = internalMutation({
         resolvedAt: now,
       },
       resolvedAt: now,
+      enforcedAt: now,
       updatedAt: now,
+    });
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorRole: "system",
+      eventType: "dispute_resolved",
+      fromStatus: dispute.status,
+      toStatus: "resolved",
+      title: "Dispute resolved automatically",
+      description: args.notes,
+      metadata: { decision: args.decision, resolutionAmount: resolutionAmountCents },
+      createdAt: now,
     });
 
     const isPartialTeamClientFavorInternal =
@@ -1481,6 +2163,220 @@ export const resolveDisputeInternal = internalMutation({
   },
 });
 
+export const processDisputeDeadlineInternal = internalMutation({
+  args: {
+    disputeId: v.id("disputes"),
+    now: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute || !disputeIsActive(dispute.status)) {
+      return { processed: false as const };
+    }
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) return { processed: false as const };
+
+    if (dispute.status === "negotiation") {
+      const deadline = dispute.negotiationDeadlineAt ?? dispute.stageDeadlineAt;
+      if (!deadline || deadline > args.now) return { processed: false as const };
+      const policy = getDisputeReasonPolicy(dispute.type);
+      const sendSystemNotification =
+        api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+          "action",
+          "internal"
+        >;
+      await transitionDisputeStage(ctx, {
+        dispute,
+        toStatus: "awaiting_party_evidence",
+        title: "Negotiation window ended",
+        description:
+          "The case moved to the evidence stage because the direct negotiation window expired.",
+        stageDeadlineAt: deadlineFromHours(args.now, policy.evidenceHours),
+        extraPatch: {
+          evidenceDeadlineAt: deadlineFromHours(args.now, policy.evidenceHours),
+          nonCooperationFlags: [
+            ...(dispute.nonCooperationFlags ?? []),
+            "negotiation_deadline_expired",
+          ],
+        },
+      });
+      const recipients = getDisputePartyUserIds(project, dispute);
+      if (recipients.length > 0) {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: recipients,
+          title: "Dispute evidence window opened",
+          message: `Negotiation ended for ${project.intakeForm.title}. Please submit evidence before the review deadline.`,
+          type: "dispute",
+          data: { disputeId: args.disputeId, projectId: dispute.projectId },
+        });
+      }
+      return { processed: true as const, status: "awaiting_party_evidence" as const };
+    }
+
+    if (dispute.status === "awaiting_party_evidence") {
+      const deadline = dispute.evidenceDeadlineAt ?? dispute.stageDeadlineAt;
+      if (!deadline || deadline > args.now) return { processed: false as const };
+      const sendSystemNotification =
+        api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+          "action",
+          "internal"
+        >;
+      await transitionDisputeStage(ctx, {
+        dispute,
+        toStatus: "under_review",
+        title: "Evidence window closed",
+        description: "The evidence window ended and the case is now ready for staff review.",
+        extraPatch: {
+          nonCooperationFlags: [
+            ...(dispute.nonCooperationFlags ?? []),
+            "evidence_deadline_expired",
+          ],
+        },
+      });
+      const recipients = getDisputePartyUserIds(project, dispute);
+      if (recipients.length > 0) {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: recipients,
+          title: "Dispute evidence window closed",
+          message: `The evidence window closed for ${project.intakeForm.title}. 49GIG staff will review the case.`,
+          type: "dispute",
+          data: { disputeId: args.disputeId, projectId: dispute.projectId },
+        });
+      }
+      return { processed: true as const, status: "under_review" as const };
+    }
+
+    if (dispute.status === "objection_window") {
+      const deadline = dispute.objectionWindowEndsAt ?? dispute.stageDeadlineAt;
+      if (!deadline || deadline > args.now) return { processed: false as const };
+      if (!dispute.resolution) return { processed: false as const };
+
+      await ctx.db.patch(args.disputeId, {
+        status: "resolved",
+        stage: "resolved",
+        stageStartedAt: args.now,
+        stageDeadlineAt: undefined,
+        resolvedAt: args.now,
+        enforcedAt: args.now,
+        updatedAt: args.now,
+      });
+      await recordDisputeStageEvent(ctx, {
+        disputeId: args.disputeId,
+        projectId: dispute.projectId,
+        actorRole: "system",
+        eventType: "dispute_judgment_auto_enforced",
+        fromStatus: dispute.status,
+        toStatus: "resolved",
+        title: "Judgment automatically enforced",
+        description: "The objection window closed with no accepted objection.",
+        createdAt: args.now,
+      });
+
+      const releaseDisputeFunds =
+        api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
+      const sendSystemNotification =
+        api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+          "action",
+          "internal"
+        >;
+      await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
+        disputeId: args.disputeId,
+      });
+      const recipients = getDisputePartyUserIds(project, dispute);
+      if (recipients.length > 0) {
+        await ctx.scheduler.runAfter(0, sendSystemNotification, {
+          userIds: recipients,
+          title: "Dispute judgment enforced",
+          message: `The objection window closed and the judgment for ${project.intakeForm.title} has been enforced.`,
+          type: "dispute",
+          data: { disputeId: args.disputeId, projectId: dispute.projectId },
+        });
+      }
+      return { processed: true as const, status: "resolved" as const };
+    }
+
+    if (dispute.status === "appeal_review") {
+      const deadline = dispute.appealWindowEndsAt ?? dispute.stageDeadlineAt;
+      if (!deadline || deadline > args.now) return { processed: false as const };
+      await transitionDisputeStage(ctx, {
+        dispute,
+        toStatus: "under_review",
+        title: "Appeal review due",
+        description:
+          "The objection review deadline has passed. Staff should accept or reject the objection.",
+      });
+      return { processed: true as const, status: "under_review" as const };
+    }
+
+    return { processed: false as const };
+  },
+});
+
+export const backfillProfessionalDisputeLifecycleInternal = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const limit = Math.min(args.limit ?? 100, 500);
+    const disputes = await ctx.db.query("disputes").take(limit);
+    let updated = 0;
+
+    for (const dispute of disputes) {
+      if (dispute.stage || dispute.track || dispute.requiredEvidenceChecklist) continue;
+      const policy = getDisputeReasonPolicy(dispute.type);
+      const isTerminal =
+        dispute.status === "resolved" ||
+        dispute.status === "closed" ||
+        dispute.status === "cancelled";
+      const stage = isTerminal
+        ? dispute.status === "resolved"
+          ? "resolved"
+          : "closed"
+        : dispute.status === "under_review" || dispute.status === "escalated"
+          ? "under_review"
+          : "negotiation";
+      const stageStartedAt = dispute.updatedAt ?? dispute.createdAt ?? now;
+      const negotiationDeadlineAt = deadlineFromHours(
+        dispute.createdAt ?? now,
+        policy.negotiationHours
+      );
+
+      await ctx.db.patch(dispute._id, {
+        track: policy.fastTrackEligible ? "fast_track" : "normal",
+        stage,
+        stageStartedAt,
+        stageDeadlineAt: isTerminal ? undefined : negotiationDeadlineAt,
+        negotiationDeadlineAt: isTerminal ? undefined : negotiationDeadlineAt,
+        evidenceDeadlineAt: isTerminal
+          ? undefined
+          : deadlineFromHours(stageStartedAt, policy.evidenceHours),
+        fastTrackEligible: policy.fastTrackEligible,
+        policyReasonLabel: policy.label,
+        requiredEvidenceChecklist: policy.requiredEvidence.map((item) => ({
+          id: item.id,
+          owner: item.owner,
+          label: item.label,
+          description: item.description,
+        })),
+        updatedAt: now,
+      });
+      await recordDisputeStageEvent(ctx, {
+        disputeId: dispute._id,
+        projectId: dispute.projectId,
+        actorRole: "system",
+        eventType: "dispute_lifecycle_backfilled",
+        toStatus: dispute.status,
+        title: "Lifecycle fields backfilled",
+        description: "Legacy dispute was made compatible with the professional case flow.",
+        createdAt: now,
+      });
+      updated++;
+    }
+
+    return { updated };
+  },
+});
+
 /**
  * Escalate dispute to admin
  */
@@ -1675,8 +2571,8 @@ export const cancelDispute = mutation({
       throw new Error("Only the dispute initiator can cancel this dispute");
     }
 
-    if (dispute.status !== "open" && dispute.status !== "under_review") {
-      throw new Error("Only open or under-review disputes can be cancelled");
+    if (!disputeIsActive(dispute.status)) {
+      throw new Error("Only active disputes can be cancelled");
     }
 
     if (!args.reason.trim()) {
@@ -1692,10 +2588,23 @@ export const cancelDispute = mutation({
 
     await ctx.db.patch(args.disputeId, {
       status: "cancelled",
+      stage: dispute.stage,
       cancellationReason: args.reason.trim(),
       cancelledAt: now,
       cancelledBy: user._id,
       updatedAt: now,
+    });
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      actorRole: user.role === "freelancer" ? "freelancer" : "client",
+      eventType: "dispute_cancelled",
+      fromStatus: dispute.status,
+      toStatus: "cancelled",
+      title: "Dispute cancelled",
+      description: args.reason.trim(),
+      createdAt: now,
     });
 
     // Restore project status from "disputed" back to "in_progress"

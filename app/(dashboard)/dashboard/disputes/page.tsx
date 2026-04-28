@@ -50,13 +50,19 @@ import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar"
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { DashboardStatusBadge } from "@/components/dashboard/dashboard-status-badge";
+import { disputeStatusLabel } from "@/lib/dispute-flow";
 
 type StatusFilter =
   | "open"
+  | "negotiation"
+  | "awaiting_party_evidence"
   | "under_review"
+  | "objection_window"
+  | "appeal_review"
   | "resolved"
   | "escalated"
   | "closed"
+  | "cancelled"
   | undefined;
 
 /** Row shape from `getDisputes` (document + list enrichments). */
@@ -112,14 +118,14 @@ export default function DisputesPage() {
     const tone =
       status === "resolved"
         ? "success"
-        : status === "open" || status === "escalated"
+        : status === "open" || status === "escalated" || status === "objection_window"
           ? "danger"
-          : status === "under_review"
+          : status === "under_review" || status === "awaiting_party_evidence" || status === "negotiation"
             ? "warning"
             : "neutral";
     return (
       <DashboardStatusBadge
-        label={status.replace(/_/g, " ").toUpperCase()}
+        label={disputeStatusLabel(status).toUpperCase()}
         tone={tone as "success" | "danger" | "warning" | "neutral"}
       />
     );
@@ -151,10 +157,16 @@ export default function DisputesPage() {
   );
 
   const openCount = (pendingDisputes ?? disputes).filter(
-    (d: Doc<"disputes">) => d.status === "open"
+    (d: Doc<"disputes">) =>
+      d.status === "open" ||
+      d.status === "negotiation" ||
+      d.status === "awaiting_party_evidence"
   ).length;
   const underReviewCount = (pendingDisputes ?? disputes).filter(
-    (d: Doc<"disputes">) => d.status === "under_review"
+    (d: Doc<"disputes">) =>
+      d.status === "under_review" ||
+      d.status === "objection_window" ||
+      d.status === "appeal_review"
   ).length;
   const resolvedCount = disputes.filter(
     (d: Doc<"disputes">) => d.status === "resolved"
@@ -254,16 +266,20 @@ export default function DisputesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="open">Open</SelectItem>
+              <SelectItem value="negotiation">Negotiation</SelectItem>
+              <SelectItem value="awaiting_party_evidence">Awaiting Evidence</SelectItem>
               <SelectItem value="under_review">Under Review</SelectItem>
+              <SelectItem value="objection_window">Objection Window</SelectItem>
+              <SelectItem value="appeal_review">Appeal Review</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
               <SelectItem value="escalated">Escalated</SelectItem>
               <SelectItem value="closed">Closed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
         ) : (
           <>
-            {(["all", "open", "under_review", "resolved"] as const).map((s) => (
+            {(["all", "negotiation", "awaiting_party_evidence", "under_review", "resolved"] as const).map((s) => (
               <Button
                 key={s}
                 variant={(statusFilter ?? "all") === s ? "default" : "outline"}
@@ -273,7 +289,7 @@ export default function DisputesPage() {
                   setCurrentPage(1);
                 }}
               >
-                {s === "all" ? "All" : s.replace("_", " ").charAt(0).toUpperCase() + s.replace("_", " ").slice(1)}
+                {s === "all" ? "All" : disputeStatusLabel(s)}
               </Button>
             ))}
           </>

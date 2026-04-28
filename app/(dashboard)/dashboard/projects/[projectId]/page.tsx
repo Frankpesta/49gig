@@ -28,6 +28,8 @@ import {
   Loader2,
   Trash2,
   Ban,
+  PauseCircle,
+  PlayCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Doc, Id } from "@/convex/_generated/dataModel";
@@ -217,6 +219,13 @@ export default function ProjectDetailPage() {
   const [isAdminDeleting, setIsAdminDeleting] = useState(false);
   const [showAdminCancelDialog, setShowAdminCancelDialog] = useState(false);
   const [isAdminCancelling, setIsAdminCancelling] = useState(false);
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
+  const [replaceOldFreelancerId, setReplaceOldFreelancerId] = useState("");
+  const [replaceNewFreelancerId, setReplaceNewFreelancerId] = useState("");
+  const [replaceReason, setReplaceReason] = useState("");
+  const [isReplacingFreelancer, setIsReplacingFreelancer] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
+  const [pausingKey, setPausingKey] = useState<string | null>(null);
 
   // Validate the projectId from URL params
   const isValidId = isValidConvexId(projectIdParam);
@@ -251,6 +260,24 @@ export default function ProjectDetailPage() {
       ? { projectId, userId: user._id }
       : "skip"
   );
+  const billingPauses = useQuery(
+    (api as any)["projects/queries"].getProjectBillingPausesForAdmin,
+    user?.role === "admin" && user?._id && projectId
+      ? { projectId, userId: user._id }
+      : "skip"
+  );
+  const replacementCandidates = useQuery(
+    (api as any)["projects/queries"].getAdminReplacementCandidates,
+    user?.role === "admin" && user?._id && projectId
+      ? {
+          projectId,
+          userId: user._id,
+          oldFreelancerId: replaceOldFreelancerId
+            ? (replaceOldFreelancerId as Id<"users">)
+            : undefined,
+        }
+      : "skip"
+  );
 
   useEffect(() => {
     if (!cycleDeepLinkId || !monthlyCycles?.length) return;
@@ -279,6 +306,15 @@ export default function ProjectDetailPage() {
   );
   const adminDeleteProjectMutation = useMutation(
     (api as any)["projects/mutations"].adminDeleteProject
+  );
+  const adminPauseProjectBilling = useMutation(
+    (api as any)["projects/mutations"].adminPauseProjectBilling
+  );
+  const adminResumeProjectBilling = useMutation(
+    (api as any)["projects/mutations"].adminResumeProjectBilling
+  );
+  const adminReplaceFreelancer = useMutation(
+    (api as any)["projects/mutations"].adminReplaceFreelancer
   );
   const pendingFreelancerMatches = useQuery(
     (api as any).matching.queries.getPendingFreelancerMatches,
@@ -424,6 +460,30 @@ export default function ProjectDetailPage() {
         }>;
       }
     ).confirmedTeamMembers ?? [];
+  const assignedFreelancers: Array<{
+    _id: Id<"users">;
+    name: string;
+    teamRole?: string;
+  }> =
+    confirmedTeamMembers.length > 0
+      ? confirmedTeamMembers
+      : project.freelancer
+        ? [{ _id: project.freelancer._id, name: project.freelancer.name }]
+        : [];
+  const activeBillingPauses = ((billingPauses ?? []) as Array<{
+    _id: string;
+    scope: "project" | "freelancer";
+    status: "active" | "resumed";
+    freelancerId?: Id<"users">;
+    reason: string;
+    freelancerName?: string | null;
+  }>).filter((pause) => pause.status === "active");
+  const projectBillingPaused = activeBillingPauses.some((pause) => pause.scope === "project");
+  const pausedFreelancerIds = new Set(
+    activeBillingPauses
+      .filter((pause) => pause.scope === "freelancer" && pause.freelancerId)
+      .map((pause) => String(pause.freelancerId))
+  );
   const isTeamHire = project.intakeForm.hireType === "team";
   const teamGrossSeatRows = isTeamHire ? getTeamGrossSeatRows(project) : [];
   const viewerMatchTeamRole = (
@@ -625,6 +685,82 @@ export default function ProjectDetailPage() {
       toast.error(getUserFriendlyError(err) || "Could not cancel hire");
     } finally {
       setIsAdminCancelling(false);
+    }
+  };
+
+  const handlePauseBilling = async (freelancerId?: Id<"users">) => {
+    if (!projectId || !user?._id || user.role !== "admin") return;
+    if (!pauseReason.trim()) {
+      toast.error("Enter a reason before pausing payment release.");
+      return;
+    }
+    const key = freelancerId ? String(freelancerId) : "project";
+    setPausingKey(key);
+    try {
+      await adminPauseProjectBilling({
+        projectId,
+        userId: user._id,
+        freelancerId,
+        reason: pauseReason.trim(),
+      });
+      toast.success(freelancerId ? "Freelancer payment release paused" : "Hire payment release paused");
+      setPauseReason("");
+      router.refresh();
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not pause payment release");
+    } finally {
+      setPausingKey(null);
+    }
+  };
+
+  const handleResumeBilling = async (freelancerId?: Id<"users">) => {
+    if (!projectId || !user?._id || user.role !== "admin") return;
+    const key = freelancerId ? String(freelancerId) : "project";
+    setPausingKey(key);
+    try {
+      await adminResumeProjectBilling({
+        projectId,
+        userId: user._id,
+        freelancerId,
+      });
+      toast.success(freelancerId ? "Freelancer payment release resumed" : "Hire payment release resumed");
+      router.refresh();
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not resume payment release");
+    } finally {
+      setPausingKey(null);
+    }
+  };
+
+  const handleAdminReplaceFreelancer = async () => {
+    if (!projectId || !user?._id || user.role !== "admin") return;
+    if (!replaceOldFreelancerId || !replaceNewFreelancerId) {
+      toast.error("Select the current freelancer and replacement freelancer.");
+      return;
+    }
+    if (!replaceReason.trim()) {
+      toast.error("Enter a replacement reason.");
+      return;
+    }
+    setIsReplacingFreelancer(true);
+    try {
+      await adminReplaceFreelancer({
+        projectId,
+        userId: user._id,
+        oldFreelancerId: replaceOldFreelancerId as Id<"users">,
+        replacementFreelancerId: replaceNewFreelancerId as Id<"users">,
+        reason: replaceReason.trim(),
+      });
+      toast.success("Talent replaced and assigned immediately");
+      setShowReplaceDialog(false);
+      setReplaceOldFreelancerId("");
+      setReplaceNewFreelancerId("");
+      setReplaceReason("");
+      router.refresh();
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not replace talent");
+    } finally {
+      setIsReplacingFreelancer(false);
     }
   };
 
@@ -846,6 +982,190 @@ export default function ProjectDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="w-full rounded-md border border-border bg-card/80 p-3">
+              <div className="mb-3 space-y-1">
+                <p className="text-sm font-medium text-foreground">Billing release controls</p>
+                <p className="text-xs text-muted-foreground">
+                  Admin pauses block wallet release, including client approval and auto-release, until resumed.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="pause-reason">Reason for next pause</Label>
+                  <Textarea
+                    id="pause-reason"
+                    value={pauseReason}
+                    onChange={(event) => setPauseReason(event.target.value)}
+                    placeholder="Explain why payment release is being paused"
+                    className="min-h-20"
+                  />
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  {projectBillingPaused ? (
+                    <Button
+                      variant="outline"
+                      className="min-h-11 w-full sm:w-auto"
+                      onClick={() => void handleResumeBilling()}
+                      disabled={pausingKey === "project"}
+                    >
+                      {pausingKey === "project" ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <PlayCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Resume all payment releases
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="min-h-11 w-full sm:w-auto"
+                      onClick={() => void handlePauseBilling()}
+                      disabled={pausingKey === "project"}
+                    >
+                      {pausingKey === "project" ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <PauseCircle className="mr-2 h-4 w-4" />
+                      )}
+                      Pause all payment releases
+                    </Button>
+                  )}
+                </div>
+                {assignedFreelancers.length > 0 && (
+                  <div className="space-y-2">
+                    {assignedFreelancers.map((freelancer) => {
+                      const paused = pausedFreelancerIds.has(String(freelancer._id));
+                      const busy = pausingKey === String(freelancer._id);
+                      return (
+                        <div
+                          key={freelancer._id}
+                          className="flex flex-col gap-2 rounded-md border border-border/70 p-3 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground">{freelancer.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {freelancer.teamRole ?? "Assigned freelancer"}
+                              {paused ? " • payment paused" : ""}
+                            </p>
+                          </div>
+                          {paused ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleResumeBilling(freelancer._id)}
+                              disabled={busy}
+                            >
+                              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              Resume
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handlePauseBilling(freelancer._id)}
+                              disabled={busy || projectBillingPaused}
+                            >
+                              {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              Pause freelancer
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+            {assignedFreelancers.length > 0 &&
+              (project.status === "matched" || project.status === "in_progress") && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="min-h-11 w-full touch-manipulation sm:w-auto"
+                    onClick={() => setShowReplaceDialog(true)}
+                  >
+                    <UserSearch className="mr-2 h-4 w-4" />
+                    Replace talent
+                  </Button>
+                  <Dialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Replace assigned talent</DialogTitle>
+                        <DialogDescription>
+                          The selected freelancer is removed immediately, their future release is paused, and the replacement is assigned now.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="old-freelancer">Current freelancer</Label>
+                          <select
+                            id="old-freelancer"
+                            value={replaceOldFreelancerId}
+                            onChange={(event) => {
+                              setReplaceOldFreelancerId(event.target.value);
+                              setReplaceNewFreelancerId("");
+                            }}
+                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="">Select freelancer to replace</option>
+                            {assignedFreelancers.map((freelancer) => (
+                              <option key={freelancer._id} value={freelancer._id}>
+                                {freelancer.name}{freelancer.teamRole ? ` — ${freelancer.teamRole}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="replacement-freelancer">Replacement freelancer</Label>
+                          <select
+                            id="replacement-freelancer"
+                            value={replaceNewFreelancerId}
+                            onChange={(event) => setReplaceNewFreelancerId(event.target.value)}
+                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="">Select replacement</option>
+                            {((replacementCandidates ?? []) as Array<{
+                              _id: Id<"users">;
+                              name: string;
+                              experienceLevel?: string;
+                              skillOverlap: number;
+                            }>).map((candidate) => (
+                              <option key={candidate._id} value={candidate._id}>
+                                {candidate.name} — {candidate.experienceLevel ?? "level not set"} • {Math.round(candidate.skillOverlap)}% skill match
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="replace-reason">Reason</Label>
+                          <Textarea
+                            id="replace-reason"
+                            value={replaceReason}
+                            onChange={(event) => setReplaceReason(event.target.value)}
+                            placeholder="Explain why this replacement is being made"
+                            className="min-h-24"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowReplaceDialog(false)}
+                          disabled={isReplacingFreelancer}
+                        >
+                          Cancel
+                        </Button>
+                        <Button onClick={handleAdminReplaceFreelancer} disabled={isReplacingFreelancer}>
+                          {isReplacingFreelancer ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : null}
+                          Replace now
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </>
+              )}
             {project.status !== "cancelled" && project.status !== "completed" && (
               <>
                 <Button

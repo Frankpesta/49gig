@@ -12,10 +12,12 @@ import {
   assertNonNegativeIntegerCents,
   assertPlatformFeePercent,
 } from "../disputes/amounts";
+import { mergePermanentExclusions } from "../match_exclusions";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
   api: {
+    contracts: { actions: { generateAndSendContract: unknown } };
     notifications: { actions: { sendSystemNotification: unknown } };
     matching: { actions: { generateMatchesForDraft: unknown } };
   };
@@ -52,6 +54,73 @@ async function getCurrentUserInMutation(
     return null;
   }
   return userDoc;
+}
+
+function assertAdmin(user: Doc<"users"> | null): asserts user is Doc<"users"> {
+  if (!user || user.role !== "admin") {
+    throw new Error("Only admins can perform this action");
+  }
+}
+
+async function notifyProjectUsers(
+  ctx: MutationCtx,
+  userIds: Doc<"users">["_id"][],
+  title: string,
+  message: string,
+  data: Record<string, unknown>
+) {
+  const uniqueIds = [...new Set(userIds.map(String))] as Doc<"users">["_id"][];
+  if (uniqueIds.length === 0) return;
+  const sendSystemNotification =
+    api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+      "action",
+      "internal"
+    >;
+  await ctx.scheduler.runAfter(0, sendSystemNotification, {
+    userIds: uniqueIds,
+    title,
+    message,
+    type: "project",
+    data,
+  });
+}
+
+async function ensureFreelancerPause(
+  ctx: MutationCtx,
+  args: {
+    projectId: Id<"projects">;
+    freelancerId: Id<"users">;
+    adminId: Id<"users">;
+    reason: string;
+    now: number;
+  }
+) {
+  const existing = await ctx.db
+    .query("projectBillingPauses")
+    .withIndex("by_project_status", (q) =>
+      q.eq("projectId", args.projectId).eq("status", "active")
+    )
+    .collect();
+  if (
+    existing.some(
+      (p) =>
+        p.scope === "freelancer" &&
+        p.freelancerId &&
+        String(p.freelancerId) === String(args.freelancerId)
+    )
+  ) {
+    return;
+  }
+  await ctx.db.insert("projectBillingPauses", {
+    projectId: args.projectId,
+    freelancerId: args.freelancerId,
+    scope: "freelancer",
+    status: "active",
+    reason: args.reason,
+    createdBy: args.adminId,
+    createdAt: args.now,
+    updatedAt: args.now,
+  });
 }
 
 function validateTeamBudgetBreakdown(
@@ -679,6 +748,344 @@ export const updateProjectStatus = mutation({
     }
 
     return args.projectId;
+  },
+});
+
+export const adminPauseProjectBilling = mutation({
+  args: {
+    projectId: v.id("projects"),
+    freelancerId: v.optional(v.id("users")),
+    reason: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInMutation(ctx, args.userId);
+    assertAdmin(admin);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    const reason = args.reason.trim();
+    if (!reason) throw new Error("Pause reason is required");
+
+    if (args.freelancerId) {
+      const roster = new Set([
+        ...(project.matchedFreelancerId ? [String(project.matchedFreelancerId)] : []),
+        ...(project.matchedFreelancerIds ?? []).map(String),
+      ]);
+      if (!roster.has(String(args.freelancerId))) {
+        throw new Error("Freelancer is not currently assigned to this hire");
+      }
+    }
+
+    const scope = args.freelancerId ? "freelancer" : "project";
+    const active = await ctx.db
+      .query("projectBillingPauses")
+      .withIndex("by_project_status", (q) =>
+        q.eq("projectId", args.projectId).eq("status", "active")
+      )
+      .collect();
+    const existing = active.find((p) =>
+      scope === "project"
+        ? p.scope === "project"
+        : p.scope === "freelancer" &&
+          p.freelancerId &&
+          String(p.freelancerId) === String(args.freelancerId)
+    );
+    if (existing) return { pauseId: existing._id, alreadyActive: true };
+
+    const now = Date.now();
+    const pauseId = await ctx.db.insert("projectBillingPauses", {
+      projectId: args.projectId,
+      freelancerId: args.freelancerId,
+      scope,
+      status: "active",
+      reason,
+      createdBy: admin._id,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "admin_billing_pause_created",
+      actionType: "admin",
+      actorId: admin._id,
+      actorRole: "admin",
+      targetType: "project",
+      targetId: args.projectId,
+      details: { freelancerId: args.freelancerId, scope, reason },
+      createdAt: now,
+    });
+
+    const recipients: Id<"users">[] = [project.clientId];
+    if (args.freelancerId) {
+      recipients.push(args.freelancerId);
+    } else {
+      if (project.matchedFreelancerId) recipients.push(project.matchedFreelancerId);
+      for (const fid of project.matchedFreelancerIds ?? []) recipients.push(fid);
+    }
+    await notifyProjectUsers(
+      ctx,
+      recipients,
+      "Payment release paused",
+      args.freelancerId
+        ? `An admin paused payment release for one freelancer on "${project.intakeForm.title}".`
+        : `An admin paused all payment releases for "${project.intakeForm.title}".`,
+      { projectId: args.projectId, freelancerId: args.freelancerId, pauseId }
+    );
+
+    return { pauseId, alreadyActive: false };
+  },
+});
+
+export const adminResumeProjectBilling = mutation({
+  args: {
+    projectId: v.id("projects"),
+    freelancerId: v.optional(v.id("users")),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInMutation(ctx, args.userId);
+    assertAdmin(admin);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+
+    const scope = args.freelancerId ? "freelancer" : "project";
+    const active = await ctx.db
+      .query("projectBillingPauses")
+      .withIndex("by_project_status", (q) =>
+        q.eq("projectId", args.projectId).eq("status", "active")
+      )
+      .collect();
+    const matching = active.filter((p) =>
+      scope === "project"
+        ? p.scope === "project"
+        : p.scope === "freelancer" &&
+          p.freelancerId &&
+          String(p.freelancerId) === String(args.freelancerId)
+    );
+    const now = Date.now();
+    for (const pause of matching) {
+      await ctx.db.patch(pause._id, {
+        status: "resumed",
+        resumedBy: admin._id,
+        resumedAt: now,
+        updatedAt: now,
+      });
+    }
+
+    await ctx.db.insert("auditLogs", {
+      action: "admin_billing_pause_resumed",
+      actionType: "admin",
+      actorId: admin._id,
+      actorRole: "admin",
+      targetType: "project",
+      targetId: args.projectId,
+      details: { freelancerId: args.freelancerId, scope, resumedCount: matching.length },
+      createdAt: now,
+    });
+
+    const recipients: Id<"users">[] = [project.clientId];
+    if (args.freelancerId) {
+      recipients.push(args.freelancerId);
+    } else {
+      if (project.matchedFreelancerId) recipients.push(project.matchedFreelancerId);
+      for (const fid of project.matchedFreelancerIds ?? []) recipients.push(fid);
+    }
+    await notifyProjectUsers(
+      ctx,
+      recipients,
+      "Payment release resumed",
+      args.freelancerId
+        ? `An admin resumed payment release for one freelancer on "${project.intakeForm.title}".`
+        : `An admin resumed payment releases for "${project.intakeForm.title}".`,
+      { projectId: args.projectId, freelancerId: args.freelancerId }
+    );
+
+    return { resumed: matching.length };
+  },
+});
+
+export const adminReplaceFreelancer = mutation({
+  args: {
+    projectId: v.id("projects"),
+    oldFreelancerId: v.id("users"),
+    replacementFreelancerId: v.id("users"),
+    reason: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const admin = await getCurrentUserInMutation(ctx, args.userId);
+    assertAdmin(admin);
+    const reason = args.reason.trim();
+    if (!reason) throw new Error("Replacement reason is required");
+    if (String(args.oldFreelancerId) === String(args.replacementFreelancerId)) {
+      throw new Error("Choose a different replacement freelancer");
+    }
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    if (project.status !== "matched" && project.status !== "in_progress") {
+      throw new Error("Admin replacement is only available for matched or in-progress hires");
+    }
+
+    const replacement = await ctx.db.get(args.replacementFreelancerId);
+    if (!replacement || replacement.status !== "active" || replacement.role !== "freelancer") {
+      throw new Error("Replacement freelancer is not active");
+    }
+
+    const currentRoster = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? [];
+    if (!currentRoster.some((id) => String(id) === String(args.oldFreelancerId))) {
+      throw new Error("Old freelancer is not currently assigned to this hire");
+    }
+    if (currentRoster.some((id) => String(id) === String(args.replacementFreelancerId))) {
+      throw new Error("Replacement freelancer is already assigned to this hire");
+    }
+
+    const now = Date.now();
+    const projectMatches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+    const oldAcceptedMatch = projectMatches.find(
+      (m) =>
+        String(m.freelancerId) === String(args.oldFreelancerId) &&
+        m.status === "accepted"
+    );
+    const replacementTeamRole = oldAcceptedMatch?.teamRole;
+
+    for (const m of projectMatches) {
+      if (String(m.freelancerId) === String(args.oldFreelancerId)) {
+        await ctx.db.patch(m._id, {
+          status: "rejected",
+          freelancerRejectionReason: `Removed by admin: ${reason}`,
+          updatedAt: now,
+        });
+      }
+    }
+
+    const replacementMatchId = await ctx.db.insert("matches", {
+      projectId: args.projectId,
+      freelancerId: args.replacementFreelancerId,
+      score: 1000,
+      confidence: "high",
+      scoringBreakdown: {
+        skillOverlap: 100,
+        vettingScore: 100,
+        ratings: 100,
+        availability: 100,
+        pastPerformance: 100,
+        timezoneCompatibility: 100,
+      },
+      explanation: `Assigned by admin as replacement: ${reason}`,
+      teamRole: replacementTeamRole,
+      status: "accepted",
+      clientAction: "accepted",
+      clientActionAt: now,
+      freelancerAction: "accepted",
+      freelancerActionAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const rosterPatch: Partial<Doc<"projects">> = {
+      matchedAt: project.matchedAt ?? now,
+      selectedFreelancerId: undefined,
+      selectedFreelancerIds: undefined,
+      contractFileId: undefined,
+      contractGeneratedAt: undefined,
+      contractSignedAt: undefined,
+      clientContractSignedAt: undefined,
+      clientContractSignedAtIp: undefined,
+      clientContractSignedAtUserAgent: undefined,
+      freelancerContractSignatures: undefined,
+      contractFullyExecutedEmailedAt: undefined,
+      permanentlyExcludedFreelancerIds: mergePermanentExclusions(
+        project.permanentlyExcludedFreelancerIds,
+        [args.oldFreelancerId]
+      ),
+      replacementMatchingAt: undefined,
+      replacementFlowDisputeId: undefined,
+      updatedAt: now,
+    };
+
+    if (project.matchedFreelancerId) {
+      rosterPatch.matchedFreelancerId = args.replacementFreelancerId;
+    } else {
+      rosterPatch.matchedFreelancerIds = (project.matchedFreelancerIds ?? []).map((fid) =>
+        String(fid) === String(args.oldFreelancerId)
+          ? args.replacementFreelancerId
+          : fid
+      );
+    }
+    await ctx.db.patch(args.projectId, rosterPatch);
+
+    await ensureFreelancerPause(ctx, {
+      projectId: args.projectId,
+      freelancerId: args.oldFreelancerId,
+      adminId: admin._id,
+      reason: `Removed by admin replacement: ${reason}`,
+      now,
+    });
+
+    await ctx.runMutation(
+      internalAny.projects.mutations.sweepFreelancersRemovedFromProjectInternal,
+      {
+        projectId: args.projectId,
+        freelancerIds: [args.oldFreelancerId],
+      }
+    );
+
+    await ctx.db.insert("auditLogs", {
+      action: "admin_freelancer_replaced",
+      actionType: "admin",
+      actorId: admin._id,
+      actorRole: "admin",
+      targetType: "project",
+      targetId: args.projectId,
+      details: {
+        oldFreelancerId: args.oldFreelancerId,
+        replacementFreelancerId: args.replacementFreelancerId,
+        replacementMatchId,
+        teamRole: replacementTeamRole,
+        reason,
+      },
+      createdAt: now,
+    });
+
+    await notifyProjectUsers(
+      ctx,
+      [project.clientId],
+      "Talent replaced by admin",
+      `An admin replaced a freelancer on "${project.intakeForm.title}". The new freelancer has been assigned immediately.`,
+      {
+        projectId: args.projectId,
+        oldFreelancerId: args.oldFreelancerId,
+        replacementFreelancerId: args.replacementFreelancerId,
+      }
+    );
+    await notifyProjectUsers(
+      ctx,
+      [args.oldFreelancerId],
+      "Removed from hire",
+      `An admin removed you from "${project.intakeForm.title}". Future payment release for this hire is paused for your account.`,
+      { projectId: args.projectId }
+    );
+    await notifyProjectUsers(
+      ctx,
+      [args.replacementFreelancerId],
+      "Assigned to hire",
+      `An admin assigned you to "${project.intakeForm.title}" as a replacement freelancer.`,
+      { projectId: args.projectId, matchId: replacementMatchId }
+    );
+
+    const generateAndSendContract = api.api.contracts.actions
+      .generateAndSendContract as FunctionReference<"action">;
+    await ctx.scheduler.runAfter(0, generateAndSendContract, {
+      matchId: replacementMatchId,
+    });
+
+    return { replacementMatchId };
   },
 });
 
