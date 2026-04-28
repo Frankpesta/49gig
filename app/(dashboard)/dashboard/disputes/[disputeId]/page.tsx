@@ -61,6 +61,13 @@ import {
 } from "@/lib/dispute-flow";
 
 type DisputeEvidenceItem = Doc<"disputes">["evidence"][number] & { fileUrl?: string | null };
+type RequiredEvidenceChecklistItem = {
+  id: string;
+  owner: "client" | "freelancer" | "both";
+  label: string;
+  description: string;
+  satisfiedAt?: number;
+};
 
 function DetailField({
   label,
@@ -591,7 +598,7 @@ export default function DisputeDetailPage() {
                   <div className="space-y-2">
                     <p className="text-sm font-semibold">Evidence checklist</p>
                     <div className="grid gap-2">
-                      {dispute.requiredEvidenceChecklist!.map((item) => (
+                      {(dispute.requiredEvidenceChecklist as RequiredEvidenceChecklistItem[]).map((item) => (
                         <div key={item.id} className="rounded-lg border border-border/50 bg-muted/10 p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-sm font-medium">{item.label}</p>
