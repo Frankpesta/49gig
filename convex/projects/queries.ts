@@ -194,8 +194,16 @@ export const getProjects = query({
         let freelancerHireDisplayStatus: Doc<"projects">["status"] | undefined;
         let openDisputeOnHire = false;
         let viewerIsDisputePartyOnHire = false;
+        let viewerMatchTeamRole: string | undefined;
 
         if (user.role === "freelancer") {
+          const mine = await ctx.db
+            .query("matches")
+            .withIndex("by_project", (q) => q.eq("projectId", project._id))
+            .filter((q) => q.eq(q.field("freelancerId"), user._id))
+            .first();
+          viewerMatchTeamRole = mine?.teamRole ?? undefined;
+
           const disputesOnProject = await ctx.db
             .query("disputes")
             .withIndex("by_project", (q) => q.eq("projectId", project._id))
@@ -255,6 +263,7 @@ export const getProjects = query({
                 freelancerHireDisplayStatus,
                 openDisputeOnHire,
                 viewerIsDisputePartyOnHire,
+                viewerMatchTeamRole,
               }
             : {}),
         };
