@@ -30,13 +30,13 @@ import {
   Ban,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { Id } from "@/convex/_generated/dataModel";
+import { Doc, Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { getDurationMonths } from "@/lib/project-duration";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -66,9 +66,11 @@ import {
   isCategoryLabel,
   isLegacyCategoryLabel,
 } from "@/lib/platform-skills";
-import { getRoleLabelsForProjectIntake, type TeamSlotIntake } from "@/lib/team-slots";
-import type { RoleType } from "@/lib/budget-calculator";
-import { teamHireBudgetFromPricingConfig } from "@/lib/team-hire-pricing-breakdown";
+import {
+  getRoleLabelsForProjectIntake,
+  teamSlotsToMatchSpecs,
+  type TeamSlotIntake,
+} from "@/lib/team-slots";
 import { freelancerEngagementNetTotalUsd } from "@/lib/project-freelancer-earnings";
 import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
 
@@ -118,14 +120,58 @@ function getActualSkills(requiredSkills: string[]): string[] {
   );
 }
 
-/** Row shape from `getTeamHireEscrowBudgetBreakdown` (client project sidebar). */
-type TeamEscrowBudgetRow = {
-  freelancerId: Id<"users">;
-  name: string;
-  teamRole: string | undefined;
-  netInEscrow: number;
-  grossToClient: number;
-};
+function getTeamGrossSeatRows(project: Doc<"projects">): Array<{
+  label: string;
+  grossAmount: number;
+}> {
+  const rawSlots = (project.intakeForm.teamSlots ?? []) as TeamSlotIntake[];
+  const slots = rawSlots.filter((slot) => Boolean(slot.roleId));
+  const specs = slots.length > 0 ? teamSlotsToMatchSpecs(slots) : [];
+  const count =
+    specs.length ||
+    project.intakeForm.teamMemberCount ||
+    project.matchedFreelancerIds?.length ||
+    0;
+  if (count <= 0) return [];
+
+  const totalGrossCents = Math.round(Math.max(0, project.totalAmount) * 100);
+  const breakdown = project.teamBudgetBreakdown;
+  const weightedRows =
+    specs.length > 0
+      ? specs.map((spec, index) => ({
+          label: spec.teamRoleLabel,
+          weight:
+            breakdown && Number.isFinite(breakdown[spec.roleKey])
+              ? Math.max(0, breakdown[spec.roleKey] ?? 0)
+              : 1,
+          index,
+        }))
+      : Array.from({ length: count }, (_, index) => ({
+          label: `Seat ${index + 1}`,
+          weight: 1,
+          index,
+        }));
+  const totalWeight = weightedRows.reduce((sum, row) => sum + row.weight, 0);
+  const normalizedRows =
+    totalWeight > 0
+      ? weightedRows
+      : weightedRows.map((row) => ({ ...row, weight: 1 }));
+  const normalizedTotalWeight =
+    totalWeight > 0 ? totalWeight : normalizedRows.length;
+
+  let allocatedCents = 0;
+  return normalizedRows.map((row, index) => {
+    const isLast = index === normalizedRows.length - 1;
+    const cents = isLast
+      ? totalGrossCents - allocatedCents
+      : Math.round((totalGrossCents * row.weight) / normalizedTotalWeight);
+    allocatedCents += cents;
+    return {
+      label: row.label,
+      grossAmount: cents / 100,
+    };
+  });
+}
 
 // Helper function to validate Convex ID format
 function isValidConvexId(id: string | string[] | undefined): id is Id<"projects"> {
@@ -193,48 +239,6 @@ export default function ProjectDetailPage() {
     (api as any)["projects/queries"].getProject,
     user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
-
-  const teamHireIsClientOrStaff =
-    !!user &&
-    !!project &&
-    project.intakeForm.hireType === "team" &&
-    (user._id === project.clientId ||
-      user.role === "admin" ||
-      user.role === "moderator");
-  const teamEscrowBudget = useQuery(
-    (api as any)["projects/queries"].getTeamHireEscrowBudgetBreakdown,
-    user?._id && projectId && teamHireIsClientOrStaff
-      ? { projectId: String(projectId), userId: user._id }
-      : "skip"
-  );
-
-  const pricingConfig = useQuery(api.pricing.queries.getPricingConfig);
-
-  const teamPlatformPricing = useMemo(() => {
-    if (!project || project.intakeForm.hireType !== "team" || pricingConfig === undefined) {
-      return null;
-    }
-    const intake = project.intakeForm;
-    const slots = (intake.teamSlots ?? []) as TeamSlotIntake[];
-    const n = intake.teamMemberCount ?? slots.length;
-    const start =
-      intake.startDate != null ? new Date(intake.startDate) : null;
-    const end = intake.endDate != null ? new Date(intake.endDate) : null;
-    if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return null;
-    }
-    const roleType = (intake.roleType ?? "full_time") as RoleType;
-    return teamHireBudgetFromPricingConfig({
-      teamMemberCount: n,
-      teamSlots: slots,
-      experienceLevel: intake.experienceLevel,
-      roleType,
-      startDate: start,
-      endDate: end,
-      intakeProjectType: intake.projectType,
-      pricingConfig,
-    });
-  }, [project, pricingConfig]);
 
   const monthlyCycles = useQuery(
     api.monthlyBillingCycles.queries.getCyclesByProjectId,
@@ -421,6 +425,7 @@ export default function ProjectDetailPage() {
       }
     ).confirmedTeamMembers ?? [];
   const isTeamHire = project.intakeForm.hireType === "team";
+  const teamGrossSeatRows = isTeamHire ? getTeamGrossSeatRows(project) : [];
   const viewerMatchTeamRole = (
     project as { viewerMatchTeamRole?: string }
   ).viewerMatchTeamRole;
@@ -963,7 +968,7 @@ export default function ProjectDetailPage() {
             </Link>
           </Button>
           <div className="min-w-0 space-y-1">
-            <h1 className="text-xl font-heading font-bold break-words sm:text-2xl md:text-3xl">
+            <h1 className="text-xl font-heading font-bold wrap-break-word sm:text-2xl md:text-3xl">
               {project.intakeForm.title}
             </h1>
             <div className="flex flex-wrap items-center gap-2">
@@ -1390,89 +1395,43 @@ export default function ProjectDetailPage() {
               <div>
                 <div className="text-sm font-medium">Budget</div>
                 {isTeamHire && (isClient || isStaff) ? (
-                  teamEscrowBudget === undefined ? (
-                    <Skeleton className="h-8 w-36 mt-1" />
-                  ) : teamEscrowBudget == null ? (
-                    <p className="text-xs text-muted-foreground mt-1">Budget details unavailable.</p>
-                  ) : (
-                    <>
-                      {pricingConfig === undefined ? (
-                        <Skeleton className="mt-2 h-14 w-full rounded-md" />
-                      ) : teamPlatformPricing?.breakdown?.teamMembers &&
-                        teamPlatformPricing.breakdown.teamMembers.length > 0 ? (
-                        <div className="mt-2 space-y-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Per seat (platform pricing)
-                          </p>
-                          <ul className="space-y-2 rounded-md border border-border/50 bg-muted/20 p-2.5 text-xs">
-                            {teamPlatformPricing.breakdown.teamMembers.map((m, idx) => (
-                              <li key={`${m.role}-${m.category}-${idx}`} className="space-y-0.5">
-                                <div className="font-medium text-foreground">{m.roleDisplayName}</div>
-                                <div className="tabular-nums text-muted-foreground">
-                                  <span className="text-foreground">
-                                    $
-                                    {m.monthlyTotal.toLocaleString(undefined, {
-                                      minimumFractionDigits: 2,
-                                      maximumFractionDigits: 2,
-                                    })}
-                                  </span>
-                                  /mo gross
-                                  <span className="text-[10px]">
-                                    {" "}
-                                    · ${m.hourlyRate}/hr × {m.hoursPerMonth} hrs
-                                  </span>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                          <p className="text-[10px] leading-snug text-muted-foreground">
-                            Uses the admin rate card in the database (same as hire intake). Escrow figures below
-                            reflect cash currently held; split weights come from{" "}
-                            <span className="font-medium">teamBudgetBreakdown</span> saved at funding.
-                          </p>
-                          <Separator className="my-3" />
-                        </div>
-                      ) : null}
-
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Escrow (client gross)
-                      </p>
-                      <div className="text-lg font-semibold mt-0.5">
-                        $
-                        {teamEscrowBudget.totalGross.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </div>
-                      {teamEscrowBudget.rows.length > 0 && (
-                        <ul className="mt-3 space-y-3 border-t border-border pt-3">
-                          {teamEscrowBudget.rows.map((row: TeamEscrowBudgetRow) => (
-                            <li key={String(row.freelancerId)} className="text-xs space-y-0.5">
-                              <div className="font-medium text-foreground">
-                                {row.name}
-                                {row.teamRole ? (
-                                  <span className="text-muted-foreground font-normal">
-                                    {" "}
-                                    · {humanizeTeamRoleKey(row.teamRole)}
-                                  </span>
-                                ) : null}
-                              </div>
-                              <div className="text-muted-foreground">
-                                Your cost for this seat:{" "}
-                                <span className="text-foreground">
-                                  $
-                                  {row.grossToClient.toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </span>
-                              </div>
+                  <>
+                    <div className="text-lg font-semibold mt-0.5">
+                      ${project.totalAmount.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {isClient ? "Total amount for this hire" : "Hire total (staff view)"}
+                    </div>
+                    {teamGrossSeatRows.length > 0 && (
+                      <div className="mt-3 space-y-2 border-t border-border pt-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Per-seat breakdown
+                        </p>
+                        <ul className="space-y-2 text-xs">
+                          {teamGrossSeatRows.map((row) => (
+                            <li
+                              key={row.label}
+                              className="flex items-start justify-between gap-3"
+                            >
+                              <span className="font-medium text-foreground">
+                                {row.label}
+                              </span>
+                              <span className="shrink-0 tabular-nums text-muted-foreground">
+                                $
+                                {row.grossAmount.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
                             </li>
                           ))}
                         </ul>
-                      )}
-                    </>
-                  )
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <>
                     <div className="text-lg font-semibold mt-0.5">
