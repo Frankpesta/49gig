@@ -7,6 +7,15 @@ import { v } from "convex/values";
 import { sendEmail } from "../email/send";
 import React from "react";
 import { assertRecaptchaToken } from "../recaptchaVerify";
+import { SystemNoticeEmail } from "../../emails/templates";
+
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 /**
  * Submit contact enquiry from public form. Inserts to DB and notifies admins.
@@ -38,33 +47,27 @@ export const submitContactEnquiry = action({
       const appUrl =
         process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://49gig.com";
       const dashboardUrl = `${appUrl}/dashboard/enquiries`;
+      const date = formatDate();
 
       await sendEmail({
         to: adminEmails,
         subject: `[49GIG] New contact enquiry: ${args.subject}`,
-        react: React.createElement(
-          "div",
-          { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-          React.createElement("h2", { style: { marginBottom: "16px" } }, "New Contact Enquiry"),
-          React.createElement("p", null, `From: ${args.name} <${args.email}>`),
-          React.createElement("p", null, `Category: ${args.category}`),
-          React.createElement("p", null, `Subject: ${args.subject}`),
-          React.createElement("p", {
-            style: { marginTop: "16px", whiteSpace: "pre-wrap" },
-          }, args.message),
-          React.createElement("a", {
-            href: dashboardUrl,
-            style: {
-              display: "inline-block",
-              marginTop: "24px",
-              padding: "12px 24px",
-              backgroundColor: "#2563eb",
-              color: "white",
-              textDecoration: "none",
-              borderRadius: "8px",
-            },
-          }, "View & Reply in Dashboard")
-        ),
+        react: React.createElement(SystemNoticeEmail, {
+          name: "team",
+          appUrl,
+          logoUrl: `${appUrl}/logo-light.png`,
+          date,
+          heroLabel: "Contact Enquiry",
+          headline: "New contact enquiry",
+          details: [
+            { label: "From", value: `${args.name} <${args.email}>` },
+            { label: "Category", value: args.category },
+            { label: "Subject", value: args.subject },
+          ],
+          bodyText: args.message,
+          ctaHref: dashboardUrl,
+          ctaLabel: "View and reply",
+        }),
       });
     }
 
@@ -95,29 +98,27 @@ export const sendContactEnquiryReplyEmail = action({
 
     const appUrl =
       process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://49gig.com";
+    const date = formatDate();
 
     await sendEmail({
       to: enquiry.email,
       subject: `Re: ${enquiry.subject} – 49GIG Support`,
       replyTo: replier?.email,
-      react: React.createElement(
-        "div",
-        { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-        React.createElement("p", null, `Hi ${enquiry.name},`),
-        React.createElement("p", { style: { marginTop: "16px", whiteSpace: "pre-wrap" } }, enquiry.replyMessage),
-        replier
-          ? React.createElement(
-              "p",
-              { style: { marginTop: "16px", color: "#6b7280", fontSize: "14px" } },
-              `You can reply directly to this email to continue the conversation with ${replier.name} (${replier.email}).`
-            )
-          : null,
-        React.createElement("p", { style: { marginTop: "24px", color: "#6b7280", fontSize: "14px" } },
-          `You can also submit a new enquiry at ${appUrl}/contact.`
-        ),
-        React.createElement("p", { style: { marginTop: "16px" } }, "Best regards,"),
-        React.createElement("p", null, "The 49GIG Team")
-      ),
+      react: React.createElement(SystemNoticeEmail, {
+        name: enquiry.name,
+        appUrl,
+        logoUrl: `${appUrl}/logo-light.png`,
+        date,
+        heroLabel: "Support Reply",
+        headline: "Support replied to your enquiry",
+        bodyText: `${enquiry.replyMessage}${
+          replier
+            ? `\n\nYou can reply directly to this email to continue the conversation with ${replier.name} (${replier.email}).`
+            : ""
+        }\n\nBest regards,\nThe 49GIG Team`,
+        ctaHref: `${appUrl}/contact`,
+        ctaLabel: "Contact support",
+      }),
     });
   },
 });
@@ -144,37 +145,26 @@ export const sendContactEnquiryAssignmentEmailInternal = internalAction({
     const appUrl =
       process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://49gig.com";
     const dashboardUrl = `${appUrl}/dashboard/enquiries`;
+    const date = formatDate();
 
     await sendEmail({
       to: moderator.email,
       subject: `[49GIG] Contact enquiry assigned to you: ${enquiry.subject}`,
-      react: React.createElement(
-        "div",
-        { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-        React.createElement("p", null, `Hi ${moderator.name},`),
-        React.createElement(
-          "p",
-          { style: { marginTop: "16px" } },
-          "An admin has assigned a contact enquiry to you."
-        ),
-        React.createElement("p", { style: { marginTop: "12px" } }, React.createElement("strong", null, "From: "), `${enquiry.name} <${enquiry.email}>`),
-        React.createElement("p", null, React.createElement("strong", null, "Subject: "), enquiry.subject),
-        React.createElement("p", {
-          style: { marginTop: "16px", whiteSpace: "pre-wrap" },
-        }, enquiry.message),
-        React.createElement("a", {
-          href: dashboardUrl,
-          style: {
-            display: "inline-block",
-            marginTop: "24px",
-            padding: "12px 24px",
-            backgroundColor: "#2563eb",
-            color: "white",
-            textDecoration: "none",
-            borderRadius: "8px",
-          },
-        }, "Open enquiries in dashboard")
-      ),
+      react: React.createElement(SystemNoticeEmail, {
+        name: moderator.name,
+        appUrl,
+        logoUrl: `${appUrl}/logo-light.png`,
+        date,
+        heroLabel: "Contact Enquiry",
+        headline: "A contact enquiry was assigned to you",
+        details: [
+          { label: "From", value: `${enquiry.name} <${enquiry.email}>` },
+          { label: "Subject", value: enquiry.subject },
+        ],
+        bodyText: `An admin assigned this contact enquiry to you.\n\n${enquiry.message}`,
+        ctaHref: dashboardUrl,
+        ctaLabel: "Open enquiries",
+      }),
     });
   },
 });

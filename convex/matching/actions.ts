@@ -19,6 +19,7 @@ import {
   isFreelancerEligibleForProjectMatch,
   platformRoleIdForTeamRoleKey,
   freelancerHasExactSoftwareSubField,
+  MIN_REQUIRED_SKILL_OVERLAP_PERCENT,
 } from "../../lib/matching-skill-utils";
 import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 import { isFreelancerInMatchingPool } from "../../lib/freelancer-matching-readiness";
@@ -231,9 +232,10 @@ function freelancerMatchesExperience(
   allowLowerExperience: boolean
 ): boolean {
   const freelancerLevel = freelancer.profile?.experienceLevel || "mid";
-  if (freelancerLevel === requiredLevel) return true;
-  if (!allowLowerExperience) return false;
-  return experienceLevelIndex(freelancerLevel) < experienceLevelIndex(requiredLevel);
+  const freelancerIdx = experienceLevelIndex(freelancerLevel);
+  const requiredIdx = experienceLevelIndex(requiredLevel);
+  if (allowLowerExperience) return freelancerIdx < requiredIdx;
+  return freelancerIdx >= requiredIdx;
 }
 
 function computeOverallScore(breakdown: ScoringBreakdown): number {
@@ -916,7 +918,7 @@ export const generateMatchesForDraft = action({
       return { matchIds: [], isTeam: false, groupCount: 0, availability: null };
     }
 
-    // Exact experience by default. Lower levels are only included after explicit client opt-in.
+    // Default shows requested level or higher. Lower levels only appear after explicit client opt-in.
     const levelFiltered = approvedFreelancers.filter((a) => {
       return freelancerMatchesExperience(
         a.freelancer,
@@ -973,7 +975,7 @@ export const generateMatchesForDraft = action({
       const top10 = scores
         .filter((m) =>
           normalizedSkills.length > 0
-            ? m.breakdown.skillOverlap > 0
+            ? m.breakdown.skillOverlap >= MIN_REQUIRED_SKILL_OVERLAP_PERCENT
             : m.breakdown.skillOverlap >= 45
         )
         .slice(0, 10);
@@ -1004,7 +1006,7 @@ export const generateMatchesForDraft = action({
           );
           if (
             normalizedSkills.length > 0
-              ? breakdown.skillOverlap > 0
+              ? breakdown.skillOverlap >= MIN_REQUIRED_SKILL_OVERLAP_PERCENT
               : breakdown.skillOverlap >= 45
           ) {
             hasLowerLevelWithExactSkills = true;
@@ -1123,7 +1125,9 @@ export const generateMatchesForDraft = action({
         groupScores.sort((a, b) => b.score - a.score);
         const top10 = groupScores
           .filter((m) =>
-            slotSkills.length > 0 ? m.breakdown.skillOverlap > 0 : m.breakdown.skillOverlap >= 45
+            slotSkills.length > 0
+              ? m.breakdown.skillOverlap >= MIN_REQUIRED_SKILL_OVERLAP_PERCENT
+              : m.breakdown.skillOverlap >= 45
           )
           .slice(0, 10);
 
@@ -1205,7 +1209,7 @@ export const generateMatchesForDraft = action({
 
         groupScores.sort((a, b) => b.score - a.score);
         const top10 = groupScores
-          .filter((m) => m.breakdown.skillOverlap > 0)
+          .filter((m) => m.breakdown.skillOverlap >= MIN_REQUIRED_SKILL_OVERLAP_PERCENT)
           .slice(0, 10);
 
         for (const match of top10) {
@@ -1248,7 +1252,10 @@ export const generateMatchesForDraft = action({
             vettingScore,
             { requiredSkillSubset: spec.skills, categoryRoleId: spec.roleId }
           );
-          if (breakdown.skillOverlap > 0 && freelancerMatchesRole(freelancer.profile?.techField, spec.roleId)) {
+          if (
+            breakdown.skillOverlap >= MIN_REQUIRED_SKILL_OVERLAP_PERCENT &&
+            freelancerMatchesRole(freelancer.profile?.techField, spec.roleId)
+          ) {
             hasLowerLevelWithExactSkills = true;
             break;
           }

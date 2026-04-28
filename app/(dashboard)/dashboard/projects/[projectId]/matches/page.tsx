@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useAction } from "convex/react";
+import { makeFunctionReference } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -95,6 +96,18 @@ type FreelancerPublicProfile = {
   averageRating: number;
   reviewCount: number;
 };
+
+type FreelancerPublicProfileArgs = {
+  projectId: Id<"projects">;
+  freelancerId: Id<"users">;
+  userId: Id<"users">;
+};
+
+const getFreelancerPublicProfileRef = makeFunctionReference<
+  "query",
+  FreelancerPublicProfileArgs,
+  FreelancerPublicProfile | null
+>("matching/queries:getFreelancerPublicProfile");
 
 function FreelancerProfileContent({
   profile: data,
@@ -414,10 +427,11 @@ function LockedSelectionProfileCard({
   onViewProfile: () => void;
   continuePaymentHref: string;
 }) {
-  const profile = useQuery(
-    (api as any)["matching/queries"].getFreelancerPublicProfile as any,
-    { projectId, freelancerId, userId }
-  ) as FreelancerPublicProfile | null | undefined;
+  const profile = useQuery(getFreelancerPublicProfileRef, {
+    projectId,
+    freelancerId,
+    userId,
+  });
   if (profile === undefined) {
     return <Skeleton className="h-64 rounded-xl" />;
   }
@@ -483,7 +497,7 @@ export default function ProjectMatchesPage() {
   );
   const [viewingFreelancerId, setViewingFreelancerId] = useState<Id<"users"> | null>(null);
   const publicProfile = useQuery(
-    (api as any)["matching/queries"].getFreelancerPublicProfile,
+    getFreelancerPublicProfileRef,
     projectId && user?._id && viewingFreelancerId
       ? { projectId, freelancerId: viewingFreelancerId, userId: user._id }
       : "skip"
@@ -824,7 +838,7 @@ export default function ProjectMatchesPage() {
       } else {
         setMatchingAvailability(null);
       }
-      toast.success("Showing lower-level exact skill matches where available.");
+      toast.success("Showing lower-level matches where available.");
     } catch {
       toast.error("Couldn’t load lower-level matches. Try again shortly.");
     } finally {
@@ -1395,10 +1409,10 @@ export default function ProjectMatchesPage() {
                   {matchingAvailability.hasLowerLevelWithExactSkills ? (
                     <>
                       <p>
-                        We only show freelancers with the exact role, tech stack, skills, and experience level you selected.
+                        We only show freelancers with the right role, tech stack, and a strong skill overlap.
                       </p>
                       <p>
-                        We found lower-level freelancers with the exact required role and skills. You can review them if you want to widen this hire.
+                        We found lower-level freelancers with matching role and skills. You can review them if you want to widen this hire.
                       </p>
                       <Button
                         variant="outline"
@@ -1406,7 +1420,7 @@ export default function ProjectMatchesPage() {
                         onClick={() => void handleShowLowerLevelMatches()}
                         disabled={lowerLevelMatchingRunning}
                       >
-                        {lowerLevelMatchingRunning ? "Loading..." : "Show lower-level exact matches"}
+                        {lowerLevelMatchingRunning ? "Loading..." : "Show lower-level matches"}
                       </Button>
                     </>
                   ) : (
@@ -1579,7 +1593,7 @@ export default function ProjectMatchesPage() {
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         {matchingAvailability?.hasLowerLevelWithExactSkills
-                          ? "We have lower-level talent with the exact required role and skills. You can review them if you want to widen this hire."
+                          ? "We have lower-level talent with matching role and skills. You can review them if you want to widen this hire."
                           : "We'll match you with qualified talent once it becomes available. You can proceed with your other selections or check back later."}
                       </p>
                       {matchingAvailability?.hasLowerLevelWithExactSkills && (
@@ -1590,7 +1604,7 @@ export default function ProjectMatchesPage() {
                           onClick={() => void handleShowLowerLevelMatches()}
                           disabled={lowerLevelMatchingRunning}
                         >
-                          {lowerLevelMatchingRunning ? "Loading..." : "Show lower-level exact matches"}
+                          {lowerLevelMatchingRunning ? "Loading..." : "Show lower-level matches"}
                         </Button>
                       )}
                     </CardContent>

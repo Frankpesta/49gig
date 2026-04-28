@@ -4,6 +4,27 @@ import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import React from "react";
 import { sendEmail } from "../email/send";
+import { SystemNoticeEmail } from "../../emails/templates";
+
+function getAppUrl() {
+  return (
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://49gig.com"
+  );
+}
+
+function getLogoUrl(appUrl: string) {
+  return `${appUrl}/logo-light.png`;
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
 
 /**
  * Send KYC rejected email (reason + ask to resubmit)
@@ -17,28 +38,22 @@ export const sendKycRejectedEmail = internalAction({
   },
   handler: async (ctx, args) => {
     const stepLabel = args.step === "id" ? "ID verification" : "address verification";
+    const appUrl = getAppUrl();
     await sendEmail({
       to: args.email,
       subject: "49GIG KYC – Action required",
-      react: React.createElement(
-        "div",
-        { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-        React.createElement("h2", { style: { marginBottom: "16px" } }, "KYC update"),
-        React.createElement("p", null, `Hi ${args.name},`),
-        React.createElement("p", { style: { marginTop: "16px" } },
-          `Your ${stepLabel} could not be approved. Please review the reason below and resubmit.`
-        ),
-        React.createElement("p", { style: { marginTop: "16px", padding: "12px", background: "#f3f4f6", borderRadius: "8px" } },
-          "Reason: ",
-          args.reason
-        ),
-        React.createElement("p", { style: { marginTop: "16px" } },
-          "Log in and open Freelancer verification at /onboarding/verification to upload new documents. Use clear images or PDFs (max 5MB)."
-        ),
-        React.createElement("p", { style: { marginTop: "24px", color: "#6b7280", fontSize: "14px" } },
-          "If you have questions, contact support."
-        )
-      ),
+      react: React.createElement(SystemNoticeEmail, {
+        name: args.name,
+        appUrl,
+        logoUrl: getLogoUrl(appUrl),
+        date: formatDate(),
+        heroLabel: "KYC Update",
+        headline: "KYC action required",
+        details: [{ label: "Reason", value: args.reason }],
+        bodyText: `Your ${stepLabel} could not be approved. Please review the reason and resubmit clear images or PDFs from your verification page.`,
+        ctaHref: `${appUrl}/onboarding/verification`,
+        ctaLabel: "Continue verification",
+      }),
     });
     return { sent: true };
   },
@@ -53,24 +68,22 @@ export const sendKycApprovedEmail = internalAction({
     name: v.string(),
   },
   handler: async (ctx, args) => {
+    const appUrl = getAppUrl();
     await sendEmail({
       to: args.email,
       subject: "49GIG KYC approved – You’re all set",
-      react: React.createElement(
-        "div",
-        { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-        React.createElement("h2", { style: { marginBottom: "16px" } }, "KYC approved"),
-        React.createElement("p", null, `Hi ${args.name},`),
-        React.createElement("p", { style: { marginTop: "16px" } },
-          "Congratulations! Your identity and address verification have been approved. You can now enjoy full access to the platform and be matched with client projects."
-        ),
-        React.createElement("p", { style: { marginTop: "16px" } },
-          "Log in to your dashboard to view opportunities and start getting matched."
-        ),
-        React.createElement("p", { style: { marginTop: "24px", color: "#6b7280", fontSize: "14px" } },
-          "Welcome to 49GIG."
-        )
-      ),
+      react: React.createElement(SystemNoticeEmail, {
+        name: args.name,
+        appUrl,
+        logoUrl: getLogoUrl(appUrl),
+        date: formatDate(),
+        heroLabel: "KYC Approved",
+        headline: "Your KYC has been approved",
+        bodyText:
+          "Congratulations. Your identity and address verification have been approved. You now have full platform access and can be matched with client projects.",
+        ctaHref: `${appUrl}/dashboard`,
+        ctaLabel: "Open dashboard",
+      }),
     });
     return { sent: true };
   },
@@ -86,25 +99,23 @@ export const sendKycAccountRemovedEmail = internalAction({
     reason: v.string(),
   },
   handler: async (ctx, args) => {
+    const appUrl = getAppUrl();
     await sendEmail({
       to: args.email,
       subject: "49GIG account update",
-      react: React.createElement(
-        "div",
-        { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-        React.createElement("h2", { style: { marginBottom: "16px" } }, "Account update"),
-        React.createElement("p", null, `Hi ${args.name},`),
-        React.createElement("p", { style: { marginTop: "16px" } },
-          "After repeated unsuccessful KYC attempts, your account has been removed from the platform."
-        ),
-        React.createElement("p", { style: { marginTop: "16px", padding: "12px", background: "#fef2f2", borderRadius: "8px" } },
-          "Reason: ",
-          args.reason
-        ),
-        React.createElement("p", { style: { marginTop: "24px", color: "#6b7280", fontSize: "14px" } },
-          "If you believe this is an error, please contact support."
-        )
-      ),
+      react: React.createElement(SystemNoticeEmail, {
+        name: args.name,
+        appUrl,
+        logoUrl: getLogoUrl(appUrl),
+        date: formatDate(),
+        heroLabel: "Account Update",
+        headline: "Your account has been removed",
+        details: [{ label: "Reason", value: args.reason }],
+        bodyText:
+          "After repeated unsuccessful KYC attempts, your account has been removed from the platform. If you believe this is an error, please contact support.",
+        ctaHref: `${appUrl}/contact`,
+        ctaLabel: "Contact support",
+      }),
     });
     return { sent: true };
   },

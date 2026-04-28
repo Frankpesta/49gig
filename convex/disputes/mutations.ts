@@ -1072,6 +1072,19 @@ export const resolveDispute = mutation({
           type: "dispute",
           data: { disputeId: args.disputeId, projectId: dispute.projectId },
         });
+        await (
+          ctx.scheduler.runAfter as (
+            delayMs: number,
+            fn: unknown,
+            fnArgs: Record<string, unknown>
+          ) => Promise<unknown>
+        )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+          userIds: ruledAgainst,
+          subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+          headline: "Dispute resolved",
+          bodyText: decisionFreelancerMsg,
+          disputeId: args.disputeId,
+        });
       }
 
       if (isPartialTeamResolve) {
@@ -1079,12 +1092,26 @@ export const resolveDispute = mutation({
           (id) => !removedSet.has(String(id))
         );
         if (remainingNotify.length > 0) {
+          const partialMsg = `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`;
           await ctx.scheduler.runAfter(0, sendSystemNotification, {
             userIds: remainingNotify,
             title: "Dispute resolved",
-            message: `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`,
+            message: partialMsg,
             type: "dispute",
             data: { disputeId: args.disputeId, projectId: dispute.projectId },
+          });
+          await (
+            ctx.scheduler.runAfter as (
+              delayMs: number,
+              fn: unknown,
+              fnArgs: Record<string, unknown>
+            ) => Promise<unknown>
+          )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+            userIds: remainingNotify,
+            subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+            headline: "Dispute resolved",
+            bodyText: partialMsg,
+            disputeId: args.disputeId,
           });
         }
       }
@@ -1095,6 +1122,19 @@ export const resolveDispute = mutation({
         message: decisionFreelancerMsg,
         type: "dispute",
         data: { disputeId: args.disputeId, projectId: dispute.projectId },
+      });
+      await (
+        ctx.scheduler.runAfter as (
+          delayMs: number,
+          fn: unknown,
+          fnArgs: Record<string, unknown>
+        ) => Promise<unknown>
+      )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
+        userIds: uniqueFreelancerIds,
+        subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
+        headline: "Dispute resolved",
+        bodyText: decisionFreelancerMsg,
+        disputeId: args.disputeId,
       });
     }
 

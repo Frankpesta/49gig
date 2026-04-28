@@ -712,6 +712,47 @@ export function DisputeUpdateEmail({
   );
 }
 
+export function SystemNoticeEmail({
+  name = "there",
+  headline,
+  bodyText,
+  ctaHref,
+  ctaLabel,
+  details,
+  heroLabel = "49GIG Update",
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps & {
+  headline: string;
+  bodyText: string;
+  ctaHref?: string;
+  ctaLabel?: string;
+  details?: Array<{ label: string; value: string }>;
+  heroLabel?: string;
+}) {
+  return (
+    <EmailLayout
+      preview={headline}
+      heroLabel={heroLabel}
+      heroTitle={headline}
+      heroSubtitle="Sign in to your dashboard for full details and next steps."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>,
+      </Text>
+      {details && details.length > 0 && <InfoBlock rows={details} />}
+      <Text style={{ ...textStyle, marginTop: "12px", whiteSpace: "pre-wrap" as const }}>
+        {bodyText}
+      </Text>
+      {ctaHref && ctaLabel && <EmailButton href={ctaHref}>{ctaLabel}</EmailButton>}
+    </EmailLayout>
+  );
+}
+
 export function VerificationRejectedEmail({
   name = "there",
   reason,

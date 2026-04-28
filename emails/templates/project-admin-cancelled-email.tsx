@@ -1,4 +1,8 @@
 import * as React from "react";
+import { Text } from "@react-email/components";
+import { EmailButton } from "../components/EmailButton";
+import { EmailLayout } from "../components/EmailLayout";
+import { textStyle } from "../components/styles";
 
 export function ProjectAdminCancelledEmail({
   recipientName,
@@ -6,12 +10,16 @@ export function ProjectAdminCancelledEmail({
   roleLabel,
   dashboardUrl,
   appUrl,
+  logoUrl,
+  date,
 }: {
   recipientName: string;
   projectName: string;
   roleLabel: "client" | "freelancer";
   dashboardUrl: string;
   appUrl: string;
+  logoUrl?: string;
+  date: string;
 }) {
   const line =
     roleLabel === "client"
@@ -19,17 +27,23 @@ export function ProjectAdminCancelledEmail({
       : "An administrator has cancelled this hire. Please stop billable work on this project in the app.";
 
   return (
-    <div style={{ fontFamily: "sans-serif", lineHeight: 1.5 }}>
-      <p>Hi {recipientName},</p>
-      <p>
+    <EmailLayout
+      preview={`${projectName} has been cancelled by an administrator.`}
+      heroLabel="Hire Cancelled"
+      heroTitle="This hire has been cancelled."
+      heroSubtitle="Sign in to your dashboard for details and next steps."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{recipientName}</strong>,
+      </Text>
+      <Text style={textStyle}>
         <strong>{projectName}</strong> has been <strong>cancelled by an administrator</strong>.
-      </p>
-      <p>{line}</p>
-      <p>
-        <a href={dashboardUrl}>Open your dashboard</a>
-        {appUrl ? ` · ${appUrl}` : null}
-      </p>
-      <p>— 49GIG</p>
-    </div>
+      </Text>
+      <Text style={textStyle}>{line}</Text>
+      <EmailButton href={dashboardUrl}>Open dashboard</EmailButton>
+    </EmailLayout>
   );
 }
