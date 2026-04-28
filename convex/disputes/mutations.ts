@@ -2313,6 +2313,118 @@ export const processDisputeDeadlineInternal = internalMutation({
   },
 });
 
+export const finalizeDisputeProjectAfterResolutionInternal = internalMutation({
+  args: {
+    disputeId: v.id("disputes"),
+  },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute || dispute.status !== "resolved" || !dispute.resolution) {
+      return { finalized: false as const, reason: "dispute_not_resolved" as const };
+    }
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) {
+      return { finalized: false as const, reason: "project_not_found" as const };
+    }
+
+    const now = Date.now();
+    const { decision } = dispute.resolution;
+    const teamBasis =
+      dispute.teamEscrowBasisFreelancerIds && dispute.teamEscrowBasisFreelancerIds.length > 0
+        ? dispute.teamEscrowBasisFreelancerIds
+        : project.matchedFreelancerIds ?? [];
+    const disputedIds = dispute.disputedFreelancerIds ?? [];
+    const isPartialTeam =
+      teamBasis.length > 1 &&
+      disputedIds.length > 0 &&
+      disputedIds.length < teamBasis.length;
+
+    let status: Doc<"projects">["status"];
+    if (decision === "client_favor") {
+      status = isPartialTeam ? "in_progress" : "matching";
+    } else if (decision === "replacement") {
+      status = "matching";
+    } else {
+      status = "in_progress";
+    }
+
+    const projectPatch: Partial<Doc<"projects">> = {
+      status,
+      updatedAt: now,
+    };
+
+    if (decision === "client_favor" || decision === "replacement") {
+      const removed = freelancersRemovedForPermanentExclusion(project, dispute);
+      if (removed.length > 0) {
+        projectPatch.permanentlyExcludedFreelancerIds = mergePermanentExclusions(
+          project.permanentlyExcludedFreelancerIds,
+          removed
+        );
+      }
+
+      if (isPartialTeam) {
+        const removedSet = new Set(disputedIds.map(String));
+        const remainingIds = (project.matchedFreelancerIds ?? []).filter(
+          (id) => !removedSet.has(String(id))
+        );
+        const nextSelected = (project.selectedFreelancerIds ?? []).filter(
+          (id) => !removedSet.has(String(id))
+        );
+        projectPatch.matchedFreelancerIds = remainingIds;
+        projectPatch.selectedFreelancerIds = nextSelected.length > 0 ? nextSelected : undefined;
+        projectPatch.status = "in_progress";
+      } else if ((project.matchedFreelancerIds?.length ?? 0) > 0) {
+        projectPatch.matchedFreelancerIds = [];
+        projectPatch.selectedFreelancerIds = undefined;
+        projectPatch.selectedFreelancerId = undefined;
+      } else {
+        projectPatch.matchedFreelancerId = undefined;
+        projectPatch.selectedFreelancerId = undefined;
+      }
+    }
+
+    await ctx.db.patch(dispute.projectId, projectPatch);
+
+    if (decision === "client_favor" || decision === "replacement") {
+      await ensureReplacementMatchingProjectFields(ctx, {
+        projectId: dispute.projectId,
+        disputeId: args.disputeId,
+        now,
+        partialDisputedFreelancerIds: isPartialTeam ? disputedIds : undefined,
+      });
+
+      const removedSweep = freelancersRemovedForPermanentExclusion(project, dispute);
+      if (removedSweep.length > 0) {
+        await ctx.runMutation(
+          internalApi.projects.mutations.sweepFreelancersRemovedFromProjectInternal,
+          {
+            projectId: dispute.projectId,
+            freelancerIds: removedSweep,
+          }
+        );
+      }
+    }
+
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorRole: "system",
+      eventType: "dispute_project_status_finalized",
+      title: "Hire status finalized",
+      description: `Hire moved to ${status.replace(/_/g, " ")} after dispute enforcement.`,
+      metadata: {
+        decision,
+        isPartialTeam,
+        disputedFreelancerIds: disputedIds,
+      },
+      createdAt: now,
+    });
+
+    return { finalized: true as const, status };
+  },
+});
+
 export const backfillProfessionalDisputeLifecycleInternal = internalMutation({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {

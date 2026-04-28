@@ -388,6 +388,13 @@ export const releaseDisputeFunds = action({
       }
     }
 
+    await ctx.runMutation(
+      internal.disputes.mutations.finalizeDisputeProjectAfterResolutionInternal,
+      {
+        disputeId: args.disputeId,
+      }
+    );
+
     // Ensure replacement candidates are generated immediately for client-favor outcomes.
     if (decision === "client_favor") {
       if (project.intakeForm?.hireType === "team") {
