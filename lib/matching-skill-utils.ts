@@ -13,6 +13,8 @@ import {
 } from "./platform-skills";
 import { freelancerHasVerifiedPhoneForMatching } from "./freelancer-profile-links";
 
+export const MIN_REQUIRED_SKILL_OVERLAP_PERCENT = 50;
+
 function isSoftwareDevSubFieldId(value: string): boolean {
   return SOFTWARE_DEV_FIELDS.some((f) => f.id === value);
 }
@@ -123,6 +125,15 @@ export function freelancerMatchesAllRequiredSkills(
   return requiredSkills.every((skill) => fs.some((f) => skillMatches(skill, f)));
 }
 
+export function freelancerMeetsRequiredSkillThreshold(
+  requiredSkills: string[],
+  freelancerSkills: string[] | undefined,
+  minPercent = MIN_REQUIRED_SKILL_OVERLAP_PERCENT
+): boolean {
+  if (requiredSkills.length === 0) return true;
+  return calculateSkillOverlapPercent(requiredSkills, freelancerSkills ?? []) >= minPercent;
+}
+
 /**
  * Skill overlap 0–100. Empty required → 0 (caller should use category fallback).
  */
@@ -139,7 +150,7 @@ export function calculateSkillOverlapPercent(
 }
 
 /**
- * Hard gate: SMS-verified phone + techField category + every required skill.
+ * Hard gate: SMS-verified phone + techField category + enough required skills.
  * Portfolio links are enforced during onboarding / profile save, not here.
  *
  * techField is ALWAYS enforced as a category gate (when set), regardless of whether skills
@@ -173,9 +184,9 @@ export function isFreelancerEligibleForProjectMatch(
     return false;
   }
 
-  // Skill gate — when the slot/project specifies required skills, every skill must be present.
+  // Skill gate — enough overlap keeps matching useful without requiring every nice-to-have.
   if (normalizedRequired.length > 0) {
-    if (!freelancerMatchesAllRequiredSkills(normalizedRequired, freelancer.profile?.skills)) {
+    if (!freelancerMeetsRequiredSkillThreshold(normalizedRequired, freelancer.profile?.skills)) {
       return false;
     }
   }
@@ -195,8 +206,7 @@ export function isFreelancerEligibleForProjectMatch(
  *
  * Returns true when:
  *  - the budgetRoleKey is not a recognised software-dev sub-field (no constraint to apply), OR
- *  - the sub-field is "fullstack_dev" (can fill any software-dev seat), OR
- *  - the freelancer has at least one skill from the sub-field's canonical skill list.
+ *  - the freelancer has at least one skill from the target sub-field's canonical list.
  */
 export function freelancerFitsSubField(
   freelancerSkills: string[] | undefined,
@@ -213,11 +223,16 @@ export function freelancerFitsSubField(
 }
 
 export function freelancerHasExactSoftwareSubField(
-  freelancer: { profile?: { softwareDevFields?: string[]; primaryRole?: string } },
+  freelancer: { profile?: { softwareDevFields?: string[]; primaryRole?: string; skills?: string[] } },
   budgetRoleKey: string
 ): boolean {
   if (!isSoftwareDevSubFieldId(budgetRoleKey)) return true;
-  if ((freelancer.profile?.softwareDevFields ?? []).includes(budgetRoleKey)) {
+  const savedSubFields = freelancer.profile?.softwareDevFields ?? [];
+  if (savedSubFields.length > 0) {
+    return savedSubFields.includes(budgetRoleKey);
+  }
+  // Legacy profiles may not have softwareDevFields yet, so use skills/primaryRole as fallback.
+  if (freelancerFitsSubField(freelancer.profile?.skills, budgetRoleKey)) {
     return true;
   }
   const roleLabel = SOFTWARE_DEV_FIELDS.find((f) => f.id === budgetRoleKey)?.label;

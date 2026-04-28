@@ -16,10 +16,11 @@ Transactional emails sent via Resend (`convex/email/send.ts`).
 | Email | Trigger | Recipient | Template |
 |-------|---------|-----------|----------|
 | **Project created** | Client creates project | Client | `ProjectCreatedEmail` |
-| **Project created (admin)** | Client creates project | Admins | Raw HTML |
+| **Project created (admin)** | Client creates project | Admins | `AdminNewProjectEmail` |
 | **Match confirmed** | Client accepts match | Client | `MatchFoundClientEmail` |
 | **Match confirmed** | Client accepts match | Freelancer(s) | `OpportunityMatchFreelancerEmail` |
-| **Match confirmed (admin)** | Client accepts match | Admins | Raw HTML |
+| **Match confirmed (admin)** | Client accepts match | Admins | `AdminMatchConfirmedEmail` |
+| **Hire cancelled by admin** | Admin cancels an active hire | Client + Freelancer(s) | `ProjectAdminCancelledEmail` |
 | **Unfunded reminder** | 7 or 3 days before deletion | Client | `UnfundedProjectReminderEmail` |
 | **Monthly cycle pending** | Cron (daily) | Client | `MonthlyCyclePendingReminderEmail` |
 
@@ -27,8 +28,10 @@ Transactional emails sent via Resend (`convex/email/send.ts`).
 
 | Email | Trigger | Recipient | Template |
 |-------|---------|-----------|----------|
-| **New contact enquiry** | Contact form submit | Admins | Raw HTML |
-| **Contact enquiry reply** | Admin replies to enquiry | Enquirer | Raw HTML |
+| **New contact enquiry** | Contact form submit | Admins | `SystemNoticeEmail` |
+| **Contact enquiry reply** | Admin replies to enquiry | Enquirer | `SystemNoticeEmail` |
+| **Contact enquiry assigned** | Admin assigns enquiry | Moderator | `SystemNoticeEmail` |
+| **Support chat assigned** | Admin assigns support chat | Moderator | `SystemNoticeEmail` |
 
 ## Contracts
 
@@ -43,6 +46,27 @@ Transactional emails sent via Resend (`convex/email/send.ts`).
 |-------|---------|-----------|----------|
 | **Session scheduled** | One-on-one or kickoff booked | Client, Freelancer(s), Moderators | `OneOnOneSessionScheduledEmail` |
 
+## Disputes
+
+| Email | Trigger | Recipient | Template |
+|-------|---------|-----------|----------|
+| **Dispute opened** | Client/freelancer opens a dispute | Other dispute parties | `DisputeUpdateEmail` |
+| **Dispute assigned** | Staff assigns a moderator/admin | Assignee | `DisputeUpdateEmail` |
+| **Dispute resolved** | Staff or automation resolves a dispute | Client + affected Freelancer(s) | `DisputeUpdateEmail` |
+| **Dispute escalated** | Moderator escalates for admin review | Dispute parties + Admins | `DisputeUpdateEmail` |
+| **Dispute closed** | Staff closes a resolved dispute | Dispute parties | `DisputeUpdateEmail` |
+| **Dispute cancelled** | Initiator cancels an open/under-review dispute | Other dispute parties | `DisputeUpdateEmail` |
+
+## Verification & KYC
+
+| Email | Trigger | Recipient | Template |
+|-------|---------|-----------|----------|
+| **Freelancer verification unsuccessful** | Staff terminates verification | Freelancer | `VerificationTerminatedEmail` |
+| **Verification incomplete reminder** | Verification reminder job | Freelancer | `VerificationIncompleteReminderEmail` |
+| **KYC action required** | KYC document rejected | Freelancer | `SystemNoticeEmail` |
+| **KYC approved** | KYC approved | Freelancer | `SystemNoticeEmail` |
+| **Account removed after KYC failures** | Repeated KYC failure removal | Freelancer | `SystemNoticeEmail` |
+
 ## Crons (defined in `convex/crons.ts`)
 
 | Cron | Schedule | Description |
@@ -53,4 +77,4 @@ Transactional emails sent via Resend (`convex/email/send.ts`).
 | auto-release milestones | Every hour | Release approved milestones past autoReleaseAt |
 | cleanup expired sessions | Every hour | Remove expired sessions |
 
-**Note:** In-app notifications use `sendSystemNotification` (not email). Email is only sent via `sendEmail` in the actions above.
+**Note:** In-app notifications use `sendSystemNotification` (not email). Transactional email is sent via `sendEmail`, and all email bodies should render through the shared React email layout.

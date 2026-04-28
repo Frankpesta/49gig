@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import { sendEmail } from "../email/send";
 import React from "react";
+import { SystemNoticeEmail } from "../../emails/templates";
 
 const internalAny = require("../_generated/api").internal as any;
 
@@ -31,33 +32,27 @@ export const sendSupportChatAssignedEmailInternal = internalAction({
     const appUrl =
       process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://49gig.com";
     const threadUrl = `${appUrl}/dashboard/chat/support/${args.chatId}`;
+    const date = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
 
     await sendEmail({
       to: moderator.email,
       subject: `[49GIG] Support assigned: ${chat.title ?? "New thread"}`,
-      react: React.createElement(
-        "div",
-        { style: { fontFamily: "sans-serif", padding: "24px", maxWidth: "600px" } },
-        React.createElement("p", null, `Hi ${moderator.name ?? "there"},`),
-        React.createElement(
-          "p",
-          { style: { marginTop: "16px" } },
-          "An admin assigned a support conversation to you."
-        ),
-        React.createElement("p", { style: { marginTop: "12px" } }, React.createElement("strong", null, "Subject: "), chat.title ?? "(no subject)"),
-        React.createElement("a", {
-          href: threadUrl,
-          style: {
-            display: "inline-block",
-            marginTop: "24px",
-            padding: "12px 24px",
-            backgroundColor: "#2563eb",
-            color: "white",
-            textDecoration: "none",
-            borderRadius: "8px",
-          },
-        }, "Open support thread")
-      ),
+      react: React.createElement(SystemNoticeEmail, {
+        name: moderator.name ?? "there",
+        appUrl,
+        logoUrl: `${appUrl}/logo-light.png`,
+        date,
+        heroLabel: "Support",
+        headline: "A support conversation was assigned to you",
+        details: [{ label: "Subject", value: chat.title ?? "(no subject)" }],
+        bodyText: "An admin assigned this support conversation to you.",
+        ctaHref: threadUrl,
+        ctaLabel: "Open support thread",
+      }),
     });
   },
 });

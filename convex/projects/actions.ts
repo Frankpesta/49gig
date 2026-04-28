@@ -380,6 +380,8 @@ export const sendHireAdminCancelledEmailsInternal = internalAction({
     const appUrl = getAppUrl();
     const dashboardUrl = `${appUrl}/dashboard/projects/${args.projectId}`;
     const projectName = project.intakeForm?.title ?? "Your hire";
+    const logoUrl = getLogoUrl(appUrl);
+    const date = formatDate();
 
     if (client?.email) {
       await sendEmail({
@@ -391,6 +393,8 @@ export const sendHireAdminCancelledEmailsInternal = internalAction({
           roleLabel: "client",
           dashboardUrl,
           appUrl,
+          logoUrl,
+          date,
         }),
       });
     }
@@ -415,6 +419,8 @@ export const sendHireAdminCancelledEmailsInternal = internalAction({
             roleLabel: "freelancer",
             dashboardUrl,
             appUrl,
+            logoUrl,
+            date,
           }),
         });
       }
