@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { api } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import * as flutterwave from "./flutterwave";
+import { assertUsdCurrency } from "../currencyPolicy";
 
 const internalAny: any = require("../_generated/api").internal;
 const apiAny: any = require("../_generated/api").api;
@@ -201,7 +202,16 @@ export const createPaymentIntent = action({
       throw new Error("A payment is already being processed for this project. Please wait or contact support.");
     }
 
-    const fundingGrossAmount = args.amount;
+    assertUsdCurrency(args.currency, "createPaymentIntent");
+    assertUsdCurrency(project.currency || "usd", "createPaymentIntent project");
+    if (!Number.isFinite(args.amount) || args.amount <= 0) {
+      throw new Error("Invalid payment amount");
+    }
+    if (Math.abs(args.amount - project.totalAmount) > 0.01) {
+      throw new Error("Payment amount must match the hire total");
+    }
+
+    const fundingGrossAmount = project.totalAmount;
     const currencyLower = args.currency.toLowerCase();
     const spendableCents = await ctx.runQuery(
       internalAny.wallets.queries.getClientSpendableWalletCentsInternal,
@@ -279,13 +289,12 @@ export const createPaymentIntent = action({
     });
 
     // Create payment record in database
-    const defaultPlatformFee = project.platformFee ?? await ctx.runQuery(
+    const platformFeePercent = project.platformFee ?? await ctx.runQuery(
       internalAny.platformSettings.queries.getPlatformFeePercentageInternal,
       {}
     );
-    const platformFee = defaultPlatformFee;
-    const platformFeeAmount = (fundingGrossAmount * platformFee) / 100;
-    const netAmount = fundingGrossAmount - platformFeeAmount;
+    const platformFeeAmountUsd = (fundingGrossAmount * platformFeePercent) / 100;
+    const netAmount = fundingGrossAmount - platformFeeAmountUsd;
 
     const paymentId = await ctx.runMutation(
       internalAny.payments.mutations.createPayment,
@@ -294,7 +303,7 @@ export const createPaymentIntent = action({
         type: "pre_funding",
         amount: flutterwaveAmount,
         currency: currencyLower,
-        platformFee: platformFeeAmount,
+        platformFee: platformFeeAmountUsd,
         netAmount: netAmount,
         fundingGrossAmount,
         clientWalletCreditApplied:
@@ -358,6 +367,7 @@ export const createTopUpPaymentIntent = action({
     if (project.status !== "in_progress" && project.status !== "cancelled") {
       throw new Error("Add payment is only available for active hires or ended hires you can reactivate");
     }
+    assertUsdCurrency(project.currency || "usd", "createTopUpPaymentIntent");
 
     const monthsToFund = Math.max(1, Math.floor(args.monthsToFund));
     const raw = project.intakeForm?.projectDuration;
@@ -397,11 +407,11 @@ export const createTopUpPaymentIntent = action({
       },
     });
 
-    const platformFee =
+    const platformFeePercent =
       project.platformFee ??
       (await ctx.runQuery(internalAny.platformSettings.queries.getPlatformFeePercentageInternal, {}));
-    const platformFeeAmount = (amount * platformFee) / 100;
-    const netAmount = amount - platformFeeAmount;
+    const platformFeeAmountUsd = (amount * platformFeePercent) / 100;
+    const netAmount = amount - platformFeeAmountUsd;
 
     const paymentId = await ctx.runMutation(internalAny.payments.mutations.createPayment, {
       projectId: args.projectId,
@@ -409,7 +419,7 @@ export const createTopUpPaymentIntent = action({
       topUpMonths: monthsToFund,
       amount,
       currency: project.currency || "usd",
-      platformFee: platformFeeAmount,
+      platformFee: platformFeeAmountUsd,
       netAmount,
       flutterwaveTransactionId: txRef,
       flutterwaveCustomerEmail: user.email,

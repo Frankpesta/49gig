@@ -7,6 +7,11 @@ import { resolveTargetTeamSize } from "../../lib/budget-calculator";
 import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
 import { clearReplacementFlowFieldsOnProject } from "./replacement";
 import { assertUsdCurrency } from "../currencyPolicy";
+import {
+  assertNonNegativeFiniteAmount,
+  assertNonNegativeIntegerCents,
+  assertPlatformFeePercent,
+} from "../disputes/amounts";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -47,6 +52,30 @@ async function getCurrentUserInMutation(
     return null;
   }
   return userDoc;
+}
+
+function validateTeamBudgetBreakdown(
+  breakdown: Record<string, number> | undefined
+): Record<string, number> | undefined {
+  if (!breakdown) return undefined;
+  for (const [role, amountCents] of Object.entries(breakdown)) {
+    if (!role.trim()) {
+      throw new Error("Team budget breakdown role keys must be non-empty");
+    }
+    assertNonNegativeIntegerCents(
+      amountCents,
+      `Team budget breakdown for ${role}`
+    );
+  }
+  return breakdown;
+}
+
+function validateFundUpfrontMonths(months: number | undefined): number | undefined {
+  if (months === undefined) return undefined;
+  if (!Number.isFinite(months) || Math.floor(months) !== months || months < 1) {
+    throw new Error("Fund upfront months must be a positive whole number");
+  }
+  return months;
 }
 
 /**
@@ -214,6 +243,22 @@ export const createProject = mutation({
       }
     }
 
+    assertUsdCurrency(args.currency, "createProject");
+    const totalAmount = assertNonNegativeFiniteAmount(
+      args.totalAmount,
+      "Project total amount"
+    );
+    const platformFee = assertPlatformFeePercent(args.platformFee);
+    const fundUpfrontMonths = validateFundUpfrontMonths(args.fundUpfrontMonths);
+    const teamBudgetBreakdown = validateTeamBudgetBreakdown(
+      args.teamBudgetBreakdown
+    );
+    const intakeForm = {
+      ...args.intakeForm,
+      budget: totalAmount,
+      estimatedBudget: totalAmount,
+    };
+
     const now = Date.now();
 
     // Calculate escrowed amount (will be 0 until funded)
@@ -222,14 +267,14 @@ export const createProject = mutation({
     // Create project
     const projectId = await ctx.db.insert("projects", {
       clientId: user._id,
-      intakeForm: args.intakeForm,
+      intakeForm,
       status: "draft",
-      totalAmount: args.totalAmount,
+      totalAmount,
       escrowedAmount,
-      platformFee: args.platformFee,
+      platformFee,
       currency: args.currency,
-      fundUpfrontMonths: args.fundUpfrontMonths,
-      teamBudgetBreakdown: args.teamBudgetBreakdown,
+      fundUpfrontMonths,
+      teamBudgetBreakdown,
       createdAt: now,
       updatedAt: now,
     });
@@ -243,8 +288,8 @@ export const createProject = mutation({
       targetType: "project",
       targetId: projectId,
       details: {
-        title: args.intakeForm.title,
-        budget: args.totalAmount,
+        title: intakeForm.title,
+        budget: totalAmount,
       },
       createdAt: now,
     });
@@ -257,7 +302,7 @@ export const createProject = mutation({
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [user._id],
       title: "Project created",
-      message: `Your project "${args.intakeForm.title}" was created.`,
+      message: `Your project "${intakeForm.title}" was created.`,
       type: "project",
       data: { projectId },
     });
@@ -267,12 +312,12 @@ export const createProject = mutation({
       projectId,
       clientEmail: user.email,
       clientName: user.name,
-      projectName: args.intakeForm.title,
+      projectName: intakeForm.title,
     });
 
     // Notify admins
     await ctx.scheduler.runAfter(0, internalAny.projects.actions.sendProjectCreatedAdminEmail, {
-      projectName: args.intakeForm.title,
+      projectName: intakeForm.title,
       projectId,
     });
 
@@ -322,24 +367,34 @@ export const updateProject = mutation({
       updatedAt: Date.now(),
     };
 
+    const nextTotalAmount =
+      args.totalAmount !== undefined
+        ? assertNonNegativeFiniteAmount(args.totalAmount, "Project total amount")
+        : undefined;
+
     if (args.intakeForm) {
       updates.intakeForm = { ...project.intakeForm, ...args.intakeForm };
+      const amountForIntake = nextTotalAmount ?? project.totalAmount;
+      updates.intakeForm.budget = amountForIntake;
+      updates.intakeForm.estimatedBudget = amountForIntake;
     }
 
-    if (args.totalAmount !== undefined) {
-      updates.totalAmount = args.totalAmount;
+    if (nextTotalAmount !== undefined) {
+      updates.totalAmount = nextTotalAmount;
     }
 
     if (args.platformFee !== undefined) {
-      updates.platformFee = args.platformFee;
+      updates.platformFee = assertPlatformFeePercent(args.platformFee);
     }
 
     if (args.fundUpfrontMonths !== undefined) {
-      updates.fundUpfrontMonths = args.fundUpfrontMonths;
+      updates.fundUpfrontMonths = validateFundUpfrontMonths(args.fundUpfrontMonths);
     }
 
     if (args.teamBudgetBreakdown !== undefined) {
-      updates.teamBudgetBreakdown = args.teamBudgetBreakdown;
+      updates.teamBudgetBreakdown = validateTeamBudgetBreakdown(
+        args.teamBudgetBreakdown
+      );
     }
 
     await ctx.db.patch(args.projectId, updates);

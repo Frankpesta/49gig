@@ -417,7 +417,7 @@ export default function EditProjectPage() {
       await updateProject({
         projectId,
         userId: user._id,
-        fundUpfrontMonths: 0,
+        fundUpfrontMonths: Math.max(1, durationMonths),
         totalAmount,
         platformFee,
         teamBudgetBreakdown,

@@ -3,7 +3,11 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
-import { escrowNetToClientLockedGross } from "./amounts";
+import {
+  dollarsToCents,
+  escrowNetToClientLockedGross,
+  assertNonNegativeIntegerCents,
+} from "./amounts";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 import {
   freelancersRemovedForPermanentExclusion,
@@ -109,6 +113,38 @@ async function ensureReplacementMatchingProjectFields(
   }
 
   await ctx.db.patch(args.projectId, patch as any);
+}
+
+async function disputeNetScopeCents(
+  ctx: MutationCtx,
+  project: Doc<"projects">,
+  dispute: Doc<"disputes">
+): Promise<number> {
+  const teamBasis =
+    dispute.teamEscrowBasisFreelancerIds && dispute.teamEscrowBasisFreelancerIds.length > 0
+      ? dispute.teamEscrowBasisFreelancerIds
+      : project.matchedFreelancerIds ?? [];
+  const disputedIds = dispute.disputedFreelancerIds ?? [];
+  const isPartialTeam =
+    teamBasis.length > 0 &&
+    disputedIds.length > 0 &&
+    disputedIds.length < teamBasis.length;
+  const poolCents = dispute.monthlyCycleId
+    ? Math.max(0, ((await ctx.db.get(dispute.monthlyCycleId))?.amountCents ?? 0))
+    : dollarsToCents(project.escrowedAmount ?? 0);
+
+  if (!isPartialTeam) {
+    return poolCents;
+  }
+
+  const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+    ctx,
+    project._id,
+    teamBasis,
+    project.teamBudgetBreakdown,
+    poolCents
+  );
+  return sumShareCentsForFreelancers(shareMap, disputedIds);
 }
 
 /** Audit when client refund gross is below dispute.lockedAmount because escrow could not cover it. */
@@ -801,6 +837,24 @@ export const resolveDispute = mutation({
 
     const now = Date.now();
 
+    let resolutionAmountCents: number | undefined;
+    if (args.decision === "partial") {
+      if (args.resolutionAmount == null) {
+        throw new Error("Resolution amount is required for partial decisions");
+      }
+      resolutionAmountCents = assertNonNegativeIntegerCents(
+        Math.round(args.resolutionAmount),
+        "Resolution amount"
+      );
+      if (resolutionAmountCents <= 0) {
+        throw new Error("Resolution amount must be greater than zero");
+      }
+      const maxResolutionCents = await disputeNetScopeCents(ctx, project, dispute);
+      if (resolutionAmountCents > maxResolutionCents) {
+        throw new Error("Resolution amount cannot exceed the disputed escrow amount");
+      }
+    }
+
     const sendSystemNotification =
       api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
         "action",
@@ -838,7 +892,7 @@ export const resolveDispute = mutation({
       status: "resolved",
       resolution: {
         decision: args.decision,
-        resolutionAmount: args.resolutionAmount,
+        resolutionAmount: resolutionAmountCents,
         notes: args.notes,
         clientMessage: decisionClientMsg,
         freelancerMessage: decisionFreelancerMsg,
@@ -1054,7 +1108,7 @@ export const resolveDispute = mutation({
       targetId: args.disputeId,
       details: {
         decision: args.decision,
-        resolutionAmount: args.resolutionAmount,
+        resolutionAmount: resolutionAmountCents,
       },
       createdAt: now,
     });
@@ -1095,6 +1149,24 @@ export const resolveDisputeInternal = internalMutation({
 
     const now = Date.now();
 
+    let resolutionAmountCents: number | undefined;
+    if (args.decision === "partial") {
+      if (args.resolutionAmount == null) {
+        throw new Error("Resolution amount is required for partial decisions");
+      }
+      resolutionAmountCents = assertNonNegativeIntegerCents(
+        Math.round(args.resolutionAmount),
+        "Resolution amount"
+      );
+      if (resolutionAmountCents <= 0) {
+        throw new Error("Resolution amount must be greater than zero");
+      }
+      const maxResolutionCents = await disputeNetScopeCents(ctx, project, dispute);
+      if (resolutionAmountCents > maxResolutionCents) {
+        throw new Error("Resolution amount cannot exceed the disputed escrow amount");
+      }
+    }
+
     const releaseDisputeFunds =
       api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
 
@@ -1102,7 +1174,7 @@ export const resolveDisputeInternal = internalMutation({
       status: "resolved",
       resolution: {
         decision: args.decision,
-        resolutionAmount: args.resolutionAmount,
+        resolutionAmount: resolutionAmountCents,
         notes: args.notes,
         resolvedAt: now,
       },

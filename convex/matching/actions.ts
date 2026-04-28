@@ -18,8 +18,7 @@ import {
   calculateSkillOverlapPercent,
   isFreelancerEligibleForProjectMatch,
   platformRoleIdForTeamRoleKey,
-  freelancerMatchesAtLeastOneRequiredSkill,
-  freelancerFitsSubField,
+  freelancerHasExactSoftwareSubField,
 } from "../../lib/matching-skill-utils";
 import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 import { isFreelancerInMatchingPool } from "../../lib/freelancer-matching-readiness";
@@ -219,6 +218,24 @@ const SCORING_WEIGHTS = {
   pastPerformance: 0.1,
 };
 
+const EXPERIENCE_LEVELS = ["junior", "mid", "senior", "expert"] as const;
+
+function experienceLevelIndex(level: string | undefined): number {
+  const i = EXPERIENCE_LEVELS.indexOf(level as (typeof EXPERIENCE_LEVELS)[number]);
+  return i >= 0 ? i : 1;
+}
+
+function freelancerMatchesExperience(
+  freelancer: Doc<"users">,
+  requiredLevel: string,
+  allowLowerExperience: boolean
+): boolean {
+  const freelancerLevel = freelancer.profile?.experienceLevel || "mid";
+  if (freelancerLevel === requiredLevel) return true;
+  if (!allowLowerExperience) return false;
+  return experienceLevelIndex(freelancerLevel) < experienceLevelIndex(requiredLevel);
+}
+
 function computeOverallScore(breakdown: ScoringBreakdown): number {
   return (
     breakdown.skillOverlap * SCORING_WEIGHTS.skillOverlap +
@@ -329,6 +346,8 @@ export const generateMatches = action({
     const intakeForm = project.intakeForm;
     const normalizedSkills = normalizeRequiredSkillsForMatching(intakeForm);
     const projectRoleId = projectPrimaryRoleId(intakeForm);
+    const requestedLevel = intakeForm.experienceLevel || "mid";
+    const requestedSoftwareSubField = intakeForm.softwareDevFields?.[0];
 
     // Calculate scores for each freelancer
     const scores: Array<{
@@ -362,6 +381,15 @@ export const generateMatches = action({
           normalizedSkills,
           projectRoleId
         )
+      ) {
+        continue;
+      }
+      if (!freelancerMatchesExperience(freelancer, requestedLevel, false)) {
+        continue;
+      }
+      if (
+        requestedSoftwareSubField &&
+        !freelancerHasExactSoftwareSubField(freelancer, requestedSoftwareSubField)
       ) {
         continue;
       }
@@ -584,8 +612,12 @@ export const generateTeamMatches = action({
             continue;
           }
 
+          if (!freelancerMatchesExperience(freelancer, spec.experienceLevel, false)) {
+            continue;
+          }
+
           // Sub-field gate: distinguish frontend/backend/mobile/etc. within software_development.
-          if (!freelancerFitsSubField(freelancer.profile?.skills, spec.roleKey)) continue;
+          if (!freelancerHasExactSoftwareSubField(freelancer, spec.roleKey)) continue;
 
           const matchResult = matchFreelancerToRole(
             freelancer,
@@ -672,6 +704,16 @@ export const generateTeamMatches = action({
           ) {
             continue;
           }
+          if (
+            !freelancerMatchesExperience(
+              freelancer,
+              intakeForm.experienceLevel as string,
+              false
+            )
+          ) {
+            continue;
+          }
+          if (!freelancerHasExactSoftwareSubField(freelancer, role)) continue;
 
           const matchResult = matchFreelancerToRole(
             freelancer,
@@ -811,6 +853,7 @@ export const generateTeamMatches = action({
 export const generateMatchesForDraft = action({
   args: {
     projectId: v.id("projects"),
+    allowLowerExperience: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const project = await ctx.runQuery(
@@ -833,11 +876,8 @@ export const generateMatchesForDraft = action({
     const normalizedSkills = normalizeRequiredSkillsForMatching(intakeForm);
     const projectRoleId = projectPrimaryRoleId(intakeForm);
     const requestedLevel = intakeForm.experienceLevel || "mid";
-    const LEVEL_ORDER = ["junior", "mid", "senior", "expert"] as const;
-    const levelIndex = (l: string) => {
-      const i = LEVEL_ORDER.indexOf(l as (typeof LEVEL_ORDER)[number]);
-      return i >= 0 ? i : 1;
-    };
+    const allowLowerExperience = args.allowLowerExperience === true;
+    const requestedSoftwareSubField = intakeForm.softwareDevFields?.[0];
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
 
     const verifiedFreelancers = (allUsers || []).filter((u: any) =>
@@ -876,18 +916,18 @@ export const generateMatchesForDraft = action({
       return { matchIds: [], isTeam: false, groupCount: 0, availability: null };
     }
 
-    // Filter by experience level: include freelancers at the requested level or above.
-    // Over-qualified freelancers (senior for a mid role) are better than zero matches.
+    // Exact experience by default. Lower levels are only included after explicit client opt-in.
     const levelFiltered = approvedFreelancers.filter((a) => {
-      const fl = a.freelancer.profile?.experienceLevel || "mid";
-      return levelIndex(fl) >= levelIndex(requestedLevel);
+      return freelancerMatchesExperience(
+        a.freelancer,
+        requestedLevel,
+        allowLowerExperience
+      );
     });
-    // "hasHigherLevel" check is now redundant (higherLevel ⊂ levelFiltered), but keep the
-    // variable for the availability message in case levelFiltered itself is empty.
-    const higherLevelFreelancers = approvedFreelancers.filter((a) => {
-      const fl = a.freelancer.profile?.experienceLevel || "mid";
-      return levelIndex(fl) > levelIndex(requestedLevel);
-    });
+    const lowerLevelFreelancers = approvedFreelancers.filter((a) =>
+      experienceLevelIndex(a.freelancer.profile?.experienceLevel || "mid") <
+      experienceLevelIndex(requestedLevel)
+    );
 
     const now = Date.now();
     const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -914,6 +954,12 @@ export const generateMatchesForDraft = action({
         ) {
           continue;
         }
+        if (
+          requestedSoftwareSubField &&
+          !freelancerHasExactSoftwareSubField(freelancer, requestedSoftwareSubField)
+        ) {
+          continue;
+        }
         const { score: overallScore, breakdown } = await scoreOneFreelancer(
           ctx,
           freelancer,
@@ -932,16 +978,21 @@ export const generateMatchesForDraft = action({
         )
         .slice(0, 10);
 
-      // Check if we have higher-level freelancers (for availability message when 0 matches)
-      let hasHigherLevelWithSkills = false;
-      if (top10.length === 0 && higherLevelFreelancers.length > 0) {
-        for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
+      let hasLowerLevelWithExactSkills = false;
+      if (!allowLowerExperience && top10.length === 0 && lowerLevelFreelancers.length > 0) {
+        for (const { freelancer, overallScore: vettingScore } of lowerLevelFreelancers) {
           if (
             !isFreelancerEligibleForProjectMatch(
               freelancer,
               normalizedSkills,
               projectRoleId
             )
+          ) {
+            continue;
+          }
+          if (
+            requestedSoftwareSubField &&
+            !freelancerHasExactSoftwareSubField(freelancer, requestedSoftwareSubField)
           ) {
             continue;
           }
@@ -956,7 +1007,7 @@ export const generateMatchesForDraft = action({
               ? breakdown.skillOverlap > 0
               : breakdown.skillOverlap >= 45
           ) {
-            hasHigherLevelWithSkills = true;
+            hasLowerLevelWithExactSkills = true;
             break;
           }
         }
@@ -986,7 +1037,7 @@ export const generateMatchesForDraft = action({
 
       const availability =
         top10.length === 0
-          ? { atRequestedLevel: 0, hasHigherLevelWithSkills }
+          ? { atRequestedLevel: 0, hasLowerLevelWithExactSkills }
           : null;
       if (matchIds.length === 0) {
         await ctx.runMutation(internal.matching.mutations.setProjectAwaitingMatch, {
@@ -1007,7 +1058,12 @@ export const generateMatchesForDraft = action({
 
     // Unified spec list: each entry drives one seat's matching and post-loop availability check.
     // Both the slot-based path and the skill-grouping path populate this.
-    type RoleSpec = { skills: string[]; roleId: string; roleLabel: string };
+    type RoleSpec = {
+      skills: string[];
+      roleId: string;
+      roleLabel: string;
+      softwareSubFieldKey?: string;
+    };
     const roleSpecs: RoleSpec[] = [];
 
     // When the project uses per-seat teamSlots, derive labels via teamSlotsToMatchSpecs so
@@ -1027,7 +1083,12 @@ export const generateMatchesForDraft = action({
           requiredSkills: spec.skills ?? [],
         });
 
-        roleSpecs.push({ skills: slotSkills, roleId: specRoleId, roleLabel: spec.teamRoleLabel });
+        roleSpecs.push({
+          skills: slotSkills,
+          roleId: specRoleId,
+          roleLabel: spec.teamRoleLabel,
+          softwareSubFieldKey: spec.roleKey,
+        });
 
         const matchCountBeforeSpec = matchIds.length;
         const groupScores: Array<{
@@ -1043,8 +1104,11 @@ export const generateMatchesForDraft = action({
           if (!isFreelancerEligibleForProjectMatch(freelancer, slotSkills, specRoleId)) continue;
 
           // Sub-field gate: within software_development, discriminate frontend/backend/mobile/etc.
-          // by checking the freelancer has at least one canonical skill for this sub-field.
-          if (!freelancerFitsSubField(freelancer.profile?.skills, spec.roleKey)) continue;
+          // by requiring the freelancer's saved software sub-field to match the seat exactly.
+          if (!freelancerHasExactSoftwareSubField(freelancer, spec.roleKey)) continue;
+          if (!freelancerMatchesExperience(freelancer, spec.experienceLevel, allowLowerExperience)) {
+            continue;
+          }
 
           const { score: overallScore, breakdown } = await scoreOneFreelancer(
             ctx,
@@ -1112,7 +1176,11 @@ export const generateMatchesForDraft = action({
             ];
 
       for (const group of groups) {
-        roleSpecs.push({ skills: group.skills, roleId: group.roleId, roleLabel: group.roleLabel });
+        roleSpecs.push({
+          skills: group.skills,
+          roleId: group.roleId,
+          roleLabel: group.roleLabel,
+        });
 
         const matchCountBeforeGroup = matchIds.length;
         const groupScores: Array<{
@@ -1124,6 +1192,7 @@ export const generateMatchesForDraft = action({
         for (const { freelancer, overallScore: vettingScore } of levelFiltered) {
           if (isFreelancerPermanentlyExcluded(project, freelancer._id as string)) continue;
           if (!isFreelancerEligibleForProjectMatch(freelancer, group.skills, group.roleId)) continue;
+          if (!freelancerHasExactSoftwareSubField(freelancer, group.roleId)) continue;
           const { score: overallScore, breakdown } = await scoreOneFreelancer(
             ctx,
             freelancer,
@@ -1161,12 +1230,17 @@ export const generateMatchesForDraft = action({
       }
     }
 
-    // For team: check if any role had 0 matches and we have higher-level freelancers
-    let hasHigherLevelWithSkills = false;
-    if (matchIds.length === 0 && higherLevelFreelancers.length > 0) {
+    let hasLowerLevelWithExactSkills = false;
+    if (!allowLowerExperience && matchIds.length === 0 && lowerLevelFreelancers.length > 0) {
       for (const spec of roleSpecs) {
-        for (const { freelancer, overallScore: vettingScore } of higherLevelFreelancers) {
+        for (const { freelancer, overallScore: vettingScore } of lowerLevelFreelancers) {
           if (!isFreelancerEligibleForProjectMatch(freelancer, spec.skills, spec.roleId)) continue;
+          if (
+            spec.softwareSubFieldKey &&
+            !freelancerHasExactSoftwareSubField(freelancer, spec.softwareSubFieldKey)
+          ) {
+            continue;
+          }
           const { breakdown } = await scoreOneFreelancer(
             ctx,
             freelancer,
@@ -1175,17 +1249,17 @@ export const generateMatchesForDraft = action({
             { requiredSkillSubset: spec.skills, categoryRoleId: spec.roleId }
           );
           if (breakdown.skillOverlap > 0 && freelancerMatchesRole(freelancer.profile?.techField, spec.roleId)) {
-            hasHigherLevelWithSkills = true;
+            hasLowerLevelWithExactSkills = true;
             break;
           }
         }
-        if (hasHigherLevelWithSkills) break;
+        if (hasLowerLevelWithExactSkills) break;
       }
     }
 
     const availability =
       matchIds.length === 0
-        ? { atRequestedLevel: 0, hasHigherLevelWithSkills }
+        ? { atRequestedLevel: 0, hasLowerLevelWithExactSkills }
         : null;
 
     if (rolesMissing.length > 0) {
