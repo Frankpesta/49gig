@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { makeFunctionReference } from "convex/server";
 import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
 import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
 import { useOAuth } from "@/hooks/use-oauth";
@@ -44,6 +44,28 @@ type FreelancerSignupExperienceLevel = NonNullable<
   NonNullable<User["profile"]>["experienceLevel"]
 >;
 
+type SignupWithRecaptchaArgs = {
+  recaptchaToken: string;
+  email: string;
+  password: string;
+  name: string;
+  role: "client" | "freelancer";
+  profile?: {
+    techField?: FreelancerSignupTechField;
+    experienceLevel?: FreelancerSignupExperienceLevel;
+    skills?: string[];
+    softwareDevFields?: string[];
+    languagesWritten?: string[];
+    phoneNumber?: string;
+  };
+};
+
+type SignupWithRecaptchaResult = {
+  success: boolean;
+  sessionToken?: string;
+  emailVerificationRequired?: boolean;
+};
+
 const EXPERIENCE_LEVELS = [
   { value: "junior", label: "Junior" },
   { value: "mid", label: "Mid-Level" },
@@ -65,7 +87,13 @@ export default function FreelancerSignupPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const signupWithRecaptcha = useAction(api.auth.actions.signupWithRecaptcha);
+  const signupWithRecaptcha = useAction(
+    makeFunctionReference<
+      "action",
+      SignupWithRecaptchaArgs,
+      SignupWithRecaptchaResult
+    >("auth/actions:signupWithRecaptcha")
+  );
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
 
   const categorySkills =
@@ -213,6 +241,11 @@ export default function FreelancerSignupPage() {
           experienceLevel:
             freelancerDraft.experienceLevel as FreelancerSignupExperienceLevel,
           skills: freelancerDraft.skills,
+          softwareDevFields:
+            freelancerDraft.techField === "software_development" &&
+            freelancerDraft.softwareDevField
+              ? [freelancerDraft.softwareDevField]
+              : undefined,
           languagesWritten: builtLanguages.languages,
           ...(signupPhoneE164 ? { phoneNumber: signupPhoneE164 } : {}),
         },

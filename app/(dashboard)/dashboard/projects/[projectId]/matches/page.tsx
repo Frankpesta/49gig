@@ -514,8 +514,9 @@ export default function ProjectMatchesPage() {
   const replacementGenAttemptedRef = useRef(false);
   const [matchingAvailability, setMatchingAvailability] = useState<{
     atRequestedLevel: number;
-    hasHigherLevelWithSkills: boolean;
+    hasLowerLevelWithExactSkills: boolean;
   } | null>(null);
+  const [lowerLevelMatchingRunning, setLowerLevelMatchingRunning] = useState(false);
   const [selectedSingleId, setSelectedSingleId] = useState<Id<"users"> | null>(
     null
   );
@@ -809,6 +810,27 @@ export default function ProjectMatchesPage() {
     generateMatches,
     generateTeamMatches,
   ]);
+
+  const handleShowLowerLevelMatches = useCallback(async () => {
+    if (!projectId) return;
+    setLowerLevelMatchingRunning(true);
+    try {
+      const result = await generateMatchesForDraft({
+        projectId,
+        allowLowerExperience: true,
+      });
+      if (result?.availability) {
+        setMatchingAvailability(result.availability);
+      } else {
+        setMatchingAvailability(null);
+      }
+      toast.success("Showing lower-level exact skill matches where available.");
+    } catch {
+      toast.error("Couldn’t load lower-level matches. Try again shortly.");
+    } finally {
+      setLowerLevelMatchingRunning(false);
+    }
+  }, [projectId, generateMatchesForDraft]);
 
   const handleSelectSingle = useCallback(
     (freelancerId: Id<"users">) => {
@@ -1370,17 +1392,26 @@ export default function ProjectMatchesPage() {
                   No freelancers at your selected experience level right now.
                 </p>
                 <div className="text-muted-foreground text-sm sm:text-base space-y-2 max-w-lg mx-auto">
-                  {matchingAvailability.hasHigherLevelWithSkills ? (
+                  {matchingAvailability.hasLowerLevelWithExactSkills ? (
                     <>
-                      <p>We match by the experience level you chose (Junior, Mid-Level, Senior, or Expert).</p>
-                      <p>We have higher-level talent available who match your skills. Consider editing your hire to select a different experience level—you may find great matches quickly.</p>
-                      <Link href={`/dashboard/projects/${projectId}/edit`}>
-                        <Button variant="outline" className="mt-2">Edit hire & change experience level</Button>
-                      </Link>
+                      <p>
+                        We only show freelancers with the exact role, tech stack, skills, and experience level you selected.
+                      </p>
+                      <p>
+                        We found lower-level freelancers with the exact required role and skills. You can review them if you want to widen this hire.
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="mt-2"
+                        onClick={() => void handleShowLowerLevelMatches()}
+                        disabled={lowerLevelMatchingRunning}
+                      >
+                        {lowerLevelMatchingRunning ? "Loading..." : "Show lower-level exact matches"}
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <p>We&apos;ll match you with qualified talent once it becomes available at your selected level.</p>
+                      <p>We&apos;ll match you with qualified talent once it becomes available at your selected role, skills, and level.</p>
                       <p>You&apos;ll be notified as soon as we have suitable matches ready for review.</p>
                     </>
                   )}
@@ -1547,14 +1578,20 @@ export default function ProjectMatchesPage() {
                         No available freelancers for this role at your selected experience level.
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {matchingAvailability?.hasHigherLevelWithSkills
-                          ? "We have higher-level talent available. Consider editing your hire to select a different experience level."
+                        {matchingAvailability?.hasLowerLevelWithExactSkills
+                          ? "We have lower-level talent with the exact required role and skills. You can review them if you want to widen this hire."
                           : "We'll match you with qualified talent once it becomes available. You can proceed with your other selections or check back later."}
                       </p>
-                      {matchingAvailability?.hasHigherLevelWithSkills && (
-                        <Link href={`/dashboard/projects/${projectId}/edit`}>
-                          <Button variant="outline" size="sm" className="mt-3">Edit hire</Button>
-                        </Link>
+                      {matchingAvailability?.hasLowerLevelWithExactSkills && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-3"
+                          onClick={() => void handleShowLowerLevelMatches()}
+                          disabled={lowerLevelMatchingRunning}
+                        >
+                          {lowerLevelMatchingRunning ? "Loading..." : "Show lower-level exact matches"}
+                        </Button>
                       )}
                     </CardContent>
                   </Card>

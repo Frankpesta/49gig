@@ -301,9 +301,28 @@ export const releaseDisputeFunds = action({
       }
     } else if (decision === "partial") {
       if (resolutionAmount != null && resolutionAmount > 0) {
-        const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
-        const freelancerCents = Math.min(resolutionAmount, escrowCents);
-        const clientCents = Math.max(0, escrowCents - freelancerCents);
+        let scopeCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+        if (isPartialTeam) {
+          const c = dispute.monthlyCycleId
+            ? await ctx.runQuery(
+                internal.disputes.queries.computeDisputedMonthlyCycleShareCentsInternal,
+                { disputeId: args.disputeId }
+              )
+            : await ctx.runQuery(
+                internal.disputes.queries.computeDisputedTeamEscrowNetCentsFromDisputeInternal,
+                { disputeId: args.disputeId }
+              );
+          scopeCents = c.disputedNetCents;
+        } else if (dispute.monthlyCycleId) {
+          const cycle = await ctx.runQuery(
+            (api as any)["monthlyBillingCycles/queries"].getCycleById,
+            { monthlyCycleId: dispute.monthlyCycleId }
+          );
+          scopeCents = Math.max(0, cycle?.amountCents ?? 0);
+        }
+
+        const freelancerCents = Math.min(resolutionAmount, scopeCents);
+        const clientCents = Math.max(0, scopeCents - freelancerCents);
         if (clientCents > 0) {
           await ctx.runMutation(
             internal.monthlyBillingCycles.mutations.creditClientWalletFromEscrowInternal,
@@ -325,14 +344,22 @@ export const releaseDisputeFunds = action({
               currency,
               // Do not mark cycle approved here; split may be less than one full cycle.
               monthlyCycleId: undefined,
+              freelancerIds: isPartialTeam ? disputedIds : undefined,
             }
           );
         }
-        // Full escrow was split; cancel unreleased cycles so they cannot be approved again.
-        await ctx.runMutation(
-          internal.monthlyBillingCycles.mutations.cancelPendingAndDisputedCyclesInternal,
-          { projectId: dispute.projectId }
-        );
+        if (dispute.monthlyCycleId) {
+          await ctx.runMutation(
+            internal.monthlyBillingCycles.mutations.cancelDisputedMonthlyCycleInternal,
+            { monthlyCycleId: dispute.monthlyCycleId }
+          );
+        } else if (!isPartialTeam) {
+          // Full escrow was split; cancel unreleased cycles so they cannot be approved again.
+          await ctx.runMutation(
+            internal.monthlyBillingCycles.mutations.cancelPendingAndDisputedCyclesInternal,
+            { projectId: dispute.projectId }
+          );
+        }
       }
     } else if (decision === "replacement") {
       if (dispute.monthlyCycleId) {

@@ -113,6 +113,16 @@ export function freelancerMatchesAtLeastOneRequiredSkill(
   return requiredSkills.some((skill) => fs.some((f) => skillMatches(skill, f)));
 }
 
+export function freelancerMatchesAllRequiredSkills(
+  requiredSkills: string[],
+  freelancerSkills: string[] | undefined
+): boolean {
+  if (requiredSkills.length === 0) return true;
+  const fs = freelancerSkills ?? [];
+  if (fs.length === 0) return false;
+  return requiredSkills.every((skill) => fs.some((f) => skillMatches(skill, f)));
+}
+
 /**
  * Skill overlap 0–100. Empty required → 0 (caller should use category fallback).
  */
@@ -129,7 +139,7 @@ export function calculateSkillOverlapPercent(
 }
 
 /**
- * Hard gate: SMS-verified phone + techField category + skill match (when skills are specified).
+ * Hard gate: SMS-verified phone + techField category + every required skill.
  * Portfolio links are enforced during onboarding / profile save, not here.
  *
  * techField is ALWAYS enforced as a category gate (when set), regardless of whether skills
@@ -163,9 +173,9 @@ export function isFreelancerEligibleForProjectMatch(
     return false;
   }
 
-  // Skill gate — when the slot/project specifies required skills.
+  // Skill gate — when the slot/project specifies required skills, every skill must be present.
   if (normalizedRequired.length > 0) {
-    if (!freelancerMatchesAtLeastOneRequiredSkill(normalizedRequired, freelancer.profile?.skills)) {
+    if (!freelancerMatchesAllRequiredSkills(normalizedRequired, freelancer.profile?.skills)) {
       return false;
     }
   }
@@ -192,9 +202,6 @@ export function freelancerFitsSubField(
   freelancerSkills: string[] | undefined,
   budgetRoleKey: string
 ): boolean {
-  // fullstack devs are valid candidates for any software-dev sub-field seat.
-  if (budgetRoleKey === "fullstack_dev") return true;
-
   const subFieldSkills = getSoftwareDevFieldSkills([budgetRoleKey]);
   // If no canonical skills are defined for this key it isn't a software-dev sub-field — skip.
   if (subFieldSkills.length === 0) return true;
@@ -203,4 +210,19 @@ export function freelancerFitsSubField(
   if (fs.length === 0) return false;
 
   return fs.some((fl) => subFieldSkills.some((cs) => skillMatches(cs, fl)));
+}
+
+export function freelancerHasExactSoftwareSubField(
+  freelancer: { profile?: { softwareDevFields?: string[]; primaryRole?: string } },
+  budgetRoleKey: string
+): boolean {
+  if (!isSoftwareDevSubFieldId(budgetRoleKey)) return true;
+  if ((freelancer.profile?.softwareDevFields ?? []).includes(budgetRoleKey)) {
+    return true;
+  }
+  const roleLabel = SOFTWARE_DEV_FIELDS.find((f) => f.id === budgetRoleKey)?.label;
+  return (
+    !!roleLabel &&
+    freelancer.profile?.primaryRole?.trim().toLowerCase() === roleLabel.toLowerCase()
+  );
 }

@@ -696,14 +696,20 @@ export const releaseDisputeFundsToWalletInternal = internalMutation({
     amountCents: v.number(),
     currency: v.string(),
     monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
+    freelancerIds: v.optional(v.array(v.id("users"))),
   },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
     if (!project) return { released: false };
 
-    const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
+    const projectFreelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
       ? [project.matchedFreelancerId]
       : project.matchedFreelancerIds ?? [];
+    const requested = new Set((args.freelancerIds ?? []).map(String));
+    const freelancerIds =
+      requested.size > 0
+        ? projectFreelancerIds.filter((id) => requested.has(String(id)))
+        : projectFreelancerIds;
 
     if (freelancerIds.length === 0) return { released: false };
 

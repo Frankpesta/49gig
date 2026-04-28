@@ -2,6 +2,7 @@ import { internalMutation } from "../_generated/server";
 import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
+import { assertUsdCurrency } from "../currencyPolicy";
 const apiModule = require("../_generated/api");
 const api = apiModule as {
   api: {
@@ -76,6 +77,16 @@ export const createPayment = internalMutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    assertUsdCurrency(args.currency, "createPayment");
+    if (!Number.isFinite(args.amount) || args.amount < 0) {
+      throw new Error("Payment amount must be non-negative");
+    }
+    if (!Number.isFinite(args.netAmount) || args.netAmount < 0) {
+      throw new Error("Payment net amount must be non-negative");
+    }
+    if (args.platformFee != null && (!Number.isFinite(args.platformFee) || args.platformFee < 0)) {
+      throw new Error("Payment platform fee amount must be non-negative");
+    }
 
     // CRITICAL: Check for existing payment to prevent duplicates
     // This is a safety check in case the action's check didn't catch it
@@ -265,6 +276,7 @@ export const completePreFundingWithWalletOnlyInternal = internalMutation({
     walletCreditCents: v.number(),
   },
   handler: async (ctx, args) => {
+    assertUsdCurrency(args.currency, "completePreFundingWithWalletOnlyInternal");
     const user = (await ctx.db.get(args.userId)) as Doc<"users"> | null;
     if (!user || user.status !== "active" || user.role !== "client") {
       throw new Error("Only clients can complete funding");

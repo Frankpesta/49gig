@@ -76,7 +76,7 @@ export default function ResolveDisputePage() {
         disputeId: disputeId as Id<"disputes">,
         decision: formData.decision as ResolveDecision,
         resolutionAmount: formData.resolutionAmount
-          ? parseFloat(formData.resolutionAmount) * 100
+          ? Math.round(parseFloat(formData.resolutionAmount) * 100)
           : undefined,
         notes: formData.notes,
         clientMessage: formData.clientMessage.trim() || undefined,
@@ -235,7 +235,7 @@ export default function ResolveDisputePage() {
             {formData.decision === "partial" && (
               <div className="space-y-2">
                 <Label htmlFor="resolutionAmount">
-                  Resolution Amount (USD) *
+                  Freelancer net amount to release (USD) *
                 </Label>
                 <Input
                   id="resolutionAmount"
@@ -249,6 +249,9 @@ export default function ResolveDisputePage() {
                   placeholder="0.00"
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  The remainder of the disputed escrow scope is credited back to the client.
+                </p>
                 <p className="text-sm text-muted-foreground">
                   Amount credited to the freelancer&apos;s wallet (USD). The rest of current escrow is credited to the client&apos;s in-platform balance. Unreleased monthly cycles are cancelled after this split.
                 </p>

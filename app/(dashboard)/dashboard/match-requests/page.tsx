@@ -296,9 +296,6 @@ export default function MatchRequestsPage() {
                       maximumFractionDigits: 2,
                     })}
                   </p>
-                  <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-                    After platform fee. For team hires, this is your seat only—not the client&apos;s full spend.
-                  </p>
                 </div>
               )}
               {detailMatch?.projectDuration && (
