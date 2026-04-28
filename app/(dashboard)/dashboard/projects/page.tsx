@@ -33,12 +33,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { useSearchParams } from "next/navigation";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useState } from "react";
+import { freelancerEngagementNetTotalUsd } from "@/lib/project-freelancer-earnings";
 
 const STATUS_CONFIG: Record<
   string,
@@ -254,6 +254,7 @@ export default function ProjectsPage() {
             freelancerHireDisplayStatus?: string;
             openDisputeOnHire?: boolean;
             viewerIsDisputePartyOnHire?: boolean;
+            viewerMatchTeamRole?: string;
           }) => {
             const displayStatus =
               user?.role === "freelancer" && project.freelancerHireDisplayStatus
@@ -261,6 +262,24 @@ export default function ProjectsPage() {
                 : project.status;
             const statusConfig = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.draft;
             const StatusIcon = statusConfig.icon;
+            const amountForViewer =
+              user?.role === "freelancer"
+                ? freelancerEngagementNetTotalUsd(
+                    {
+                      totalAmount: project.totalAmount,
+                      platformFee: project.platformFee,
+                      teamBudgetBreakdown: project.teamBudgetBreakdown,
+                      intakeForm: project.intakeForm,
+                      matchedFreelancerIds: project.matchedFreelancerIds as
+                        | string[]
+                        | undefined,
+                      matchedFreelancerId: project.matchedFreelancerId as
+                        | string
+                        | undefined,
+                    },
+                    project.viewerMatchTeamRole
+                  )
+                : project.totalAmount;
 
             return (
               <Card key={project._id} className="rounded-xl overflow-hidden hover:shadow-lg transition-all duration-200">
@@ -300,9 +319,10 @@ export default function ProjectsPage() {
                       <DollarSign className="h-4 w-4" />
                       <span>
                         $
-                        {isClient
-                          ? project.totalAmount.toLocaleString()
-                          : ((project.totalAmount * (100 - (project.platformFee ?? DEFAULT_PLATFORM_FEE_PERCENT))) / 100).toLocaleString()}
+                        {amountForViewer.toLocaleString(undefined, {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        })}
                       </span>
                     </div>
                     <div className="flex items-center gap-1 text-muted-foreground">
