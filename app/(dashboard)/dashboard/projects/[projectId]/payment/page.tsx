@@ -64,6 +64,12 @@ export default function PaymentPage() {
   }, [project, walletBreakdown]);
 
   useEffect(() => {
+    if (walletBreakdown === undefined) return;
+    if (maxWalletApplyCents <= 0) {
+      setFundingPreference("card_only");
+      setWalletApplyCents(0);
+      return;
+    }
     if (fundingPreference === "wallet_max") {
       setWalletApplyCents(maxWalletApplyCents);
     } else if (fundingPreference === "card_only") {
@@ -71,7 +77,7 @@ export default function PaymentPage() {
     } else {
       setWalletApplyCents((c) => Math.min(c, maxWalletApplyCents));
     }
-  }, [maxWalletApplyCents, fundingPreference]);
+  }, [maxWalletApplyCents, fundingPreference, walletBreakdown]);
 
   const onFundingPreferenceChange = useCallback((value: string) => {
     const v = value as FundingPreference;
@@ -286,92 +292,105 @@ export default function PaymentPage() {
                 {amountToPay.toFixed(2)} {project.currency.toUpperCase()}
               </span>
             </div>
-            {maxWalletApplyCents > 0 && (
-              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-                <div className="flex items-start gap-2">
-                  <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div className="space-y-2 text-sm">
-                    <p className="font-medium">Pay from wallet and/or card</p>
+            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-start gap-2">
+                <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                <div className="space-y-2 text-sm">
+                  <p className="font-medium">Pay from wallet and/or card</p>
+                  <p className="text-xs text-muted-foreground">
+                    Choose where to pay from. Any wallet amount you apply reduces the card charge.
+                  </p>
+                  <RadioGroup
+                    value={fundingPreference}
+                    onValueChange={onFundingPreferenceChange}
+                    className="grid gap-2 pt-1"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem
+                        value="wallet_max"
+                        id="fund-wallet-max"
+                        disabled={maxWalletApplyCents <= 0}
+                      />
+                      <Label
+                        htmlFor="fund-wallet-max"
+                        className={`font-normal ${maxWalletApplyCents > 0 ? "cursor-pointer" : "text-muted-foreground"}`}
+                      >
+                        Use available wallet credit first ({(maxWalletApplyCents / 100).toFixed(2)}{" "}
+                        {project.currency.toUpperCase()})
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem
+                        value="custom"
+                        id="fund-custom"
+                        disabled={maxWalletApplyCents <= 0}
+                      />
+                      <Label
+                        htmlFor="fund-custom"
+                        className={`font-normal ${maxWalletApplyCents > 0 ? "cursor-pointer" : "text-muted-foreground"}`}
+                      >
+                        Custom wallet amount
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="card_only" id="fund-card-only" />
+                      <Label htmlFor="fund-card-only" className="font-normal cursor-pointer">
+                        Pay full amount by card
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                  {maxWalletApplyCents <= 0 ? (
                     <p className="text-xs text-muted-foreground">
-                      Choose how much of your in-platform balance to apply (
-                      {project.currency.toUpperCase()}). The server charges your card only for what is left after
-                      wallet credit (never the full hire price plus wallet).
+                      No wallet balance is currently available for this hire.
                     </p>
-                    <RadioGroup
-                      value={fundingPreference}
-                      onValueChange={onFundingPreferenceChange}
-                      className="grid gap-2 pt-1"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="wallet_max" id="fund-wallet-max" />
-                        <Label htmlFor="fund-wallet-max" className="font-normal cursor-pointer">
-                          Use all available wallet credit first ({(maxWalletApplyCents / 100).toFixed(2)}{" "}
-                          {project.currency.toUpperCase()})
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="custom" id="fund-custom" />
-                        <Label htmlFor="fund-custom" className="font-normal cursor-pointer">
-                          Custom amount (slider below)
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="card_only" id="fund-card-only" />
-                        <Label htmlFor="fund-card-only" className="font-normal cursor-pointer">
-                          Pay full amount by card (do not use wallet)
-                        </Label>
-                      </div>
-                    </RadioGroup>
+                  ) : (
                     <p className="text-xs text-muted-foreground">
                       Apply up to {(maxWalletApplyCents / 100).toFixed(2)}{" "}
-                      {project.currency.toUpperCase()}{" "}
-                      from your in-platform balance (referral hiring credit, referral cash, refunds from hires,
-                      etc.). Any remainder is paid by card. If your balance covers the full amount, no card
-                      charge is needed.
+                      {project.currency.toUpperCase()} from your wallet. Any remainder is paid by card.
                     </p>
-                    {walletBreakdown &&
-                      walletBreakdown.referralHiringCents > 0 &&
-                      walletBreakdown.referralHiringCents < walletBreakdown.spendableCents && (
-                        <p className="text-xs text-muted-foreground flex items-start gap-1">
-                          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          Includes{" "}
-                          {(walletBreakdown.referralHiringCents / 100).toFixed(2)}{" "}
-                          {project.currency.toUpperCase()} from referral hiring credit and other available
-                          balance.
-                        </p>
-                      )}
-                    <input
-                      type="range"
-                      min={0}
-                      max={maxWalletApplyCents}
-                      step={1}
-                      value={Math.min(walletApplyCents, maxWalletApplyCents)}
-                      onChange={(e) => {
-                        setFundingPreference("custom");
-                        setWalletApplyCents(parseInt(e.target.value, 10));
-                      }}
-                      disabled={fundingPreference !== "custom"}
-                      className="w-full accent-primary disabled:opacity-50"
-                    />
-                    <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
-                      <span>
-                        From wallet:{" "}
-                        {(Math.min(walletApplyCents, maxWalletApplyCents) / 100).toFixed(2)}{" "}
-                        {project.currency.toUpperCase()}
-                      </span>
-                      <span>
-                        Card charge (approx.):{" "}
-                        {(
-                          amountToPay -
-                          Math.min(walletApplyCents, maxWalletApplyCents) / 100
-                        ).toFixed(2)}{" "}
-                        {project.currency.toUpperCase()}
-                      </span>
-                    </div>
+                  )}
+                  {walletBreakdown &&
+                    walletBreakdown.referralHiringCents > 0 &&
+                    walletBreakdown.referralHiringCents < walletBreakdown.spendableCents && (
+                      <p className="text-xs text-muted-foreground flex items-start gap-1">
+                        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        Includes{" "}
+                        {(walletBreakdown.referralHiringCents / 100).toFixed(2)}{" "}
+                        {project.currency.toUpperCase()} from referral hiring credit and other available
+                        balance.
+                      </p>
+                    )}
+                  <input
+                    type="range"
+                    min={0}
+                    max={maxWalletApplyCents}
+                    step={1}
+                    value={Math.min(walletApplyCents, maxWalletApplyCents)}
+                    onChange={(e) => {
+                      setFundingPreference("custom");
+                      setWalletApplyCents(parseInt(e.target.value, 10));
+                    }}
+                    disabled={fundingPreference !== "custom" || maxWalletApplyCents <= 0}
+                    className="w-full accent-primary disabled:opacity-50"
+                  />
+                  <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                    <span>
+                      From wallet:{" "}
+                      {(Math.min(walletApplyCents, maxWalletApplyCents) / 100).toFixed(2)}{" "}
+                      {project.currency.toUpperCase()}
+                    </span>
+                    <span>
+                      Card charge (approx.):{" "}
+                      {(
+                        amountToPay -
+                        Math.min(walletApplyCents, maxWalletApplyCents) / 100
+                      ).toFixed(2)}{" "}
+                      {project.currency.toUpperCase()}
+                    </span>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
             <p className="text-sm text-muted-foreground">
               After payment succeeds, matching continues and monthly payouts still flow only when you approve each month&apos;s work.
             </p>

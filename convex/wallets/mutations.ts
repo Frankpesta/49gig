@@ -250,14 +250,31 @@ export const recordPendingRefund = internalMutation({
 });
 
 /**
- * Mark pending refund holds for a project as consumed when client continues with replacement.
+ * Apply dispute refund value back into the same hire when the client continues with a replacement.
+ *
+ * Pending refund rows were never spendable, so consuming them only marks the hold as used.
+ * Completed refund rows have already increased wallet balance, so they need a compensating debit.
  */
 export const clearPendingRefundsForProject = internalMutation({
   args: {
     userId: v.id("users"),
     projectId: v.id("projects"),
+    amountCents: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const requestedCents =
+      args.amountCents == null
+        ? Number.POSITIVE_INFINITY
+        : Math.max(0, Math.floor(args.amountCents));
+    if (requestedCents <= 0) {
+      return {
+        cleared: 0,
+        pendingConsumedCents: 0,
+        debitedCompletedCents: 0,
+        totalAppliedCents: 0,
+      };
+    }
+
     const wallet = await ctx.db
       .query("wallets")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -277,31 +294,152 @@ export const clearPendingRefundsForProject = internalMutation({
       .collect();
 
     let cleared = 0;
+    let pendingConsumedCents = 0;
     for (const tx of pending) {
+      const remainingToApply = requestedCents - pendingConsumedCents;
+      if (remainingToApply <= 0) break;
       const fresh = await ctx.db.get(tx._id);
       if (!fresh || fresh.status !== "pending") continue;
-      await ctx.db.patch(tx._id, {
-        status: "failed",
-        description: `${tx.description} (consumed as project continuation credit)`,
-      });
+      const consumeCents = Math.min(fresh.amountCents, remainingToApply);
+      if (consumeCents <= 0) continue;
+
+      let targetId = fresh._id;
+      if (consumeCents >= fresh.amountCents) {
+        await ctx.db.patch(fresh._id, {
+          status: "failed",
+          description: `${fresh.description} (consumed as project continuation credit)`,
+        });
+      } else {
+        await ctx.db.patch(fresh._id, {
+          amountCents: fresh.amountCents - consumeCents,
+          description: `${fresh.description} (remaining continuation credit)`,
+        });
+        targetId = await ctx.db.insert("walletTransactions", {
+          walletId: wallet._id,
+          userId: args.userId,
+          type: "refund",
+          amountCents: consumeCents,
+          currency: fresh.currency,
+          description: `${fresh.description} (consumed as project continuation credit)`,
+          projectId: args.projectId,
+          paymentId: fresh.paymentId,
+          status: "failed",
+          createdAt: Date.now(),
+        });
+      }
       await ctx.db.insert("auditLogs", {
         action: "pending_refund_consumed",
         actionType: "system",
         actorId: args.userId,
         actorRole: "system",
         targetType: "wallet_transaction",
-        targetId: tx._id,
+        targetId,
         details: {
           projectId: args.projectId,
-          amountCents: tx.amountCents,
-          currency: tx.currency,
+          amountCents: consumeCents,
+          currency: fresh.currency,
         },
         createdAt: Date.now(),
       });
       cleared += 1;
+      pendingConsumedCents += consumeCents;
     }
 
-    return { cleared };
+    const completedRefunds = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("projectId"), args.projectId),
+          q.eq(q.field("type"), "refund"),
+          q.eq(q.field("status"), "completed")
+        )
+      )
+      .collect();
+    const completedRefundCents = completedRefunds.reduce(
+      (sum, tx) => sum + Math.max(0, tx.amountCents),
+      0
+    );
+
+    const priorContinuationDebits = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("projectId"), args.projectId),
+          q.eq(q.field("type"), "debit"),
+          q.eq(q.field("category"), "hiring_credit"),
+          q.eq(q.field("status"), "completed")
+        )
+      )
+      .collect();
+    const alreadyDebitedCents = priorContinuationDebits.reduce(
+      (sum, tx) => sum + Math.max(0, tx.amountCents),
+      0
+    );
+    const remainingAfterPending = Math.max(
+      0,
+      requestedCents - pendingConsumedCents
+    );
+    const debitCents = Math.min(
+      remainingAfterPending,
+      Math.max(0, completedRefundCents - alreadyDebitedCents)
+    );
+
+    if (debitCents > 0) {
+      const freshWallet = await ctx.db.get(wallet._id);
+      if (!freshWallet || freshWallet.balanceCents < debitCents) {
+        throw new Error(
+          "Continuation credit is no longer available in the client wallet."
+        );
+      }
+
+      const now = Date.now();
+      const newBalance = freshWallet.balanceCents - debitCents;
+      const currency = completedRefunds[0]?.currency ?? freshWallet.currency;
+      assertUsdCurrency(currency, "clearPendingRefundsForProject");
+
+      await ctx.db.patch(freshWallet._id, {
+        balanceCents: newBalance,
+        updatedAt: now,
+      });
+
+      const debitId = await ctx.db.insert("walletTransactions", {
+        walletId: freshWallet._id,
+        userId: args.userId,
+        type: "debit",
+        category: "hiring_credit",
+        amountCents: debitCents,
+        currency,
+        balanceAfterCents: newBalance,
+        description: "Dispute refund applied as continuation credit",
+        projectId: args.projectId,
+        status: "completed",
+        createdAt: now,
+      });
+
+      await ctx.db.insert("auditLogs", {
+        action: "completed_refund_applied_to_continuation",
+        actionType: "system",
+        actorId: args.userId,
+        actorRole: "system",
+        targetType: "wallet_transaction",
+        targetId: debitId,
+        details: {
+          projectId: args.projectId,
+          amountCents: debitCents,
+          currency,
+        },
+        createdAt: now,
+      });
+    }
+
+    return {
+      cleared,
+      pendingConsumedCents,
+      debitedCompletedCents: debitCents,
+      totalAppliedCents: pendingConsumedCents + debitCents,
+    };
   },
 });
 
