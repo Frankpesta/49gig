@@ -15,12 +15,7 @@ import {
   ArrowLeft,
   Plus,
   CheckCircle2,
-  XCircle,
-  Paperclip,
-  Send,
   Loader2,
-  Download,
-  Image as ImageIcon,
   User,
   Users,
   Calendar,
@@ -29,9 +24,12 @@ import {
   Briefcase,
   Scale,
   ExternalLink,
+  Paperclip,
+  Inbox,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { AddEvidenceDialog } from "./add-evidence-dialog";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import type { ReactNode } from "react";
@@ -47,6 +45,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -54,18 +53,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  disputeStatusLabel,
-  getDisputeReasonPolicy,
-} from "@/lib/dispute-flow";
+import { disputeStatusLabel } from "@/lib/dispute-flow";
 
 type DisputeEvidenceItem = Doc<"disputes">["evidence"][number] & { fileUrl?: string | null };
-type RequiredEvidenceChecklistItem = {
-  id: string;
-  owner: "client" | "freelancer" | "both";
-  label: string;
+type EvidenceRequest = {
+  _id: Id<"disputeEvidenceRequests">;
   description: string;
-  satisfiedAt?: number;
+  scope: "client" | "freelancer" | "both" | "specific";
+  status: "pending" | "fulfilled" | "cancelled";
+  requestedFromUserIds: Id<"users">[];
+  fulfilledByUserIds?: Id<"users">[];
+  createdAt: number;
+  resolvedAt?: number;
 };
 
 function DetailField({
@@ -98,29 +97,22 @@ export default function DisputeDetailPage() {
   const disputeId = params.disputeId as string;
 
   const [isAddingEvidence, setIsAddingEvidence] = useState(false);
-  const [disputeChatText, setDisputeChatText] = useState("");
-  const [sendingChat, setSendingChat] = useState(false);
-  const [pendingFiles, setPendingFiles] = useState<Array<{ fileId: Id<"_storage">; fileName: string; fileSize: number; mimeType: string }>>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const sendDisputeChatMessage = useMutation(api.disputes.mutations.sendDisputeChatMessage);
-  const generateUploadUrl = useMutation(api.disputes.mutations.generateDisputeUploadUrl);
   const cancelDisputeMutation = useMutation(api.disputes.mutations.cancelDispute);
-  const requestPlatformIntervention = useMutation(api.disputes.mutations.requestPlatformIntervention);
-  const raiseDisputeObjection = useMutation(api.disputes.mutations.raiseDisputeObjection);
-  const enforceDisputeJudgment = useMutation(api.disputes.mutations.enforceDisputeJudgment);
-  const reviewDisputeEvidence = useMutation(api.disputes.mutations.reviewDisputeEvidence);
+  const requestDisputeEvidence = useMutation(api.disputes.mutations.requestDisputeEvidence);
+  const cancelDisputeEvidenceRequest = useMutation(
+    api.disputes.mutations.cancelDisputeEvidenceRequest
+  );
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
-  const [interventionDialogOpen, setInterventionDialogOpen] = useState(false);
-  const [interventionReason, setInterventionReason] = useState("");
-  const [isRequestingIntervention, setIsRequestingIntervention] = useState(false);
-  const [objectionDialogOpen, setObjectionDialogOpen] = useState(false);
-  const [objectionReason, setObjectionReason] = useState("");
-  const [isObjecting, setIsObjecting] = useState(false);
+
+  const [evidenceRequestDialogOpen, setEvidenceRequestDialogOpen] = useState(false);
+  const [evidenceRequestScope, setEvidenceRequestScope] =
+    useState<"client" | "freelancer" | "both" | "specific">("both");
+  const [evidenceRequestDescription, setEvidenceRequestDescription] = useState("");
+  const [evidenceRequestFreelancerIds, setEvidenceRequestFreelancerIds] = useState<string[]>([]);
+  const [isCreatingEvidenceRequest, setIsCreatingEvidenceRequest] = useState(false);
 
   const dispute = useQuery(
     api.disputes.queries.getDispute,
@@ -133,13 +125,6 @@ export default function DisputeDetailPage() {
     api.projects.queries.getProject,
     dispute && isAuthenticated && user?._id
       ? { projectId: dispute.projectId, userId: user._id }
-      : "skip"
-  );
-
-  const disputeMessages = useQuery(
-    api.disputes.queries.listDisputeMessages,
-    dispute && user?._id
-      ? { disputeId: dispute._id, userId: user._id }
       : "skip"
   );
 
@@ -161,11 +146,6 @@ export default function DisputeDetailPage() {
   );
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignModeratorPick, setAssignModeratorPick] = useState<string>("");
-
-  // Must be declared before any early returns — Rules of Hooks
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [disputeMessages]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -200,44 +180,34 @@ export default function DisputeDetailPage() {
 
   const activeDisputeStatuses = new Set([
     "open",
+    "under_review",
+    "escalated",
+    // Legacy statuses (so old rows still appear active in the UI).
     "negotiation",
     "platform_intervention_requested",
     "awaiting_party_evidence",
-    "under_review",
     "judgment_issued",
     "objection_window",
     "appeal_review",
     "enforcing_resolution",
-    "escalated",
   ]);
   const isActiveDispute = activeDisputeStatuses.has(dispute.status);
   const canCancel = dispute.initiatorId === user._id && isActiveDispute;
-  const policy = getDisputeReasonPolicy(dispute.type);
   const progressSteps = [
     {
-      label: "Negotiation",
-      description: "Parties try to resolve directly.",
-      statuses: ["open", "negotiation"],
+      label: "Open",
+      description: "Dispute submitted; staff are notified.",
+      statuses: ["open", "negotiation", "platform_intervention_requested", "awaiting_party_evidence"],
     },
     {
-      label: "Evidence",
-      description: "Both sides submit proof.",
-      statuses: ["platform_intervention_requested", "awaiting_party_evidence"],
+      label: "Under review",
+      description: "49GIG reviews the case and may request more evidence.",
+      statuses: ["under_review", "escalated", "judgment_issued", "objection_window", "appeal_review", "enforcing_resolution"],
     },
     {
-      label: "Review",
-      description: "49GIG reviews the case file.",
-      statuses: ["under_review", "escalated"],
-    },
-    {
-      label: "Judgment",
-      description: "Decision is issued for objection.",
-      statuses: ["judgment_issued", "objection_window", "appeal_review"],
-    },
-    {
-      label: "Settlement",
-      description: "Funds and hire status are enforced.",
-      statuses: ["enforcing_resolution", "resolved", "closed", "cancelled"],
+      label: "Settled",
+      description: "Outcome enforced; hire status updated.",
+      statuses: ["resolved", "closed", "cancelled"],
     },
   ];
   const activeProgressIndex = Math.max(
@@ -250,14 +220,7 @@ export default function DisputeDetailPage() {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
       open: "destructive",
-      negotiation: "secondary",
-      platform_intervention_requested: "secondary",
-      awaiting_party_evidence: "secondary",
       under_review: "secondary",
-      judgment_issued: "secondary",
-      objection_window: "destructive",
-      appeal_review: "secondary",
-      enforcing_resolution: "secondary",
       resolved: "default",
       escalated: "destructive",
       closed: "outline",
@@ -296,50 +259,22 @@ export default function DisputeDetailPage() {
   const isModerator = user.role === "moderator" || user.role === "admin";
   const canClaimOrAssignDispute =
     isModerator &&
-    (dispute.status === "open" || dispute.status === "negotiation" || dispute.status === "awaiting_party_evidence") &&
+    dispute.status === "open" &&
     !dispute.assignedModeratorId;
   const canAdminPickModerator = user.role === "admin" && canClaimOrAssignDispute;
   const canModeratorSelfAssign = user.role === "moderator" && canClaimOrAssignDispute;
-  const canResolve =
-    isModerator &&
-    isActiveDispute;
-  const canRequestIntervention =
-    (user.role === "client" || user.role === "freelancer") &&
-    (dispute.status === "negotiation" || dispute.status === "open");
-  const canObject =
-    (user.role === "client" || user.role === "freelancer") &&
-    dispute.status === "objection_window";
-  const canEnforceJudgment = isModerator && dispute.status === "objection_window";
+  const canResolve = isModerator && isActiveDispute;
+  const canRequestEvidenceFromParties = isModerator && isActiveDispute;
 
-  const canPostInDisputeChat =
-    (user.role === "client" || user.role === "freelancer" || isModerator) &&
-    isActiveDispute;
-
-  const handleSendDisputeChat = async () => {
-    if (!user?._id || (!disputeChatText.trim() && pendingFiles.length === 0)) return;
-    setSendingChat(true);
-    try {
-      await sendDisputeChatMessage({
-        disputeId: dispute._id,
-        body: disputeChatText.trim(),
-        userId: user._id,
-        attachments: pendingFiles.length > 0 ? pendingFiles : undefined,
-      });
-      setDisputeChatText("");
-      setPendingFiles([]);
-    } catch (e) {
-      toast.error(getUserFriendlyError(e) || "Could not send message");
-    } finally {
-      setSendingChat(false);
-    }
-  };
-
-  const handleChatKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendDisputeChat();
-    }
-  };
+  const evidenceRequests = (dispute.evidenceRequests ?? []) as EvidenceRequest[];
+  const myEvidenceRequests = evidenceRequests.filter((r) =>
+    r.requestedFromUserIds.some((id) => String(id) === String(user._id))
+  );
+  const projectFreelancerOptions: { _id: Id<"users">; name: string }[] =
+    (adminContext?.freelancers ?? []).map((f: { _id: string; name: string }) => ({
+      _id: f._id as Id<"users">,
+      name: f.name,
+    }));
 
   const handleCancelDispute = async () => {
     if (!user?._id || !cancelReason.trim()) return;
@@ -360,104 +295,55 @@ export default function DisputeDetailPage() {
     }
   };
 
-  const handleRequestIntervention = async () => {
-    if (!user?._id || !interventionReason.trim()) return;
-    setIsRequestingIntervention(true);
+  const resetEvidenceRequestForm = () => {
+    setEvidenceRequestScope("both");
+    setEvidenceRequestDescription("");
+    setEvidenceRequestFreelancerIds([]);
+  };
+
+  const handleSubmitEvidenceRequest = async () => {
+    if (!user?._id || !evidenceRequestDescription.trim()) return;
+    if (
+      evidenceRequestScope === "specific" &&
+      evidenceRequestFreelancerIds.length === 0
+    ) {
+      toast.error("Pick at least one freelancer to ask.");
+      return;
+    }
+    setIsCreatingEvidenceRequest(true);
     try {
-      await requestPlatformIntervention({
+      await requestDisputeEvidence({
         disputeId: dispute._id,
-        reason: interventionReason.trim(),
+        scope: evidenceRequestScope,
+        freelancerIds:
+          evidenceRequestScope === "specific"
+            ? (evidenceRequestFreelancerIds as Id<"users">[])
+            : undefined,
+        description: evidenceRequestDescription.trim(),
         userId: user._id,
       });
-      toast.success("Platform intervention requested.");
-      setInterventionDialogOpen(false);
-      setInterventionReason("");
+      toast.success("Evidence request sent.");
+      setEvidenceRequestDialogOpen(false);
+      resetEvidenceRequestForm();
     } catch (err) {
-      toast.error(getUserFriendlyError(err) || "Could not request intervention.");
+      toast.error(getUserFriendlyError(err) || "Could not send request.");
     } finally {
-      setIsRequestingIntervention(false);
+      setIsCreatingEvidenceRequest(false);
     }
   };
 
-  const handleRaiseObjection = async () => {
-    if (!user?._id || !objectionReason.trim()) return;
-    setIsObjecting(true);
-    try {
-      await raiseDisputeObjection({
-        disputeId: dispute._id,
-        reason: objectionReason.trim(),
-        userId: user._id,
-      });
-      toast.success("Objection submitted for review.");
-      setObjectionDialogOpen(false);
-      setObjectionReason("");
-    } catch (err) {
-      toast.error(getUserFriendlyError(err) || "Could not submit objection.");
-    } finally {
-      setIsObjecting(false);
-    }
-  };
-
-  const handleEnforceJudgment = async () => {
-    if (!user?._id) return;
-    try {
-      await enforceDisputeJudgment({
-        disputeId: dispute._id,
-        notes: "Judgment enforced by staff.",
-        userId: user._id,
-      });
-      toast.success("Judgment enforced.");
-    } catch (err) {
-      toast.error(getUserFriendlyError(err) || "Could not enforce judgment.");
-    }
-  };
-
-  const handleReviewEvidence = async (
-    evidenceId: Id<"disputeEvidence">,
-    status: "accepted" | "rejected"
+  const handleCancelEvidenceRequest = async (
+    evidenceRequestId: Id<"disputeEvidenceRequests">
   ) => {
     if (!user?._id) return;
     try {
-      await reviewDisputeEvidence({
-        evidenceId,
-        status,
-        reviewNotes: status === "accepted" ? "Accepted for review." : "Rejected as not relevant.",
+      await cancelDisputeEvidenceRequest({
+        evidenceRequestId,
         userId: user._id,
       });
-      toast.success(`Evidence ${status}.`);
+      toast.success("Evidence request cancelled.");
     } catch (err) {
-      toast.error(getUserFriendlyError(err) || "Could not review evidence.");
-    }
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files?.length || !user?._id) return;
-    setIsUploading(true);
-    try {
-      const uploaded: typeof pendingFiles = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file.size > 20 * 1024 * 1024) {
-          toast.error(`${file.name} exceeds 20MB limit`);
-          continue;
-        }
-        const uploadUrl = await generateUploadUrl({ userId: user._id });
-        const res = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-        if (!res.ok) throw new Error("Upload failed");
-        const { storageId } = await res.json();
-        uploaded.push({ fileId: storageId, fileName: file.name, fileSize: file.size, mimeType: file.type });
-      }
-      setPendingFiles((prev) => [...prev, ...uploaded]);
-    } catch {
-      toast.error("File upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-      e.target.value = "";
+      toast.error(getUserFriendlyError(err) || "Could not cancel request.");
     }
   };
 
@@ -594,7 +480,7 @@ export default function DisputeDetailPage() {
                   Case progress
                 </CardTitle>
                 <CardDescription className="text-sm leading-relaxed">
-                  Current stage, deadlines, evidence expectations, and the professional review trail.
+                  Disputes are an escalation. Use the project chat to communicate; staff drive the review here.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
@@ -639,56 +525,23 @@ export default function DisputeDetailPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Current stage
-                    </p>
-                    <p className="mt-2 text-sm font-semibold">
-                      {disputeStatusLabel(dispute.stage ?? dispute.status)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Deadline
-                    </p>
-                    <p className="mt-2 text-sm font-semibold">
-                      {dispute.stageDeadlineAt
-                        ? new Date(dispute.stageDeadlineAt).toLocaleString()
-                        : "No active deadline"}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Track
-                    </p>
-                    <p className="mt-2 text-sm font-semibold capitalize">
-                      {dispute.track ?? (policy.fastTrackEligible ? "fast track" : "normal")}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {dispute.policyReasonLabel ?? policy.label}
-                    </p>
-                  </div>
-                </div>
-
-                {(dispute.requiredEvidenceChecklist?.length ?? 0) > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold">Evidence checklist</p>
-                    <div className="grid gap-2">
-                      {(dispute.requiredEvidenceChecklist as RequiredEvidenceChecklistItem[]).map((item) => (
-                        <div key={item.id} className="rounded-lg border border-border/50 bg-muted/10 p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-medium">{item.label}</p>
-                            <Badge variant={item.satisfiedAt ? "default" : "outline"}>
-                              {item.satisfiedAt ? "Submitted" : item.owner === "both" ? "Both parties" : item.owner}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
-                        </div>
-                      ))}
+                <div className="rounded-xl border border-primary/20 bg-primary/4 px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">Communication stays on the project</p>
+                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                        Continue conversations in the project chat. Use this page to track the dispute, add evidence,
+                        and respond to staff requests.
+                      </p>
+                      <Button variant="link" className="h-auto p-0 mt-2 text-sm font-semibold" asChild>
+                        <Link href={`/dashboard/projects/${String(dispute.projectId)}#chat`}>
+                          Open project chat
+                        </Link>
+                      </Button>
                     </div>
                   </div>
-                )}
+                </div>
 
                 {Array.isArray(dispute.stageEvents) && dispute.stageEvents.length > 0 && (
                   <div className="space-y-2">
@@ -713,161 +566,118 @@ export default function DisputeDetailPage() {
               </CardContent>
             </Card>
 
-          {/* Dispute discussion chat */}
-          <Card className="flex min-h-[min(28rem,70dvh)] flex-col overflow-hidden rounded-2xl border-border/60 shadow-sm">
-            <CardHeader className="shrink-0 space-y-1 border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
-              <CardTitle className="flex items-center gap-2 text-base font-semibold tracking-tight sm:text-lg">
-                <MessageSquare className="h-5 w-5 shrink-0 text-primary" />
-                Dispute chat
-              </CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                Exchange messages and share documents with the other party. 49GIG staff review the full thread.
-              </CardDescription>
-            </CardHeader>
-
-            {/* Messages */}
-            <CardContent className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3 sm:p-4 max-h-[min(24rem,45dvh)] sm:max-h-[min(26rem,50dvh)]">
-              {disputeMessages === undefined ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">Loading messages…</p>
-              ) : disputeMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 gap-2">
-                  <MessageSquare className="h-8 w-8 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">No messages yet. Start the discussion.</p>
-                </div>
-              ) : (
-                <>
-                  {disputeMessages.map((m: {
-                    _id: string;
-                    authorId: Id<"users">;
-                    authorName?: string;
-                    authorRole: string;
-                    body: string;
-                    createdAt: number;
-                    attachments?: Array<{ fileId: Id<"_storage">; fileName: string; fileSize: number; mimeType: string; url?: string }>;
-                  }) => {
-                    const isMine = m.authorId === user._id;
-                    const isSystem = m.authorRole === "system";
-                    const isStaffMsg = m.authorRole === "admin" || m.authorRole === "moderator";
-                    return (
-                      <div
-                        key={m._id}
-                        className={`flex ${isMine ? "justify-end" : isSystem ? "justify-center" : "justify-start"}`}
+            {/* Evidence requests */}
+            {(isModerator || myEvidenceRequests.length > 0) && (
+              <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
+                <CardHeader className="space-y-3 border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                        <Inbox className="h-5 w-5 shrink-0 text-primary" />
+                        Evidence requests
+                      </CardTitle>
+                      <CardDescription className="text-sm leading-relaxed">
+                        {isModerator
+                          ? "Ask the client, freelancer(s), or specific seats to upload more evidence."
+                          : "49GIG staff have asked you to upload more evidence so the case can move forward."}
+                      </CardDescription>
+                    </div>
+                    {canRequestEvidenceFromParties && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        onClick={() => setEvidenceRequestDialogOpen(true)}
                       >
-                        {isSystem ? (
-                          <div className="max-w-[80%] rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-center text-xs text-foreground">
-                            {m.body}
-                          </div>
-                        ) : (
-                          <div className={`max-w-[75%] space-y-1 ${isMine ? "items-end" : "items-start"} flex flex-col`}>
-                            <div className={`text-[11px] font-medium px-1 ${isMine ? "text-right text-primary" : "text-muted-foreground"}`}>
-                              {m.authorName ?? m.authorRole}{isStaffMsg ? " (Staff)" : ""} · {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                            </div>
-                            <div
-                              className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${
-                                isMine
-                                  ? "bg-primary text-primary-foreground rounded-br-sm"
-                                  : isStaffMsg
-                                    ? "bg-violet-500/10 border border-violet-400/30 text-foreground rounded-bl-sm"
-                                    : "bg-card border border-border/60 text-foreground rounded-bl-sm"
-                              }`}
-                            >
-                              {m.body && m.body !== "📎 Attachment" && (
-                                <p className="whitespace-pre-wrap">{m.body}</p>
-                              )}
-                              {m.attachments && m.attachments.length > 0 && (
-                                <div className={`space-y-2 ${m.body && m.body !== "📎 Attachment" ? "mt-2 pt-2 border-t border-current/20" : ""}`}>
-                                  {m.attachments.map((att, i) => {
-                                    const isImage = att.mimeType.startsWith("image/");
-                                    return (
-                                      <div key={i} className="flex items-center gap-2">
-                                        {isImage ? <ImageIcon className="h-4 w-4 shrink-0 opacity-80" /> : <FileText className="h-4 w-4 shrink-0 opacity-80" />}
-                                        <span className="text-xs truncate flex-1 opacity-90">{att.fileName}</span>
-                                        {att.url && (
-                                          <a href={att.url} target="_blank" rel="noopener noreferrer" className="shrink-0 opacity-80 hover:opacity-100">
-                                            <Download className="h-3.5 w-3.5" />
-                                          </a>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
+                        <Plus className="mr-2 h-4 w-4" />
+                        Request evidence
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3 px-4 py-5 sm:px-6 sm:py-6">
+                  {(isModerator ? evidenceRequests : myEvidenceRequests).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/10 py-8 text-center">
+                      <Inbox className="h-7 w-7 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">
+                        {isModerator ? "No evidence requests yet." : "Nothing pending from staff."}
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {(isModerator ? evidenceRequests : myEvidenceRequests).map((req) => {
+                        const scopeLabel =
+                          req.scope === "client"
+                            ? "Client"
+                            : req.scope === "freelancer"
+                              ? "Freelancer(s)"
+                              : req.scope === "both"
+                                ? "Client + Freelancer(s)"
+                                : "Specific seats";
+                        const isMine = req.requestedFromUserIds.some(
+                          (id) => String(id) === String(user._id)
+                        );
+                        return (
+                          <li
+                            key={req._id}
+                            className="rounded-xl border border-border/50 bg-muted/10 p-3 sm:p-4"
+                          >
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge
+                                    variant={
+                                      req.status === "pending"
+                                        ? "destructive"
+                                        : req.status === "fulfilled"
+                                          ? "default"
+                                          : "outline"
+                                    }
+                                  >
+                                    {req.status}
+                                  </Badge>
+                                  <span className="text-xs font-medium text-muted-foreground">
+                                    {scopeLabel}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {new Date(req.createdAt).toLocaleString()}
+                                  </span>
                                 </div>
-                              )}
+                                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">
+                                  {req.description}
+                                </p>
+                              </div>
+                              <div className="flex shrink-0 flex-wrap gap-2">
+                                {!isModerator && isMine && req.status === "pending" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setIsAddingEvidence(true)}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Upload evidence
+                                  </Button>
+                                )}
+                                {isModerator && req.status === "pending" && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => void handleCancelEvidenceRequest(req._id)}
+                                  >
+                                    <X className="mr-2 h-4 w-4" />
+                                    Cancel request
+                                  </Button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </>
-              )}
-            </CardContent>
-
-            {/* Composer */}
-            {canPostInDisputeChat && (
-              <div className="shrink-0 space-y-2 border-t border-border/50 bg-muted/10 p-3 sm:p-4">
-                {/* Pending files preview */}
-                {pendingFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 px-0.5">
-                    {pendingFiles.map((f, i) => (
-                      <div key={i} className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2 py-1 text-xs">
-                        <FileText className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span className="max-w-[min(12rem,55vw)] truncate">{f.fileName}</span>
-                        <button type="button" className="ml-1 text-muted-foreground hover:text-destructive" onClick={() => setPendingFiles((p) => p.filter((_, j) => j !== i))}>
-                          <XCircle className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.zip,.ppt,.pptx"
-                    className="hidden"
-                    onChange={handleFileSelect}
-                  />
-                  <div className="flex min-w-0 flex-1 items-end gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 shrink-0 rounded-full"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading || sendingChat}
-                      title="Attach file or document"
-                    >
-                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-                    </Button>
-                    <Textarea
-                      placeholder="Type a message… (Shift+Enter for new line)"
-                      value={disputeChatText}
-                      onChange={(e) => setDisputeChatText(e.target.value)}
-                      onKeyDown={handleChatKeyDown}
-                      rows={2}
-                      disabled={sendingChat}
-                      className="min-h-11 max-h-32 flex-1 resize-none rounded-2xl border-border/80 bg-background px-4 py-2.5 text-sm leading-relaxed sm:min-h-10 sm:py-2.5"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    className="h-10 w-10 shrink-0 self-end rounded-full sm:self-auto"
-                    onClick={handleSendDisputeChat}
-                    disabled={sendingChat || isUploading || (!disputeChatText.trim() && pendingFiles.length === 0)}
-                    aria-label="Send"
-                  >
-                    {sendingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  </Button>
-                </div>
-                <p className="text-[11px] text-muted-foreground px-0.5 sm:px-1">
-                  Images, PDFs, documents up to 20MB. Enter to send · Shift+Enter for new line.
-                </p>
-              </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
             )}
-          </Card>
 
           {/* Evidence */}
           <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
@@ -907,59 +717,33 @@ export default function DisputeDetailPage() {
             <CardContent className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
               {Array.isArray(dispute.structuredEvidence) && dispute.structuredEvidence.length > 0 && (
                 <div className="space-y-3">
-                  <p className="text-sm font-semibold">Structured evidence review</p>
+                  <p className="text-sm font-semibold">Submitted evidence</p>
                   {dispute.structuredEvidence.map((evidence: {
                     _id: Id<"disputeEvidence">;
                     title: string;
                     description?: string;
                     evidenceType: string;
-                    status: "submitted" | "accepted" | "rejected";
                     fileUrl?: string | null;
                     url?: string;
                   }) => (
                     <div key={evidence._id} className="rounded-xl border border-border/50 bg-muted/10 p-3">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold">{evidence.title}</p>
-                            <Badge variant={evidence.status === "accepted" ? "default" : evidence.status === "rejected" ? "destructive" : "outline"}>
-                              {evidence.status}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground capitalize">
-                            {evidence.evidenceType.replace(/_/g, " ")}
-                          </p>
-                          {evidence.description && (
-                            <p className="mt-2 text-sm text-muted-foreground">{evidence.description}</p>
-                          )}
-                          {(evidence.fileUrl || evidence.url) && (
-                            <a
-                              href={evidence.fileUrl ?? evidence.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
-                            >
-                              Open evidence
-                            </a>
-                          )}
-                        </div>
-                        {isModerator && evidence.status === "submitted" && (
-                          <div className="flex shrink-0 gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void handleReviewEvidence(evidence._id, "accepted")}
-                            >
-                              Accept
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void handleReviewEvidence(evidence._id, "rejected")}
-                            >
-                              Reject
-                            </Button>
-                          </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">{evidence.title}</p>
+                        <p className="mt-1 text-xs text-muted-foreground capitalize">
+                          {evidence.evidenceType.replace(/_/g, " ")}
+                        </p>
+                        {evidence.description && (
+                          <p className="mt-2 text-sm text-muted-foreground">{evidence.description}</p>
+                        )}
+                        {(evidence.fileUrl || evidence.url) && (
+                          <a
+                            href={evidence.fileUrl ?? evidence.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
+                          >
+                            Open evidence
+                          </a>
                         )}
                       </div>
                     </div>
@@ -1206,43 +990,26 @@ export default function DisputeDetailPage() {
             </CardContent>
           </Card>
 
-          {(canRequestIntervention || canObject) && (
-            <Card className="overflow-hidden rounded-2xl border-primary/25 shadow-sm">
-              <CardHeader className="border-b border-border/50 bg-primary/4 px-4 py-4 sm:px-6 sm:py-5">
-                <CardTitle className="text-base font-semibold sm:text-lg">Party actions</CardTitle>
-                <CardDescription>Use these only when the current stage requires escalation.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
-                {canRequestIntervention && (
-                  <Button className="w-full" onClick={() => setInterventionDialogOpen(true)}>
-                    Request 49GIG intervention
-                  </Button>
-                )}
-                {canObject && (
-                  <Button variant="outline" className="w-full" onClick={() => setObjectionDialogOpen(true)}>
-                    Object to judgment
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
           {/* Actions (Moderator/Admin) */}
           {canResolve && (
             <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
               <CardHeader className="border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
                 <CardTitle className="text-base font-semibold sm:text-lg">Moderator actions</CardTitle>
-                <CardDescription>Review evidence, issue judgment, or enforce after objection window</CardDescription>
+                <CardDescription>Review evidence, request more if needed, then resolve.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
                 <Button className="w-full" asChild>
                   <Link href={`/dashboard/disputes/${disputeId}/resolve`}>
-                    Issue judgment
+                    Resolve dispute
                   </Link>
                 </Button>
-                {canEnforceJudgment && (
-                  <Button variant="secondary" className="w-full" onClick={handleEnforceJudgment}>
-                    Enforce judgment now
+                {canRequestEvidenceFromParties && (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setEvidenceRequestDialogOpen(true)}
+                  >
+                    Request more evidence
                   </Button>
                 )}
                 {user.role === "moderator" && (
@@ -1375,81 +1142,114 @@ export default function DisputeDetailPage() {
       </Dialog>
 
       <Dialog
-        open={interventionDialogOpen}
+        open={evidenceRequestDialogOpen}
         onOpenChange={(open) => {
-          setInterventionDialogOpen(open);
-          if (!open) setInterventionReason("");
+          setEvidenceRequestDialogOpen(open);
+          if (!open) resetEvidenceRequestForm();
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Request 49GIG intervention</DialogTitle>
+            <DialogTitle>Request more evidence</DialogTitle>
             <DialogDescription>
-              Move this case from direct negotiation into a formal evidence window for platform review.
+              Choose who should respond and describe what you need. The selected parties will be notified
+              and can upload evidence directly on this page.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="intervention-reason">Why should the platform intervene?</Label>
-            <Textarea
-              id="intervention-reason"
-              value={interventionReason}
-              onChange={(e) => setInterventionReason(e.target.value)}
-              rows={4}
-              placeholder="Explain what you tried to resolve directly and what still needs review."
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInterventionDialogOpen(false)}>
-              Not now
-            </Button>
-            <Button
-              onClick={() => void handleRequestIntervention()}
-              disabled={isRequestingIntervention || !interventionReason.trim()}
-            >
-              {isRequestingIntervention ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Request intervention
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="evidence-scope">Who should respond?</Label>
+              <Select
+                value={evidenceRequestScope}
+                onValueChange={(value) =>
+                  setEvidenceRequestScope(value as typeof evidenceRequestScope)
+                }
+              >
+                <SelectTrigger id="evidence-scope" className="w-full">
+                  <SelectValue placeholder="Select recipients" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="client">Client only</SelectItem>
+                  <SelectItem value="freelancer">All freelancer(s) on this hire</SelectItem>
+                  <SelectItem value="both">Client and freelancer(s)</SelectItem>
+                  <SelectItem value="specific">Specific freelancer(s)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-      <Dialog
-        open={objectionDialogOpen}
-        onOpenChange={(open) => {
-          setObjectionDialogOpen(open);
-          if (!open) setObjectionReason("");
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Object to judgment</DialogTitle>
-            <DialogDescription>
-              Submit a focused objection if the judgment missed material evidence or contains a clear error.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="objection-reason">Objection reason</Label>
-            <Textarea
-              id="objection-reason"
-              value={objectionReason}
-              onChange={(e) => setObjectionReason(e.target.value)}
-              rows={4}
-              placeholder="State the specific error and refer to the evidence already in the case."
-            />
-            <p className="text-xs text-muted-foreground">
-              Objections are reviewed by staff before a final settlement is enforced.
-            </p>
+            {evidenceRequestScope === "specific" && (
+              <div className="space-y-2">
+                <Label>Pick the freelancer(s) on this hire</Label>
+                {projectFreelancerOptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No freelancers are currently associated with this hire.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {projectFreelancerOptions.map((f) => {
+                      const checked = evidenceRequestFreelancerIds.includes(String(f._id));
+                      return (
+                        <label
+                          key={String(f._id)}
+                          className="flex items-center gap-2 rounded-md border border-border/60 px-3 py-2 text-sm"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(value) => {
+                              setEvidenceRequestFreelancerIds((prev) => {
+                                const id = String(f._id);
+                                if (value === true) return prev.includes(id) ? prev : [...prev, id];
+                                return prev.filter((p) => p !== id);
+                              });
+                            }}
+                          />
+                          <span className="font-medium">{f.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="evidence-description">What do you need from them?</Label>
+              <Textarea
+                id="evidence-description"
+                value={evidenceRequestDescription}
+                onChange={(e) => setEvidenceRequestDescription(e.target.value)}
+                rows={5}
+                placeholder="e.g. Please upload screenshots of the failed deliverable and your last messages confirming scope."
+              />
+              <p className="text-xs text-muted-foreground">
+                Be specific so the parties know exactly what to send.
+              </p>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setObjectionDialogOpen(false)}>
-              Not now
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEvidenceRequestDialogOpen(false);
+                resetEvidenceRequestForm();
+              }}
+              disabled={isCreatingEvidenceRequest}
+            >
+              Cancel
             </Button>
             <Button
-              onClick={() => void handleRaiseObjection()}
-              disabled={isObjecting || !objectionReason.trim()}
+              onClick={() => void handleSubmitEvidenceRequest()}
+              disabled={
+                isCreatingEvidenceRequest ||
+                !evidenceRequestDescription.trim() ||
+                (evidenceRequestScope === "specific" &&
+                  evidenceRequestFreelancerIds.length === 0)
+              }
             >
-              {isObjecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Submit objection
+              {isCreatingEvidenceRequest ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Send request
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -33,13 +33,6 @@ crons.interval(
   internal["cron/monthlyCycles"].autoReleaseMonthlyCycles
 );
 
-// Advance dispute negotiation/evidence/objection deadlines.
-crons.interval(
-  "process dispute deadlines",
-  { minutes: 30 },
-  internal["cron/disputes"].processDisputeDeadlines
-);
-
 // Clean up expired sessions
 crons.interval(
   "cleanup expired sessions",

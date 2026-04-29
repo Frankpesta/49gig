@@ -261,18 +261,19 @@ export default function NewDisputePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Open an Appeal</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Escalate to a dispute</h1>
           <p className="text-muted-foreground mt-1">
-            Start with direct negotiation, then move to 49GIG review if both parties cannot agree.
+            Try to resolve issues in the project chat first. Open a dispute when you need 49GIG staff to step in.
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Guided Dispute Intake</CardTitle>
+          <CardTitle>Open a dispute</CardTitle>
           <CardDescription>
-            Follow the same structure every professional case needs: scope, reason, evidence, and requested intervention.
+            Tell us which hire is affected, why you&apos;re escalating, and attach any evidence you already have.
+            Staff will review and may ask for more.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -284,12 +285,11 @@ export default function NewDisputePage() {
               </div>
             )}
 
-            <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 text-sm sm:grid-cols-4">
+            <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/20 p-4 text-sm sm:grid-cols-3">
               {[
                 ["1", "Select hire"],
-                ["2", "Choose reason"],
+                ["2", "Describe the issue"],
                 ["3", "Attach evidence"],
-                ["4", "Negotiation opens"],
               ].map(([step, label]) => (
                 <div key={step} className="flex items-center gap-2">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
@@ -456,9 +456,7 @@ export default function NewDisputePage() {
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-3 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">{selectedPolicy.summary}</p>
                   <p className="mt-1">
-                    Timeline: {selectedPolicy.negotiationHours}h negotiation,{" "}
-                    {selectedPolicy.evidenceHours}h evidence window,{" "}
-                    {selectedPolicy.objectionHours}h objection window.
+                    Staff will review your evidence and may ask for more details before resolving.
                   </p>
                 </div>
               )}
@@ -492,9 +490,9 @@ export default function NewDisputePage() {
             {selectedPolicy && (
               <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-4">
                 <div>
-                  <Label>Required evidence checklist</Label>
+                  <Label>Helpful evidence to attach</Label>
                   <p className="text-xs text-muted-foreground">
-                    Submit as much of this proof as possible now. Missing items can be added during the evidence window.
+                    Add as much as you have now. Staff can request anything else they need after the dispute is opened.
                   </p>
                 </div>
                 <div className="space-y-2">
