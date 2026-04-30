@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -34,6 +34,7 @@ export default function AddPaymentPage() {
 
   const [isInitializing, setIsInitializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const proceedLockRef = useRef(false);
 
   useEffect(() => {
     if (!user || user.role !== "client") {
@@ -60,7 +61,8 @@ export default function AddPaymentPage() {
 
   const handleProceed = async () => {
     if (!project || !user) return;
-    if (isInitializing) return;
+    if (proceedLockRef.current || isInitializing) return;
+    proceedLockRef.current = true;
     try {
       setIsInitializing(true);
       setError(null);
@@ -73,6 +75,7 @@ export default function AddPaymentPage() {
     } catch (err: unknown) {
       setError(getUserFriendlyError(err) || "Failed to start payment");
     } finally {
+      proceedLockRef.current = false;
       setIsInitializing(false);
     }
   };

@@ -19,6 +19,61 @@ function flutterwaveVerifyErrorLooksLikeNoTransaction(message: string): boolean 
   );
 }
 
+/**
+ * Resolve the public-facing site URL we tell Flutterwave to redirect to after checkout.
+ *
+ * Flutterwave's Standard checkout requires a real, reachable redirect URL. A placeholder like
+ * `https://your-site.com/...` also breaks return flows after pay/cancel. Additionally, a
+ * `payment_options` filter that does not overlap what your dashboard enables (e.g. card-only
+ * when USD card is off) can leave the hosted page with no usable methods—often surfaced as a
+ * cancelled/abandoned session—so we omit `payment_options` and let Flutterwave use all enabled
+ * channels for the currency.
+ */
+function resolveFrontendBaseUrl(): string {
+  const raw =
+    (process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_BASE_URL || "").trim();
+  if (raw && !/your-site\.com/i.test(raw)) {
+    return raw.replace(/\/+$/, "");
+  }
+  const isTestMode =
+    (process.env.FLUTTERWAVE_SECRET_KEY || "").startsWith("FLWSECK_TEST");
+  if (isTestMode) {
+    console.warn(
+      "[payments] FRONTEND_URL / NEXT_PUBLIC_BASE_URL is not set. Falling back to http://localhost:3000 (Flutterwave test mode). Set FRONTEND_URL in your .env.local for staging/production."
+    );
+    return "http://localhost:3000";
+  }
+  throw new Error(
+    "Server is not configured for live payments: set FRONTEND_URL (or NEXT_PUBLIC_BASE_URL) in the Convex dashboard so Flutterwave can redirect back after checkout."
+  );
+}
+
+/** Build the customer payload Flutterwave Standard expects, falling back gracefully on missing fields. */
+function buildFlutterwaveCustomer(user: {
+  email?: string;
+  name?: string;
+  profile?: { phoneNumber?: string };
+}): { email: string; name: string; phone_number?: string } {
+  const email = (user.email || "").trim();
+  if (!email) {
+    throw new Error("Cannot start checkout: your account is missing an email address.");
+  }
+  const fallbackName = email.split("@")[0] || "Client";
+  const name = (user.name || "").trim() || fallbackName;
+  const phone = (user.profile?.phoneNumber || "").trim();
+  return phone ? { email, name, phone_number: phone } : { email, name };
+}
+
+/** Flutterwave meta must be string values; non-strings have caused odd hosted-checkout behaviour. */
+function flutterwaveStringMeta(meta: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(meta)) {
+    if (v === undefined || v === null) continue;
+    out[k] = typeof v === "string" ? v : String(v);
+  }
+  return out;
+}
+
 type PaymentSummary = {
   _id: Id<"payments">;
   projectId?: Id<"projects">;
@@ -259,33 +314,27 @@ export const createPaymentIntent = action({
 
     const txRef = `49gig-${args.projectId}-${Date.now()}`;
 
-    // Get redirect URL - use FRONTEND_URL or NEXT_PUBLIC_BASE_URL, fallback to a sensible default
-    // CONVEX_SITE_URL points to Convex hosting, not the frontend app
-    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://your-site.com";
+    const baseUrl = resolveFrontendBaseUrl();
     const redirectUrl = `${baseUrl}/dashboard/projects/${args.projectId}/payment/callback`;
 
-    const flutterwaveAmount = fwCents / 100;
+    const flutterwaveAmount = Number((fwCents / 100).toFixed(2));
     const clientWalletCreditApplied = applyCents / 100;
 
-    // Initialize Flutterwave payment
     const paymentData = await flutterwave.initializePayment({
       tx_ref: txRef,
       amount: flutterwaveAmount,
       currency: args.currency.toUpperCase(),
       redirect_url: redirectUrl,
-      customer: {
-        email: user.email,
-        name: user.name,
-      },
+      customer: buildFlutterwaveCustomer(user),
       customizations: {
         title: "49GIG Project Funding",
-        description: `Project: ${project.intakeForm.title}`,
+        description: `Project: ${project.intakeForm.title}`.slice(0, 100),
       },
-      meta: {
+      meta: flutterwaveStringMeta({
         projectId: args.projectId,
         userId: args.userId,
         type: "pre_funding",
-      },
+      }),
     });
 
     // Create payment record in database
@@ -381,43 +430,41 @@ export const createTopUpPaymentIntent = action({
       throw new Error("Invalid amount for selected months");
     }
 
+    const amountRounded = Number(amount.toFixed(2));
     const currency = (project.currency || "USD").toUpperCase();
-    const baseUrl =
-      process.env.FRONTEND_URL ||
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      "https://your-site.com";
+    const baseUrl = resolveFrontendBaseUrl();
     const redirectUrl = `${baseUrl}/dashboard/projects/${args.projectId}/payment/callback?type=top_up`;
     const txRef = `49gig-topup-${args.projectId}-${Date.now()}`;
 
     const paymentData = await flutterwave.initializePayment({
       tx_ref: txRef,
-      amount,
+      amount: amountRounded,
       currency,
       redirect_url: redirectUrl,
-      customer: { email: user.email, name: user.name },
+      customer: buildFlutterwaveCustomer(user),
       customizations: {
         title: "49GIG Add Payment",
-        description: `Add ${monthsToFund} month(s) for: ${project.intakeForm?.title ?? "Hire"}`,
+        description: `Add ${monthsToFund} month(s) for: ${project.intakeForm?.title ?? "Hire"}`.slice(0, 100),
       },
-      meta: {
+      meta: flutterwaveStringMeta({
         projectId: args.projectId,
         userId: args.userId,
         type: "top_up",
-        monthsToFund: String(monthsToFund),
-      },
+        monthsToFund,
+      }),
     });
 
     const platformFeePercent =
       project.platformFee ??
       (await ctx.runQuery(internalAny.platformSettings.queries.getPlatformFeePercentageInternal, {}));
-    const platformFeeAmountUsd = (amount * platformFeePercent) / 100;
-    const netAmount = amount - platformFeeAmountUsd;
+    const platformFeeAmountUsd = (amountRounded * platformFeePercent) / 100;
+    const netAmount = amountRounded - platformFeeAmountUsd;
 
     const paymentId = await ctx.runMutation(internalAny.payments.mutations.createPayment, {
       projectId: args.projectId,
       type: "top_up",
       topUpMonths: monthsToFund,
-      amount,
+      amount: amountRounded,
       currency: project.currency || "usd",
       platformFee: platformFeeAmountUsd,
       netAmount,
@@ -447,12 +494,16 @@ export const abandonCheckoutPayment = action({
     txRef: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ released: boolean }> => {
+    // Best-effort cleanup: if the project is missing or the caller isn't
+    // authorized to see it (e.g. admin force-deleted, or a stale callback
+    // fired after navigation), no-op instead of throwing — there's nothing
+    // legitimate to release.
     const project = await ctx.runQuery(internalAny.payments.queries.getProject, {
       projectId: args.projectId,
       userId: args.userId,
     });
     if (!project) {
-      throw new Error("Project not found");
+      return { released: false };
     }
 
     let payment: PaymentSummary = null;
