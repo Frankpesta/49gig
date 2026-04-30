@@ -1222,12 +1222,25 @@ export const adminDeleteProject = mutation({
       .query("payments")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
+
+    // Admin override for the pending-payment guard:
+    // mark any in-flight pre_funding / top_up rows as terminal so the delete
+    // can proceed. If a webhook later arrives saying the gateway charge
+    // succeeded, the payment row is still kept (detached) for audit, and the
+    // post-success side effects (escrow / matching) safely no-op because the
+    // project is gone — admin is responsible for any manual refund.
+    const nowForCancel = Date.now();
+    const cancelledPaymentIds: Id<"payments">[] = [];
     for (const p of payments) {
-      if (p.status === "pending" || p.status === "processing") {
-        throw new Error(
-          "Cannot delete hire while a payment is pending or processing. Wait for it to finish or cancel it first."
-        );
-      }
+      if (p.status !== "pending" && p.status !== "processing") continue;
+      if (p.type !== "pre_funding" && p.type !== "top_up") continue;
+      await ctx.db.patch(p._id, {
+        status: "cancelled",
+        errorMessage:
+          "Hire was deleted by admin while this payment was still pending. If the gateway charged the client, issue a manual refund.",
+        updatedAt: nowForCancel,
+      });
+      cancelledPaymentIds.push(p._id);
     }
 
     const walletUsers = userIdsTouchingProjectEscrow(project);
@@ -1346,6 +1359,7 @@ export const adminDeleteProject = mutation({
         title: project.intakeForm.title,
         clientId: project.clientId,
         priorStatus: project.status,
+        cancelledPendingPayments: cancelledPaymentIds.map((id) => String(id)),
       },
       createdAt: Date.now(),
     });

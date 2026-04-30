@@ -29,6 +29,7 @@ export default function PaymentPage() {
   const projectId = params.projectId as string;
 
   const createPaymentIntent = useAction(api.payments.actions.createPaymentIntent);
+  const abandonCheckoutPayment = useAction(api.payments.actions.abandonCheckoutPayment);
   const updateProject = useMutation(api.projects.mutations.updateProject);
   const project = useQuery(
     api.projects.queries.getProject,
@@ -53,6 +54,7 @@ export default function PaymentPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
+  const [isAbandoning, setIsAbandoning] = useState(false);
   const [walletApplyCents, setWalletApplyCents] = useState(0);
   type FundingPreference = "wallet_max" | "custom" | "card_only";
   const [fundingPreference, setFundingPreference] = useState<FundingPreference>("wallet_max");
@@ -119,6 +121,28 @@ export default function PaymentPage() {
       return;
     }
   }, [project, paymentStatus, projectId, router]);
+
+  const handleAbandonPreviousAttempt = async () => {
+    if (!user) return;
+    if (isAbandoning) return;
+    try {
+      setIsAbandoning(true);
+      const result = await abandonCheckoutPayment({
+        projectId: projectId as any,
+        userId: user._id,
+      });
+      if (result.released) {
+        toast.success("Previous attempt cancelled. You can pay again.");
+        setError(null);
+      } else {
+        toast.message("No pending attempt to cancel.");
+      }
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not cancel the previous attempt.");
+    } finally {
+      setIsAbandoning(false);
+    }
+  };
 
   const handleProceedToPayment = async () => {
     if (!project || !user) return;
@@ -207,6 +231,7 @@ export default function PaymentPage() {
   }
 
   if (error) {
+    const looksLikeStalePending = /already being processed/i.test(error);
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Card className="w-full max-w-md border-destructive">
@@ -217,10 +242,27 @@ export default function PaymentPage() {
             </CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            {looksLikeStalePending && (
+              <Button
+                onClick={() => void handleAbandonPreviousAttempt()}
+                className="w-full"
+                disabled={isAbandoning}
+              >
+                {isAbandoning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  "Cancel previous attempt and start fresh"
+                )}
+              </Button>
+            )}
             <Button
               onClick={() => router.push(`/dashboard/projects/${projectId}`)}
               variant="outline"
+              className="w-full"
             >
               Back to Hire
             </Button>
@@ -237,6 +279,14 @@ export default function PaymentPage() {
   const walletAppliedCents = Math.min(walletApplyCents, maxWalletApplyCents);
   const cardChargeApproxZero = grossCents - walletAppliedCents <= 0;
 
+  const stalePendingPayment =
+    paymentStatus?.payment &&
+    paymentStatus.payment.type === "pre_funding" &&
+    (paymentStatus.payment.status === "pending" ||
+      paymentStatus.payment.status === "processing") &&
+    !!paymentStatus.payment.flutterwaveTransactionId &&
+    !paymentStatus.isPreFundingPaymentSucceeded;
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
@@ -245,6 +295,40 @@ export default function PaymentPage() {
           Fund your hire to start matching with vetted freelancers.
         </p>
       </div>
+
+      {stalePendingPayment && (
+        <Card className="border-amber-200 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">
+                  A previous payment attempt is still open
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Cancel it to start a fresh checkout. No charges will be made.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleAbandonPreviousAttempt()}
+              disabled={isAbandoning}
+              className="shrink-0"
+            >
+              {isAbandoning ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Cancelling...
+                </>
+              ) : (
+                "Cancel and start fresh"
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
