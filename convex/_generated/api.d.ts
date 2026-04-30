@@ -32,7 +32,6 @@ import type * as contracts_actions from "../contracts/actions.js";
 import type * as contracts_content from "../contracts/content.js";
 import type * as contracts_mutations from "../contracts/mutations.js";
 import type * as contracts_queries from "../contracts/queries.js";
-import type * as cron_disputes from "../cron/disputes.js";
 import type * as cron_kyc from "../cron/kyc.js";
 import type * as cron_milestones from "../cron/milestones.js";
 import type * as cron_monthlyCycles from "../cron/monthlyCycles.js";
@@ -157,7 +156,6 @@ declare const fullApi: ApiFromModules<{
   "contracts/content": typeof contracts_content;
   "contracts/mutations": typeof contracts_mutations;
   "contracts/queries": typeof contracts_queries;
-  "cron/disputes": typeof cron_disputes;
   "cron/kyc": typeof cron_kyc;
   "cron/milestones": typeof cron_milestones;
   "cron/monthlyCycles": typeof cron_monthlyCycles;

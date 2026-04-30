@@ -54,11 +54,7 @@ import { disputeStatusLabel } from "@/lib/dispute-flow";
 
 type StatusFilter =
   | "open"
-  | "negotiation"
-  | "awaiting_party_evidence"
   | "under_review"
-  | "objection_window"
-  | "appeal_review"
   | "resolved"
   | "escalated"
   | "closed"
@@ -118,9 +114,9 @@ export default function DisputesPage() {
     const tone =
       status === "resolved"
         ? "success"
-        : status === "open" || status === "escalated" || status === "objection_window"
+        : status === "open" || status === "escalated"
           ? "danger"
-          : status === "under_review" || status === "awaiting_party_evidence" || status === "negotiation"
+          : status === "under_review"
             ? "warning"
             : "neutral";
     return (
@@ -157,16 +153,10 @@ export default function DisputesPage() {
   );
 
   const openCount = (pendingDisputes ?? disputes).filter(
-    (d: Doc<"disputes">) =>
-      d.status === "open" ||
-      d.status === "negotiation" ||
-      d.status === "awaiting_party_evidence"
+    (d: Doc<"disputes">) => d.status === "open"
   ).length;
   const underReviewCount = (pendingDisputes ?? disputes).filter(
-    (d: Doc<"disputes">) =>
-      d.status === "under_review" ||
-      d.status === "objection_window" ||
-      d.status === "appeal_review"
+    (d: Doc<"disputes">) => d.status === "under_review"
   ).length;
   const resolvedCount = disputes.filter(
     (d: Doc<"disputes">) => d.status === "resolved"
@@ -266,11 +256,8 @@ export default function DisputesPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="negotiation">Negotiation</SelectItem>
-              <SelectItem value="awaiting_party_evidence">Awaiting Evidence</SelectItem>
+              <SelectItem value="open">Open</SelectItem>
               <SelectItem value="under_review">Under Review</SelectItem>
-              <SelectItem value="objection_window">Objection Window</SelectItem>
-              <SelectItem value="appeal_review">Appeal Review</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
               <SelectItem value="escalated">Escalated</SelectItem>
               <SelectItem value="closed">Closed</SelectItem>
@@ -279,7 +266,7 @@ export default function DisputesPage() {
           </Select>
         ) : (
           <>
-            {(["all", "negotiation", "awaiting_party_evidence", "under_review", "resolved"] as const).map((s) => (
+            {(["all", "open", "under_review", "resolved"] as const).map((s) => (
               <Button
                 key={s}
                 variant={(statusFilter ?? "all") === s ? "default" : "outline"}

@@ -48,7 +48,7 @@ export default function ResolveDisputePage() {
       : "skip"
   );
 
-  const issueDisputeJudgment = useMutation(api.disputes.mutations.issueDisputeJudgment);
+  const resolveDispute = useMutation(api.disputes.mutations.resolveDispute);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +72,7 @@ export default function ResolveDisputePage() {
     setIsSubmitting(true);
 
     try {
-      await issueDisputeJudgment({
+      await resolveDispute({
         disputeId: disputeId as Id<"disputes">,
         decision: formData.decision as ResolveDecision,
         resolutionAmount: formData.resolutionAmount
@@ -86,7 +86,7 @@ export default function ResolveDisputePage() {
 
       router.push(`/dashboard/disputes/${disputeId}`);
     } catch (err: unknown) {
-      setError(getUserFriendlyError(err) || "Failed to issue judgment");
+      setError(getUserFriendlyError(err) || "Failed to resolve dispute");
     } finally {
       setIsSubmitting(false);
     }
@@ -106,7 +106,7 @@ export default function ResolveDisputePage() {
         <Card>
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground">
-              Only moderators and admins can issue dispute judgments
+              Only moderators and admins can resolve disputes
             </p>
             <Button asChild className="mt-4">
               <Link href="/dashboard/disputes">Back to Disputes</Link>
@@ -151,7 +151,7 @@ export default function ResolveDisputePage() {
           <CardContent className="p-8 text-center">
             <p className="text-muted-foreground">
               {dispute.status === "cancelled"
-                ? "This dispute was cancelled and cannot be judged here."
+                ? "This dispute was cancelled and cannot be resolved."
                 : "This dispute is already resolved"}
             </p>
             <Button asChild className="mt-4">
@@ -172,16 +172,16 @@ export default function ResolveDisputePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Issue Judgment</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Resolve Dispute</h1>
           <p className="text-muted-foreground mt-1">
-            Publish a staff decision, then allow the parties an objection window before enforcement.
+            Record the final decision. Funds settle and the hire status updates immediately.
           </p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Judgment Details</CardTitle>
+          <CardTitle>Resolution Details</CardTitle>
           <CardDescription>
             Review the evidence and record a clear, enforceable decision.
           </CardDescription>
@@ -196,7 +196,7 @@ export default function ResolveDisputePage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="decision">Judgment *</Label>
+              <Label htmlFor="decision">Decision *</Label>
               <Select
                 value={formData.decision}
                 onValueChange={(value) =>
@@ -205,7 +205,7 @@ export default function ResolveDisputePage() {
                 required
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select judgment outcome" />
+                  <SelectValue placeholder="Select decision" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="client_favor">In Favor of Client</SelectItem>
@@ -253,7 +253,7 @@ export default function ResolveDisputePage() {
                   This is the client refund amount. The remaining disputed escrow is released to the freelancer side.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  This judgment will not settle funds immediately. It opens an objection window first.
+                  Funds will settle immediately when the resolution is recorded.
                 </p>
               </div>
             )}
@@ -327,7 +327,7 @@ export default function ResolveDisputePage() {
 
             <div className="flex gap-4 pt-4">
               <Button type="submit" disabled={isSubmitting} className="flex-1">
-                {isSubmitting ? "Issuing judgment..." : "Issue judgment"}
+                {isSubmitting ? "Resolving dispute..." : "Resolve dispute"}
               </Button>
               <Button type="button" variant="outline" asChild>
                 <Link href={`/dashboard/disputes/${disputeId}`}>Cancel</Link>

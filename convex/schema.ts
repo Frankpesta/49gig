@@ -1256,6 +1256,7 @@ export default defineSchema({
       v.literal("admin")
     ),
     checklistItemId: v.optional(v.string()),
+    evidenceRequestId: v.optional(v.id("disputeEvidenceRequests")),
     title: v.string(),
     description: v.optional(v.string()),
     evidenceType: v.union(
@@ -1283,6 +1284,32 @@ export default defineSchema({
     .index("by_dispute", ["disputeId", "createdAt"])
     .index("by_project", ["projectId", "createdAt"])
     .index("by_status", ["status"]),
+
+  /** Admin/moderator follow-up evidence requests addressed to specific dispute parties. */
+  disputeEvidenceRequests: defineTable({
+    disputeId: v.id("disputes"),
+    projectId: v.id("projects"),
+    requestedBy: v.id("users"),
+    requestedFromUserIds: v.array(v.id("users")),
+    scope: v.union(
+      v.literal("client"),
+      v.literal("freelancer"),
+      v.literal("both"),
+      v.literal("specific")
+    ),
+    description: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("fulfilled"),
+      v.literal("cancelled")
+    ),
+    fulfilledByUserIds: v.optional(v.array(v.id("users"))),
+    resolvedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_dispute", ["disputeId", "createdAt"])
+    .index("by_status", ["status", "createdAt"]),
 
   /** Immutable dispute timeline events for a case-center audit trail. */
   disputeStageEvents: defineTable({
