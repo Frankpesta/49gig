@@ -31,6 +31,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 import { AddEvidenceDialog } from "./add-evidence-dialog";
+import { RespondEvidenceDialog } from "./respond-evidence-dialog";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import type { ReactNode } from "react";
 import { Textarea } from "@/components/ui/textarea";
@@ -113,6 +114,8 @@ export default function DisputeDetailPage() {
   const [evidenceRequestDescription, setEvidenceRequestDescription] = useState("");
   const [evidenceRequestFreelancerIds, setEvidenceRequestFreelancerIds] = useState<string[]>([]);
   const [isCreatingEvidenceRequest, setIsCreatingEvidenceRequest] = useState(false);
+
+  const [respondingRequest, setRespondingRequest] = useState<EvidenceRequest | null>(null);
 
   const dispute = useQuery(
     api.disputes.queries.getDispute,
@@ -578,8 +581,8 @@ export default function DisputeDetailPage() {
                       </CardTitle>
                       <CardDescription className="text-sm leading-relaxed">
                         {isModerator
-                          ? "Ask the client, freelancer(s), or specific seats to upload more evidence."
-                          : "49GIG staff have asked you to upload more evidence so the case can move forward."}
+                          ? "Ask the client, freelancer(s), or specific seats to write a response or attach evidence."
+                          : "49GIG staff have asked you for more details. Reply in writing — and optionally attach a file or link."}
                       </CardDescription>
                     </div>
                     {canRequestEvidenceFromParties && (
@@ -652,10 +655,10 @@ export default function DisputeDetailPage() {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => setIsAddingEvidence(true)}
+                                    onClick={() => setRespondingRequest(req)}
                                   >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Upload evidence
+                                    <MessageSquare className="mr-2 h-4 w-4" />
+                                    Respond
                                   </Button>
                                 )}
                                 {isModerator && req.status === "pending" && (
@@ -1153,7 +1156,7 @@ export default function DisputeDetailPage() {
             <DialogTitle>Request more evidence</DialogTitle>
             <DialogDescription>
               Choose who should respond and describe what you need. The selected parties will be notified
-              and can upload evidence directly on this page.
+              and can reply with a written response, attach a file, or share a link directly on this page.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1254,6 +1257,19 @@ export default function DisputeDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {user?._id && dispute && (
+        <RespondEvidenceDialog
+          open={!!respondingRequest}
+          onOpenChange={(open) => {
+            if (!open) setRespondingRequest(null);
+          }}
+          disputeId={dispute._id}
+          evidenceRequestId={respondingRequest?._id ?? null}
+          requestDescription={respondingRequest?.description ?? ""}
+          userId={user._id}
+        />
+      )}
 
       {/* Cancel dispute dialog */}
       <Dialog
