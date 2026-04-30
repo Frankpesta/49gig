@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import { clearReplacementFlowFieldsOnProject } from "../projects/replacement";
-import { getRoleLabelsForProjectIntake } from "../../lib/team-slots";
+import { getRoleLabelsForProjectIntake, type TeamSlotIntake } from "../../lib/team-slots";
 import { getDurationMonths } from "../../lib/project-duration";
 import { budgetRoleKeyForMatchTeamRole } from "../../lib/project-freelancer-earnings";
 import {
@@ -76,6 +76,32 @@ export const createMatch = internalMutation({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) => q.eq(q.field("freelancerId"), args.freelancerId))
       .collect();
+
+    // Team hire: at most one active (pending/accepted) shortlist row per freelancer per
+    // *template role* (e.g. ui_ux), not per seat label (Ui Designer #1 vs #2). Different
+    // templates (frontend vs backend) may still shortlist the same person.
+    if (args.teamRole !== undefined && project) {
+      const incomingKey = budgetRoleKeyForMatchTeamRole(
+        args.teamRole,
+        project.intakeForm?.teamSlots as TeamSlotIntake[] | undefined
+      );
+      const otherSeatActive = existingList.find((m) => {
+        if (m.teamRole === undefined || m.teamRole === args.teamRole) return false;
+        if (m.status !== "pending" && m.status !== "accepted") return false;
+        const existingKey = budgetRoleKeyForMatchTeamRole(
+          m.teamRole,
+          project.intakeForm?.teamSlots as TeamSlotIntake[] | undefined
+        );
+        if (incomingKey != null && existingKey != null) {
+          return incomingKey === existingKey;
+        }
+        return false;
+      });
+      if (otherSeatActive) {
+        return otherSeatActive._id;
+      }
+    }
+
     const existing =
       args.teamRole !== undefined
         ? existingList.find((m) => m.teamRole === args.teamRole)
@@ -500,6 +526,27 @@ export const respondToMatchAsFreelancer = mutation({
         freelancerActionAt: now,
         updatedAt: now,
       });
+
+      // Same freelancer may still have a second client-accepted row for this hire (duplicate
+      // team-seat bug / legacy data). Reject those so Match Requests and team completion logic
+      // only see one confirmation per freelancer per project.
+      const preCleanup = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", match.projectId))
+        .collect();
+      for (const m of preCleanup) {
+        if (m._id === match._id) continue;
+        if (String(m.freelancerId) !== String(match.freelancerId)) continue;
+        if (m.clientAction !== "accepted" || m.freelancerAction) continue;
+        await ctx.db.patch(m._id, {
+          status: "rejected",
+          freelancerAction: "rejected",
+          freelancerActionAt: now,
+          updatedAt: now,
+          freelancerRejectionReason:
+            "Automatically closed: duplicate match row for this hire (same freelancer).",
+        });
+      }
 
       const allProjectMatches = await ctx.db
         .query("matches")

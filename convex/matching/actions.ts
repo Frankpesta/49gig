@@ -1057,6 +1057,12 @@ export const generateMatchesForDraft = action({
     }
 
     const rolesMissing: string[] = [];
+    /**
+     * For duplicate seats that share the same role template (e.g. two "Ui Designer" slots),
+     * each freelancer must appear in at most one seat's shortlist. Keyed by intake `roleKey`
+     * so we do not block the same person from both "Backend" and "Frontend" groups.
+     */
+    const teamShortlistFreelancersByRoleKey = new Map<string, Set<string>>();
 
     // Unified spec list: each entry drives one seat's matching and post-loop availability check.
     // Both the slot-based path and the skill-grouping path populate this.
@@ -1123,15 +1129,23 @@ export const generateMatchesForDraft = action({
         }
 
         groupScores.sort((a, b) => b.score - a.score);
-        const top10 = groupScores
-          .filter((m) =>
-            slotSkills.length > 0
-              ? m.breakdown.skillOverlap >= MIN_REQUIRED_SKILL_OVERLAP_PERCENT
-              : m.breakdown.skillOverlap >= 45
-          )
-          .slice(0, 10);
+        const eligibleOrdered = groupScores.filter((m) =>
+          slotSkills.length > 0
+            ? m.breakdown.skillOverlap >= MIN_REQUIRED_SKILL_OVERLAP_PERCENT
+            : m.breakdown.skillOverlap >= 45
+        );
 
-        for (const match of top10) {
+        let addedThisSeat = 0;
+        let usedThisRoleKey = teamShortlistFreelancersByRoleKey.get(spec.roleKey);
+        if (!usedThisRoleKey) {
+          usedThisRoleKey = new Set();
+          teamShortlistFreelancersByRoleKey.set(spec.roleKey, usedThisRoleKey);
+        }
+        for (const match of eligibleOrdered) {
+          const fid = String(match.freelancer._id);
+          if (usedThisRoleKey.has(fid)) continue;
+          if (addedThisSeat >= 10) break;
+
           const explanation = generateExplanation(match.breakdown, match.freelancer.name, intakeForm.title);
           const confidence = determineConfidence(match.score);
           const matchId = await ctx.runMutation(internal.matching.mutations.createMatch, {
@@ -1144,7 +1158,9 @@ export const generateMatchesForDraft = action({
             expiresAt,
             teamRole: spec.teamRoleLabel,
           });
+          usedThisRoleKey.add(fid);
           matchIds.push(matchId);
+          addedThisSeat++;
         }
 
         if (matchIds.length === matchCountBeforeSpec) {

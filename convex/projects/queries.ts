@@ -1186,41 +1186,71 @@ export const getAdminReplacementCandidates = query({
     const requestedSoftwareSubField = project.intakeForm.softwareDevFields?.[0];
 
     const users = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "freelancer")).collect();
-    return users
-      .filter((freelancer) => {
-        if (!isFreelancerInMatchingPool(freelancer)) return false;
-        if (roster.has(String(freelancer._id))) return false;
-        if (excluded.has(String(freelancer._id))) return false;
-        if (
-          !isFreelancerEligibleForProjectMatch(
-            freelancer,
-            normalizedSkills,
-            projectRoleId
-          )
-        ) {
-          return false;
-        }
-        if (
-          requestedSoftwareSubField &&
-          !freelancerHasExactSoftwareSubField(freelancer, requestedSoftwareSubField)
-        ) {
-          return false;
-        }
-        return true;
-      })
+    const filtered = users.filter((freelancer) => {
+      if (!isFreelancerInMatchingPool(freelancer)) return false;
+      if (roster.has(String(freelancer._id))) return false;
+      if (excluded.has(String(freelancer._id))) return false;
+      if (
+        !isFreelancerEligibleForProjectMatch(freelancer, normalizedSkills, projectRoleId)
+      ) {
+        return false;
+      }
+      if (
+        requestedSoftwareSubField &&
+        !freelancerHasExactSoftwareSubField(freelancer, requestedSoftwareSubField)
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const sorted = filtered
       .map((freelancer) => ({
-        _id: freelancer._id,
-        name: freelancer.name,
-        email: freelancer.email,
-        primaryRole: freelancer.profile?.primaryRole,
-        experienceLevel: freelancer.profile?.experienceLevel,
-        skills: freelancer.profile?.skills ?? [],
+        freelancer,
         skillOverlap: calculateSkillOverlapPercent(
           normalizedSkills,
           freelancer.profile?.skills ?? []
         ),
       }))
-      .sort((a, b) => b.skillOverlap - a.skillOverlap || a.name.localeCompare(b.name))
+      .sort((a, b) => b.skillOverlap - a.skillOverlap || a.freelancer.name.localeCompare(b.freelancer.name))
       .slice(0, 50);
+
+    return await Promise.all(
+      sorted.map(async ({ freelancer, skillOverlap }) => {
+        const vetting = await ctx.db
+          .query("vettingResults")
+          .withIndex("by_freelancer", (q) => q.eq("freelancerId", freelancer._id))
+          .first();
+        const p = freelancer.profile;
+        return {
+          _id: freelancer._id,
+          name: freelancer.name,
+          email: freelancer.email,
+          primaryRole: p?.primaryRole,
+          experienceLevel: p?.experienceLevel,
+          skills: p?.skills ?? [],
+          skillOverlap,
+          techField: p?.techField,
+          softwareDevFields: p?.softwareDevFields,
+          bio: p?.bio,
+          resumeBio: freelancer.resumeBio,
+          timezone: p?.timezone,
+          country: p?.country,
+          availability: p?.availability,
+          weeklyHours: p?.weeklyHours,
+          languagesWritten: p?.languagesWritten,
+          imageUrl: p?.imageUrl,
+          portfolioUrl: p?.portfolioUrl,
+          githubUrl: p?.githubUrl,
+          behanceUrl: p?.behanceUrl,
+          linkedinUrl: p?.linkedinUrl,
+          resumeUrl: freelancer.resumeUrl,
+          verificationStatus: freelancer.verificationStatus,
+          kycStatus: freelancer.kycStatus,
+          vettingOverallScore: vetting?.overallScore,
+          vettingStatus: vetting?.status,
+        };
+      })
+    );
   },
 });

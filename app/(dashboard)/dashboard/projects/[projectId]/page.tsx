@@ -30,6 +30,8 @@ import {
   Ban,
   PauseCircle,
   PlayCircle,
+  ExternalLink,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Doc, Id } from "@/convex/_generated/dataModel";
@@ -38,7 +40,7 @@ import { getUserFriendlyError } from "@/lib/error-handling";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { DEFAULT_PLATFORM_FEE_PERCENT } from "@/lib/platform-fee";
 import { getDurationMonths } from "@/lib/project-duration";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -67,6 +69,7 @@ import {
   humanizeTeamRoleKey,
   isCategoryLabel,
   isLegacyCategoryLabel,
+  PLATFORM_CATEGORIES,
 } from "@/lib/platform-skills";
 import {
   getRoleLabelsForProjectIntake,
@@ -75,6 +78,49 @@ import {
 } from "@/lib/team-slots";
 import { freelancerEngagementNetTotalUsd } from "@/lib/project-freelancer-earnings";
 import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const REPLACEMENT_EXPERIENCE_LABELS: Record<string, string> = {
+  junior: "Junior",
+  mid: "Mid-Level",
+  senior: "Senior",
+  expert: "Expert",
+};
+
+function adminReplacementTechFieldLabel(techField?: string): string {
+  if (!techField) return "—";
+  const cat = PLATFORM_CATEGORIES.find((c) => c.id === techField);
+  return cat?.label ?? techField.replace(/_/g, " ");
+}
+
+type AdminReplacementCandidate = {
+  _id: Id<"users">;
+  name: string;
+  email: string;
+  primaryRole?: string;
+  experienceLevel?: string;
+  skills: string[];
+  skillOverlap: number;
+  techField?: string;
+  softwareDevFields?: string[];
+  bio?: string;
+  resumeBio?: string;
+  timezone?: string;
+  country?: string;
+  availability?: string;
+  weeklyHours?: number;
+  languagesWritten?: string[];
+  imageUrl?: string;
+  portfolioUrl?: string;
+  githubUrl?: string;
+  behanceUrl?: string;
+  linkedinUrl?: string;
+  resumeUrl?: string;
+  verificationStatus?: string;
+  kycStatus?: string;
+  vettingOverallScore?: number;
+  vettingStatus?: string;
+};
 
 const STATUS_CONFIG: Record<
   string,
@@ -278,6 +324,15 @@ export default function ProjectDetailPage() {
         }
       : "skip"
   );
+
+  const selectedReplacementCandidate = useMemo(() => {
+    if (!replaceNewFreelancerId || !replacementCandidates?.length) return null;
+    return (
+      (replacementCandidates as AdminReplacementCandidate[]).find(
+        (c) => String(c._id) === replaceNewFreelancerId
+      ) ?? null
+    );
+  }, [replaceNewFreelancerId, replacementCandidates]);
 
   useEffect(() => {
     if (!cycleDeepLinkId || !monthlyCycles?.length) return;
@@ -1088,7 +1143,7 @@ export default function ProjectDetailPage() {
                     Replace talent
                   </Button>
                   <Dialog open={showReplaceDialog} onOpenChange={setShowReplaceDialog}>
-                    <DialogContent>
+                    <DialogContent className="max-h-[min(90dvh,44rem)] overflow-y-auto sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle>Replace assigned talent</DialogTitle>
                         <DialogDescription>
@@ -1121,21 +1176,258 @@ export default function ProjectDetailPage() {
                             id="replacement-freelancer"
                             value={replaceNewFreelancerId}
                             onChange={(event) => setReplaceNewFreelancerId(event.target.value)}
-                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            disabled={!replaceOldFreelancerId}
+                            className="min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-50"
                           >
-                            <option value="">Select replacement</option>
-                            {((replacementCandidates ?? []) as Array<{
-                              _id: Id<"users">;
-                              name: string;
-                              experienceLevel?: string;
-                              skillOverlap: number;
-                            }>).map((candidate) => (
-                              <option key={candidate._id} value={candidate._id}>
-                                {candidate.name} — {candidate.experienceLevel ?? "level not set"} • {Math.round(candidate.skillOverlap)}% skill match
-                              </option>
-                            ))}
+                            <option value="">
+                              {replaceOldFreelancerId ? "Select replacement" : "Choose who to replace first"}
+                            </option>
+                            {(replacementCandidates as AdminReplacementCandidate[] | undefined)?.map(
+                              (candidate) => (
+                                <option key={candidate._id} value={candidate._id}>
+                                  {candidate.name} —{" "}
+                                  {REPLACEMENT_EXPERIENCE_LABELS[candidate.experienceLevel ?? ""] ??
+                                    candidate.experienceLevel ??
+                                    "level not set"}{" "}
+                                  • {Math.round(candidate.skillOverlap)}% skill match
+                                </option>
+                              )
+                            )}
                           </select>
+                          <p className="text-xs text-muted-foreground">
+                            Pick someone from the pre-filtered pool, then review their profile below before confirming.
+                          </p>
                         </div>
+
+                        {replaceOldFreelancerId && replacementCandidates === undefined ? (
+                          <div className="flex items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                            Loading candidate profiles…
+                          </div>
+                        ) : selectedReplacementCandidate ? (
+                          <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="flex min-w-0 gap-3">
+                                <Avatar className="h-12 w-12 shrink-0 border border-border/60">
+                                  <AvatarImage
+                                    src={selectedReplacementCandidate.imageUrl}
+                                    alt={selectedReplacementCandidate.name}
+                                  />
+                                  <AvatarFallback className="text-sm font-medium">
+                                    {selectedReplacementCandidate.name.slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-foreground leading-snug wrap-break-word">
+                                    {selectedReplacementCandidate.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground break-all">
+                                    {selectedReplacementCandidate.email}
+                                  </p>
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {selectedReplacementCandidate.primaryRole && (
+                                      <Badge variant="secondary" className="text-xs font-normal">
+                                        {selectedReplacementCandidate.primaryRole}
+                                      </Badge>
+                                    )}
+                                    {selectedReplacementCandidate.experienceLevel && (
+                                      <Badge variant="outline" className="text-xs font-normal">
+                                        {REPLACEMENT_EXPERIENCE_LABELS[
+                                          selectedReplacementCandidate.experienceLevel
+                                        ] ?? selectedReplacementCandidate.experienceLevel}
+                                      </Badge>
+                                    )}
+                                    <Badge variant="outline" className="text-xs font-normal">
+                                      {Math.round(selectedReplacementCandidate.skillOverlap)}% skills vs hire
+                                    </Badge>
+                                    {typeof selectedReplacementCandidate.vettingOverallScore === "number" && (
+                                      <Badge variant="outline" className="text-xs font-normal">
+                                        Vetting {Math.round(selectedReplacementCandidate.vettingOverallScore)}
+                                      </Badge>
+                                    )}
+                                    {selectedReplacementCandidate.verificationStatus === "approved" && (
+                                      <Badge variant="secondary" className="gap-0.5 text-xs font-normal">
+                                        <ShieldCheck className="h-3 w-3" />
+                                        Verified
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <Button variant="outline" size="sm" className="shrink-0" asChild>
+                                <Link
+                                  href={`/dashboard/users/${selectedReplacementCandidate._id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  Full profile
+                                  <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                                </Link>
+                              </Button>
+                            </div>
+
+                            <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                              <p>
+                                <span className="font-medium text-foreground">Category: </span>
+                                {adminReplacementTechFieldLabel(selectedReplacementCandidate.techField)}
+                              </p>
+                              {selectedReplacementCandidate.softwareDevFields &&
+                                selectedReplacementCandidate.softwareDevFields.length > 0 && (
+                                  <p>
+                                    <span className="font-medium text-foreground">Sub-field: </span>
+                                    {selectedReplacementCandidate.softwareDevFields
+                                      .map((k) => humanizeTeamRoleKey(k))
+                                      .join(", ")}
+                                  </p>
+                                )}
+                              {[selectedReplacementCandidate.country, selectedReplacementCandidate.timezone]
+                                .filter(Boolean)
+                                .length > 0 && (
+                                <p className="sm:col-span-2">
+                                  <span className="font-medium text-foreground">Location / TZ: </span>
+                                  {[selectedReplacementCandidate.country, selectedReplacementCandidate.timezone]
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                                </p>
+                              )}
+                              {selectedReplacementCandidate.availability && (
+                                <p>
+                                  <span className="font-medium text-foreground">Availability: </span>
+                                  {selectedReplacementCandidate.availability.replace(/_/g, " ")}
+                                </p>
+                              )}
+                              {typeof selectedReplacementCandidate.weeklyHours === "number" && (
+                                <p>
+                                  <span className="font-medium text-foreground">Weekly hours: </span>
+                                  {selectedReplacementCandidate.weeklyHours}
+                                </p>
+                              )}
+                              {selectedReplacementCandidate.kycStatus && (
+                                <p>
+                                  <span className="font-medium text-foreground">KYC: </span>
+                                  {selectedReplacementCandidate.kycStatus.replace(/_/g, " ")}
+                                </p>
+                              )}
+                              {selectedReplacementCandidate.vettingStatus && (
+                                <p>
+                                  <span className="font-medium text-foreground">Vetting row: </span>
+                                  {selectedReplacementCandidate.vettingStatus.replace(/_/g, " ")}
+                                </p>
+                              )}
+                            </div>
+
+                            {selectedReplacementCandidate.languagesWritten &&
+                              selectedReplacementCandidate.languagesWritten.length > 0 && (
+                                <p className="text-xs">
+                                  <span className="font-medium text-foreground">Languages: </span>
+                                  <span className="text-muted-foreground">
+                                    {selectedReplacementCandidate.languagesWritten.join(", ")}
+                                  </span>
+                                </p>
+                              )}
+
+                            {(selectedReplacementCandidate.bio || selectedReplacementCandidate.resumeBio) && (
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-foreground">Bio / summary</p>
+                                <p className="max-h-28 overflow-y-auto text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                                  {(() => {
+                                    const text = (
+                                      selectedReplacementCandidate.bio ||
+                                      selectedReplacementCandidate.resumeBio ||
+                                      ""
+                                    ).trim();
+                                    const cap = 1200;
+                                    return text.length > cap ? `${text.slice(0, cap)}…` : text;
+                                  })()}
+                                </p>
+                              </div>
+                            )}
+
+                            {selectedReplacementCandidate.skills.length > 0 && (
+                              <div>
+                                <p className="mb-1.5 text-xs font-medium text-foreground">Skills</p>
+                                <div className="max-h-20 w-full overflow-y-auto rounded-md border border-border/50 bg-background/50 p-2">
+                                  <div className="flex flex-wrap gap-1">
+                                    {selectedReplacementCandidate.skills.map((s) => (
+                                      <Badge key={s} variant="outline" className="text-[10px] font-normal">
+                                        {s}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex flex-wrap gap-2 border-t border-border/60 pt-3">
+                              {selectedReplacementCandidate.portfolioUrl && (
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                                  <a
+                                    href={selectedReplacementCandidate.portfolioUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    Portfolio <ExternalLink className="ml-1 inline h-3 w-3" />
+                                  </a>
+                                </Button>
+                              )}
+                              {selectedReplacementCandidate.githubUrl && (
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                                  <a
+                                    href={selectedReplacementCandidate.githubUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    GitHub <ExternalLink className="ml-1 inline h-3 w-3" />
+                                  </a>
+                                </Button>
+                              )}
+                              {selectedReplacementCandidate.behanceUrl && (
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                                  <a
+                                    href={selectedReplacementCandidate.behanceUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    Behance <ExternalLink className="ml-1 inline h-3 w-3" />
+                                  </a>
+                                </Button>
+                              )}
+                              {selectedReplacementCandidate.linkedinUrl && (
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                                  <a
+                                    href={selectedReplacementCandidate.linkedinUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    LinkedIn <ExternalLink className="ml-1 inline h-3 w-3" />
+                                  </a>
+                                </Button>
+                              )}
+                              {selectedReplacementCandidate.resumeUrl && (
+                                <Button variant="link" size="sm" className="h-auto p-0 text-xs" asChild>
+                                  <a
+                                    href={selectedReplacementCandidate.resumeUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    Resume file <ExternalLink className="ml-1 inline h-3 w-3" />
+                                  </a>
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ) : replaceOldFreelancerId &&
+                          replacementCandidates &&
+                          (replacementCandidates as AdminReplacementCandidate[]).length === 0 ? (
+                          <p className="text-sm text-amber-700 dark:text-amber-400">
+                            No eligible replacements match this hire&apos;s filters. Use{" "}
+                            <Link href="/dashboard/admin/manual-match" className="underline font-medium">
+                              manual match
+                            </Link>{" "}
+                            if you need to assign someone outside this pool.
+                          </p>
+                        ) : null}
+
                         <div className="space-y-2">
                           <Label htmlFor="replace-reason">Reason</Label>
                           <Textarea
