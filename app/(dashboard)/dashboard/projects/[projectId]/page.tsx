@@ -1219,9 +1219,11 @@ export default function ProjectDetailPage() {
                   <AlertDialogTitle>Delete this hire as admin?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This permanently removes the hire and related matches, chats, billing cycles, milestones, resolved
-                    disputes, and reviews. Payment history rows stay for audit but are detached from this hire. You
-                    cannot do this while escrow remains, while a dispute is open, or while payments or refunds are still
-                    in flight.
+                    disputes, and reviews. Payment history rows stay for audit but are detached from this hire.
+                    Works regardless of project status — including pending payment, where any in-flight checkout will be
+                    marked cancelled. If the gateway later confirms a charge for a cancelled checkout, you must issue a
+                    manual refund. You still cannot delete while escrow holds funds, while a dispute is active, or while
+                    a refund is in flight — clear those first.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
