@@ -324,8 +324,30 @@ export const getPendingFreelancerMatches = query({
       (m) => m.clientAction === "accepted" && !m.freelancerAction
     );
 
+    // Same hire can briefly have two `matches` rows for one freelancer (duplicate team seats /
+    // legacy data). The Match Requests UI would show two identical approval cards — collapse to
+    // one row per (project, freelancer) so freelancers only ever respond once.
+    const dedupedByProject = new Map<string, (typeof pendingSelection)[0]>();
+    for (const m of pendingSelection) {
+      const key = `${m.projectId}:${m.freelancerId}`;
+      const existing = dedupedByProject.get(key);
+      if (!existing) {
+        dedupedByProject.set(key, m);
+        continue;
+      }
+      const existingAt = existing.clientActionAt ?? 0;
+      const mAt = m.clientActionAt ?? 0;
+      const winner =
+        m.score > existing.score ||
+        (m.score === existing.score && mAt > existingAt)
+          ? m
+          : existing;
+      dedupedByProject.set(key, winner);
+    }
+    const pendingDeduped = Array.from(dedupedByProject.values());
+
     return Promise.all(
-      pendingSelection.map(async (match) => {
+      pendingDeduped.map(async (match) => {
         const project = await ctx.db.get(match.projectId);
         if (!project) {
           return {
