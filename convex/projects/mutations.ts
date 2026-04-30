@@ -1143,39 +1143,17 @@ function userIdsTouchingProjectEscrow(project: Doc<"projects">): Id<"users">[] {
   return ids;
 }
 
-async function assertNoPendingRefundForProject(
-  ctx: MutationCtx,
-  projectId: Doc<"projects">["_id"],
-  userIds: Id<"users">[]
-) {
-  for (const userId of userIds) {
-    const wallet = await ctx.db
-      .query("wallets")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .first();
-    if (!wallet) continue;
-    const pending = await ctx.db
-      .query("walletTransactions")
-      .withIndex("by_wallet", (q) => q.eq("walletId", wallet._id))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("projectId"), projectId),
-          q.eq(q.field("type"), "refund"),
-          q.eq(q.field("status"), "pending")
-        )
-      )
-      .first();
-    if (pending) {
-      throw new Error(
-        "Cannot delete hire while a pending refund is recorded for this project. Clear or complete the refund first."
-      );
-    }
-  }
-}
-
 /**
- * Permanently delete a hire and related rows. **Admin only.**
- * Blocked when escrow remains, a dispute is open, payments are in flight, or a pending refund is tied to this project.
+ * Permanently delete a hire and related rows. **Admin only — force delete.**
+ *
+ * Works for any project status (draft, pending_funding, in_progress, disputed, etc.).
+ * Before deletion, money is unwound safely:
+ *   - any pending dispute refunds are completed into the client's wallet,
+ *   - remaining escrow is credited back to the client's wallet,
+ *   - pending / disputed monthly cycles are cancelled,
+ *   - active disputes are marked cancelled (with a reason) before the dispute rows are removed,
+ *   - in-flight Flutterwave checkouts are marked cancelled (admin must manually refund if the
+ *     gateway later confirms a charge — payment rows remain detached for audit).
  */
 export const adminDeleteProject = mutation({
   args: {
@@ -1196,40 +1174,72 @@ export const adminDeleteProject = mutation({
       throw new Error("Project not found");
     }
 
-    const openDispute = await ctx.db
+    const now = Date.now();
+    const currency = (project.currency || "usd").toLowerCase();
+    const walletUsers = userIdsTouchingProjectEscrow(project);
+
+    // 1) Complete any pending dispute refunds for the client → moves them to the client's wallet balance.
+    const pendingRefundsResult = await ctx.runMutation(
+      internalAny.wallets.mutations.completePendingDisputeRefundsForProjectInternal,
+      {
+        userId: project.clientId,
+        projectId: args.projectId,
+        reasonSuffix: "(hire deleted by admin — funds moved to your wallet balance)",
+      }
+    );
+    const pendingRefundsCompletedCents =
+      (pendingRefundsResult?.totalCents as number | undefined) ?? 0;
+
+    // 2) Drain remaining escrow → client wallet credit (USD-only policy).
+    const escrowCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+    if (escrowCents > 0) {
+      assertUsdCurrency(currency, "Admin force-delete hire");
+      await ctx.runMutation(
+        internalAny.monthlyBillingCycles.mutations.creditClientWalletFromEscrowInternal,
+        {
+          projectId: args.projectId,
+          amountCents: escrowCents,
+          currency,
+          description: `Hire deleted by admin — escrow refunded (${project.intakeForm.title})`,
+        }
+      );
+    }
+
+    // 3) Cancel any pending / disputed monthly billing cycles for this project.
+    await ctx.runMutation(
+      internalAny.monthlyBillingCycles.mutations.cancelPendingAndDisputedCyclesInternal,
+      { projectId: args.projectId }
+    );
+
+    // 4) Cancel any active disputes (open / under_review / escalated) so they have a clean
+    //    audit trail before the dispute rows are removed in cleanup below.
+    const activeDisputes = await ctx.db
       .query("disputes")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .filter((q) =>
         q.or(
           q.eq(q.field("status"), "open"),
-          q.eq(q.field("status"), "under_review")
+          q.eq(q.field("status"), "under_review"),
+          q.eq(q.field("status"), "escalated")
         )
       )
-      .first();
-    if (openDispute) {
-      throw new Error(
-        "Cannot delete hire while a dispute is open or under review. Resolve or cancel the dispute first."
-      );
+      .collect();
+    for (const d of activeDisputes) {
+      await ctx.db.patch(d._id, {
+        status: "cancelled",
+        cancellationReason: "Hire deleted by admin (force delete)",
+        cancelledAt: now,
+        cancelledBy: user._id,
+        updatedAt: now,
+      });
     }
 
-    if ((project.escrowedAmount ?? 0) > 0) {
-      throw new Error(
-        "Cannot delete hire while escrow balance remains. Refund or release funds first (escrow must be zero)."
-      );
-    }
-
+    // 5) Cancel in-flight Flutterwave checkouts (pre_funding / top_up). Payment rows stay (detached)
+    //    for audit; if the gateway later confirms a charge, admin must manually refund.
     const payments = await ctx.db
       .query("payments")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
-
-    // Admin override for the pending-payment guard:
-    // mark any in-flight pre_funding / top_up rows as terminal so the delete
-    // can proceed. If a webhook later arrives saying the gateway charge
-    // succeeded, the payment row is still kept (detached) for audit, and the
-    // post-success side effects (escrow / matching) safely no-op because the
-    // project is gone — admin is responsible for any manual refund.
-    const nowForCancel = Date.now();
     const cancelledPaymentIds: Id<"payments">[] = [];
     for (const p of payments) {
       if (p.status !== "pending" && p.status !== "processing") continue;
@@ -1238,13 +1248,10 @@ export const adminDeleteProject = mutation({
         status: "cancelled",
         errorMessage:
           "Hire was deleted by admin while this payment was still pending. If the gateway charged the client, issue a manual refund.",
-        updatedAt: nowForCancel,
+        updatedAt: now,
       });
       cancelledPaymentIds.push(p._id);
     }
-
-    const walletUsers = userIdsTouchingProjectEscrow(project);
-    await assertNoPendingRefundForProject(ctx, args.projectId, walletUsers);
 
     const accruals = await ctx.db
       .query("referralAccruals")
@@ -1359,9 +1366,38 @@ export const adminDeleteProject = mutation({
         title: project.intakeForm.title,
         clientId: project.clientId,
         priorStatus: project.status,
+        escrowRefundedCents: escrowCents,
+        pendingRefundsCompletedCents,
+        cancelledDisputesCount: activeDisputes.length,
         cancelledPendingPayments: cancelledPaymentIds.map((id) => String(id)),
       },
       createdAt: Date.now(),
+    });
+
+    // Notify client + freelancers that the hire was permanently removed.
+    const sendSystemNotification =
+      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    const recipientIds: Doc<"users">["_id"][] = [project.clientId];
+    if (project.matchedFreelancerId) {
+      recipientIds.push(project.matchedFreelancerId);
+    }
+    for (const fid of project.matchedFreelancerIds ?? []) {
+      if (!recipientIds.some((x) => String(x) === String(fid))) recipientIds.push(fid);
+    }
+    const refundedDollars = (escrowCents + pendingRefundsCompletedCents) / 100;
+    const refundNote =
+      refundedDollars > 0
+        ? ` Any remaining escrow and pending dispute refunds (USD ${refundedDollars.toFixed(2)}) were credited to the client wallet.`
+        : "";
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: recipientIds,
+      title: "Hire deleted",
+      message: `The hire "${project.intakeForm.title}" was permanently deleted by an administrator.${refundNote}`,
+      type: "project",
+      data: { projectId: args.projectId },
     });
 
     await ctx.db.delete(args.projectId);

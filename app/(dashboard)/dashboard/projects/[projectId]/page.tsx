@@ -1218,12 +1218,22 @@ export default function ProjectDetailPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete this hire as admin?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This permanently removes the hire and related matches, chats, billing cycles, milestones, resolved
-                    disputes, and reviews. Payment history rows stay for audit but are detached from this hire.
-                    Works regardless of project status — including pending payment, where any in-flight checkout will be
-                    marked cancelled. If the gateway later confirms a charge for a cancelled checkout, you must issue a
-                    manual refund. You still cannot delete while escrow holds funds, while a dispute is active, or while
-                    a refund is in flight — clear those first.
+                    Permanently removes this hire <strong>regardless of status</strong> — draft, pending payment, in
+                    progress, disputed, anything. Before deletion the system automatically:
+                    <span className="mt-2 block">
+                      • completes any pending dispute refunds into the client&apos;s wallet,
+                      <br />• credits remaining escrow back to the client&apos;s wallet,
+                      <br />• cancels pending and disputed monthly billing cycles,
+                      <br />• marks active disputes as cancelled (then deletes them),
+                      <br />• cancels in-flight Flutterwave checkouts.
+                    </span>
+                    <span className="mt-2 block">
+                      Then matches, chats, billing cycles, milestones, disputes, and reviews are removed. Payment rows
+                      stay (detached) for audit. The client and matched freelancers are notified.
+                    </span>
+                    <span className="mt-2 block font-medium">
+                      If the gateway later confirms a charge for a cancelled checkout, you must issue a manual refund.
+                    </span>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
