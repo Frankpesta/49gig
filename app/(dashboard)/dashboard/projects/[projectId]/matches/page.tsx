@@ -651,13 +651,54 @@ export default function ProjectMatchesPage() {
     if (!isTeam) return map;
     for (const role of allRoleLabels) {
       const raw = matchesByRoleMap.get(role) ?? [];
+      // Hide freelancers already chosen for *other* seats so the same person can't
+      // be suggested twice for a multi-seat role (e.g. two UI Designer seats).
+      const usedElsewhere = new Set(
+        Object.entries(roleSelections)
+          .filter(([otherRole, fid]) => otherRole !== role && fid != null)
+          .map(([, fid]) => String(fid))
+      );
+      const filtered = raw.filter((m) => !usedElsewhere.has(String(m.freelancerId)));
       map.set(
         role,
-        [...raw].sort((a, b) => b.score - a.score).slice(0, MATCH_CAROUSEL_CAP)
+        [...filtered].sort((a, b) => b.score - a.score).slice(0, MATCH_CAROUSEL_CAP)
       );
     }
     return map;
-  }, [isTeam, allRoleLabels, matchesByRoleMap]);
+  }, [isTeam, allRoleLabels, matchesByRoleMap, roleSelections]);
+
+  // If a selection in another seat shrinks this seat's pool past the current
+  // carousel index, snap back to the first available suggestion so the seat
+  // doesn't render an empty slot.
+  useEffect(() => {
+    if (!isTeam) return;
+    setRoleCarouselIndex((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const role of allRoleLabels) {
+        const poolLen = (sortedTeamPools.get(role) ?? []).length;
+        const idx = next[role] ?? 0;
+        if (poolLen === 0) continue;
+        if (idx >= poolLen) {
+          next[role] = 0;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    setRolePoolExhausted((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const role of allRoleLabels) {
+        const poolLen = (sortedTeamPools.get(role) ?? []).length;
+        if (poolLen > 0 && next[role]) {
+          next[role] = false;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [isTeam, allRoleLabels, sortedTeamPools]);
 
   const pendingMatchSig = useMemo(
     () => pendingMatches.map((m) => m._id).join(","),
@@ -1657,6 +1698,18 @@ export default function ProjectMatchesPage() {
                           <Link href="/contact">Contact support</Link>
                         </Button>
                       </div>
+                    </CardContent>
+                  </Card>
+                ) : roleMatches.length > 0 && pool.length === 0 ? (
+                  <Card className="rounded-xl border-amber-500/35 bg-amber-500/5">
+                    <CardContent className="py-8 px-4 sm:px-6 space-y-3 text-center">
+                      <p className="font-medium text-foreground">
+                        All available candidates are already chosen for other seats
+                      </p>
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                        Free up a freelancer by changing another seat&apos;s selection, or check back later as
+                        more matches become available.
+                      </p>
                     </CardContent>
                   </Card>
                 ) : current ? (

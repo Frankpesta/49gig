@@ -38,6 +38,8 @@ export async function initializePayment(data: {
     name: string;
     phone_number?: string;
   };
+  /** Comma-separated list of payment channels (e.g. "card,banktransfer"). Empty = all enabled. */
+  payment_options?: string;
   customizations?: {
     title?: string;
     description?: string;
@@ -59,14 +61,37 @@ export async function initializePayment(data: {
     body: JSON.stringify(data),
   });
 
+  const bodyText = await response.text();
+  let parsed: unknown;
+  try {
+    parsed = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    parsed = null;
+  }
+
   if (!response.ok) {
-    const error = await response.json();
+    const errorObj = (parsed as { message?: string; data?: unknown }) ?? {};
+    console.error("[flutterwave] initializePayment failed", {
+      status: response.status,
+      statusText: response.statusText,
+      tx_ref: data.tx_ref,
+      currency: data.currency,
+      amount: data.amount,
+      redirect_url: data.redirect_url,
+      response: parsed ?? bodyText.slice(0, 500),
+    });
     throw new Error(
-      error.message || `Flutterwave API error: ${response.statusText}`
+      errorObj.message
+        ? `Flutterwave: ${errorObj.message}`
+        : `Flutterwave API error (${response.status}): ${response.statusText}`
     );
   }
 
-  return response.json();
+  return parsed as {
+    status: string;
+    message: string;
+    data: { link: string; tx_ref: string; status: string };
+  };
 }
 
 /**

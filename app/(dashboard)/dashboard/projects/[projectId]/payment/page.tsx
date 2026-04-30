@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -56,6 +56,8 @@ export default function PaymentPage() {
   const [isInitializing, setIsInitializing] = useState(false);
   const [isAbandoning, setIsAbandoning] = useState(false);
   const [walletApplyCents, setWalletApplyCents] = useState(0);
+  /** Synchronous guard — React state updates are async, so a double tap can spawn two Flutterwave sessions. */
+  const proceedToPaymentLockRef = useRef(false);
   type FundingPreference = "wallet_max" | "custom" | "card_only";
   const [fundingPreference, setFundingPreference] = useState<FundingPreference>("wallet_max");
 
@@ -146,7 +148,8 @@ export default function PaymentPage() {
 
   const handleProceedToPayment = async () => {
     if (!project || !user) return;
-    if (isInitializing) return;
+    if (proceedToPaymentLockRef.current || isInitializing) return;
+    proceedToPaymentLockRef.current = true;
 
     try {
       setIsInitializing(true);
@@ -189,6 +192,7 @@ export default function PaymentPage() {
       const errorMessage = getUserFriendlyError(err) || "Failed to initialize payment";
       setError(errorMessage);
     } finally {
+      proceedToPaymentLockRef.current = false;
       setIsLoading(false);
       setIsInitializing(false);
     }
