@@ -6,146 +6,16 @@ import { clientRefundGrossAndNetEscrowRemoval } from "./amounts";
 import { assertUsdCurrency } from "../currencyPolicy";
 
 /**
- * Automated dispute resolution
- * Attempts to resolve disputes based on predefined rules
+ * Automated dispute resolution is disabled — disputes require staff judgment and manual enforcement.
  */
 export const attemptAutomatedResolution = action({
   args: {
     disputeId: v.id("disputes"),
   },
-  handler: async (ctx, args) => {
-    const dispute = await ctx.runQuery(api.disputes.queries.getDispute, {
-      disputeId: args.disputeId,
-    });
-
-    if (!dispute) {
-      throw new Error("Dispute not found");
-    }
-
-    if (dispute.status !== "open") {
-      return { canAutoResolve: false, reason: "Dispute not in open status" };
-    }
-
-    // Actions have no viewer identity — use internal query (getProject requires userId + auth).
-    const project = await ctx.runQuery(internal.projects.queries.getProjectInternal, {
-      projectId: dispute.projectId,
-    });
-
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
-    // Rule 1: Work/deliverable quality dispute - if monthly cycle is overdue by >7 days, favor client
-    if (dispute.type === "milestone_quality") {
-      if (dispute.monthlyCycleId) {
-        const cycle = await ctx.runQuery(
-          (api as any)["monthlyBillingCycles/queries"].getCycleById,
-          { monthlyCycleId: dispute.monthlyCycleId }
-        );
-        if (cycle?.monthEndDate) {
-          const daysOverdue = (Date.now() - cycle.monthEndDate) / (1000 * 60 * 60 * 24);
-          if (daysOverdue > 7) {
-            await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
-              disputeId: args.disputeId,
-              decision: "client_favor",
-              notes: `Automated resolution: Monthly period overdue by ${Math.round(daysOverdue)} days`,
-            });
-            return { canAutoResolve: true, resolved: true, decision: "client_favor" };
-          }
-        }
-      } else if (dispute.milestoneId) {
-        const milestone = await ctx.runQuery(
-          (api as any)["projects/queries"].getMilestoneById,
-          { milestoneId: dispute.milestoneId }
-        );
-        if (milestone?.dueDate) {
-          const daysOverdue = (Date.now() - milestone.dueDate) / (1000 * 60 * 60 * 24);
-          if (daysOverdue > 7) {
-            await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
-              disputeId: args.disputeId,
-              decision: "client_favor",
-              notes: `Automated resolution: Milestone overdue by ${Math.round(daysOverdue)} days`,
-            });
-            return { canAutoResolve: true, resolved: true, decision: "client_favor" };
-          }
-        }
-      }
-    }
-
-    // Rule 2: If communication dispute and no messages in chat for >3 days, favor client
-    if (dispute.type === "communication") {
-      // Get project chat
-      const chat = await ctx.runQuery(api.chat.queries.getProjectChat, {
-        projectId: dispute.projectId,
-      });
-
-      if (chat) {
-        const messages = await ctx.runQuery(api.chat.queries.getMessages, {
-          chatId: chat._id,
-          limit: 1,
-        });
-
-        if (messages.length > 0) {
-          const lastMessageTime = messages[messages.length - 1].createdAt;
-          const daysSinceLastMessage =
-            (Date.now() - lastMessageTime) / (1000 * 60 * 60 * 24);
-
-          if (daysSinceLastMessage > 3) {
-            // Auto-resolve in client's favor
-            await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
-              disputeId: args.disputeId,
-              decision: "client_favor",
-              notes: `Automated resolution: No communication for ${Math.round(daysSinceLastMessage)} days`,
-            });
-
-            return {
-              canAutoResolve: true,
-              resolved: true,
-              decision: "client_favor",
-            };
-          }
-        }
-      }
-    }
-
-    // Rule 3: Payment dispute - if monthly cycle was already approved/released, favor freelancer
-    if (dispute.type === "payment") {
-      if (dispute.monthlyCycleId) {
-        const cycle = await ctx.runQuery(
-          (api as any)["monthlyBillingCycles/queries"].getCycleById,
-          { monthlyCycleId: dispute.monthlyCycleId }
-        );
-        if (cycle?.status === "approved") {
-          await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
-            disputeId: args.disputeId,
-            decision: "freelancer_favor",
-            notes: "Automated resolution: Monthly payment was already released",
-          });
-          return { canAutoResolve: true, resolved: true, decision: "freelancer_favor" };
-        }
-      } else if (dispute.milestoneId) {
-        const payments = await ctx.runQuery(
-          internal.payments.queries.getPaymentsByProjectInternal,
-          { projectId: dispute.projectId }
-        );
-        const milestonePayment = payments?.find(
-          (p: any) => p.milestoneId === dispute.milestoneId && p.status === "succeeded"
-        );
-        if (milestonePayment) {
-          await ctx.runMutation(internal.disputes.mutations.resolveDisputeInternal, {
-            disputeId: args.disputeId,
-            decision: "freelancer_favor",
-            notes: "Automated resolution: Payment was successful",
-          });
-          return { canAutoResolve: true, resolved: true, decision: "freelancer_favor" };
-        }
-      }
-    }
-
-    // Cannot auto-resolve
+  handler: async () => {
     return {
-      canAutoResolve: false,
-      reason: "No automated resolution rules apply",
+      canAutoResolve: false as const,
+      reason: "Automated dispute resolution is disabled; staff enforcement is required.",
     };
   },
 });
@@ -314,11 +184,11 @@ export const releaseDisputeFunds = action({
               );
           scopeCents = c.disputedNetCents;
         } else if (dispute.monthlyCycleId) {
-          const cycle = await ctx.runQuery(
-            (api as any)["monthlyBillingCycles/queries"].getCycleById,
-            { monthlyCycleId: dispute.monthlyCycleId }
+          const pond = await ctx.runQuery(
+            internal.disputes.queries.disputeEconomicsBasisPoolFreelancerNetCentsInternal,
+            { disputeId: args.disputeId }
           );
-          scopeCents = Math.max(0, cycle?.amountCents ?? 0);
+          scopeCents = pond.poolCents;
         }
 
         const freelancerCents = Math.min(resolutionAmount, scopeCents);
@@ -385,26 +255,6 @@ export const releaseDisputeFunds = action({
             projectId: dispute.projectId,
           });
         }
-      }
-    }
-
-    await ctx.runMutation(
-      internal.disputes.mutations.finalizeDisputeProjectAfterResolutionInternal,
-      {
-        disputeId: args.disputeId,
-      }
-    );
-
-    // Ensure replacement candidates are generated immediately for client-favor outcomes.
-    if (decision === "client_favor") {
-      if (project.intakeForm?.hireType === "team") {
-        await ctx.runAction(api.matching.actions.generateTeamMatches, {
-          projectId: dispute.projectId,
-        });
-      } else {
-        await ctx.runAction(api.matching.actions.generateMatches, {
-          projectId: dispute.projectId,
-        });
       }
     }
 

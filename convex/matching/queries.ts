@@ -147,16 +147,6 @@ export const getFreelancerPublicProfile = query({
       .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
       .first();
 
-    const reviews = await ctx.db
-      .query("reviews")
-      .withIndex("by_freelancer", (q) => q.eq("freelancerId", args.freelancerId))
-      .collect();
-    const ratingCount = reviews.length;
-    const averageRating =
-      ratingCount > 0
-        ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / ratingCount) * 10) / 10
-        : 0;
-
     const vettingScore = Math.round(
       vettingResult?.overallScore ?? match?.scoringBreakdown.vettingScore ?? 0
     );
@@ -168,8 +158,6 @@ export const getFreelancerPublicProfile = query({
       verificationStatus: freelancer.verificationStatus,
       vettingScore,
       vettingStatus: vettingResult?.status ?? null,
-      averageRating,
-      reviewCount: ratingCount,
     };
   },
 });

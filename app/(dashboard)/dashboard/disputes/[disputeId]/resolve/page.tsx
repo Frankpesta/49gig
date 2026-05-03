@@ -60,7 +60,7 @@ export default function ResolveDisputePage() {
     }
 
     if (formData.decision === "partial" && !formData.resolutionAmount) {
-      setError("Client refund amount is required for partial decisions");
+      setError("Guidance amount required for partial judgments (used when running fund release)");
       return;
     }
 
@@ -86,7 +86,7 @@ export default function ResolveDisputePage() {
 
       router.push(`/dashboard/disputes/${disputeId}`);
     } catch (err: unknown) {
-      setError(getUserFriendlyError(err) || "Failed to resolve dispute");
+      setError(getUserFriendlyError(err) || "Failed to record judgment");
     } finally {
       setIsSubmitting(false);
     }
@@ -163,6 +163,31 @@ export default function ResolveDisputePage() {
     );
   }
 
+  const staffCanJudge =
+    user.role === "admin" ||
+    (user.role === "moderator" &&
+      !!dispute.assignedModeratorId &&
+      String(dispute.assignedModeratorId) === String(user._id));
+
+  if (!staffCanJudge) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card>
+          <CardContent className="p-8 text-center space-y-2">
+            <p className="text-muted-foreground">
+              {user.role === "moderator"
+                ? "Claim this dispute from the case page (Assign to me) before recording a judgment."
+                : "You are not authorized to record a judgment here."}
+            </p>
+            <Button asChild className="mt-4">
+              <Link href={`/dashboard/disputes/${disputeId}`}>Back to dispute</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto max-w-4xl py-8">
       <div className="mb-6 flex items-center gap-4">
@@ -172,9 +197,10 @@ export default function ResolveDisputePage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Resolve Dispute</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Record dispute judgment</h1>
           <p className="text-muted-foreground mt-1">
-            Record the final decision. Funds settle and the hire status updates immediately.
+            Capture the decision classification and staff notes. Funds, roster changes, and hire status are
+            applied later from the dispute page under manual enforcement.
           </p>
         </div>
       </div>

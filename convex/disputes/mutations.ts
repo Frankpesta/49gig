@@ -23,6 +23,7 @@ import {
   getDisputeRecipientFreelancerIds,
   viewerIsDisputeParty,
 } from "./partyAccess";
+import { resolvedLockedEconomicsFreelancerNetPoolCents } from "./lockingBasis";
 import { getDisputeReasonPolicy } from "../../lib/dispute-flow";
 
 const api = require("../_generated/api") as {
@@ -30,6 +31,12 @@ const api = require("../_generated/api") as {
     notifications: { actions: { sendSystemNotification: unknown } };
     disputes: { actions: { releaseDisputeFunds: unknown } };
     projects: { actions: { sendSelectReplacementClientEmail: unknown } };
+    matching: {
+      actions: {
+        generateMatches: unknown;
+        generateTeamMatches: unknown;
+      };
+    };
   };
 };
 
@@ -179,9 +186,11 @@ async function disputeNetScopeCents(
     teamBasis.length > 0 &&
     disputedIds.length > 0 &&
     disputedIds.length < teamBasis.length;
-  const poolCents = dispute.monthlyCycleId
-    ? Math.max(0, ((await ctx.db.get(dispute.monthlyCycleId))?.amountCents ?? 0))
-    : dollarsToCents(project.escrowedAmount ?? 0);
+  const poolCents = await resolvedLockedEconomicsFreelancerNetPoolCents(
+    ctx,
+    dispute,
+    project
+  );
 
   if (!isPartialTeam) {
     return poolCents;
@@ -269,6 +278,55 @@ async function getCurrentUserInMutation(
     return null;
   }
   return user as Doc<"users">;
+}
+
+/** Admins bypass; moderators must own the assignment. */
+function assertAssignedStaffForDispute(
+  user: Doc<"users">,
+  dispute: Doc<"disputes">,
+  actionDescription: string
+): void {
+  if (user.role === "admin") return;
+  if (user.role !== "moderator") {
+    throw new Error("Unauthorized — only admins and moderators can do this.");
+  }
+  if (!dispute.assignedModeratorId) {
+    throw new Error(
+      `Assign this dispute to a moderator before ${actionDescription}.`
+    );
+  }
+  if (String(dispute.assignedModeratorId) !== String(user._id)) {
+    throw new Error(`Only the assigned moderator can ${actionDescription}.`);
+  }
+}
+
+function assertEnforcementWindow(dispute: Doc<"disputes">): void {
+  if (dispute.status !== "resolved") {
+    throw new Error("The dispute must have a recorded judgment before enforcement.");
+  }
+  if (dispute.resolutionExecutedAt != null) {
+    throw new Error("Enforcement has already been finalized for this dispute.");
+  }
+}
+
+async function appendDisputeEnforcementEvent(
+  ctx: MutationCtx,
+  args: {
+    disputeId: Id<"disputes">;
+    projectId: Id<"projects">;
+    actorId: Id<"users">;
+    kind: string;
+    details?: unknown;
+  }
+) {
+  await ctx.db.insert("disputeEnforcementEvents", {
+    disputeId: args.disputeId,
+    projectId: args.projectId,
+    actorId: args.actorId,
+    kind: args.kind,
+    details: args.details,
+    createdAt: Date.now(),
+  });
 }
 
 /**
@@ -441,11 +499,25 @@ export const initiateDispute = mutation({
       }
     }
 
-    const escrowNet = Math.max(0, project.escrowedAmount ?? 0);
+    const escrowNetWhole = Math.max(0, project.escrowedAmount ?? 0);
     const platformFeePct = await effectivePlatformFeePercentForProject(
       ctx,
       project.platformFee
     );
+
+    /** Freelancer-net pool (cents) this dispute attaches to — cycle slice or full hire escrow net. */
+    let basisPoolFreelancerNetCents: number;
+    if (monthlyCycleDoc != null) {
+      basisPoolFreelancerNetCents = Math.max(
+        0,
+        Math.round(monthlyCycleDoc.amountCents ?? 0)
+      );
+    } else {
+      basisPoolFreelancerNetCents = Math.round(escrowNetWhole * 100);
+    }
+
+    const basisFreelancerNetUsd =
+      basisPoolFreelancerNetCents > 0 ? basisPoolFreelancerNetCents / 100 : 0;
 
     // Validate partial team dispute: all specified freelancers must be on the project
     const teamMemberIds = project.matchedFreelancerIds ?? [];
@@ -474,18 +546,24 @@ export const initiateDispute = mutation({
       teamMemberIds.length > 0 &&
       disputedIdsUnique.length < teamMemberIds.length;
 
-    // Client gross that corresponds to all net escrow (cannot lock more than this for a partial team dispute).
-    const fullEscrowClientGross = escrowNetToClientLockedGross(escrowNet, platformFeePct);
+    // Gross upper bounds: economics basis pool vs whole hire escrow held.
+    const maxClientGrossForEconomicsBasis = escrowNetToClientLockedGross(
+      basisFreelancerNetUsd,
+      platformFeePct
+    );
+    const fullEscrowClientGross = escrowNetToClientLockedGross(
+      escrowNetWhole,
+      platformFeePct
+    );
 
     let lockedAmount: number;
     if (isPartialTeamDispute && disputedIdsUnique) {
-      const totalPoolCents = Math.round(escrowNet * 100);
       const shareMap = await computeTeamPoolShareCentsByFreelancerId(
         ctx,
         projectId,
         teamMemberIds as Id<"users">[],
         project.teamBudgetBreakdown,
-        totalPoolCents
+        basisPoolFreelancerNetCents
       );
       const disputedNetCents = sumShareCentsForFreelancers(
         shareMap,
@@ -493,9 +571,13 @@ export const initiateDispute = mutation({
       );
       lockedAmount = escrowNetToClientLockedGross(disputedNetCents / 100, platformFeePct);
     } else {
-      lockedAmount = fullEscrowClientGross;
+      lockedAmount = maxClientGrossForEconomicsBasis;
     }
-    lockedAmount = Math.min(lockedAmount, fullEscrowClientGross);
+    lockedAmount = Math.min(
+      lockedAmount,
+      maxClientGrossForEconomicsBasis,
+      fullEscrowClientGross
+    );
 
     const now = Date.now();
     const policy = getDisputeReasonPolicy(args.type);
@@ -516,6 +598,7 @@ export const initiateDispute = mutation({
       stageStartedAt: now,
       policyReasonLabel: policy.label,
       lockedAmount,
+      lockedEconomicsFreelancerNetPoolCents: basisPoolFreelancerNetCents,
       disputedFreelancerIds:
         disputedIdsUnique && disputedIdsUnique.length > 0
           ? disputedIdsUnique
@@ -586,8 +669,6 @@ export const initiateDispute = mutation({
         "action",
         "internal"
       >;
-    const releaseDisputeFunds =
-      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
 
     const syntheticDispute: Pick<Doc<"disputes">, "initiatorId" | "disputedFreelancerIds"> = {
       initiatorId: user._id,
@@ -1327,7 +1408,6 @@ export const resolveDispute = mutation({
       throw new Error("Not authenticated");
     }
 
-    // Only moderators and admins can resolve
     if (user.role !== "moderator" && user.role !== "admin") {
       throw new Error("Unauthorized - only moderators and admins can resolve disputes");
     }
@@ -1337,12 +1417,12 @@ export const resolveDispute = mutation({
       throw new Error("Dispute not found");
     }
 
-    // Check if already resolved
     if (dispute.status === "resolved" || dispute.status === "closed") {
       throw new Error("Dispute already resolved");
     }
 
-    // Get project
+    assertAssignedStaffForDispute(user, dispute, "record a judgment");
+
     const project = await ctx.db.get(dispute.projectId);
     if (!project) {
       throw new Error("Project not found");
@@ -1373,34 +1453,19 @@ export const resolveDispute = mutation({
         "action",
         "internal"
       >;
-    const releaseDisputeFunds =
-      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
-    const sendSelectReplacementClientEmail = api.api.projects.actions
-      .sendSelectReplacementClientEmail as unknown as FunctionReference<
-      "action",
-      "internal"
-    >;
 
-    // Build personalized messages for each party if not explicitly provided
-    const decisionClientMsg = args.clientMessage?.trim() ||
-      (args.decision === "client_favor"
-        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. Your funds are reserved for this hire and you can select replacement freelancer(s) to continue.`
-        : args.decision === "freelancer_favor"
-        ? `The dispute for "${project.intakeForm.title}" was not resolved in your favor. The freelancer's position was upheld.`
-        : args.decision === "partial"
-        ? `The dispute for "${project.intakeForm.title}" was partially resolved. A portion of the funds has been redistributed. ${args.notes}`
-        : `The dispute for "${project.intakeForm.title}" resulted in a replacement decision. A new freelancer will be matched.`);
+    const titleLine = project.intakeForm?.title ?? "Hire";
 
-    const decisionFreelancerMsg = args.freelancerMessage?.trim() ||
-      (args.decision === "freelancer_favor"
-        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. ${args.notes}`
-        : args.decision === "client_favor"
-        ? `The dispute for "${project.intakeForm.title}" was not resolved in your favor. The client's position was upheld.`
-        : args.decision === "partial"
-        ? `The dispute for "${project.intakeForm.title}" was partially resolved. A portion of the funds has been redistributed. ${args.notes}`
-        : `The dispute for "${project.intakeForm.title}" resulted in a replacement decision. You have been removed from this hire.`);
+    const neutralPartyMsg = `Staff recorded a judgment on the dispute for "${titleLine}". Assigned staff will apply the outcome in the platform (including any fund movements or roster changes when applicable). You will be notified as steps complete.`;
 
-    // Update dispute
+    const decisionClientMsg =
+      args.clientMessage?.trim() ||
+      neutralPartyMsg;
+
+    const decisionFreelancerMsg =
+      args.freelancerMessage?.trim() ||
+      neutralPartyMsg;
+
     await ctx.db.patch(args.disputeId, {
       status: "resolved",
       stage: "resolved",
@@ -1416,7 +1481,8 @@ export const resolveDispute = mutation({
         resolvedAt: now,
       },
       resolvedAt: now,
-      enforcedAt: now,
+      resolutionExecutedAt: undefined,
+      resolutionExecutionSummary: undefined,
       updatedAt: now,
     });
     await recordDisputeStageEvent(ctx, {
@@ -1424,138 +1490,19 @@ export const resolveDispute = mutation({
       projectId: dispute.projectId,
       actorId: user._id,
       actorRole: user.role,
-      eventType: "dispute_resolved",
+      eventType: "dispute_judgment_recorded",
       fromStatus: dispute.status,
       toStatus: "resolved",
-      title: "Dispute resolved",
+      title: "Judgment recorded",
       description: args.notes,
       metadata: { decision: args.decision, resolutionAmount: resolutionAmountCents },
       createdAt: now,
     });
 
-    // Update project status
-    const isPartialTeamClientFavor =
-      args.decision === "client_favor" &&
-      (project.matchedFreelancerIds?.length ?? 0) > 0 &&
-      !!dispute.disputedFreelancerIds &&
-      dispute.disputedFreelancerIds.length > 0 &&
-      dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
-
-    let newProjectStatus: Doc<"projects">["status"] = "disputed";
-    if (args.decision === "replacement") {
-      newProjectStatus = "matching";
-    } else if (args.decision === "client_favor") {
-      newProjectStatus = isPartialTeamClientFavor ? "in_progress" : "matching";
-    } else if (args.decision === "partial") {
-      newProjectStatus = "in_progress";
-    } else {
-      // Freelancer favor — work continues; unreleased escrow stays until normal monthly approval flow
-      newProjectStatus = "in_progress";
-    }
-
-    const exclusionPatch: {
-      permanentlyExcludedFreelancerIds?: Doc<"users">["_id"][];
-    } = {};
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const removed = freelancersRemovedForPermanentExclusion(project, dispute);
-      if (removed.length > 0) {
-        exclusionPatch.permanentlyExcludedFreelancerIds = mergePermanentExclusions(
-          project.permanentlyExcludedFreelancerIds,
-          removed
-        );
-      }
-    }
-
-    await ctx.db.patch(dispute.projectId, {
-      status: newProjectStatus,
-      updatedAt: now,
-      ...exclusionPatch,
-    });
-
-    await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
-      disputeId: args.disputeId,
-    });
-
-    // Remove freelancers from project when ruling is against them (no suspension)
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const isTeamProject = (project.matchedFreelancerIds?.length ?? 0) > 0;
-      const isPartialTeam =
-        isTeamProject &&
-        dispute.disputedFreelancerIds &&
-        dispute.disputedFreelancerIds.length > 0 &&
-        dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
-
-      if (isPartialTeam && dispute.disputedFreelancerIds) {
-        // Partial team dispute: remove only the disputed members, keep remaining
-        const disputed = dispute.disputedFreelancerIds;
-        const remainingIds = (project.matchedFreelancerIds ?? []).filter(
-          (id) => !disputed.includes(id)
-        );
-        const nextSelected = (project.selectedFreelancerIds ?? []).filter(
-          (id) => !disputed.includes(id)
-        );
-        await ctx.db.patch(dispute.projectId, {
-          matchedFreelancerIds: remainingIds,
-          status: "in_progress",
-          selectedFreelancerIds:
-            nextSelected.length > 0 ? nextSelected : undefined,
-          updatedAt: now,
-        } as any);
-      } else {
-        // Single hire or full team: remove all matched freelancers from the project
-        if (isTeamProject) {
-          await ctx.db.patch(dispute.projectId, {
-            matchedFreelancerIds: [],
-            selectedFreelancerIds: undefined,
-            selectedFreelancerId: undefined,
-            updatedAt: now,
-          } as any);
-        } else {
-          await ctx.db.patch(dispute.projectId, {
-            matchedFreelancerId: undefined,
-            selectedFreelancerId: undefined,
-            updatedAt: now,
-          } as any);
-        }
-      }
-    }
-
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const teamLenPreRemove = (project.matchedFreelancerIds?.length ?? 0);
-      const isPartialTeamResolve =
-        teamLenPreRemove > 0 &&
-        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
-        dispute.disputedFreelancerIds!.length < teamLenPreRemove;
-      await ensureReplacementMatchingProjectFields(ctx, {
-        projectId: dispute.projectId,
-        disputeId: args.disputeId,
-        now,
-        partialDisputedFreelancerIds:
-          isPartialTeamResolve && dispute.disputedFreelancerIds
-            ? dispute.disputedFreelancerIds
-            : undefined,
-      });
-    }
-
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const removedSweep = freelancersRemovedForPermanentExclusion(project, dispute);
-      if (removedSweep.length > 0) {
-        await ctx.runMutation(
-          internalApi.projects.mutations.sweepFreelancersRemovedFromProjectInternal,
-          {
-            projectId: dispute.projectId,
-            freelancerIds: removedSweep,
-          }
-        );
-      }
-    }
-
     const recipientFreelancerIds = getDisputeRecipientFreelancerIds(project, dispute);
-
-    // Send personalized notifications to each party
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
       userIds: [project.clientId],
-      title: "Dispute resolved",
+      title: "Dispute judgment recorded",
       message: decisionClientMsg,
       type: "dispute",
       data: { disputeId: args.disputeId, projectId: dispute.projectId },
@@ -1568,87 +1515,16 @@ export const resolveDispute = mutation({
       ) => Promise<unknown>
     )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
       userIds: [project.clientId],
-      subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-      headline: "Dispute resolved",
+      subject: `[49GIG] Dispute judgment: ${project.intakeForm.title ?? "Hire"}`,
+      headline: "Judgment recorded",
       bodyText: decisionClientMsg,
       disputeId: args.disputeId,
     });
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      await ctx.scheduler.runAfter(0, sendSelectReplacementClientEmail, {
-        projectId: dispute.projectId,
-      });
-    }
 
-    const uniqueFreelancerIds = recipientFreelancerIds;
-
-    if (
-      (args.decision === "client_favor" || args.decision === "replacement") &&
-      uniqueFreelancerIds.length > 0
-    ) {
-      const removedIds = freelancersRemovedForPermanentExclusion(project, dispute);
-      const removedSet = new Set(removedIds.map(String));
-      const isPartialTeamResolve =
-        (project.matchedFreelancerIds?.length ?? 0) > 0 &&
-        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
-        (dispute.disputedFreelancerIds?.length ?? 0) <
-          (project.matchedFreelancerIds?.length ?? 0);
-
-      const ruledAgainst = uniqueFreelancerIds.filter((id) => removedSet.has(String(id)));
-      if (ruledAgainst.length > 0) {
-        await ctx.scheduler.runAfter(0, sendSystemNotification, {
-          userIds: ruledAgainst,
-          title: "Dispute resolved",
-          message: decisionFreelancerMsg,
-          type: "dispute",
-          data: { disputeId: args.disputeId, projectId: dispute.projectId },
-        });
-        await (
-          ctx.scheduler.runAfter as (
-            delayMs: number,
-            fn: unknown,
-            fnArgs: Record<string, unknown>
-          ) => Promise<unknown>
-        )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
-          userIds: ruledAgainst,
-          subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-          headline: "Dispute resolved",
-          bodyText: decisionFreelancerMsg,
-          disputeId: args.disputeId,
-        });
-      }
-
-      if (isPartialTeamResolve) {
-        const remainingNotify = uniqueFreelancerIds.filter(
-          (id) => !removedSet.has(String(id))
-        );
-        if (remainingNotify.length > 0) {
-          const partialMsg = `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`;
-          await ctx.scheduler.runAfter(0, sendSystemNotification, {
-            userIds: remainingNotify,
-            title: "Dispute resolved",
-            message: partialMsg,
-            type: "dispute",
-            data: { disputeId: args.disputeId, projectId: dispute.projectId },
-          });
-          await (
-            ctx.scheduler.runAfter as (
-              delayMs: number,
-              fn: unknown,
-              fnArgs: Record<string, unknown>
-            ) => Promise<unknown>
-          )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
-            userIds: remainingNotify,
-            subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-            headline: "Dispute resolved",
-            bodyText: partialMsg,
-            disputeId: args.disputeId,
-          });
-        }
-      }
-    } else if (uniqueFreelancerIds.length > 0) {
+    if (recipientFreelancerIds.length > 0) {
       await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: uniqueFreelancerIds,
-        title: "Dispute resolved",
+        userIds: recipientFreelancerIds,
+        title: "Dispute judgment recorded",
         message: decisionFreelancerMsg,
         type: "dispute",
         data: { disputeId: args.disputeId, projectId: dispute.projectId },
@@ -1660,17 +1536,16 @@ export const resolveDispute = mutation({
           fnArgs: Record<string, unknown>
         ) => Promise<unknown>
       )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
-        userIds: uniqueFreelancerIds,
-        subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-        headline: "Dispute resolved",
+        userIds: recipientFreelancerIds,
+        subject: `[49GIG] Dispute judgment: ${project.intakeForm.title ?? "Hire"}`,
+        headline: "Judgment recorded",
         bodyText: decisionFreelancerMsg,
         disputeId: args.disputeId,
       });
     }
 
-    // Create audit log
     await ctx.db.insert("auditLogs", {
-      action: "dispute_resolved",
+      action: "dispute_judgment_recorded",
       actionType: user.role === "admin" ? "admin" : "dispute",
       actorId: user._id,
       actorRole: user.role,
@@ -1703,327 +1578,10 @@ export const resolveDisputeInternal = internalMutation({
     resolutionAmount: v.optional(v.number()),
     notes: v.string(),
   },
-  handler: async (ctx, args) => {
-    const dispute = await ctx.db.get(args.disputeId);
-    if (!dispute) {
-      throw new Error("Dispute not found");
-    }
-    if (dispute.status === "resolved" || dispute.status === "closed") {
-      throw new Error("Dispute already resolved");
-    }
-
-    const project = await ctx.db.get(dispute.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
-    const now = Date.now();
-
-    let resolutionAmountCents: number | undefined;
-    if (args.decision === "partial") {
-      if (args.resolutionAmount == null) {
-        throw new Error("Resolution amount is required for partial decisions");
-      }
-      resolutionAmountCents = assertNonNegativeIntegerCents(
-        Math.round(args.resolutionAmount),
-        "Resolution amount"
-      );
-      if (resolutionAmountCents <= 0) {
-        throw new Error("Resolution amount must be greater than zero");
-      }
-      const maxResolutionCents = await disputeNetScopeCents(ctx, project, dispute);
-      if (resolutionAmountCents > maxResolutionCents) {
-        throw new Error("Resolution amount cannot exceed the disputed escrow amount");
-      }
-    }
-
-    const releaseDisputeFunds =
-      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
-
-    await ctx.db.patch(args.disputeId, {
-      status: "resolved",
-      stage: "resolved",
-      stageStartedAt: now,
-      stageDeadlineAt: undefined,
-      resolution: {
-        decision: args.decision,
-        resolutionAmount: resolutionAmountCents,
-        notes: args.notes,
-        resolvedAt: now,
-      },
-      resolvedAt: now,
-      enforcedAt: now,
-      updatedAt: now,
-    });
-    await recordDisputeStageEvent(ctx, {
-      disputeId: args.disputeId,
-      projectId: dispute.projectId,
-      actorRole: "system",
-      eventType: "dispute_resolved",
-      fromStatus: dispute.status,
-      toStatus: "resolved",
-      title: "Dispute resolved automatically",
-      description: args.notes,
-      metadata: { decision: args.decision, resolutionAmount: resolutionAmountCents },
-      createdAt: now,
-    });
-
-    const isPartialTeamClientFavorInternal =
-      args.decision === "client_favor" &&
-      (project.matchedFreelancerIds?.length ?? 0) > 0 &&
-      !!dispute.disputedFreelancerIds &&
-      dispute.disputedFreelancerIds.length > 0 &&
-      dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
-
-    let newProjectStatus: Doc<"projects">["status"] = "disputed";
-    if (args.decision === "replacement") {
-      newProjectStatus = "matching";
-    } else if (args.decision === "client_favor") {
-      newProjectStatus = isPartialTeamClientFavorInternal ? "in_progress" : "matching";
-    } else if (args.decision === "partial") {
-      newProjectStatus = "in_progress";
-    } else {
-      newProjectStatus = "in_progress";
-    }
-
-    const exclusionPatch: {
-      permanentlyExcludedFreelancerIds?: Doc<"users">["_id"][];
-    } = {};
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const removed = freelancersRemovedForPermanentExclusion(project, dispute);
-      if (removed.length > 0) {
-        exclusionPatch.permanentlyExcludedFreelancerIds = mergePermanentExclusions(
-          project.permanentlyExcludedFreelancerIds,
-          removed
-        );
-      }
-    }
-
-    await ctx.db.patch(dispute.projectId, {
-      status: newProjectStatus,
-      updatedAt: now,
-      ...exclusionPatch,
-    });
-
-    await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
-      disputeId: args.disputeId,
-    });
-
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const isTeamProject = (project.matchedFreelancerIds?.length ?? 0) > 0;
-      const isPartialTeam =
-        isTeamProject &&
-        dispute.disputedFreelancerIds &&
-        dispute.disputedFreelancerIds.length > 0 &&
-        dispute.disputedFreelancerIds.length < (project.matchedFreelancerIds?.length ?? 0);
-
-      if (isPartialTeam && dispute.disputedFreelancerIds) {
-        const disputed = dispute.disputedFreelancerIds;
-        const remainingIds = (project.matchedFreelancerIds ?? []).filter(
-          (id) => !disputed.includes(id)
-        );
-        const nextSelected = (project.selectedFreelancerIds ?? []).filter(
-          (id) => !disputed.includes(id)
-        );
-        await ctx.db.patch(dispute.projectId, {
-          matchedFreelancerIds: remainingIds,
-          status: "in_progress",
-          selectedFreelancerIds:
-            nextSelected.length > 0 ? nextSelected : undefined,
-          updatedAt: now,
-        } as any);
-      } else {
-        if (isTeamProject) {
-          await ctx.db.patch(dispute.projectId, {
-            matchedFreelancerIds: [],
-            selectedFreelancerIds: undefined,
-            selectedFreelancerId: undefined,
-            updatedAt: now,
-          } as any);
-        } else {
-          await ctx.db.patch(dispute.projectId, {
-            matchedFreelancerId: undefined,
-            selectedFreelancerId: undefined,
-            updatedAt: now,
-          } as any);
-        }
-      }
-    }
-
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const teamLenPreRemove = (project.matchedFreelancerIds?.length ?? 0);
-      const isPartialTeamResolve =
-        teamLenPreRemove > 0 &&
-        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
-        dispute.disputedFreelancerIds!.length < teamLenPreRemove;
-      await ensureReplacementMatchingProjectFields(ctx, {
-        projectId: dispute.projectId,
-        disputeId: args.disputeId,
-        now,
-        partialDisputedFreelancerIds:
-          isPartialTeamResolve && dispute.disputedFreelancerIds
-            ? dispute.disputedFreelancerIds
-            : undefined,
-      });
-    }
-
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      const removedSweep = freelancersRemovedForPermanentExclusion(project, dispute);
-      if (removedSweep.length > 0) {
-        await ctx.runMutation(
-          internalApi.projects.mutations.sweepFreelancersRemovedFromProjectInternal,
-          {
-            projectId: dispute.projectId,
-            freelancerIds: removedSweep,
-          }
-        );
-      }
-    }
-
-    const sendSystemNotification =
-      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
-        "action",
-        "internal"
-      >;
-    const sendSelectReplacementClientEmail = api.api.projects.actions
-      .sendSelectReplacementClientEmail as unknown as FunctionReference<
-      "action",
-      "internal"
-    >;
-
-    const decisionClientMsg =
-      args.decision === "client_favor"
-        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. Your funds are reserved for this hire and you can select replacement freelancer(s) to continue.`
-        : args.decision === "freelancer_favor"
-          ? `The dispute for "${project.intakeForm.title}" was not resolved in your favor.`
-          : args.decision === "partial"
-            ? `The dispute for "${project.intakeForm.title}" was partially resolved. ${args.notes}`
-            : `The dispute for "${project.intakeForm.title}" resulted in a replacement decision.`;
-
-    await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: [project.clientId],
-      title: "Dispute resolved",
-      message: decisionClientMsg,
-      type: "dispute",
-      data: { disputeId: args.disputeId, projectId: dispute.projectId },
-    });
-    await (
-      ctx.scheduler.runAfter as (
-        delayMs: number,
-        fn: unknown,
-        fnArgs: Record<string, unknown>
-      ) => Promise<unknown>
-    )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
-      userIds: [project.clientId],
-      subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-      headline: "Dispute resolved",
-      bodyText: decisionClientMsg,
-      disputeId: args.disputeId,
-    });
-    if (args.decision === "client_favor" || args.decision === "replacement") {
-      await ctx.scheduler.runAfter(0, sendSelectReplacementClientEmail, {
-        projectId: dispute.projectId,
-      });
-    }
-
-    const decisionFreelancerMsg =
-      args.decision === "freelancer_favor"
-        ? `The dispute for "${project.intakeForm.title}" was resolved in your favor. ${args.notes}`
-        : args.decision === "client_favor"
-          ? `The dispute for "${project.intakeForm.title}" was not resolved in your favor. The client's position was upheld.`
-          : args.decision === "partial"
-            ? `The dispute for "${project.intakeForm.title}" was partially resolved. ${args.notes}`
-            : `The dispute for "${project.intakeForm.title}" resulted in a replacement decision. You have been removed from this hire.`;
-
-    const uniqueFreelancerIds = getDisputeRecipientFreelancerIds(project, dispute);
-
-    if (
-      (args.decision === "client_favor" || args.decision === "replacement") &&
-      uniqueFreelancerIds.length > 0
-    ) {
-      const removedIds = freelancersRemovedForPermanentExclusion(project, dispute);
-      const removedSet = new Set(removedIds.map(String));
-      const isPartialTeamResolve =
-        (project.matchedFreelancerIds?.length ?? 0) > 0 &&
-        (dispute.disputedFreelancerIds?.length ?? 0) > 0 &&
-        (dispute.disputedFreelancerIds?.length ?? 0) <
-          (project.matchedFreelancerIds?.length ?? 0);
-
-      const ruledAgainst = uniqueFreelancerIds.filter((id) => removedSet.has(String(id)));
-      if (ruledAgainst.length > 0) {
-        await ctx.scheduler.runAfter(0, sendSystemNotification, {
-          userIds: ruledAgainst,
-          title: "Dispute resolved",
-          message: decisionFreelancerMsg,
-          type: "dispute",
-          data: { disputeId: args.disputeId, projectId: dispute.projectId },
-        });
-        await (
-          ctx.scheduler.runAfter as (
-            delayMs: number,
-            fn: unknown,
-            fnArgs: Record<string, unknown>
-          ) => Promise<unknown>
-        )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
-          userIds: ruledAgainst,
-          subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-          headline: "Dispute resolved",
-          bodyText: decisionFreelancerMsg,
-          disputeId: args.disputeId,
-        });
-      }
-      if (isPartialTeamResolve) {
-        const remainingNotify = uniqueFreelancerIds.filter(
-          (id) => !removedSet.has(String(id))
-        );
-        if (remainingNotify.length > 0) {
-          const partialMsg = `A dispute on "${project.intakeForm.title}" was resolved. You remain on this hire while the client replaces removed team members.`;
-          await ctx.scheduler.runAfter(0, sendSystemNotification, {
-            userIds: remainingNotify,
-            title: "Dispute resolved",
-            message: partialMsg,
-            type: "dispute",
-            data: { disputeId: args.disputeId, projectId: dispute.projectId },
-          });
-          await (
-            ctx.scheduler.runAfter as (
-              delayMs: number,
-              fn: unknown,
-              fnArgs: Record<string, unknown>
-            ) => Promise<unknown>
-          )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
-            userIds: remainingNotify,
-            subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-            headline: "Dispute resolved",
-            bodyText: partialMsg,
-            disputeId: args.disputeId,
-          });
-        }
-      }
-    } else if (uniqueFreelancerIds.length > 0) {
-      await ctx.scheduler.runAfter(0, sendSystemNotification, {
-        userIds: uniqueFreelancerIds,
-        title: "Dispute resolved",
-        message: decisionFreelancerMsg,
-        type: "dispute",
-        data: { disputeId: args.disputeId, projectId: dispute.projectId },
-      });
-      await (
-        ctx.scheduler.runAfter as (
-          delayMs: number,
-          fn: unknown,
-          fnArgs: Record<string, unknown>
-        ) => Promise<unknown>
-      )(0, internalAny.disputes.staffEmails.sendDisputePartyEmailsInternal, {
-        userIds: uniqueFreelancerIds,
-        subject: `[49GIG] Dispute resolved: ${project.intakeForm.title ?? "Hire"}`,
-        headline: "Dispute resolved",
-        bodyText: decisionFreelancerMsg,
-        disputeId: args.disputeId,
-      });
-    }
-
-    return { success: true };
+  handler: async () => {
+    throw new Error(
+      "Automated dispute resolution is disabled. Staff must record a judgment and run manual enforcement."
+    );
   },
 });
 
@@ -2148,6 +1706,356 @@ export const finalizeDisputeProjectAfterResolutionInternal = internalMutation({
     });
 
     return { finalized: true as const, status };
+  },
+});
+
+/** Apply escrow/fund movements from judgment (delegates to `releaseDisputeFunds`). */
+export const scheduleJudgmentFundsRelease = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (
+      !user ||
+      (user.role !== "moderator" && user.role !== "admin")
+    ) {
+      throw new Error("Unauthorized");
+    }
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    assertEnforcementWindow(dispute);
+    assertAssignedStaffForDispute(user, dispute, "release funds");
+
+    const releaseDisputeFunds =
+      api.api.disputes.actions.releaseDisputeFunds as unknown as FunctionReference<"action">;
+    await ctx.scheduler.runAfter(0, releaseDisputeFunds, {
+      disputeId: args.disputeId,
+    });
+
+    await appendDisputeEnforcementEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      kind: "schedule_funds_release",
+      details: {},
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "dispute_enforcement_schedule_funds",
+      actionType: user.role === "admin" ? "admin" : "dispute",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "dispute",
+      targetId: args.disputeId,
+      details: {},
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/** Align hire roster and status with judgment (replacement fields, exclusions, removals). */
+export const applyJudgmentProjectRoster = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (
+      !user ||
+      (user.role !== "moderator" && user.role !== "admin")
+    ) {
+      throw new Error("Unauthorized");
+    }
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    assertEnforcementWindow(dispute);
+    assertAssignedStaffForDispute(user, dispute, "update hire roster");
+
+    const result = await ctx.runMutation(
+      internalApi.disputes.mutations.finalizeDisputeProjectAfterResolutionInternal,
+      {
+        disputeId: args.disputeId,
+      }
+    );
+
+    await appendDisputeEnforcementEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      kind: "apply_project_roster",
+      details: result,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "dispute_enforcement_roster",
+      actionType: user.role === "admin" ? "admin" : "dispute",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "dispute",
+      targetId: args.disputeId,
+      details: result,
+      createdAt: Date.now(),
+    });
+
+    return result;
+  },
+});
+
+/** Regenerate ranked replacement candidates after client-favor/replacement judgments. */
+export const enqueueJudgmentReplacementCandidates = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (
+      !user ||
+      (user.role !== "moderator" && user.role !== "admin")
+    ) {
+      throw new Error("Unauthorized");
+    }
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute?.resolution) throw new Error("Dispute judgment not found");
+    assertEnforcementWindow(dispute);
+    assertAssignedStaffForDispute(
+      user,
+      dispute,
+      "regenerate replacement candidates"
+    );
+
+    const decision = dispute.resolution.decision;
+    if (decision !== "client_favor" && decision !== "replacement") {
+      throw new Error(
+        "Replacement candidate generation applies to client favor or replacement judgments only."
+      );
+    }
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) throw new Error("Project not found");
+
+    const generateTeamMatches =
+      api.api.matching.actions.generateTeamMatches as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+    const generateMatches =
+      api.api.matching.actions.generateMatches as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
+    if ((project.intakeForm as { hireType?: string } | undefined)?.hireType === "team") {
+      await ctx.scheduler.runAfter(0, generateTeamMatches, {
+        projectId: dispute.projectId,
+      });
+    } else {
+      await ctx.scheduler.runAfter(0, generateMatches, {
+        projectId: dispute.projectId,
+      });
+    }
+
+    await appendDisputeEnforcementEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      kind: "enqueue_replacement_matches",
+      details: { hireType: project.intakeForm?.hireType },
+    });
+
+    return { success: true };
+  },
+});
+
+/** Notify the client to pick replacement freelancer(s). */
+export const sendJudgmentReplacementClientNotice = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (
+      !user ||
+      (user.role !== "moderator" && user.role !== "admin")
+    ) {
+      throw new Error("Unauthorized");
+    }
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute?.resolution) throw new Error("Dispute judgment not found");
+    assertEnforcementWindow(dispute);
+    assertAssignedStaffForDispute(
+      user,
+      dispute,
+      "send replacement reminder email"
+    );
+
+    const decision = dispute.resolution.decision;
+    if (decision !== "client_favor" && decision !== "replacement") {
+      throw new Error(
+        "Replacement notice applies to client favor or replacement judgments only."
+      );
+    }
+
+    const sendSelectReplacementClientEmail =
+      api.api.projects.actions.sendSelectReplacementClientEmail as unknown as FunctionReference<
+        "action",
+        "internal"
+      >;
+
+    await ctx.scheduler.runAfter(0, sendSelectReplacementClientEmail, {
+      projectId: dispute.projectId,
+    });
+
+    await appendDisputeEnforcementEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      kind: "notify_client_replacement_flow",
+      details: {},
+    });
+
+    return { success: true };
+  },
+});
+
+/** Clear hire `disputed` status and unblock the disputed billing cycle without changing roster. */
+export const resumeProjectAfterJudgmentDispute = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (
+      !user ||
+      (user.role !== "moderator" && user.role !== "admin")
+    ) {
+      throw new Error("Unauthorized");
+    }
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    assertEnforcementWindow(dispute);
+    assertAssignedStaffForDispute(user, dispute, "resume hire from disputed state");
+
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) throw new Error("Project not found");
+
+    const now = Date.now();
+    if (project.status === "disputed") {
+      await ctx.db.patch(dispute.projectId, {
+        status: "in_progress",
+        updatedAt: now,
+      });
+    }
+
+    if (dispute.monthlyCycleId) {
+      const cycle = await ctx.db.get(dispute.monthlyCycleId);
+      if (cycle?.status === "disputed") {
+        await ctx.db.patch(dispute.monthlyCycleId, {
+          status: "pending",
+          disputeId: undefined,
+          updatedAt: now,
+        });
+      }
+    }
+
+    await appendDisputeEnforcementEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      kind: "resume_project_in_progress",
+      details: {},
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "dispute_enforcement_resume_project",
+      actionType: user.role === "admin" ? "admin" : "dispute",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "dispute",
+      targetId: args.disputeId,
+      details: {},
+      createdAt: now,
+    });
+
+    return { success: true };
+  },
+});
+
+/** Mark enforcement workflow complete — run after substantive actions finished. */
+export const finalizeDisputeEnforcement = mutation({
+  args: {
+    disputeId: v.id("disputes"),
+    summary: v.optional(v.string()),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (
+      !user ||
+      (user.role !== "moderator" && user.role !== "admin")
+    ) {
+      throw new Error("Unauthorized");
+    }
+
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) throw new Error("Dispute not found");
+    if (dispute.status !== "resolved") {
+      throw new Error("Dispute is not resolved");
+    }
+    if (dispute.resolutionExecutedAt != null) {
+      throw new Error("Enforcement is already finalized");
+    }
+    assertAssignedStaffForDispute(user, dispute, "finalize enforcement");
+
+    const now = Date.now();
+    const trimmed = args.summary?.trim();
+
+    await ctx.db.patch(args.disputeId, {
+      resolutionExecutedAt: now,
+      resolutionExecutionSummary: trimmed || undefined,
+      enforcedAt: now,
+      updatedAt: now,
+    });
+
+    await recordDisputeStageEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      actorRole: user.role,
+      eventType: "dispute_enforcement_finalized",
+      title: "Enforcement finalized",
+      description: trimmed,
+      metadata: {},
+      createdAt: now,
+    });
+
+    await appendDisputeEnforcementEvent(ctx, {
+      disputeId: args.disputeId,
+      projectId: dispute.projectId,
+      actorId: user._id,
+      kind: "finalize_enforcement",
+      details: trimmed ? { summary: trimmed } : {},
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "dispute_enforcement_finalized",
+      actionType: user.role === "admin" ? "admin" : "dispute",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "dispute",
+      targetId: args.disputeId,
+      details: { summary: trimmed },
+      createdAt: now,
+    });
+
+    return { success: true };
   },
 });
 

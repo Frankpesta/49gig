@@ -2,7 +2,7 @@ import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
-import { clientLockedGrossToFreelancerEscrowPool } from "./amounts";
+import { freelancerSeatLockedEconomicsFreelancerNetUsd, resolvedLockedEconomicsFreelancerNetPoolCents } from "./lockingBasis";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 import {
   computeTeamPoolShareCentsByFreelancerId,
@@ -26,11 +26,9 @@ async function getCurrentUserInQuery(
 }
 
 /**
- * Clients and staff see client-gross USD (what sits on the client side of escrow, incl. fee):
- * - Open / under review: gross equivalent of the freelancer-net pool in scope (full team),
- *   or for **partial** team disputes, gross of each **disputed** member’s full-engagement net
- *   (what that seat earns from the hire — matches the disputed freelancer’s “locked amount” net).
- * - Otherwise: `dispute.lockedAmount` (snapshot at filing / resolution path — already gross).
+ * Clients and staff see client-gross USD (`dispute.lockedAmount` snapshot at filing).
+ * Freelancers each see freelancer-net USD for **their seat** from `lockedEconomicsFreelancerNetPoolCents`
+ * (fallback: legacy monthly-cycle / escrow rules), subdivided consistently with initiation.
  */
 async function clientOrStaffVisibleLockedGrossUsd(
   ctx: QueryCtx,
@@ -153,27 +151,12 @@ export const getDisputes = query({
                 feePct
               );
             } else if (isFreelancerOnProject) {
-              const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
-                d.lockedAmount,
-                feePct
+              lockedAmount = await freelancerSeatLockedEconomicsFreelancerNetUsd(
+                ctx,
+                d,
+                project,
+                user._id
               );
-              const teamBasis = teamBasisUserIdsForDispute(d, project);
-              const isTeamDispute = teamBasis.length > 1;
-
-              if (isTeamDispute) {
-                const totalPoolCents = Math.round(fullNetPool * 100);
-                const shareMap = await computeTeamPoolShareCentsByFreelancerId(
-                  ctx,
-                  d.projectId,
-                  teamBasis,
-                  project.teamBudgetBreakdown,
-                  totalPoolCents
-                );
-                const myShareCents = shareMap.get(String(user._id)) ?? 0;
-                lockedAmount = Math.round(myShareCents) / 100;
-              } else {
-                lockedAmount = fullNetPool;
-              }
             }
           }
           return {
@@ -371,7 +354,6 @@ export const getDispute = query({
     // Role-based visibility of resolution notes and locked amount
     let visibleResolution = dispute.resolution;
     // Stored lockedAmount is client gross (includes platform fee).
-    // Freelancers see only their individual net share; clients/staff see client gross.
     let visibleLockedAmount = dispute.lockedAmount;
 
     const isFreelancerParty =
@@ -379,27 +361,12 @@ export const getDispute = query({
       viewerIsDisputeParty(user._id, project, dispute);
 
     if (isFreelancerParty && !isAdminOrModerator) {
-      const fullNetPool = clientLockedGrossToFreelancerEscrowPool(
-        dispute.lockedAmount,
-        feePctForViews
+      visibleLockedAmount = await freelancerSeatLockedEconomicsFreelancerNetUsd(
+        ctx,
+        dispute,
+        project,
+        user._id
       );
-      const teamBasis = teamBasisUserIdsForDispute(dispute, project);
-      const isTeamDispute = teamBasis.length > 1;
-
-      if (isTeamDispute) {
-        const totalPoolCents = Math.round(fullNetPool * 100);
-        const shareMap = await computeTeamPoolShareCentsByFreelancerId(
-          ctx,
-          dispute.projectId,
-          teamBasis,
-          project.teamBudgetBreakdown,
-          totalPoolCents
-        );
-        const myShareCents = shareMap.get(String(user._id)) ?? 0;
-        visibleLockedAmount = Math.round(myShareCents) / 100;
-      } else {
-        visibleLockedAmount = fullNetPool;
-      }
     } else if (isClient || isAdminOrModerator || isAssignedModerator) {
       visibleLockedAmount = await clientOrStaffVisibleLockedGrossUsd(
         ctx,
@@ -439,11 +406,20 @@ export const getDispute = query({
       .query("disputeEvidence")
       .withIndex("by_dispute", (q) => q.eq("disputeId", args.disputeId))
       .collect();
+    structuredEvidence.sort((a, b) => a.createdAt - b.createdAt);
     const enrichedStructuredEvidence = await Promise.all(
-      structuredEvidence.map(async (e) => ({
-        ...e,
-        fileUrl: e.fileId ? await ctx.storage.getUrl(e.fileId) : null,
-      }))
+      structuredEvidence.map(async (e) => {
+        const submitter = await ctx.db.get(e.submittedBy);
+        const submitterDisplayName =
+          submitter?.name?.trim() || "Unknown";
+        const submitterRole = e.submittedByRole;
+        return {
+          ...e,
+          fileUrl: e.fileId ? await ctx.storage.getUrl(e.fileId) : null,
+          submitterDisplayName,
+          submitterRole,
+        };
+      })
     );
     const stageEvents = await ctx.db
       .query("disputeStageEvents")
@@ -708,7 +684,11 @@ export const computeDisputedTeamEscrowNetCentsFromDisputeInternal = internalQuer
       }
     }
 
-    const totalPoolCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+    const totalPoolCents = await resolvedLockedEconomicsFreelancerNetPoolCents(
+      ctx,
+      dispute,
+      project
+    );
     const shareMap = await computeTeamPoolShareCentsByFreelancerId(
       ctx,
       dispute.projectId,
@@ -744,7 +724,11 @@ export const computeDisputedMonthlyCycleShareCentsInternal = internalQuery({
       }
     }
 
-    const poolCents = Math.max(0, cycle.amountCents);
+    const poolCents = await resolvedLockedEconomicsFreelancerNetPoolCents(
+      ctx,
+      dispute,
+      project
+    );
     const shareMap = await computeTeamPoolShareCentsByFreelancerId(
       ctx,
       dispute.projectId,
@@ -754,5 +738,57 @@ export const computeDisputedMonthlyCycleShareCentsInternal = internalQuery({
     );
     const disputedNetCents = sumShareCentsForFreelancers(shareMap, disputedIds);
     return { disputedNetCents };
+  },
+});
+
+/** Internal: freelancer-net escrow pool cents that seat economics & `lockedAmount` are computed from. */
+export const disputeEconomicsBasisPoolFreelancerNetCentsInternal = internalQuery({
+  args: { disputeId: v.id("disputes") },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) return { poolCents: 0 as const };
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) return { poolCents: 0 as const };
+    const poolCents = await resolvedLockedEconomicsFreelancerNetPoolCents(
+      ctx,
+      dispute,
+      project
+    );
+    return { poolCents };
+  },
+});
+
+/**
+ * Enforcement audit rows for staff dashboards.
+ */
+export const listDisputeEnforcementEvents = query({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (
+      !user ||
+      (user.role !== "admin" && user.role !== "moderator")
+    ) {
+      return [];
+    }
+    const events = await ctx.db
+      .query("disputeEnforcementEvents")
+      .withIndex("by_dispute", (q) => q.eq("disputeId", args.disputeId))
+      .order("desc")
+      .collect();
+
+    const withNames = await Promise.all(
+      events.map(async (e) => {
+        const actor = await ctx.db.get(e.actorId);
+        return {
+          ...e,
+          actorName: actor?.name?.trim() ?? "Staff",
+        };
+      })
+    );
+    return withNames;
   },
 });

@@ -140,7 +140,31 @@ export default function DisputeDetailPage() {
       : "skip"
   );
 
+  const enforcementEvents = useQuery(
+    api.disputes.queries.listDisputeEnforcementEvents,
+    dispute &&
+      user?._id &&
+      dispute.status === "resolved" &&
+      (user.role === "admin" || user.role === "moderator")
+      ? { disputeId: dispute._id, userId: user._id }
+      : "skip"
+  );
+
   const assignModeratorMutation = useMutation(api.disputes.mutations.assignModerator);
+  const scheduleJudgmentFunds = useMutation(api.disputes.mutations.scheduleJudgmentFundsRelease);
+  const applyJudgmentRoster = useMutation(api.disputes.mutations.applyJudgmentProjectRoster);
+  const enqueueReplacementCandidates = useMutation(
+    api.disputes.mutations.enqueueJudgmentReplacementCandidates
+  );
+  const sendReplacementClientNotice = useMutation(
+    api.disputes.mutations.sendJudgmentReplacementClientNotice
+  );
+  const resumeProjectAfterDispute = useMutation(
+    api.disputes.mutations.resumeProjectAfterJudgmentDispute
+  );
+  const finalizeDisputeEnforcementMutation = useMutation(
+    api.disputes.mutations.finalizeDisputeEnforcement
+  );
   const moderatorsForAssign = useQuery(
     api.users.queries.getAllUsersAdmin,
     user?.role === "admin" && user?._id && dispute
@@ -149,6 +173,8 @@ export default function DisputeDetailPage() {
   );
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignModeratorPick, setAssignModeratorPick] = useState<string>("");
+  const [finalizeEnforcementSummary, setFinalizeEnforcementSummary] = useState("");
+  const [enforcementBusy, setEnforcementBusy] = useState<string | null>(null);
 
   if (!isAuthenticated || !user) {
     return (
@@ -260,14 +286,32 @@ export default function DisputeDetailPage() {
     isActiveDispute;
 
   const isModerator = user.role === "moderator" || user.role === "admin";
+
   const canClaimOrAssignDispute =
     isModerator &&
     dispute.status === "open" &&
     !dispute.assignedModeratorId;
+
   const canAdminPickModerator = user.role === "admin" && canClaimOrAssignDispute;
   const canModeratorSelfAssign = user.role === "moderator" && canClaimOrAssignDispute;
-  const canResolve = isModerator && isActiveDispute;
-  const canRequestEvidenceFromParties = isModerator && isActiveDispute;
+
+  const staffCanOperateDispute =
+    user.role === "admin" ||
+    (user.role === "moderator" &&
+      !!dispute.assignedModeratorId &&
+      String(dispute.assignedModeratorId) === String(user._id));
+
+  const canResolve =
+    isModerator && staffCanOperateDispute && isActiveDispute && (user.role === "admin" || !!dispute.assignedModeratorId);
+
+  const canRequestEvidenceFromParties =
+    isModerator && isActiveDispute && staffCanOperateDispute;
+
+  const canStaffEnforcement =
+    isModerator &&
+    staffCanOperateDispute &&
+    dispute.status === "resolved" &&
+    dispute.resolutionExecutedAt == null;
 
   const evidenceRequests = (dispute.evidenceRequests ?? []) as EvidenceRequest[];
   const myEvidenceRequests = evidenceRequests.filter((r) =>
@@ -278,6 +322,19 @@ export default function DisputeDetailPage() {
       _id: f._id as Id<"users">,
       name: f.name,
     }));
+
+  const runEnforcementStep = async (stepKey: string, fn: () => Promise<void>) => {
+    if (!user?._id) return;
+    setEnforcementBusy(stepKey);
+    try {
+      await fn();
+      toast.success("Step completed.");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not complete this enforcement step.");
+    } finally {
+      setEnforcementBusy(null);
+    }
+  };
 
   const handleCancelDispute = async () => {
     if (!user?._id || !cancelReason.trim()) return;
@@ -718,90 +775,150 @@ export default function DisputeDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-5 px-4 py-5 sm:px-6 sm:py-6">
-              {Array.isArray(dispute.structuredEvidence) && dispute.structuredEvidence.length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold">Submitted evidence</p>
-                  {dispute.structuredEvidence.map((evidence: {
-                    _id: Id<"disputeEvidence">;
-                    title: string;
-                    description?: string;
-                    evidenceType: string;
-                    fileUrl?: string | null;
-                    url?: string;
-                  }) => (
-                    <div key={evidence._id} className="rounded-xl border border-border/50 bg-muted/10 p-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">{evidence.title}</p>
-                        <p className="mt-1 text-xs text-muted-foreground capitalize">
-                          {evidence.evidenceType.replace(/_/g, " ")}
-                        </p>
-                        {evidence.description && (
-                          <p className="mt-2 text-sm text-muted-foreground">{evidence.description}</p>
-                        )}
-                        {(evidence.fileUrl || evidence.url) && (
-                          <a
-                            href={evidence.fileUrl ?? evidence.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
-                          >
-                            Open evidence
-                          </a>
-                        )}
-                      </div>
+              {(() => {
+                const structured = dispute.structuredEvidence ?? [];
+                const hasStructured = structured.length > 0;
+                const legacy = dispute.evidence ?? [];
+
+                if (hasStructured) {
+                  return (
+                    <div className="space-y-3">
+                      <p className="text-sm font-semibold">Case evidence</p>
+                      {structured.map(
+                        (evidence: {
+                          _id: Id<"disputeEvidence">;
+                          title: string;
+                          description?: string;
+                          evidenceType: string;
+                          messageId?: Id<"messages">;
+                          fileUrl?: string | null;
+                          url?: string;
+                          submittedByRole?: string;
+                          submitterDisplayName?: string;
+                          createdAt: number;
+                        }) => (
+                          <div key={evidence._id} className="rounded-xl border border-border/50 bg-muted/10 p-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-baseline justify-between gap-2 gap-y-1">
+                                <p className="text-sm font-semibold">{evidence.title}</p>
+                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                  {new Date(evidence.createdAt).toLocaleString()}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                <span className="capitalize">
+                                  {(evidence.submitterDisplayName ?? "Unknown").trim()}
+                                </span>
+                                {" · "}
+                                <span className="capitalize">
+                                  {(evidence.submittedByRole ?? "party").replace(/_/g, " ")}
+                                </span>
+                                {" · "}
+                                <span className="capitalize">
+                                  {evidence.evidenceType.replace(/_/g, " ")}
+                                </span>
+                              </p>
+                              {evidence.description && (
+                                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                                  {evidence.description}
+                                </p>
+                              )}
+                              {evidence.messageId ? (
+                                <Link
+                                  href={`/dashboard/chat?message=${evidence.messageId}`}
+                                  className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
+                                >
+                                  View message
+                                </Link>
+                              ) : null}
+                              {(evidence.fileUrl || evidence.url) && (
+                                <a
+                                  href={evidence.fileUrl ?? evidence.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
+                                >
+                                  Open evidence
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-              {dispute.evidence.length === 0 ? (
-                <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/10 py-10 text-center">
-                  <FileText className="h-8 w-8 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">No evidence submitted yet.</p>
-                </div>
-              ) : (
-                <ul className="space-y-3">
-                  {dispute.evidence.map((evidence: DisputeEvidenceItem, idx: number) => (
-                    <li
-                      key={idx}
-                      className="flex gap-3 rounded-xl border border-border/50 bg-muted/10 p-3 transition-colors hover:bg-muted/20 sm:p-4"
-                    >
-                      <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background">
-                        {evidence.type === "message" && <MessageSquare className="h-4 w-4 text-primary" />}
-                        {evidence.type === "file" && <FileText className="h-4 w-4 text-primary" />}
-                        {evidence.type === "milestone_deliverable" && <DollarSign className="h-4 w-4 text-primary" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold capitalize tracking-tight">
-                          {evidence.type.replace(/_/g, " ")}
-                        </p>
-                        {evidence.description && (
-                          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{evidence.description}</p>
-                        )}
-                        {evidence.messageId && (
-                          <Link
-                            href={`/dashboard/chat?message=${evidence.messageId}`}
-                            className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
-                          >
-                            View message
-                          </Link>
-                        )}
-                        {evidence.fileId && (
-                          <a
-                            href={evidence.fileUrl ?? "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`mt-2 inline-flex text-xs font-medium hover:underline ${
-                              evidence.fileUrl ? "text-primary" : "pointer-events-none text-muted-foreground"
-                            }`}
-                          >
-                            {evidence.fileUrl ? "Download / view file" : "File (URL unavailable)"}
-                          </a>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                  );
+                }
+
+                if (legacy.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/60 bg-muted/10 py-10 text-center">
+                      <FileText className="h-8 w-8 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">No evidence submitted yet.</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold">Case evidence (legacy)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Submitted with the dispute opening by{" "}
+                      <span className="font-medium text-foreground">{dispute.initiatorFullName}</span>{" "}
+                      <span className="capitalize">({dispute.initiatorRole ?? "party"})</span>.
+                    </p>
+                    <ul className="space-y-3">
+                      {legacy.map((evidence: DisputeEvidenceItem, idx: number) => (
+                        <li
+                          key={idx}
+                          className="flex gap-3 rounded-xl border border-border/50 bg-muted/10 p-3 transition-colors hover:bg-muted/20 sm:p-4"
+                        >
+                          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-background">
+                            {evidence.type === "message" && (
+                              <MessageSquare className="h-4 w-4 text-primary" />
+                            )}
+                            {evidence.type === "file" && (
+                              <FileText className="h-4 w-4 text-primary" />
+                            )}
+                            {evidence.type === "milestone_deliverable" && (
+                              <DollarSign className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold capitalize tracking-tight">
+                              {evidence.type.replace(/_/g, " ")}
+                            </p>
+                            {evidence.description && (
+                              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                                {evidence.description}
+                              </p>
+                            )}
+                            {evidence.messageId && (
+                              <Link
+                                href={`/dashboard/chat?message=${evidence.messageId}`}
+                                className="mt-2 inline-flex text-xs font-medium text-primary hover:underline"
+                              >
+                                View message
+                              </Link>
+                            )}
+                            {evidence.fileId && (
+                              <a
+                                href={evidence.fileUrl ?? "#"}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`mt-2 inline-flex text-xs font-medium hover:underline ${
+                                  evidence.fileUrl ? "text-primary" : "pointer-events-none text-muted-foreground"
+                                }`}
+                              >
+                                {evidence.fileUrl ? "Download / view file" : "File (URL unavailable)"}
+                              </a>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
@@ -822,8 +939,8 @@ export default function DisputeDetailPage() {
                   <span className="capitalize">{dispute.resolution.decision.replace(/_/g, " ")}</span>
                   {dispute.resolution.decision === "replacement" && (
                     <p className="mt-3 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
-                      The hire returned to matching so the client can choose a replacement. Escrow was not
-                      refunded; prior freelancers were removed from the hire.
+                      Replacement was recorded as the judgment outcome. Actual hire status, escrow movements, and
+                      client-facing replacement steps are applied by assigned staff via enforcement actions.
                     </p>
                   )}
                 </DetailField>
@@ -848,6 +965,20 @@ export default function DisputeDetailPage() {
                 <DetailField label="Resolved at" icon={<Calendar />}>
                   {new Date(dispute.resolution.resolvedAt).toLocaleString()}
                 </DetailField>
+                {dispute.resolutionExecutedAt != null ? (
+                  <DetailField label="Enforcement" icon={<Clock />}>
+                    Finalized {new Date(dispute.resolutionExecutedAt).toLocaleString()}
+                    {dispute.resolutionExecutionSummary ? (
+                      <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
+                        {dispute.resolutionExecutionSummary}
+                      </p>
+                    ) : null}
+                  </DetailField>
+                ) : dispute.status === "resolved" ? (
+                  <DetailField label="Enforcement" icon={<Clock />}>
+                    Waiting for assigned staff to run manual enforcement actions.
+                  </DetailField>
+                ) : null}
               </CardContent>
             </Card>
           )}
@@ -998,12 +1129,12 @@ export default function DisputeDetailPage() {
             <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
               <CardHeader className="border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
                 <CardTitle className="text-base font-semibold sm:text-lg">Moderator actions</CardTitle>
-                <CardDescription>Review evidence, request more if needed, then resolve.</CardDescription>
+                <CardDescription>Review evidence, request more if needed, then record a judgment.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 px-4 py-4 sm:px-6 sm:py-5">
                 <Button className="w-full" asChild>
                   <Link href={`/dashboard/disputes/${disputeId}/resolve`}>
-                    Resolve dispute
+                    Record judgment
                   </Link>
                 </Button>
                 {canRequestEvidenceFromParties && (
@@ -1022,6 +1153,195 @@ export default function DisputeDetailPage() {
                     </Link>
                   </Button>
                 )}
+              </CardContent>
+            </Card>
+          )}
+
+          {canStaffEnforcement && (
+            <Card className="overflow-hidden rounded-2xl border-amber-500/25 shadow-sm">
+              <CardHeader className="border-b border-border/50 bg-amber-500/5 px-4 py-4 sm:px-6 sm:py-5">
+                <CardTitle className="text-base font-semibold sm:text-lg">
+                  Manual enforcement
+                </CardTitle>
+                <CardDescription>
+                  Judgment recorded — escrow, roster updates, matching, and client emails are intentional,
+                  ordered steps here. Funds run through the automated distribution engine for your chosen
+                  decision type.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-start"
+                    disabled={!!enforcementBusy}
+                    onClick={() =>
+                      void runEnforcementStep("funds", async () => {
+                        if (!user?._id || !dispute) return;
+                        await scheduleJudgmentFunds({
+                          disputeId: dispute._id,
+                          userId: user._id,
+                        });
+                      })
+                    }
+                  >
+                    {enforcementBusy === "funds" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Run fund release ({dispute.resolution?.decision?.replace(/_/g, " ") ?? "judgment"})
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    className="w-full justify-start"
+                    disabled={!!enforcementBusy}
+                    onClick={() =>
+                      void runEnforcementStep("roster", async () => {
+                        if (!user?._id || !dispute) return;
+                        await applyJudgmentRoster({
+                          disputeId: dispute._id,
+                          userId: user._id,
+                        });
+                      })
+                    }
+                  >
+                    {enforcementBusy === "roster" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Apply hire roster outcome
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={
+                      !!enforcementBusy ||
+                      (dispute.resolution?.decision !== "client_favor" &&
+                        dispute.resolution?.decision !== "replacement")
+                    }
+                    onClick={() =>
+                      void runEnforcementStep("matches", async () => {
+                        if (!user?._id || !dispute) return;
+                        await enqueueReplacementCandidates({
+                          disputeId: dispute._id,
+                          userId: user._id,
+                        });
+                      })
+                    }
+                  >
+                    {enforcementBusy === "matches" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Regenerate replacement candidates
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={
+                      !!enforcementBusy ||
+                      (dispute.resolution?.decision !== "client_favor" &&
+                        dispute.resolution?.decision !== "replacement")
+                    }
+                    onClick={() =>
+                      void runEnforcementStep("email", async () => {
+                        if (!user?._id || !dispute) return;
+                        await sendReplacementClientNotice({
+                          disputeId: dispute._id,
+                          userId: user._id,
+                        });
+                      })
+                    }
+                  >
+                    {enforcementBusy === "email" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Email client (replacement flow)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    disabled={!!enforcementBusy}
+                    onClick={() =>
+                      void runEnforcementStep("resume", async () => {
+                        if (!user?._id || !dispute) return;
+                        await resumeProjectAfterDispute({
+                          disputeId: dispute._id,
+                          userId: user._id,
+                        });
+                      })
+                    }
+                  >
+                    {enforcementBusy === "resume" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Resume hire (clear disputed hire status)
+                  </Button>
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-border/60 bg-muted/10 p-3">
+                  <Label htmlFor="enforce-summary">Finalize enforcement (optional summary)</Label>
+                  <Textarea
+                    id="enforce-summary"
+                    value={finalizeEnforcementSummary}
+                    onChange={(e) => setFinalizeEnforcementSummary(e.target.value)}
+                    placeholder="Internal note on what was completed"
+                    rows={3}
+                  />
+                  <Button
+                    className="w-full"
+                    disabled={!!enforcementBusy}
+                    onClick={() =>
+                      void runEnforcementStep("finalize", async () => {
+                        if (!user?._id || !dispute) return;
+                        await finalizeDisputeEnforcementMutation({
+                          disputeId: dispute._id,
+                          summary: finalizeEnforcementSummary.trim() || undefined,
+                          userId: user._id,
+                        });
+                        setFinalizeEnforcementSummary("");
+                      })
+                    }
+                  >
+                    {enforcementBusy === "finalize" ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Mark enforcement complete
+                  </Button>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    After finalizing, this case is locked against further automation steps tied to judgment
+                    enforcement.
+                  </p>
+                </div>
+
+                {Array.isArray(enforcementEvents) && enforcementEvents.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Event log
+                    </p>
+                    <ul className="max-h-48 space-y-2 overflow-y-auto text-xs">
+                      {enforcementEvents.map(
+                        (ev: {
+                          _id: string;
+                          kind: string;
+                          createdAt: number;
+                          actorName?: string;
+                          details?: unknown;
+                        }) => (
+                          <li
+                            key={ev._id}
+                            className="rounded-lg border border-border/50 bg-background/70 px-2 py-1.5"
+                          >
+                            <span className="font-medium capitalize">{ev.kind.replace(/_/g, " ")}</span>
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · {ev.actorName ?? "staff"} · {new Date(ev.createdAt).toLocaleString()}
+                            </span>
+                          </li>
+                        )
+                      )}
+                    </ul>
+                  </div>
+                ) : enforcementEvents !== undefined ? (
+                  <p className="text-xs text-muted-foreground">No enforcement events yet.</p>
+                ) : null}
               </CardContent>
             </Card>
           )}

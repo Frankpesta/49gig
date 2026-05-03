@@ -44,6 +44,7 @@ import type * as currencyPolicy from "../currencyPolicy.js";
 import type * as dashboard_queries from "../dashboard/queries.js";
 import type * as disputes_actions from "../disputes/actions.js";
 import type * as disputes_amounts from "../disputes/amounts.js";
+import type * as disputes_lockingBasis from "../disputes/lockingBasis.js";
 import type * as disputes_mutations from "../disputes/mutations.js";
 import type * as disputes_partyAccess from "../disputes/partyAccess.js";
 import type * as disputes_queries from "../disputes/queries.js";
@@ -168,6 +169,7 @@ declare const fullApi: ApiFromModules<{
   "dashboard/queries": typeof dashboard_queries;
   "disputes/actions": typeof disputes_actions;
   "disputes/amounts": typeof disputes_amounts;
+  "disputes/lockingBasis": typeof disputes_lockingBasis;
   "disputes/mutations": typeof disputes_mutations;
   "disputes/partyAccess": typeof disputes_partyAccess;
   "disputes/queries": typeof disputes_queries;
