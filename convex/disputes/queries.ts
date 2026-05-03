@@ -2,7 +2,11 @@ import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc, Id } from "../_generated/dataModel";
-import { freelancerSeatLockedEconomicsFreelancerNetUsd, resolvedLockedEconomicsFreelancerNetPoolCents } from "./lockingBasis";
+import {
+  freelancerSeatLockedEconomicsFreelancerNetUsd,
+  disputeNetScopeFreelancerNetCents,
+  resolvedLockedEconomicsFreelancerNetPoolCents,
+} from "./lockingBasis";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 import {
   computeTeamPoolShareCentsByFreelancerId,
@@ -447,6 +451,36 @@ export const getDispute = query({
       lockedAmount: visibleLockedAmount,
       initiatorFullName,
       disputedPartyNames,
+    };
+  },
+});
+
+/**
+ * Staff: freelancer-net cents in scope for partial judgments (same basis as `resolveDispute` validation).
+ */
+export const getDisputePartialJudgmentScopeForStaff = query({
+  args: {
+    disputeId: v.id("disputes"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInQuery(ctx, args.userId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator")) {
+      return null;
+    }
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) return null;
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) return null;
+    const freelancerNetCents = await disputeNetScopeFreelancerNetCents(
+      ctx,
+      project,
+      dispute
+    );
+    return {
+      freelancerNetCents,
+      freelancerNetUsd: Math.round((freelancerNetCents / 100) * 100) / 100,
+      tiedToMonthlyCycle: dispute.monthlyCycleId != null,
     };
   },
 });

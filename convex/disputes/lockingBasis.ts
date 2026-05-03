@@ -7,6 +7,7 @@ import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   computeTeamPoolShareCentsByFreelancerId,
+  sumShareCentsForFreelancers,
   teamBasisUserIdsForDispute,
 } from "../teamEscrowShares";
 
@@ -87,4 +88,42 @@ export async function freelancerSeatLockedEconomicsFreelancerNetUsd(
     poolCents
   );
   return Math.round(shareMap.get(String(freelancerUserId)) ?? 0) / 100;
+}
+
+/**
+ * Freelancer-net cents in scope for this dispute (full pool or disputed seats only on partial team).
+ * Used for partial judgments and validation.
+ */
+export async function disputeNetScopeFreelancerNetCents(
+  ctx: DbLikeCtx,
+  project: Doc<"projects">,
+  dispute: Doc<"disputes">
+): Promise<number> {
+  const teamBasis =
+    dispute.teamEscrowBasisFreelancerIds && dispute.teamEscrowBasisFreelancerIds.length > 0
+      ? dispute.teamEscrowBasisFreelancerIds
+      : project.matchedFreelancerIds ?? [];
+  const disputedIds = dispute.disputedFreelancerIds ?? [];
+  const isPartialTeam =
+    teamBasis.length > 0 &&
+    disputedIds.length > 0 &&
+    disputedIds.length < teamBasis.length;
+  const poolCents = await resolvedLockedEconomicsFreelancerNetPoolCents(
+    ctx,
+    dispute,
+    project
+  );
+
+  if (!isPartialTeam) {
+    return poolCents;
+  }
+
+  const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+    ctx,
+    project._id,
+    teamBasis,
+    project.teamBudgetBreakdown,
+    poolCents
+  );
+  return sumShareCentsForFreelancers(shareMap, disputedIds);
 }

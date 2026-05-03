@@ -1055,7 +1055,11 @@ export const getProjectTeamMembers = query({
     // Only clients on this project or admins/moderators can call this
     const isClient = project.clientId === user._id;
     const isAdminOrMod = user.role === "admin" || user.role === "moderator";
-    if (!isClient && !isAdminOrMod) return [];
+    const isFreelancerOnTeam =
+      user.role === "freelancer" &&
+      (project.matchedFreelancerIds?.some((id) => String(id) === String(user._id)) ||
+        String(project.matchedFreelancerId) === String(user._id));
+    if (!isClient && !isAdminOrMod && !isFreelancerOnTeam) return [];
 
     const ids: string[] = project.matchedFreelancerIds ?? [];
     if (ids.length === 0) return [];

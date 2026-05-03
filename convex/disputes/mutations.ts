@@ -23,7 +23,7 @@ import {
   getDisputeRecipientFreelancerIds,
   viewerIsDisputeParty,
 } from "./partyAccess";
-import { resolvedLockedEconomicsFreelancerNetPoolCents } from "./lockingBasis";
+import { disputeNetScopeFreelancerNetCents } from "./lockingBasis";
 import { getDisputeReasonPolicy } from "../../lib/dispute-flow";
 
 const api = require("../_generated/api") as {
@@ -170,40 +170,6 @@ async function ensureReplacementMatchingProjectFields(
   }
 
   await ctx.db.patch(args.projectId, patch as any);
-}
-
-async function disputeNetScopeCents(
-  ctx: MutationCtx,
-  project: Doc<"projects">,
-  dispute: Doc<"disputes">
-): Promise<number> {
-  const teamBasis =
-    dispute.teamEscrowBasisFreelancerIds && dispute.teamEscrowBasisFreelancerIds.length > 0
-      ? dispute.teamEscrowBasisFreelancerIds
-      : project.matchedFreelancerIds ?? [];
-  const disputedIds = dispute.disputedFreelancerIds ?? [];
-  const isPartialTeam =
-    teamBasis.length > 0 &&
-    disputedIds.length > 0 &&
-    disputedIds.length < teamBasis.length;
-  const poolCents = await resolvedLockedEconomicsFreelancerNetPoolCents(
-    ctx,
-    dispute,
-    project
-  );
-
-  if (!isPartialTeam) {
-    return poolCents;
-  }
-
-  const shareMap = await computeTeamPoolShareCentsByFreelancerId(
-    ctx,
-    project._id,
-    teamBasis,
-    project.teamBudgetBreakdown,
-    poolCents
-  );
-  return sumShareCentsForFreelancers(shareMap, disputedIds);
 }
 
 /** Audit when client refund gross is below dispute.lockedAmount because escrow could not cover it. */
@@ -519,15 +485,13 @@ export const initiateDispute = mutation({
     const basisFreelancerNetUsd =
       basisPoolFreelancerNetCents > 0 ? basisPoolFreelancerNetCents / 100 : 0;
 
-    // Validate partial team dispute: all specified freelancers must be on the project
+    // Validate & normalize partial team dispute scope (clients choose members; freelancers default to own seat)
     const teamMemberIds = project.matchedFreelancerIds ?? [];
     let disputedIdsUnique: Id<"users">[] | undefined;
+
     if (args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0) {
-      if (!isClient) {
-        throw new Error("Only clients can initiate partial team disputes.");
-      }
       if (teamMemberIds.length === 0) {
-        throw new Error("Partial team disputes are only available for team hires.");
+        throw new Error("Partial team scope is only for team hires.");
       }
       disputedIdsUnique = Array.from(
         new Set(args.disputedFreelancerIds.map(String))
@@ -537,13 +501,25 @@ export const initiateDispute = mutation({
           throw new Error(`Freelancer ${fid} is not a matched member of this project.`);
         }
       }
+      if (
+        isFreelancer &&
+        !disputedIdsUnique.some((id) => String(id) === String(user._id))
+      ) {
+        throw new Error(
+          "Include your seat in the team members covered by this dispute, or choose “Entire team” instead."
+        );
+      }
+    } else if (isFreelancer && teamMemberIds.length > 1) {
+      if (!teamMemberIds.includes(user._id)) {
+        throw new Error("You are not a matched member of this team hire.");
+      }
+      disputedIdsUnique = [user._id];
     }
 
     const isPartialTeamDispute =
-      isClient &&
+      teamMemberIds.length > 1 &&
       !!disputedIdsUnique &&
       disputedIdsUnique.length > 0 &&
-      teamMemberIds.length > 0 &&
       disputedIdsUnique.length < teamMemberIds.length;
 
     // Gross upper bounds: economics basis pool vs whole hire escrow held.
@@ -1397,9 +1373,21 @@ export const resolveDispute = mutation({
       v.literal("replacement")
     ),
     resolutionAmount: v.optional(v.number()),
+    partialFreelancerSharePercent: v.optional(v.number()),
     notes: v.string(),
     clientMessage: v.optional(v.string()),
     freelancerMessage: v.optional(v.string()),
+    projectStatusAfterResolution: v.union(
+      v.literal("draft"),
+      v.literal("pending_funding"),
+      v.literal("funded"),
+      v.literal("matching"),
+      v.literal("awaiting_freelancer"),
+      v.literal("matched"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("cancelled")
+    ),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -1431,20 +1419,38 @@ export const resolveDispute = mutation({
     const now = Date.now();
 
     let resolutionAmountCents: number | undefined;
+    let partialPercentRecorded: number | undefined;
     if (args.decision === "partial") {
-      if (args.resolutionAmount == null) {
-        throw new Error("Resolution amount is required for partial decisions");
+      const scope = await disputeNetScopeFreelancerNetCents(ctx, project, dispute);
+      const hasPct = args.partialFreelancerSharePercent != null;
+      const hasAmt = args.resolutionAmount != null;
+      if (hasPct && hasAmt) {
+        throw new Error(
+          "Provide either freelancer share (%) or exact freelancer payment (amount), not both."
+        );
       }
-      resolutionAmountCents = assertNonNegativeIntegerCents(
-        Math.round(args.resolutionAmount),
-        "Resolution amount"
-      );
+      if (hasPct) {
+        const p = args.partialFreelancerSharePercent!;
+        if (!Number.isInteger(p) || p < 1 || p > 99) {
+          throw new Error("Freelancer share must be a whole percent from 1 to 99.");
+        }
+        partialPercentRecorded = p;
+        resolutionAmountCents = Math.floor((scope * p) / 100);
+      } else if (hasAmt) {
+        resolutionAmountCents = assertNonNegativeIntegerCents(
+          Math.round(args.resolutionAmount!),
+          "Resolution amount"
+        );
+      } else {
+        throw new Error(
+          "Partial judgment requires freelancer share (%) or freelancer net payment (cents)."
+        );
+      }
       if (resolutionAmountCents <= 0) {
-        throw new Error("Resolution amount must be greater than zero");
+        throw new Error("Freelancer payment from the split must be greater than zero.");
       }
-      const maxResolutionCents = await disputeNetScopeCents(ctx, project, dispute);
-      if (resolutionAmountCents > maxResolutionCents) {
-        throw new Error("Resolution amount cannot exceed the disputed escrow amount");
+      if (resolutionAmountCents > scope) {
+        throw new Error("Resolution amount cannot exceed the disputed freelancer-net pool.");
       }
     }
 
@@ -1474,9 +1480,11 @@ export const resolveDispute = mutation({
       resolution: {
         decision: args.decision,
         resolutionAmount: resolutionAmountCents,
+        partialFreelancerSharePercent: partialPercentRecorded,
         notes: args.notes,
         clientMessage: decisionClientMsg,
         freelancerMessage: decisionFreelancerMsg,
+        projectStatusAfterResolution: args.projectStatusAfterResolution,
         resolvedBy: user._id,
         resolvedAt: now,
       },
@@ -1495,9 +1503,21 @@ export const resolveDispute = mutation({
       toStatus: "resolved",
       title: "Judgment recorded",
       description: args.notes,
-      metadata: { decision: args.decision, resolutionAmount: resolutionAmountCents },
+      metadata: {
+        decision: args.decision,
+        resolutionAmount: resolutionAmountCents,
+        partialFreelancerSharePercent: partialPercentRecorded,
+        projectStatusAfterResolution: args.projectStatusAfterResolution,
+      },
       createdAt: now,
     });
+
+    if (project.status === "disputed") {
+      await ctx.db.patch(dispute.projectId, {
+        status: args.projectStatusAfterResolution,
+        updatedAt: now,
+      });
+    }
 
     const recipientFreelancerIds = getDisputeRecipientFreelancerIds(project, dispute);
     await ctx.scheduler.runAfter(0, sendSystemNotification, {
@@ -1554,6 +1574,8 @@ export const resolveDispute = mutation({
       details: {
         decision: args.decision,
         resolutionAmount: resolutionAmountCents,
+        partialFreelancerSharePercent: partialPercentRecorded,
+        projectStatusAfterResolution: args.projectStatusAfterResolution,
       },
       createdAt: now,
     });
@@ -1668,6 +1690,12 @@ export const finalizeDisputeProjectAfterResolutionInternal = internalMutation({
       }
     }
 
+    const chosenStatus = dispute.resolution.projectStatusAfterResolution;
+    if (chosenStatus) {
+      projectPatch.status = chosenStatus;
+    }
+    const finalStatus = projectPatch.status ?? status;
+
     await ctx.db.patch(dispute.projectId, projectPatch);
 
     if (decision === "client_favor" || decision === "replacement") {
@@ -1696,16 +1724,17 @@ export const finalizeDisputeProjectAfterResolutionInternal = internalMutation({
       actorRole: "system",
       eventType: "dispute_project_status_finalized",
       title: "Hire status finalized",
-      description: `Hire moved to ${status.replace(/_/g, " ")} after dispute enforcement.`,
+      description: `Hire moved to ${String(finalStatus).replace(/_/g, " ")} after dispute enforcement.`,
       metadata: {
         decision,
         isPartialTeam,
         disputedFreelancerIds: disputedIds,
+        projectStatusAfterResolution: chosenStatus,
       },
       createdAt: now,
     });
 
-    return { finalized: true as const, status };
+    return { finalized: true as const, status: finalStatus };
   },
 });
 
@@ -1947,9 +1976,11 @@ export const resumeProjectAfterJudgmentDispute = mutation({
     if (!project) throw new Error("Project not found");
 
     const now = Date.now();
+    const resumeStatus =
+      dispute.resolution?.projectStatusAfterResolution ?? "in_progress";
     if (project.status === "disputed") {
       await ctx.db.patch(dispute.projectId, {
-        status: "in_progress",
+        status: resumeStatus,
         updatedAt: now,
       });
     }

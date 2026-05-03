@@ -1192,6 +1192,22 @@ export default defineSchema({
         notes: v.string(),
         clientMessage: v.optional(v.string()),
         freelancerMessage: v.optional(v.string()),
+        /** Hire `projects.status` after resolution — set by staff at judgment. */
+        projectStatusAfterResolution: v.optional(
+          v.union(
+            v.literal("draft"),
+            v.literal("pending_funding"),
+            v.literal("funded"),
+            v.literal("matching"),
+            v.literal("awaiting_freelancer"),
+            v.literal("matched"),
+            v.literal("in_progress"),
+            v.literal("completed"),
+            v.literal("cancelled")
+          )
+        ),
+        /** When set with `partial`, judgment used this whole % of the disputed freelancer-net pool for the freelancer side. */
+        partialFreelancerSharePercent: v.optional(v.number()),
         resolvedBy: v.optional(v.id("users")), // omitted for automated resolution
         resolvedAt: v.number(),
       })

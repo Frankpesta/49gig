@@ -27,6 +27,7 @@ import {
   Paperclip,
   Inbox,
   X,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -37,6 +38,7 @@ import type { ReactNode } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -136,6 +138,16 @@ export default function DisputeDetailPage() {
     dispute &&
       user?._id &&
       (user.role === "admin" || user.role === "moderator")
+      ? { disputeId: dispute._id, userId: user._id }
+      : "skip"
+  );
+
+  const partialPaymentScopeStaff = useQuery(
+    api.disputes.queries.getDisputePartialJudgmentScopeForStaff,
+    dispute &&
+      user?._id &&
+      (user.role === "admin" || user.role === "moderator") &&
+      dispute.resolution?.decision === "partial"
       ? { disputeId: dispute._id, userId: user._id }
       : "skip"
   );
@@ -317,6 +329,25 @@ export default function DisputeDetailPage() {
   const myEvidenceRequests = evidenceRequests.filter((r) =>
     r.requestedFromUserIds.some((id) => String(id) === String(user._id))
   );
+
+  const partialEnforcementBreakdown =
+    isModerator &&
+    dispute.resolution?.decision === "partial" &&
+    dispute.resolution.resolutionAmount != null &&
+    partialPaymentScopeStaff != null
+      ? (() => {
+          const poolCents = partialPaymentScopeStaff.freelancerNetCents;
+          const flCents = Math.min(dispute.resolution!.resolutionAmount!, poolCents);
+          const clientCents = Math.max(0, poolCents - flCents);
+          return {
+            poolUsd: partialPaymentScopeStaff.freelancerNetUsd,
+            freelancerUsd: flCents / 100,
+            clientUsd: clientCents / 100,
+            monthlyCycle: partialPaymentScopeStaff.tiedToMonthlyCycle,
+            percent: dispute.resolution!.partialFreelancerSharePercent,
+          };
+        })()
+      : null;
   const projectFreelancerOptions: { _id: Id<"users">; name: string }[] =
     (adminContext?.freelancers ?? []).map((f: { _id: string; name: string }) => ({
       _id: f._id as Id<"users">,
@@ -937,6 +968,14 @@ export default function DisputeDetailPage() {
               <CardContent className="space-y-4 px-4 py-5 sm:px-6 sm:py-6">
                 <DetailField label="Decision" icon={<Scale />}>
                   <span className="capitalize">{dispute.resolution.decision.replace(/_/g, " ")}</span>
+                  {dispute.resolution.projectStatusAfterResolution ? (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Hire status after resolution:{" "}
+                      <span className="font-medium text-foreground">
+                        {String(dispute.resolution.projectStatusAfterResolution).replace(/_/g, " ")}
+                      </span>
+                    </p>
+                  ) : null}
                   {dispute.resolution.decision === "replacement" && (
                     <p className="mt-3 rounded-lg border border-violet-500/20 bg-violet-500/5 px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
                       Replacement was recorded as the judgment outcome. Actual hire status, escrow movements, and
@@ -944,11 +983,68 @@ export default function DisputeDetailPage() {
                     </p>
                   )}
                 </DetailField>
+                {dispute.resolution.partialFreelancerSharePercent != null && (
+                  <DetailField label="Partial split" icon={<Scale />}>
+                    {dispute.resolution.partialFreelancerSharePercent}% of the disputed pool to freelancer (remainder to
+                    client on enforcement)
+                  </DetailField>
+                )}
                 {dispute.resolution.resolutionAmount != null && (
-                  <DetailField label="Resolution amount" icon={<DollarSign />}>
+                  <DetailField label="Freelancer payment (net)" icon={<DollarSign />}>
                     ${(dispute.resolution.resolutionAmount / 100).toFixed(2)}
                   </DetailField>
                 )}
+                {isModerator && dispute.resolution.decision === "partial" ? (
+                  partialPaymentScopeStaff === undefined ? (
+                    <p className="text-xs text-muted-foreground">Loading disputed pool for payment summary…</p>
+                  ) : partialEnforcementBreakdown ? (
+                    <div className="rounded-xl border border-amber-500/35 bg-amber-500/[0.07] p-4 space-y-3">
+                      <p className="text-sm font-semibold text-foreground">Apply this partial payment (staff)</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Judgment is saved. Money still lives in escrow until you run enforcement. Use the same disputed
+                        pool (freelancer-net) as when the judgment was recorded.
+                      </p>
+                      <div className="grid gap-2 rounded-lg border border-border/50 bg-background/90 px-3 py-2 text-sm sm:grid-cols-3">
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Pool</p>
+                          <p className="font-mono font-semibold tabular-nums">
+                            ${partialEnforcementBreakdown.poolUsd.toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {partialEnforcementBreakdown.monthlyCycle ? "Monthly cycle" : "Hire / escrow dispute"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            → Freelancers
+                          </p>
+                          <p className="font-mono font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
+                            ${partialEnforcementBreakdown.freelancerUsd.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                            → Client
+                          </p>
+                          <p className="font-mono font-semibold tabular-nums">
+                            ${partialEnforcementBreakdown.clientUsd.toFixed(2)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">Credited from escrow</p>
+                        </div>
+                      </div>
+                      <ol className="list-decimal list-inside space-y-1 text-xs text-muted-foreground">
+                        <li>
+                          Scroll to <strong className="text-foreground">Manual enforcement</strong> (sidebar).
+                        </li>
+                        <li>
+                          Click <strong className="text-foreground">Run fund release</strong> — this performs the split
+                          above.
+                        </li>
+                        <li>Continue with roster / resume / finalize as needed for this case.</li>
+                      </ol>
+                    </div>
+                  ) : null
+                ) : null}
                 <DetailField label="Staff notes" icon={<FileText />}>
                   <p className="whitespace-pre-wrap">{dispute.resolution.notes}</p>
                 </DetailField>
@@ -1170,6 +1266,46 @@ export default function DisputeDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+                {dispute.resolution?.decision === "partial" && (
+                  <Alert className="border-amber-500/40 bg-amber-500/8">
+                    <Info className="h-4 w-4 text-amber-700 dark:text-amber-500" />
+                    <AlertTitle className="text-amber-950 dark:text-amber-100">
+                      Partial payment — run fund release
+                    </AlertTitle>
+                    <AlertDescription className="text-sm text-muted-foreground space-y-2">
+                      {partialEnforcementBreakdown ? (
+                        <>
+                          <p>
+                            Recorded split:{" "}
+                            <strong className="text-foreground">
+                              ${partialEnforcementBreakdown.freelancerUsd.toFixed(2)}
+                            </strong>{" "}
+                            to freelancer side,{" "}
+                            <strong className="text-foreground">
+                              ${partialEnforcementBreakdown.clientUsd.toFixed(2)}
+                            </strong>{" "}
+                            to client (from a{" "}
+                            <strong className="text-foreground">
+                              ${partialEnforcementBreakdown.poolUsd.toFixed(2)}
+                            </strong>{" "}
+                            freelancer-net pool).
+                          </p>
+                          <p>
+                            The button below calls the payout job: freelancer wallets + client balance credit, then
+                            clears the disputed monthly cycle where applicable.
+                          </p>
+                        </>
+                      ) : partialPaymentScopeStaff === undefined ? (
+                        <p>Loading judgment amounts…</p>
+                      ) : (
+                        <p>
+                          This case has a partial judgment. Use <strong className="text-foreground">Run fund release</strong>{" "}
+                          first so freelancers and the client receive their shares from escrow.
+                        </p>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="flex flex-col gap-2">
                   <Button
                     variant="secondary"
@@ -1188,7 +1324,10 @@ export default function DisputeDetailPage() {
                     {enforcementBusy === "funds" ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : null}
-                    Run fund release ({dispute.resolution?.decision?.replace(/_/g, " ") ?? "judgment"})
+                    Run fund release
+                    {dispute.resolution?.decision === "partial"
+                      ? " — pay freelancers + credit client (partial)"
+                      : ` (${dispute.resolution?.decision?.replace(/_/g, " ") ?? "judgment"})`}
                   </Button>
                   <Button
                     variant="secondary"
