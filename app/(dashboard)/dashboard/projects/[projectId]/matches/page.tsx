@@ -93,8 +93,6 @@ type FreelancerPublicProfile = {
   verificationStatus?: string;
   vettingScore: number;
   vettingStatus: string | null;
-  averageRating: number;
-  reviewCount: number;
 };
 
 type FreelancerPublicProfileArgs = {

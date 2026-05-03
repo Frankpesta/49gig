@@ -1,7 +1,7 @@
 import { mutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 
 async function getCurrentUserInMutation(
   ctx: MutationCtx,
@@ -14,17 +14,49 @@ async function getCurrentUserInMutation(
   }
   const user = await getCurrentUser(ctx);
   if (!user || user.status !== "active") return null;
-  return user;
+  return user as Doc<"users">;
+}
+
+function resolveRatedFreelancerId(
+  project: Doc<"projects">,
+  requestedFreelancerId?: Id<"users">
+): Id<"users"> {
+  const team = project.matchedFreelancerIds ?? [];
+  const soloId = project.matchedFreelancerId;
+
+  if (team.length > 0) {
+    if (!requestedFreelancerId) {
+      throw new Error(
+        "Pick which freelancer you're rating — this hire has multiple team members."
+      );
+    }
+    const ok = team.some((id) => String(id) === String(requestedFreelancerId));
+    if (!ok) {
+      throw new Error("That freelancer is not on this hire.");
+    }
+    return requestedFreelancerId;
+  }
+
+  const base = soloId;
+  if (!base) throw new Error("Project has no matched freelancer");
+  if (
+    requestedFreelancerId &&
+    String(requestedFreelancerId) !== String(base)
+  ) {
+    throw new Error("Rating target does not match the matched freelancer.");
+  }
+  return base;
 }
 
 /**
- * Client submits a rating (1-5) and optional comment for the freelancer on a project.
- * One review per project; updating overwrites.
+ * Client submits a rating (1-5) and optional comment per freelancer on a hire.
+ * Team hires require `freelancerId`; solo hires omit it or pass the lone match id.
  */
 export const submitFreelancerRating = mutation({
   args: {
     projectId: v.id("projects"),
-    rating: v.number(), // 1-5
+    freelancerId: v.optional(v.id("users")),
+    rating: v.number(),
     comment: v.optional(v.string()),
     userId: v.optional(v.id("users")),
   },
@@ -41,19 +73,26 @@ export const submitFreelancerRating = mutation({
     if (project.clientId !== user._id && user.role !== "admin") {
       throw new Error("Only the project client can submit a rating");
     }
-    if (!project.matchedFreelancerId) throw new Error("Project has no matched freelancer");
 
-    // Allow rating when project is matched, in_progress, or completed
+    const targetFreelancerId = resolveRatedFreelancerId(
+      project,
+      args.freelancerId
+    );
+
     const allowedStatuses = ["matched", "in_progress", "completed"];
     if (!allowedStatuses.includes(project.status)) {
-      throw new Error("You can rate the freelancer once the project has a matched freelancer and is in progress or completed");
+      throw new Error(
+        "You can rate freelancers once the hire has matched freelancers and is in progress or completed"
+      );
     }
 
     const now = Date.now();
     const existing = await ctx.db
       .query("reviews")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .first();
+      .withIndex("by_project_freelancer", (q) =>
+        q.eq("projectId", args.projectId).eq("freelancerId", targetFreelancerId)
+      )
+      .unique();
 
     if (existing) {
       await ctx.db.patch(existing._id, {
@@ -67,7 +106,7 @@ export const submitFreelancerRating = mutation({
     return await ctx.db.insert("reviews", {
       projectId: args.projectId,
       clientId: user._id,
-      freelancerId: project.matchedFreelancerId,
+      freelancerId: targetFreelancerId,
       rating: args.rating,
       comment: args.comment,
       createdAt: now,

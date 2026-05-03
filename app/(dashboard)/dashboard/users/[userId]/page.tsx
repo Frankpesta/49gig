@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { Id, Doc } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/use-auth";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -249,6 +249,33 @@ export default function UserDetailPage() {
       (currentUser.role === "admin" || currentUser.role === "moderator") &&
       profileData?.role === "freelancer"
       ? { freelancerId: userId as Id<"users">, adminUserId: currentUser._id }
+      : "skip"
+  );
+
+  const freelancerReviewsForStaff = useQuery(
+    (api as any)["reviews/queries"].getReviewsForFreelancer,
+    isAuthenticated &&
+      currentUser?._id &&
+      (currentUser.role === "admin" || currentUser.role === "moderator") &&
+      profileData?.role === "freelancer"
+      ? {
+          freelancerId: userId as Id<"users">,
+          userId: currentUser._id,
+          limit: 50,
+        }
+      : "skip"
+  );
+
+  const freelancerRatingStatsForStaff = useQuery(
+    (api as any)["reviews/queries"].getFreelancerRatingStats,
+    isAuthenticated &&
+      currentUser?._id &&
+      (currentUser.role === "admin" || currentUser.role === "moderator") &&
+      profileData?.role === "freelancer"
+      ? {
+          freelancerId: userId as Id<"users">,
+          viewerUserId: currentUser._id,
+        }
       : "skip"
   );
 
@@ -627,6 +654,79 @@ export default function UserDetailPage() {
                     url={profileData.profile?.portfolioUrl}
                     icon={Globe}
                   />
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-xl overflow-hidden">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Star className="h-4 w-4 text-primary" />
+                    Client ratings
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Ratings left by hiring clients (staff-only — not shown on public or client surfaces).
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {freelancerRatingStatsForStaff === undefined ||
+                  freelancerReviewsForStaff === undefined ? (
+                    <div className="text-sm text-muted-foreground">Loading reviews…</div>
+                  ) : (
+                    <>
+                      {freelancerRatingStatsForStaff &&
+                        freelancerRatingStatsForStaff.count > 0 && (
+                          <div className="rounded-lg bg-muted/30 px-4 py-3">
+                            <p className="text-xs text-muted-foreground">Aggregate</p>
+                            <p className="text-lg font-bold tabular-nums">
+                              {freelancerRatingStatsForStaff.averageRating.toFixed(1)}/5 average
+                              <span className="text-sm font-medium text-muted-foreground ml-2">
+                                ({freelancerRatingStatsForStaff.count}{" "}
+                                {freelancerRatingStatsForStaff.count === 1 ? "rating" : "ratings"})
+                              </span>
+                            </p>
+                          </div>
+                        )}
+                      {!freelancerReviewsForStaff?.length ? (
+                        <p className="text-sm text-muted-foreground">
+                          No ratings recorded for this freelancer yet.
+                        </p>
+                      ) : (
+                        <ul className="space-y-3 divide-y divide-border/40">
+                          {freelancerReviewsForStaff.map((r: Doc<"reviews">) => (
+                            <li key={String(r._id)} className="pt-3 first:pt-0">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-semibold tabular-nums">
+                                  {r.rating}/5
+                                </p>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(r.createdAt, { addSuffix: true })}
+                                </span>
+                              </div>
+                              {r.comment ? (
+                                <p className="text-sm text-foreground mt-1 leading-relaxed whitespace-pre-wrap wrap-break-word">
+                                  {r.comment}
+                                </p>
+                              ) : null}
+                              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                                <Link
+                                  href={`/dashboard/projects/${r.projectId}`}
+                                  className="text-primary font-medium hover:underline"
+                                >
+                                  View hire
+                                </Link>
+                                <Link
+                                  href={`/dashboard/users/${r.clientId}`}
+                                  className="text-muted-foreground hover:text-foreground hover:underline"
+                                >
+                                  Client record
+                                </Link>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
 

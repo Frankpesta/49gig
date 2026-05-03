@@ -109,7 +109,9 @@ export default function ProfilePage() {
   );
   const ratingStats = useQuery(
     (api as any)["reviews/queries"].getFreelancerRatingStats,
-    effectiveUser?._id && effectiveUser?.role === "freelancer" ? { freelancerId: effectiveUser._id } : "skip"
+    effectiveUser?._id && effectiveUser?.role === "freelancer"
+      ? { freelancerId: effectiveUser._id, viewerUserId: effectiveUser._id }
+      : "skip"
   );
   const freelancerReviews = useQuery(
     (api as any)["reviews/queries"].getReviewsForFreelancer,

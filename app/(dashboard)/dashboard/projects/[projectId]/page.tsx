@@ -44,6 +44,13 @@ import { useState, useEffect, useMemo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -346,9 +353,37 @@ export default function ProjectDetailPage() {
   );
   const hasOpenDispute = (openDisputes?.length ?? 0) > 0;
 
+  const rateableFreelancerIds = useMemo((): Id<"users">[] => {
+    if (!project || project === null) return [];
+    const team = project.matchedFreelancerIds ?? [];
+    if (team.length > 0) return team;
+    if (project.matchedFreelancerId) return [project.matchedFreelancerId];
+    return [];
+  }, [project]);
+
+  const [ratingSeatId, setRatingSeatId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ids = rateableFreelancerIds.map(String);
+    if (ids.length === 0) {
+      setRatingSeatId(null);
+      return;
+    }
+    setRatingSeatId((prev) => (prev && ids.includes(prev) ? prev : ids[0] ?? null));
+  }, [rateableFreelancerIds]);
+
   const existingReview = useQuery(
     (api as any)["reviews/queries"].getReviewByProject,
-    projectId && user?._id ? { projectId, userId: user._id } : "skip"
+    projectId &&
+      user?._id &&
+      ratingSeatId &&
+      rateableFreelancerIds.some((id) => String(id) === ratingSeatId)
+      ? {
+          projectId,
+          userId: user._id,
+          freelancerId: ratingSeatId as Id<"users">,
+        }
+      : "skip"
   );
   const submitFreelancerRating = useMutation(
     (api as any)["reviews/mutations"].submitFreelancerRating
@@ -383,11 +418,13 @@ export default function ProjectDetailPage() {
   const [declineMatchReason, setDeclineMatchReason] = useState("");
   const [respondingMatchId, setRespondingMatchId] = useState<Id<"matches"> | null>(null);
 
-  // Prefill rating form when existing review loads
   useEffect(() => {
     if (existingReview) {
       setRating(existingReview.rating);
       setRatingComment(existingReview.comment ?? "");
+    } else {
+      setRating(0);
+      setRatingComment("");
     }
   }, [existingReview?._id, existingReview?.rating, existingReview?.comment]);
 
@@ -654,11 +691,21 @@ export default function ProjectDetailPage() {
   };
 
   const handleSubmitRating = async () => {
-    if (!projectId || !user?._id || rating < 1 || rating > 5) return;
+    if (
+      !projectId ||
+      !user?._id ||
+      rating < 1 ||
+      rating > 5 ||
+      !ratingSeatId ||
+      !rateableFreelancerIds.some((id) => String(id) === ratingSeatId)
+    ) {
+      return;
+    }
     setIsSubmittingRating(true);
     try {
       await submitFreelancerRating({
         projectId,
+        freelancerId: ratingSeatId as Id<"users">,
         rating,
         comment: ratingComment.trim() || undefined,
         userId: user._id,
@@ -2222,9 +2269,9 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Rate freelancer (client only, when project has a matched freelancer) */}
+          {/* Rate freelancers (client only, matched hire) */}
           {isClient &&
-            project.matchedFreelancerId &&
+            rateableFreelancerIds.length > 0 &&
             (project.status === "matched" ||
               project.status === "in_progress" ||
               project.status === "completed") && (
@@ -2232,18 +2279,56 @@ export default function ProjectDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Star className="h-5 w-5" />
-                    Rate freelancer
+                    {assignedFreelancers.length > 1 ? "Rate a team member" : "Rate freelancer"}
                   </CardTitle>
                   <CardDescription>
                     {existingReview
-                      ? "You can update your rating below. It feeds into your Satisfaction metric on the dashboard."
-                      : "Your rating helps other clients and improves your Satisfaction metric."}
+                      ? "Update your rating for this freelancer. Ratings are visible to freelancers and platform staff."
+                      : "Share how this freelancer performed. Ratings are visible to freelancers and platform staff."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {(() => {
+                    const ratingSeatOptions: Array<{
+                      _id: Id<"users">;
+                      name: string;
+                      teamRole?: string;
+                    }> =
+                      assignedFreelancers.length > 0
+                        ? assignedFreelancers
+                        : rateableFreelancerIds.map((id) => ({
+                            _id: id,
+                            name:
+                              project.freelancer &&
+                              String(project.freelancer._id) === String(id)
+                                ? project.freelancer.name
+                                : "Team member",
+                          }));
+                    return ratingSeatOptions.length > 1 ? (
+                      <div className="space-y-2">
+                        <Label className="text-sm">Who are you rating?</Label>
+                        <Select
+                          value={ratingSeatId ?? ""}
+                          onValueChange={(value) => setRatingSeatId(value || null)}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a freelancer" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ratingSeatOptions.map((f) => (
+                              <SelectItem key={String(f._id)} value={String(f._id)}>
+                                {f.name}
+                                {f.teamRole ? ` · ${humanizeTeamRoleKey(f.teamRole)}` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null;
+                  })()}
                   {existingReview && (
                     <p className="text-sm text-muted-foreground">
-                      Current: {existingReview.rating}/5 stars
+                      Current for this freelancer: {existingReview.rating}/5 stars
                       {existingReview.comment && ` — "${existingReview.comment}"`}
                     </p>
                   )}
@@ -2285,7 +2370,12 @@ export default function ProjectDetailPage() {
                   <Button
                     className="w-full"
                     onClick={handleSubmitRating}
-                    disabled={isSubmittingRating || rating < 1}
+                    disabled={
+                      isSubmittingRating ||
+                      rating < 1 ||
+                      !ratingSeatId ||
+                      !rateableFreelancerIds.some((id) => String(id) === ratingSeatId)
+                    }
                   >
                     {isSubmittingRating
                       ? "Saving..."

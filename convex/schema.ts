@@ -1016,7 +1016,8 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_freelancer", ["freelancerId"])
-    .index("by_client", ["clientId"]),
+    .index("by_client", ["clientId"])
+    .index("by_project_freelancer", ["projectId", "freelancerId"]),
 
   twoFactorTokens: defineTable({
     userId: v.id("users"),
@@ -1200,8 +1201,18 @@ export default defineSchema({
     assignedModeratorId: v.optional(v.id("users")),
     assignedAt: v.optional(v.number()),
 
+    /** Set when assigned staff finalize manual enforcement (`finalizeDisputeEnforcement`). */
+    resolutionExecutedAt: v.optional(v.number()),
+    resolutionExecutionSummary: v.optional(v.string()),
+
     // Funds
     lockedAmount: v.number(),
+    /**
+     * Snapshot freelancer-net escrow pool (cents) subdivided among `teamEscrowBasisFreelancerIds`
+     * when computing economics. Monthly disputes use that cycle's `amountCents`; hire-level disputes
+     * use pooled project escrow net. Lets seat-level UX match initiation after escrow moves.
+     */
+    lockedEconomicsFreelancerNetPoolCents: v.optional(v.number()),
 
     // Audit
     createdAt: v.number(),
@@ -1310,6 +1321,16 @@ export default defineSchema({
   })
     .index("by_dispute", ["disputeId", "createdAt"])
     .index("by_status", ["status", "createdAt"]),
+
+  /** Immutable audit log for manual post-judgment staff actions on a dispute. */
+  disputeEnforcementEvents: defineTable({
+    disputeId: v.id("disputes"),
+    projectId: v.id("projects"),
+    actorId: v.id("users"),
+    kind: v.string(),
+    details: v.optional(v.any()),
+    createdAt: v.number(),
+  }).index("by_dispute", ["disputeId", "createdAt"]),
 
   /** Immutable dispute timeline events for a case-center audit trail. */
   disputeStageEvents: defineTable({
