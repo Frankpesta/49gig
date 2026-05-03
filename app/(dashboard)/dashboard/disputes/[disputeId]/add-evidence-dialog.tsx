@@ -73,7 +73,6 @@ export function AddEvidenceDialog({
   userId,
   onSuccess,
 }: AddEvidenceDialogProps) {
-  const [mode, setMode] = useState<"chat" | "upload">("chat");
   const [selectedMessages, setSelectedMessages] = useState<string[]>([]);
   const [freeTitle, setFreeTitle] = useState("");
   const [freeDescription, setFreeDescription] = useState("");
@@ -87,7 +86,6 @@ export function AddEvidenceDialog({
 
   useEffect(() => {
     if (!open) {
-      setMode("chat");
       setSelectedMessages([]);
       setFreeTitle("");
       setFreeDescription("");
@@ -142,10 +140,7 @@ export function AddEvidenceDialog({
       fileId = json.storageId;
     }
 
-    const evidenceType:
-      | "file"
-      | "link"
-      | "other" = fileId
+    const evidenceType: "file" | "link" | "other" = fileId
       ? "file"
       : linkTrimmed
         ? "link"
@@ -162,17 +157,37 @@ export function AddEvidenceDialog({
     });
   };
 
+  const uploadIntent =
+    freeTitle.trim().length > 0 ||
+    freeDescription.trim().length > 0 ||
+    link.trim().length > 0 ||
+    file != null;
+
+  const uploadFieldsComplete =
+    freeTitle.trim().length > 0 && freeDescription.trim().length > 0;
+
+  const canSubmit =
+    selectedMessages.length > 0 || (uploadIntent && uploadFieldsComplete);
+
   const handleSubmit = async () => {
     setError("");
+    if (uploadIntent && !uploadFieldsComplete) {
+      setError(
+        "Finish the title and description for file/link evidence, or clear those fields to submit chat-only."
+      );
+      return;
+    }
+    if (selectedMessages.length === 0 && !uploadFieldsComplete) {
+      setError("Select chat messages and/or complete title and description for a file or link.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      if (mode === "chat") {
-        if (selectedMessages.length === 0) {
-          setError("Select at least one chat message.");
-          return;
-        }
+      if (selectedMessages.length > 0) {
         await submitChatEvidence();
-      } else {
+      }
+      if (uploadFieldsComplete) {
         await submitUploadEvidence();
       }
       setSelectedMessages([]);
@@ -189,9 +204,18 @@ export function AddEvidenceDialog({
     }
   };
 
-  const chatValid = selectedMessages.length > 0;
-  const uploadValid =
-    freeTitle.trim().length > 0 && freeDescription.trim().length > 0;
+  const submitLabel = (() => {
+    const parts: string[] = [];
+    if (selectedMessages.length > 0) {
+      parts.push(
+        `${selectedMessages.length} chat message${selectedMessages.length === 1 ? "" : "s"}`
+      );
+    }
+    if (uploadFieldsComplete) {
+      parts.push("file/link item");
+    }
+    return parts.length > 0 ? `Submit ${parts.join(" + ")}` : "Submit evidence";
+  })();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -199,50 +223,42 @@ export function AddEvidenceDialog({
         <DialogHeader>
           <DialogTitle>Add evidence</DialogTitle>
           <DialogDescription>
-            Attach chat messages or upload documents and links — you do not need a staff request to add
-            evidence.
+            Pick messages from the project chat and/or add a file or link — everything is on this screen.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "chat" ? "default" : "outline"}
-            onClick={() => setMode("chat")}
-          >
-            From chat
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={mode === "upload" ? "default" : "outline"}
-            onClick={() => setMode("upload")}
-          >
-            File or link
-          </Button>
-        </div>
+        <div className="space-y-8">
+          {error ? (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          ) : null}
 
-        {error ? (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
-
-        {mode === "chat" ? (
-          <div className="space-y-4">
+          <section className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">From project chat</p>
+              <p className="text-xs text-muted-foreground">
+                Select one or more messages, or skip if you only have files or links.
+              </p>
+            </div>
             <ChatEvidenceSelector
               projectId={projectId}
               userId={userId}
               selectedMessages={selectedMessages as Id<"messages">[]}
               onSelectionChange={(ids) => setSelectedMessages(ids as string[])}
             />
-          </div>
-        ) : (
-          <div className="space-y-4">
+          </section>
+
+          <section className="space-y-4 border-t border-border/60 pt-6">
+            <div>
+              <p className="text-sm font-medium">File or link</p>
+              <p className="text-xs text-muted-foreground">
+                Optional — use this for documents, screenshots, or external references.
+              </p>
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="voluntary-title">
-                Title <span className="text-destructive">*</span>
+                Title <span className="text-destructive">*</span> (for file/link)
               </Label>
               <Input
                 id="voluntary-title"
@@ -254,7 +270,7 @@ export function AddEvidenceDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="voluntary-description">
-                Description <span className="text-destructive">*</span>
+                Description <span className="text-destructive">*</span> (for file/link)
               </Label>
               <Textarea
                 id="voluntary-description"
@@ -303,26 +319,21 @@ export function AddEvidenceDialog({
               )}
               <p className="text-[11px] text-muted-foreground">Max 25MB.</p>
             </div>
-          </div>
-        )}
+          </section>
+        </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button
-            onClick={() => void handleSubmit()}
-            disabled={isSubmitting || (mode === "chat" ? !chatValid : !uploadValid)}
-          >
+          <Button onClick={() => void handleSubmit()} disabled={isSubmitting || !canSubmit}>
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Submitting…
               </>
-            ) : mode === "chat" ? (
-              `Submit ${selectedMessages.length} message${selectedMessages.length === 1 ? "" : "s"}`
             ) : (
-              "Submit evidence"
+              submitLabel
             )}
           </Button>
         </DialogFooter>
