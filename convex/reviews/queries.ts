@@ -38,7 +38,11 @@ function reviewTargetFreelancerIdFromProject(
 }
 
 /**
- * Client/admin: load the saved review row for one freelancer seat on this hire (if any).
+ * Saved review row for one freelancer seat on a hire:
+ * — Hire client may read/write context (rates that seat).
+ * — That seat’s freelancer may read the review row about themselves.
+ * — Admin/moderator may read any.
+ * Returns null when unseen / disallowed (no thrown "Not authorized" noise in logs).
  */
 export const getReviewByProject = query({
   args: {
@@ -47,22 +51,46 @@ export const getReviewByProject = query({
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const currentUser = await getCurrentUserInQuery(ctx, args.userId);
-    if (!currentUser) throw new Error("Not authenticated");
+    const identityUser = await getCurrentUser(ctx);
+    // If Convex identity is present, args.userId must match it (prevents stale Zustand id vs JWT).
+    if (
+      identityUser &&
+      args.userId &&
+      String(identityUser._id) !== String(args.userId)
+    ) {
+      return null;
+    }
+
+    const viewer: Doc<"users"> | null =
+      identityUser ??
+      (args.userId
+        ? ((await ctx.db.get(args.userId)) as Doc<"users"> | null)
+        : null);
+    if (!viewer || viewer.status !== "active") {
+      return null;
+    }
 
     const project = await ctx.db.get(args.projectId);
-    if (!project) throw new Error("Project not found");
-    const isPrivileged =
-      currentUser.role === "admin" || currentUser.role === "moderator";
-    if (
-      project.clientId !== currentUser._id &&
-      !isPrivileged
-    ) {
-      throw new Error("Not authorized");
-    }
+    if (!project) return null;
 
     const targetId = reviewTargetFreelancerIdFromProject(project, args.freelancerId);
     if (!targetId) return null;
+
+    const isPrivileged =
+      viewer.role === "admin" || viewer.role === "moderator";
+    const isClient = String(project.clientId) === String(viewer._id);
+    const isMatchedFreelancer =
+      viewer.role === "freelancer" &&
+      (String(project.matchedFreelancerId ?? "") === String(viewer._id) ||
+        !!(project.matchedFreelancerIds ?? []).some(
+          (id) => String(id) === String(viewer._id)
+        ));
+    const isReadingOwnSeatReview =
+      isMatchedFreelancer && String(targetId) === String(viewer._id);
+
+    if (!isClient && !isPrivileged && !isReadingOwnSeatReview) {
+      return null;
+    }
 
     return await ctx.db
       .query("reviews")

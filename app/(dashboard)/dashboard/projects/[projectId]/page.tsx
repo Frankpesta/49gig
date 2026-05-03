@@ -257,7 +257,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const cycleDeepLinkId = searchParams.get("cycle");
-  const { user } = useAuth();
+  const { user, isInitializing } = useAuth();
   const { trackEvent } = useAnalytics();
   const projectIdParam = params.projectId;
   const [isOpeningChat, setIsOpeningChat] = useState(false);
@@ -372,10 +372,17 @@ export default function ProjectDetailPage() {
     setRatingSeatId((prev) => (prev && ids.includes(prev) ? prev : ids[0] ?? null));
   }, [rateableFreelancerIds]);
 
+  const isProjectClientForRatings =
+    !isInitializing &&
+    user?.role === "client" &&
+    project != null &&
+    project.clientId === user._id;
+
   const existingReview = useQuery(
     (api as any)["reviews/queries"].getReviewByProject,
     projectId &&
       user?._id &&
+      isProjectClientForRatings &&
       ratingSeatId &&
       rateableFreelancerIds.some((id) => String(id) === ratingSeatId)
       ? {
