@@ -58,7 +58,6 @@ export const createPayment = internalMutation({
     flutterwaveTransferId: v.optional(v.string()),
     flutterwaveCustomerEmail: v.optional(v.string()),
     flutterwaveSubaccountId: v.optional(v.string()),
-    milestoneId: v.optional(v.id("milestones")),
     monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
     userId: v.id("users"),
     recipientId: v.optional(v.id("users")),
@@ -130,7 +129,6 @@ export const createPayment = internalMutation({
 
     const paymentId = await ctx.db.insert("payments", {
       projectId: args.projectId ?? undefined,
-      milestoneId: args.milestoneId,
       monthlyCycleId: args.monthlyCycleId,
       recipientId: args.recipientId,
       type: args.type,
@@ -624,8 +622,8 @@ export const handlePaymentSuccess = internalMutation({
       if (project.matchedFreelancerId && payment.type === "milestone_release") {
         await ctx.scheduler.runAfter(0, sendSystemNotification, {
           userIds: [project.matchedFreelancerId],
-          title: "Milestone payout released",
-          message: `A milestone payment was released for ${project.intakeForm.title}.`,
+          title: "Release payment sent",
+          message: `A scheduled release payment was sent for ${project.intakeForm.title}.`,
           type: "payment",
           data: { paymentId: payment._id, projectId },
         });

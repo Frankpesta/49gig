@@ -54,8 +54,7 @@ export const getNotificationById = query({
         resolved.userLabel = u?.name ?? "User";
       }
       if (typeof data.milestoneId === "string") {
-        const milestone = await ctx.db.get(data.milestoneId as Doc<"milestones">["_id"]);
-        resolved.milestoneLabel = milestone?.title ?? "Milestone";
+        resolved.milestoneLabel = "Legacy billing period";
       }
       if (typeof data.paymentId === "string") {
         const payment = await ctx.db.get(data.paymentId as Doc<"payments">["_id"]);

@@ -71,9 +71,9 @@ type Transaction = {
     _id: Id<"projects">;
     title: string;
   } | null;
-  milestone: {
-    _id: Id<"milestones">;
-    title: string;
+  monthlyCycle: {
+    _id: Id<"monthlyBillingCycles">;
+    monthIndex: number;
   } | null;
   walletFunding?: WalletFunding | null;
 };
@@ -224,7 +224,7 @@ export default function TransactionsPage() {
       filtered = filtered.filter(
         (t: Transaction) =>
           t.project?.title.toLowerCase().includes(query) ||
-          t.milestone?.title.toLowerCase().includes(query) ||
+          (t.monthlyCycle && `month ${t.monthlyCycle.monthIndex}`.includes(query)) ||
           t._id.toLowerCase().includes(query) ||
           TYPE_LABELS[t.type]?.toLowerCase().includes(query) ||
           (t.walletFunding?.summary && t.walletFunding.summary.toLowerCase().includes(query)) ||

@@ -129,7 +129,8 @@ export default function DisputesPage() {
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      milestone_quality: "Deliverable Quality",
+      deliverable_quality: "Deliverable Quality",
+      milestone_quality: "Deliverable Quality (legacy)",
       payment: "Payment",
       communication: "Communication",
       freelancer_replacement: "Replacement",

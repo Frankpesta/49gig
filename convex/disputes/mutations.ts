@@ -302,9 +302,9 @@ async function appendDisputeEnforcementEvent(
 export const initiateDispute = mutation({
   args: {
     projectId: v.string(), // Accept string (e.g. from URL); normalized in handler
-    milestoneId: v.optional(v.string()),
     monthlyCycleId: v.optional(v.string()),
     type: v.union(
+      v.literal("deliverable_quality"),
       v.literal("milestone_quality"),
       v.literal("payment"),
       v.literal("communication"),
@@ -327,11 +327,11 @@ export const initiateDispute = mutation({
           type: v.union(
             v.literal("message"),
             v.literal("file"),
+            v.literal("deliverable"),
             v.literal("milestone_deliverable")
           ),
           messageId: v.optional(v.id("messages")),
           fileId: v.optional(v.id("_storage")),
-          milestoneId: v.optional(v.id("milestones")),
           description: v.optional(v.string()),
         })
       )
@@ -350,14 +350,13 @@ export const initiateDispute = mutation({
     if (!projectId) {
       throw new Error("Invalid project ID");
     }
-    const milestoneIdRaw = args.milestoneId
-      ? ctx.db.normalizeId("milestones", args.milestoneId)
-      : undefined;
-    const milestoneId = milestoneIdRaw ?? undefined;
     const monthlyCycleIdRaw = args.monthlyCycleId
       ? ctx.db.normalizeId("monthlyBillingCycles", args.monthlyCycleId)
       : undefined;
     const monthlyCycleId = monthlyCycleIdRaw ?? undefined;
+
+    const storedType =
+      args.type === "milestone_quality" ? "deliverable_quality" : args.type;
 
     // Get project
     const project = await ctx.db.get(projectId);
@@ -376,6 +375,7 @@ export const initiateDispute = mutation({
     }
 
     const CLIENT_DISPUTE_TYPES = new Set<string>([
+      "deliverable_quality",
       "milestone_quality",
       "payment",
       "communication",
@@ -387,6 +387,7 @@ export const initiateDispute = mutation({
       "client_request_replacement",
     ]);
     const FREELANCER_DISPUTE_TYPES = new Set<string>([
+      "deliverable_quality",
       "milestone_quality",
       "payment",
       "communication",
@@ -402,7 +403,7 @@ export const initiateDispute = mutation({
       throw new Error("That dispute type is only available when you are the client on the hire.");
     }
 
-    // Check if dispute already exists for this project/milestone
+    // Check if dispute already exists for this project / billing period
     const existingDisputes = await ctx.db
       .query("disputes")
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
@@ -449,17 +450,8 @@ export const initiateDispute = mutation({
       if (cycleDispute) {
         throw new Error("Dispute already exists for this monthly payment");
       }
-    } else if (milestoneId) {
-      const milestoneDispute = existingDisputes.find(
-        (d) => d.milestoneId === milestoneId
-      );
-      if (milestoneDispute) {
-        throw new Error("Dispute already exists for this milestone");
-      }
     } else {
-      const projectDispute = existingDisputes.find(
-        (d) => !d.milestoneId && !d.monthlyCycleId
-      );
+      const projectDispute = existingDisputes.find((d) => !d.monthlyCycleId);
       if (projectDispute) {
         throw new Error("An open dispute already exists for this project");
       }
@@ -485,11 +477,19 @@ export const initiateDispute = mutation({
     const basisFreelancerNetUsd =
       basisPoolFreelancerNetCents > 0 ? basisPoolFreelancerNetCents / 100 : 0;
 
-    // Validate & normalize partial team dispute scope (clients choose members; freelancers default to own seat)
+    // Partial team scope: only clients may pick specific members. Freelancer disputes are always initiator vs client
+    // (economics: initiator's seat only when the hire has multiple matched freelancers).
     const teamMemberIds = project.matchedFreelancerIds ?? [];
     let disputedIdsUnique: Id<"users">[] | undefined;
 
-    if (args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0) {
+    if (isFreelancer) {
+      if (teamMemberIds.length > 1) {
+        if (!teamMemberIds.includes(user._id)) {
+          throw new Error("You are not a matched member of this team hire.");
+        }
+        disputedIdsUnique = [user._id];
+      }
+    } else if (isClient && args.disputedFreelancerIds && args.disputedFreelancerIds.length > 0) {
       if (teamMemberIds.length === 0) {
         throw new Error("Partial team scope is only for team hires.");
       }
@@ -501,19 +501,6 @@ export const initiateDispute = mutation({
           throw new Error(`Freelancer ${fid} is not a matched member of this project.`);
         }
       }
-      if (
-        isFreelancer &&
-        !disputedIdsUnique.some((id) => String(id) === String(user._id))
-      ) {
-        throw new Error(
-          "Include your seat in the team members covered by this dispute, or choose “Entire team” instead."
-        );
-      }
-    } else if (isFreelancer && teamMemberIds.length > 1) {
-      if (!teamMemberIds.includes(user._id)) {
-        throw new Error("You are not a matched member of this team hire.");
-      }
-      disputedIdsUnique = [user._id];
     }
 
     const isPartialTeamDispute =
@@ -556,16 +543,15 @@ export const initiateDispute = mutation({
     );
 
     const now = Date.now();
-    const policy = getDisputeReasonPolicy(args.type);
+    const policy = getDisputeReasonPolicy(storedType);
 
     // Create dispute (simplified lifecycle: open -> under_review -> resolved/cancelled).
     const disputeId = await ctx.db.insert("disputes", {
       projectId,
-      milestoneId,
       monthlyCycleId,
       initiatorId: user._id,
       initiatorRole: user.role === "client" ? "client" : "freelancer",
-      type: args.type,
+      type: storedType,
       reason: args.reason,
       description: args.description,
       evidence: args.evidence || [],
@@ -596,7 +582,7 @@ export const initiateDispute = mutation({
       description:
         "The case is open for staff review. Use the project chat to communicate; staff will request more evidence here as needed.",
       metadata: {
-        reasonType: args.type,
+        reasonType: storedType,
         reasonLabel: policy.label,
       },
       createdAt: now,
@@ -671,8 +657,7 @@ export const initiateDispute = mutation({
       targetId: disputeId,
       details: {
         projectId,
-        milestoneId,
-        type: args.type,
+        type: storedType,
         lockedAmount,
       },
       createdAt: Date.now(),
@@ -807,11 +792,11 @@ export const addEvidence = mutation({
       type: v.union(
         v.literal("message"),
         v.literal("file"),
+        v.literal("deliverable"),
         v.literal("milestone_deliverable")
       ),
       messageId: v.optional(v.id("messages")),
       fileId: v.optional(v.id("_storage")),
-      milestoneId: v.optional(v.id("milestones")),
       description: v.optional(v.string()),
     }),
     userId: v.optional(v.id("users")),

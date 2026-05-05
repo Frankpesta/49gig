@@ -157,14 +157,14 @@ export const getTransactions = query({
     // Sort by creation date (newest first)
     payments.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Enrich with project and milestone info
+    // Enrich with project and billing context
     const enrichedTransactions = await Promise.all(
       payments.map(async (payment) => {
         const project = payment.projectId
           ? (await ctx.db.get(payment.projectId) as Doc<"projects"> | null)
           : null;
-        const milestone = payment.milestoneId
-          ? (await ctx.db.get(payment.milestoneId) as Doc<"milestones"> | null)
+        const monthlyCycle = payment.monthlyCycleId
+          ? (await ctx.db.get(payment.monthlyCycleId) as Doc<"monthlyBillingCycles"> | null)
           : null;
 
         const walletFunding = walletFundingBreakdown(payment);
@@ -177,10 +177,12 @@ export const getTransactions = query({
                 clientId: project.clientId,
               }
             : null,
-          milestone: milestone
+          monthlyCycle: monthlyCycle
             ? {
-                _id: milestone._id,
-                title: milestone.title,
+                _id: monthlyCycle._id,
+                monthIndex: monthlyCycle.monthIndex,
+                monthStartDate: monthlyCycle.monthStartDate,
+                monthEndDate: monthlyCycle.monthEndDate,
               }
             : null,
           walletFunding,
@@ -220,7 +222,7 @@ export const getTransaction = query({
         return {
           ...payment,
           project: null,
-          milestone: null,
+          monthlyCycle: null,
           walletFunding: walletFundingBreakdown(payment),
         };
       }
@@ -241,9 +243,9 @@ export const getTransaction = query({
       return null;
     }
 
-    // Get milestone if applicable
-    const milestone = payment.milestoneId
-      ? await ctx.db.get(payment.milestoneId)
+    // Billing period context (e.g. monthly release)
+    const monthlyCycle = payment.monthlyCycleId
+      ? await ctx.db.get(payment.monthlyCycleId)
       : null;
 
     // Get project client
@@ -279,12 +281,13 @@ export const getTransaction = query({
             }
           : null,
       },
-      milestone: milestone
+      monthlyCycle: monthlyCycle
         ? {
-            _id: milestone._id,
-            title: milestone.title,
-            description: milestone.description,
-            amount: milestone.amount,
+            _id: monthlyCycle._id,
+            monthIndex: monthlyCycle.monthIndex,
+            monthStartDate: monthlyCycle.monthStartDate,
+            monthEndDate: monthlyCycle.monthEndDate,
+            amountCents: monthlyCycle.amountCents,
           }
         : null,
     };

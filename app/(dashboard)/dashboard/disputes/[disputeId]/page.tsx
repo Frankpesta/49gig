@@ -276,6 +276,7 @@ export default function DisputeDetailPage() {
 
   const getTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
+      deliverable_quality: "Deliverable / quality",
       milestone_quality: "Deliverable / quality (legacy)",
       payment: "Payment (legacy)",
       communication: "Communication (legacy)",
@@ -540,22 +541,13 @@ export default function DisputeDetailPage() {
                       <span className="capitalize">{dispute.initiatorRole}</span>
                     )}
                   </DetailField>
-                  {(dispute.monthlyCycleId || dispute.milestoneId) && (
-                    <DetailField
-                      label={dispute.monthlyCycleId ? "Monthly payment" : "Milestone"}
-                      icon={<ExternalLink />}
-                    >
+                  {dispute.monthlyCycleId && (
+                    <DetailField label="Monthly payment" icon={<ExternalLink />}>
                       <Button variant="link" className="h-auto p-0 text-sm font-semibold" asChild>
                         <Link
-                          href={`/dashboard/projects/${String(dispute.projectId)}${
-                            dispute.monthlyCycleId
-                              ? "?cycle=" + String(dispute.monthlyCycleId)
-                              : dispute.milestoneId
-                                ? "?milestone=" + String(dispute.milestoneId)
-                                : ""
-                          }`}
+                          href={`/dashboard/projects/${String(dispute.projectId)}?cycle=${String(dispute.monthlyCycleId)}`}
                         >
-                          {dispute.monthlyCycleId ? "View billing cycle on project" : "View milestone on project"}
+                          View billing cycle on project
                         </Link>
                       </Button>
                     </DetailField>
@@ -910,7 +902,7 @@ export default function DisputeDetailPage() {
                             {evidence.type === "file" && (
                               <FileText className="h-4 w-4 text-primary" />
                             )}
-                            {evidence.type === "milestone_deliverable" && (
+                            {(evidence.type === "milestone_deliverable" || evidence.type === "deliverable") && (
                               <DollarSign className="h-4 w-4 text-primary" />
                             )}
                           </div>
@@ -982,6 +974,27 @@ export default function DisputeDetailPage() {
                       client-facing replacement steps are applied by assigned staff via enforcement actions.
                     </p>
                   )}
+                  {isModerator &&
+                    dispute.resolution.decision === "freelancer_favor" &&
+                    dispute.monthlyCycleId && (
+                      <p className="mt-3 rounded-lg border border-sky-500/25 bg-sky-500/[0.06] px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
+                        <span className="font-medium text-foreground">Staff:</span>{" "}
+                        <strong className="text-foreground">Run fund release</strong> pays this month from escrow the
+                        same way as a client approval (including partial-team scope when only some seats were
+                        disputed). Requires the hire <strong className="text-foreground">in progress</strong>, billing
+                        not project-paused, and the period ended.
+                      </p>
+                    )}
+                  {isModerator &&
+                    dispute.resolution.decision === "freelancer_favor" &&
+                    !dispute.monthlyCycleId && (
+                      <p className="mt-3 rounded-lg border border-sky-500/25 bg-sky-500/[0.06] px-3 py-2.5 text-sm leading-relaxed text-muted-foreground">
+                        <span className="font-medium text-foreground">Staff:</span>{" "}
+                        <strong className="text-foreground">Run fund release</strong> pays from the disputed escrow pool
+                        (snapshot at filing) to the freelancer side — full roster or disputed seats only on partial-team
+                        disputes.
+                      </p>
+                    )}
                 </DetailField>
                 {dispute.resolution.partialFreelancerSharePercent != null && (
                   <DetailField label="Partial split" icon={<Scale />}>
@@ -1266,6 +1279,42 @@ export default function DisputeDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+                {dispute.resolution?.decision === "freelancer_favor" && dispute.monthlyCycleId && (
+                  <Alert className="border-sky-500/40 bg-sky-500/8">
+                    <Info className="h-4 w-4 text-sky-700 dark:text-sky-400" />
+                    <AlertTitle className="text-sky-950 dark:text-sky-100">
+                      Freelancer favor — monthly cycle (when money moves)
+                    </AlertTitle>
+                    <AlertDescription className="text-sm text-muted-foreground space-y-2">
+                      <p>
+                        <strong className="text-foreground">Run fund release</strong> credits freelancer wallets from
+                        escrow for this month (same split rules as client approval). On{" "}
+                        <strong className="text-foreground">partial-team</strong> disputes, only the disputed seats are
+                        paid; teammates stay pending for their share until the client approves or staff uses project-level
+                        release.
+                      </p>
+                      <p className="text-xs">
+                        Requires period ended, hire <strong className="text-foreground">in progress</strong>, project not
+                        in <strong className="text-foreground">disputed</strong> status, and no project-wide billing pause.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {dispute.resolution?.decision === "freelancer_favor" && !dispute.monthlyCycleId && (
+                  <Alert className="border-sky-500/40 bg-sky-500/8">
+                    <Info className="h-4 w-4 text-sky-700 dark:text-sky-400" />
+                    <AlertTitle className="text-sky-950 dark:text-sky-100">
+                      Freelancer favor — hire / escrow dispute
+                    </AlertTitle>
+                    <AlertDescription className="text-sm text-muted-foreground space-y-2">
+                      <p>
+                        <strong className="text-foreground">Run fund release</strong> pays the{" "}
+                        <strong className="text-foreground">disputed freelancer-net pool</strong> (snapshot at filing) to
+                        wallets, capped by current escrow.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
                 {dispute.resolution?.decision === "partial" && (
                   <Alert className="border-amber-500/40 bg-amber-500/8">
                     <Info className="h-4 w-4 text-amber-700 dark:text-amber-500" />
@@ -1327,7 +1376,11 @@ export default function DisputeDetailPage() {
                     Run fund release
                     {dispute.resolution?.decision === "partial"
                       ? " — pay freelancers + credit client (partial)"
-                      : ` (${dispute.resolution?.decision?.replace(/_/g, " ") ?? "judgment"})`}
+                      : dispute.resolution?.decision === "freelancer_favor"
+                        ? dispute.monthlyCycleId
+                          ? " — pay month (staff judgment)"
+                          : " — pay from disputed escrow pool"
+                        : ` (${dispute.resolution?.decision?.replace(/_/g, " ") ?? "judgment"})`}
                   </Button>
                   <Button
                     variant="secondary"

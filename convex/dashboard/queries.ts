@@ -84,8 +84,7 @@ export const searchByIdAdmin = query({
         | "chats"
         | "messages"
         | "notifications"
-        | "monthlyBillingCycles"
-        | "milestones",
+        | "monthlyBillingCycles",
       payload: {
         kind: string;
         title: (doc: any) => string;
@@ -174,12 +173,6 @@ export const searchByIdAdmin = query({
       title: (doc) => `Monthly cycle #${doc.monthIndex}`,
       subtitle: (doc) => `Status: ${doc.status}`,
       href: (id) => `/dashboard/monthly-approvals?cycleId=${id}`,
-    });
-    await tryPush("milestones", {
-      kind: "milestone",
-      title: (doc) => doc.title || "Milestone",
-      subtitle: (doc) => `Status: ${doc.status}`,
-      href: (id) => `/dashboard/projects?milestoneId=${id}`,
     });
     return rows;
   },
@@ -277,18 +270,14 @@ export const getDashboardMetrics = query({
         satisfactionRate = Math.round(avgRating * 20); // 1-5 → 20-100
       }
 
-      // Active projects progress: % of milestones completed (paid or approved) for active projects
+      // Active projects progress: share of monthly billing cycles approved for active hires
       const activeProjectIds = new Set(activeProjects.map((p) => p._id));
-      const allMilestones = await ctx.db.query("milestones").collect();
-      const activeMilestones = allMilestones.filter((m) =>
-        activeProjectIds.has(m.projectId)
-      );
-      const completedMilestones = activeMilestones.filter(
-        (m) => m.status === "paid" || m.status === "approved"
-      );
+      const allCycles = await ctx.db.query("monthlyBillingCycles").collect();
+      const activeCycles = allCycles.filter((c) => activeProjectIds.has(c.projectId));
+      const completedCycles = activeCycles.filter((c) => c.status === "approved");
       const activeProjectsProgress =
-        activeMilestones.length > 0
-          ? Math.round((completedMilestones.length / activeMilestones.length) * 100)
+        activeCycles.length > 0
+          ? Math.round((completedCycles.length / activeCycles.length) * 100)
           : 0;
 
       // Calculate trends (compare current period with previous period)
@@ -398,12 +387,14 @@ export const getDashboardMetrics = query({
         return sum + (project.intakeForm.estimatedHours || 0);
       }, 0);
 
-      const submittedMilestones = await ctx.db
-        .query("milestones")
-        .withIndex("by_status", (q) => q.eq("status", "submitted"))
+      const pendingCycles = await ctx.db
+        .query("monthlyBillingCycles")
+        .withIndex("by_status", (q) => q.eq("status", "pending"))
         .collect();
-      const pendingReviews = submittedMilestones.filter((milestone) =>
-        projectIds.has(milestone.projectId)
+      const pendingReviews = pendingCycles.filter(
+        (cycle) =>
+          projectIds.has(cycle.projectId) &&
+          cycle.monthEndDate <= now
       );
 
       // Client ratings / reputation
@@ -569,7 +560,7 @@ export const getDashboardMetrics = query({
         totalProjects,
         activeClients,
         activeFreelancers,
-        /** Gross client funds into the platform MTD (succeeded pre_funding, top_up, milestone_release). */
+        /** Gross client hire payments MTD (funding, top-ups, legacy release rows). */
         revenue,
         /** Gross client funds into the platform all time. */
         revenueAllTime,
@@ -589,9 +580,9 @@ export const getDashboardMetrics = query({
 });
 
 /**
- * Get upcoming milestones for the current user's projects
+ * Upcoming billing periods for the current user's active projects (month ended, still pending approval).
  */
-export const getUpcomingMilestones = query({
+export const getUpcomingBillingCycles = query({
   args: {
     userId: v.optional(v.id("users")),
     limit: v.optional(v.number()),
@@ -622,23 +613,23 @@ export const getUpcomingMilestones = query({
       return [];
     }
 
-    const allMilestones = await ctx.db.query("milestones").collect();
-    const upcoming = allMilestones
+    const allCycles = await ctx.db.query("monthlyBillingCycles").collect();
+    const upcoming = allCycles
       .filter(
-        (m) =>
-          projectIds.has(m.projectId) &&
-          m.dueDate >= now &&
-          (m.status === "pending" || m.status === "in_progress")
+        (c) =>
+          projectIds.has(c.projectId) &&
+          c.status === "pending" &&
+          c.monthEndDate >= now
       )
-      .sort((a, b) => a.dueDate - b.dueDate)
+      .sort((a, b) => a.monthEndDate - b.monthEndDate)
       .slice(0, limit);
 
-    return upcoming.map((m) => ({
-      _id: m._id,
-      title: m.title,
-      dueDate: m.dueDate,
-      status: m.status,
-      projectId: m.projectId,
+    return upcoming.map((c) => ({
+      _id: c._id,
+      title: `Month ${c.monthIndex}`,
+      dueDate: c.monthEndDate,
+      status: c.status,
+      projectId: c.projectId,
     }));
   },
 });

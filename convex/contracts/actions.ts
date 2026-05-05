@@ -187,7 +187,7 @@ async function generateContractPdf({
 
   drawHeading("Project");
   drawParagraph(
-    `Project Title: ${project.intakeForm.title}. The Contractor agrees to perform professional services for the Client as described in the project scope and milestones.`
+    `Project Title: ${project.intakeForm.title}. The Contractor agrees to perform professional services for the Client as described in the project scope, deliverables, and billing schedule.`
   );
 
   drawHeading("Effective Date");
@@ -195,12 +195,12 @@ async function generateContractPdf({
 
   drawHeading("Scope of Work");
   drawParagraph(
-    "The Contractor will provide services according to the agreed project requirements, deliverables, timeline, and milestones. Any changes to scope must be documented and mutually agreed in writing."
+    "The Contractor will provide services according to the agreed project requirements, deliverables, timeline, and monthly billing through 49GIG. Any changes to scope must be documented and mutually agreed in writing."
   );
 
   drawHeading("Compensation");
   drawParagraph(
-    `Total project compensation is ${formatCurrency(project.totalAmount, project.currency)}. Payments are released on milestone approval through the 49GIG escrow system.`
+    `Total project compensation is ${formatCurrency(project.totalAmount, project.currency)}. Payments are released through the 49GIG escrow system according to the agreed monthly billing and client approval process.`
   );
 
   drawHeading("Confidentiality");
@@ -286,7 +286,7 @@ async function generateContractPdf({
     color: rgb(0.1, 0.1, 0.1),
   });
   const appendixText =
-    "This appendix summarizes key platform policies including communication standards, payment milestones, and quality expectations. The full terms are available in the 49GIG dashboard. Both parties agree to adhere to platform policies for dispute resolution, milestone approvals, and professional conduct.";
+    "This appendix summarizes key platform policies including communication standards, monthly billing approvals, and quality expectations. The full terms are available in the 49GIG dashboard. Both parties agree to adhere to platform policies for dispute resolution, payment releases, and professional conduct.";
   let ay = pageHeight - margin - lineHeight * 2;
   const appendixLines = wrapText(appendixText, pageWidth - margin * 2, regular, bodySize);
   for (const line of appendixLines) {

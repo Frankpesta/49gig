@@ -6,6 +6,7 @@ import type { FunctionReference } from "convex/server";
 import type { MutationCtx } from "../_generated/server";
 import { getDurationMonths } from "../../lib/project-duration";
 import { assertUsdCurrency } from "../currencyPolicy";
+import { teamBasisUserIdsForDispute, computeTeamPoolShareCentsByFreelancerId } from "../teamEscrowShares";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -113,6 +114,243 @@ async function creditWalletInline(
   });
 
   return { walletId: wallet._id, newBalanceCents: newBalance };
+}
+
+/** Roster split for a cycle (same rules as client approve). */
+async function computeMonthlyCycleRosterShareCents(
+  ctx: MutationCtx,
+  cycle: Doc<"monthlyBillingCycles">,
+  project: Doc<"projects">,
+  freelancerIds: Doc<"users">["_id"][]
+): Promise<number[]> {
+  const breakdown = project.teamBudgetBreakdown;
+  let shareCentsByFreelancer: number[];
+
+  if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
+    const acceptedMatches = await ctx.db
+      .query("matches")
+      .withIndex("by_project", (q) => q.eq("projectId", cycle.projectId))
+      .collect();
+    const acceptedByFreelancer = new Map(
+      acceptedMatches
+        .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
+        .map((m) => [m.freelancerId, m])
+    );
+
+    const equalShare = Math.floor(cycle.amountCents / freelancerIds.length);
+    shareCentsByFreelancer = freelancerIds.map((fid) => {
+      const match = acceptedByFreelancer.get(fid);
+      const role = match?.teamRole;
+      const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
+      return Math.max(0, roleAmount);
+    });
+
+    const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
+    const remainder = cycle.amountCents - totalAllocated;
+    if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
+      shareCentsByFreelancer = [...shareCentsByFreelancer];
+      shareCentsByFreelancer[0] += remainder;
+    }
+  } else {
+    const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
+    const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
+    shareCentsByFreelancer = freelancerIds.map((_, i) =>
+      amountPerFreelancerCents + (i === 0 ? remainder : 0)
+    );
+  }
+
+  return shareCentsByFreelancer;
+}
+
+type MonthlyPayoutKind =
+  | "client_approve"
+  | "staff_dispute_freelancer_favor"
+  | "staff_override";
+
+/**
+ * Credits wallets, creates payment rows, updates cycle + escrow — shared by client approve,
+ * dispute freelancer-favor enforcement, and staff override release.
+ */
+async function applyMonthlyCyclePayoutShared(
+  ctx: MutationCtx,
+  args: {
+    cycle: Doc<"monthlyBillingCycles">;
+    project: Doc<"projects">;
+    monthlyCycleId: Doc<"monthlyBillingCycles">["_id"];
+    freelancerIds: Doc<"users">["_id"][];
+    shareCentsByFreelancer: number[];
+    pauseState: Awaited<ReturnType<typeof getActiveBillingPauseState>>;
+    /** When set (subset of roster), only those seats receive this run’s credits. */
+    onlyPayFreelancerIds: Doc<"users">["_id"][] | null;
+    now: number;
+    /** User id stored on cycle when fully approved (client or staff actor). */
+    approvedByUserId: Doc<"users">["_id"] | undefined;
+    payoutKind: MonthlyPayoutKind;
+    runReferralCredit: boolean;
+  }
+): Promise<{ totalReleasedThisRun: number }> {
+  const onlySet =
+    args.onlyPayFreelancerIds && args.onlyPayFreelancerIds.length > 0
+      ? new Set(args.onlyPayFreelancerIds.map(String))
+      : null;
+
+  const released = releasedCentsMap(args.cycle);
+  let totalReleasedThisRun = 0;
+  const monthLabel = new Date(args.cycle.monthStartDate).toLocaleString("default", {
+    month: "short",
+    year: "numeric",
+  });
+
+  const creditDescription =
+    args.payoutKind === "client_approve"
+      ? `Monthly approval: ${args.project.intakeForm.title} - ${monthLabel}`
+      : args.payoutKind === "staff_dispute_freelancer_favor"
+        ? `Dispute resolution (freelancer favor): ${args.project.intakeForm.title} - ${monthLabel}`
+        : `Staff release: ${args.project.intakeForm.title} - ${monthLabel}`;
+
+  const paidNotifyIds: Doc<"users">["_id"][] = [];
+
+  for (let i = 0; i < args.freelancerIds.length; i++) {
+    const fid = args.freelancerIds[i];
+    if (onlySet && !onlySet.has(String(fid))) continue;
+
+    const shareCents = args.shareCentsByFreelancer[i] ?? 0;
+    if (shareCents <= 0) continue;
+    if (args.pauseState.pausedFreelancerIds.has(String(fid))) continue;
+    const alreadyReleased = released[String(fid)] ?? 0;
+    const remainingCents = Math.max(0, shareCents - alreadyReleased);
+    if (remainingCents <= 0) continue;
+
+    await creditWalletInline(ctx, {
+      userId: fid,
+      amountCents: remainingCents,
+      currency: args.cycle.currency,
+      description: creditDescription,
+      projectId: args.cycle.projectId,
+      monthlyCycleId: args.monthlyCycleId,
+    });
+    released[String(fid)] = alreadyReleased + remainingCents;
+    totalReleasedThisRun += remainingCents;
+    paidNotifyIds.push(fid);
+  }
+
+  if (totalReleasedThisRun <= 0) {
+    throw new Error("No releasable payment remains. It may be paused by an admin.");
+  }
+
+  for (let i = 0; i < args.freelancerIds.length; i++) {
+    const fid = args.freelancerIds[i];
+    if (onlySet && !onlySet.has(String(fid))) continue;
+
+    const shareCents = args.shareCentsByFreelancer[i] ?? 0;
+    if (shareCents <= 0) continue;
+    if (args.pauseState.pausedFreelancerIds.has(String(fid))) continue;
+    const amountAlreadyRecorded = (args.cycle.releasedFreelancerCents ?? {})[String(fid)] ?? 0;
+    const paymentCents = Math.max(0, (released[String(fid)] ?? 0) - amountAlreadyRecorded);
+    if (paymentCents <= 0) continue;
+
+    await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
+      projectId: args.cycle.projectId,
+      monthlyCycleId: args.monthlyCycleId,
+      type: "monthly_release",
+      amount: paymentCents / 100,
+      currency: args.cycle.currency,
+      platformFee: 0,
+      netAmount: paymentCents / 100,
+      userId: args.project.clientId,
+      recipientId: fid,
+      status: "succeeded",
+    });
+  }
+
+  const fullyReleased = allRosterSharesReleased(
+    args.freelancerIds,
+    args.shareCentsByFreelancer,
+    released
+  );
+
+  await ctx.db.patch(args.monthlyCycleId, {
+    status: fullyReleased ? "approved" : "pending",
+    approvedBy: fullyReleased ? args.approvedByUserId : undefined,
+    approvedAt: fullyReleased ? args.now : undefined,
+    releasedFreelancerCents: released,
+    updatedAt: args.now,
+  });
+
+  await ctx.db.patch(args.cycle.projectId, {
+    escrowedAmount: Math.max(0, args.project.escrowedAmount - totalReleasedThisRun / 100),
+    updatedAt: args.now,
+  });
+
+  const sendSystemNotification =
+    api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
+      "action",
+      "internal"
+    >;
+
+  if (args.payoutKind === "client_approve") {
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: args.freelancerIds.filter(
+        (f) => !args.pauseState.pausedFreelancerIds.has(String(f))
+      ),
+      title: "Monthly payment approved",
+      message: `Client approved ${monthLabel} payment for ${args.project.intakeForm.title}. Funds have been added to your wallet.`,
+      type: "payment",
+      data: { projectId: args.cycle.projectId, monthlyCycleId: args.monthlyCycleId },
+    });
+  } else {
+    await ctx.scheduler.runAfter(0, sendSystemNotification, {
+      userIds: paidNotifyIds.filter(
+        (f) => !args.pauseState.pausedFreelancerIds.has(String(f))
+      ),
+      title:
+        args.payoutKind === "staff_dispute_freelancer_favor"
+          ? "Payment released after dispute"
+          : "Monthly payment released by staff",
+      message:
+        args.payoutKind === "staff_dispute_freelancer_favor"
+          ? `Your ${monthLabel} payment for ${args.project.intakeForm.title} was released after a dispute judgment in your favor. Funds were added to your wallet.`
+          : `Staff released your ${monthLabel} payment for ${args.project.intakeForm.title}. Funds were added to your wallet.`,
+      type: "payment",
+      data: { projectId: args.cycle.projectId, monthlyCycleId: args.monthlyCycleId },
+    });
+  }
+
+  if (args.runReferralCredit) {
+    await ctx.runMutation(
+      internalAny.referrals.internalMutations.creditReferralOnFirstMonthlyApproval,
+      { projectId: args.cycle.projectId }
+    );
+  }
+
+  return { totalReleasedThisRun };
+}
+
+function disputeBlocksStaffMonthlyCycleOverride(d: Doc<"disputes">): boolean {
+  return (
+    d.status !== "resolved" &&
+    d.status !== "closed" &&
+    d.status !== "cancelled"
+  );
+}
+
+async function assertNoBlockingDisputeOnMonthlyCycle(
+  ctx: MutationCtx,
+  monthlyCycleId: Doc<"monthlyBillingCycles">["_id"],
+  projectId: Doc<"projects">["_id"]
+) {
+  const related = await ctx.db
+    .query("disputes")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .collect();
+  for (const d of related) {
+    if (String(d.monthlyCycleId) !== String(monthlyCycleId)) continue;
+    if (disputeBlocksStaffMonthlyCycleOverride(d)) {
+      throw new Error(
+        "This billing month has an open dispute. Record a judgment and run dispute enforcement, or withdraw the dispute, before using staff release."
+      );
+    }
+  }
 }
 
 async function cancelPendingAndDisputedMonthlyCycles(
@@ -331,145 +569,236 @@ export const approveMonthlyCycle = mutation({
       throw new Error("Project has no matched freelancer(s)");
     }
 
-    // Compute share per freelancer: role-based from teamBudgetBreakdown, or equal split
-    const breakdown = project.teamBudgetBreakdown;
-    let shareCentsByFreelancer: number[];
-
-    if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
-      const acceptedMatches = await ctx.db
-        .query("matches")
-        .withIndex("by_project", (q) => q.eq("projectId", cycle.projectId))
-        .collect();
-      const acceptedByFreelancer = new Map(
-        acceptedMatches
-          .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
-          .map((m) => [m.freelancerId, m])
-      );
-
-      const equalShare = Math.floor(cycle.amountCents / freelancerIds.length);
-      shareCentsByFreelancer = freelancerIds.map((fid) => {
-        const match = acceptedByFreelancer.get(fid);
-        const role = match?.teamRole;
-        const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
-        return Math.max(0, roleAmount);
-      });
-
-      const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
-      const remainder = cycle.amountCents - totalAllocated;
-      if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
-        shareCentsByFreelancer[0] += remainder;
-      }
-    } else {
-      const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
-      const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
-      shareCentsByFreelancer = freelancerIds.map((_, i) =>
-        amountPerFreelancerCents + (i === 0 ? remainder : 0)
-      );
-    }
+    const shareCentsByFreelancer = await computeMonthlyCycleRosterShareCents(
+      ctx,
+      cycle,
+      project,
+      freelancerIds
+    );
 
     const pauseState = await getActiveBillingPauseState(ctx, cycle.projectId);
     if (pauseState.projectPaused) {
       throw new Error("Payment release is paused by an admin for this hire.");
     }
-    const released = releasedCentsMap(cycle);
 
-    // Credit each freelancer's wallet (creates wallet if needed) - inline for immediate balance update
-    let totalReleasedThisRun = 0;
-    for (let i = 0; i < freelancerIds.length; i++) {
-      const fid = freelancerIds[i];
-      const shareCents = shareCentsByFreelancer[i] ?? 0;
-      if (shareCents <= 0) continue;
-      if (pauseState.pausedFreelancerIds.has(String(fid))) continue;
-      const alreadyReleased = released[String(fid)] ?? 0;
-      const remainingCents = Math.max(0, shareCents - alreadyReleased);
-      if (remainingCents <= 0) continue;
+    await applyMonthlyCyclePayoutShared(ctx, {
+      cycle,
+      project,
+      monthlyCycleId: args.monthlyCycleId,
+      freelancerIds,
+      shareCentsByFreelancer,
+      pauseState,
+      onlyPayFreelancerIds: null,
+      now,
+      approvedByUserId: (user as Doc<"users">)._id,
+      payoutKind: "client_approve",
+      runReferralCredit: true,
+    });
 
-      const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
-        month: "short",
-        year: "numeric",
-      });
-      await creditWalletInline(ctx, {
-        userId: fid,
-        amountCents: remainingCents,
-        currency: cycle.currency,
-        description: `Monthly approval: ${project.intakeForm.title} - ${monthLabel}`,
-        projectId: cycle.projectId,
-        monthlyCycleId: args.monthlyCycleId,
-      });
-      released[String(fid)] = alreadyReleased + remainingCents;
-      totalReleasedThisRun += remainingCents;
+    return { success: true };
+  },
+});
+
+/**
+ * After `freelancer_favor` judgment: pay the disputed month the same way as client approve
+ * (full roster or only disputed seats on partial-team disputes). Idempotent if already approved.
+ */
+export const releaseMonthlyCycleAfterFreelancerFavorJudgmentInternal = internalMutation({
+  args: {
+    disputeId: v.id("disputes"),
+    monthlyCycleId: v.id("monthlyBillingCycles"),
+  },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute?.resolution || dispute.resolution.decision !== "freelancer_favor") {
+      throw new Error("Dispute is not resolved in the freelancer's favor.");
+    }
+    if (String(dispute.monthlyCycleId) !== String(args.monthlyCycleId)) {
+      throw new Error("Monthly cycle does not match this dispute.");
     }
 
-    if (totalReleasedThisRun <= 0) {
-      throw new Error("No releasable payment remains. It may be paused by an admin.");
+    let cycle = await ctx.db.get(args.monthlyCycleId);
+    if (!cycle) throw new Error("Monthly cycle not found");
+
+    if (cycle.status === "approved") {
+      return { ok: true as const, alreadyReleased: true as const };
     }
 
-    // Create payment record(s) for audit - one per freelancer
-    for (let i = 0; i < freelancerIds.length; i++) {
-      const fid = freelancerIds[i];
-      const shareCents = shareCentsByFreelancer[i] ?? 0;
-      if (shareCents <= 0) continue;
-      if (pauseState.pausedFreelancerIds.has(String(fid))) continue;
-      const amountAlreadyRecorded = (cycle.releasedFreelancerCents ?? {})[String(fid)] ?? 0;
-      const paymentCents = Math.max(0, (released[String(fid)] ?? 0) - amountAlreadyRecorded);
-      if (paymentCents <= 0) continue;
-
-      await ctx.scheduler.runAfter(0, internalAny.payments.mutations.createPayment, {
-        projectId: cycle.projectId,
-        monthlyCycleId: args.monthlyCycleId,
-        type: "monthly_release",
-        amount: paymentCents / 100,
-        currency: cycle.currency,
-        platformFee: 0,
-        netAmount: paymentCents / 100,
-        userId: project.clientId,
-        recipientId: fid,
-        status: "succeeded",
+    if (cycle.status === "disputed") {
+      await ctx.db.patch(args.monthlyCycleId, {
+        status: "pending",
+        disputeId: undefined,
+        updatedAt: Date.now(),
       });
+      cycle = (await ctx.db.get(args.monthlyCycleId))!;
     }
 
-    // Update cycle status
-    await ctx.db.patch(args.monthlyCycleId, {
-      status: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
-        ? "approved"
-        : "pending",
-      approvedBy: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
-        ? (user as Doc<"users">)._id
-        : undefined,
-      approvedAt: allRosterSharesReleased(freelancerIds, shareCentsByFreelancer, released)
-        ? now
-        : undefined,
-      releasedFreelancerCents: released,
-      updatedAt: now,
-    });
+    if (cycle.status !== "pending") {
+      throw new Error(
+        `Cannot release funds: cycle status is ${cycle.status} (expected pending).`
+      );
+    }
 
-    // Decrease project escrowed amount
-    await ctx.db.patch(cycle.projectId, {
-      escrowedAmount: Math.max(0, project.escrowedAmount - totalReleasedThisRun / 100),
-      updatedAt: now,
-    });
+    const project = await ctx.db.get(cycle.projectId);
+    if (!project) throw new Error("Project not found");
 
-    const sendSystemNotification =
-      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
-        "action",
-        "internal"
-      >;
-    const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", {
-      month: "short",
-      year: "numeric",
-    });
-    await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: freelancerIds.filter((fid) => !pauseState.pausedFreelancerIds.has(String(fid))),
-      title: "Monthly payment approved",
-      message: `Client approved ${monthLabel} payment for ${project.intakeForm.title}. Funds have been added to your wallet.`,
-      type: "payment",
-      data: { projectId: cycle.projectId, monthlyCycleId: args.monthlyCycleId },
-    });
+    if (project.status === "disputed") {
+      throw new Error(
+        "Hire is still marked disputed at the project level. Run resume / roster enforcement so the hire is in progress before releasing funds."
+      );
+    }
 
-    await ctx.runMutation(
-      internalAny.referrals.internalMutations.creditReferralOnFirstMonthlyApproval,
-      { projectId: cycle.projectId }
+    if (project.status !== "in_progress") {
+      throw new Error("Monthly releases require the hire to be in progress.");
+    }
+
+    const now = Date.now();
+    if (now < cycle.monthEndDate) {
+      throw new Error(
+        "This billing month has not ended yet — cannot release this cycle."
+      );
+    }
+
+    const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? [];
+
+    if (freelancerIds.length === 0) {
+      throw new Error("Project has no matched freelancer(s)");
+    }
+
+    const teamBasis = teamBasisUserIdsForDispute(dispute, project).map(String);
+    const disputedRaw = dispute.disputedFreelancerIds ?? [];
+    const isPartialTeam =
+      teamBasis.length > 0 &&
+      disputedRaw.length > 0 &&
+      disputedRaw.length < teamBasis.length &&
+      disputedRaw.every((id) => teamBasis.includes(String(id)));
+
+    const onlyPay: Doc<"users">["_id"][] | null = isPartialTeam ? disputedRaw : null;
+
+    const shareCentsByFreelancer = await computeMonthlyCycleRosterShareCents(
+      ctx,
+      cycle,
+      project,
+      freelancerIds
     );
+
+    const pauseState = await getActiveBillingPauseState(ctx, cycle.projectId);
+    if (pauseState.projectPaused) {
+      throw new Error(
+        "Payment release is paused for this hire — resume billing before releasing."
+      );
+    }
+
+    const approver =
+      dispute.resolution.resolvedBy ??
+      dispute.assignedModeratorId ??
+      project.clientId;
+
+    await applyMonthlyCyclePayoutShared(ctx, {
+      cycle,
+      project,
+      monthlyCycleId: args.monthlyCycleId,
+      freelancerIds,
+      shareCentsByFreelancer,
+      pauseState,
+      onlyPayFreelancerIds: onlyPay,
+      now,
+      approvedByUserId: approver,
+      payoutKind: "staff_dispute_freelancer_favor",
+      runReferralCredit: false,
+    });
+
+    return { ok: true as const, alreadyReleased: false as const };
+  },
+});
+
+/**
+ * Staff: release a pending month when the client will not approve (no open dispute blocking this cycle).
+ * Same economics as client approve; does not run referral-first-approval credit.
+ */
+export const staffReleaseMonthlyCyclePayment = mutation({
+  args: {
+    monthlyCycleId: v.id("monthlyBillingCycles"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user || (user.role !== "moderator" && user.role !== "admin")) {
+      throw new Error("Only platform staff can release a month without client approval.");
+    }
+
+    const cycle = await ctx.db.get(args.monthlyCycleId);
+    if (!cycle) throw new Error("Monthly cycle not found");
+    if (cycle.status !== "pending") {
+      throw new Error(`Cycle is not pending (status: ${cycle.status}).`);
+    }
+
+    const project = await ctx.db.get(cycle.projectId);
+    if (!project) throw new Error("Project not found");
+
+    if (project.status === "disputed") {
+      throw new Error(
+        "Hire is disputed at the project level. Resolve enforcement first, or use the dispute case to release funds."
+      );
+    }
+
+    if (project.status !== "in_progress") {
+      throw new Error("Staff release is only available while the hire is in progress.");
+    }
+
+    const now = Date.now();
+    if (now < cycle.monthEndDate) {
+      throw new Error("This billing month has not ended yet.");
+    }
+
+    await assertNoBlockingDisputeOnMonthlyCycle(ctx, args.monthlyCycleId, cycle.projectId);
+
+    const freelancerIds: Doc<"users">["_id"][] = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? [];
+
+    if (freelancerIds.length === 0) {
+      throw new Error("Project has no matched freelancer(s)");
+    }
+
+    const shareCentsByFreelancer = await computeMonthlyCycleRosterShareCents(
+      ctx,
+      cycle,
+      project,
+      freelancerIds
+    );
+
+    const pauseState = await getActiveBillingPauseState(ctx, cycle.projectId);
+    if (pauseState.projectPaused) {
+      throw new Error("Payment release is paused for this hire.");
+    }
+
+    await applyMonthlyCyclePayoutShared(ctx, {
+      cycle,
+      project,
+      monthlyCycleId: args.monthlyCycleId,
+      freelancerIds,
+      shareCentsByFreelancer,
+      pauseState,
+      onlyPayFreelancerIds: null,
+      now,
+      approvedByUserId: user._id,
+      payoutKind: "staff_override",
+      runReferralCredit: false,
+    });
+
+    await ctx.db.insert("auditLogs", {
+      action: "staff_monthly_cycle_release",
+      actionType: "admin",
+      actorId: user._id,
+      actorRole: user.role,
+      targetType: "project",
+      targetId: cycle.projectId,
+      details: { monthlyCycleId: args.monthlyCycleId },
+      createdAt: now,
+    });
 
     return { success: true };
   },
@@ -796,36 +1125,46 @@ export const releaseDisputeFundsToWalletInternal = internalMutation({
 
     if (freelancerIds.length === 0) return { released: false };
 
-    const breakdown = project.teamBudgetBreakdown;
     let shareCentsByFreelancer: number[];
 
-    if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
-      const acceptedMatches = await ctx.db
-        .query("matches")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-      const acceptedByFreelancer = new Map(
-        acceptedMatches
-          .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
-          .map((m) => [m.freelancerId, m])
-      );
-      const equalShare = Math.floor(args.amountCents / freelancerIds.length);
-      shareCentsByFreelancer = freelancerIds.map((fid) => {
-        const match = acceptedByFreelancer.get(fid);
-        const role = match?.teamRole;
-        const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
-        return Math.max(0, roleAmount);
-      });
-      const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
-      const remainder = args.amountCents - totalAllocated;
-      if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
-        shareCentsByFreelancer[0] += remainder;
-      }
+    if (projectFreelancerIds.length === 1 && freelancerIds.length === 1) {
+      shareCentsByFreelancer = [args.amountCents];
     } else {
-      const amountPerFreelancerCents = Math.floor(args.amountCents / freelancerIds.length);
-      const remainder = args.amountCents - amountPerFreelancerCents * freelancerIds.length;
-      shareCentsByFreelancer = freelancerIds.map((_, i) =>
-        amountPerFreelancerCents + (i === 0 ? remainder : 0)
+      const weightPool = 1_000_000;
+      const weightMap = await computeTeamPoolShareCentsByFreelancerId(
+        ctx,
+        args.projectId,
+        projectFreelancerIds,
+        project.teamBudgetBreakdown,
+        weightPool
+      );
+      let wSum = 0;
+      for (const fid of freelancerIds) {
+        wSum += weightMap.get(String(fid)) ?? 0;
+      }
+      if (wSum <= 0) {
+        const per = Math.floor(args.amountCents / freelancerIds.length);
+        const rem = args.amountCents - per * freelancerIds.length;
+        shareCentsByFreelancer = freelancerIds.map((_, i) => per + (i === 0 ? rem : 0));
+      } else {
+        let allocated = 0;
+        shareCentsByFreelancer = freelancerIds.map((fid, i) => {
+          const w = weightMap.get(String(fid)) ?? 0;
+          if (i === freelancerIds.length - 1) {
+            return Math.max(0, args.amountCents - allocated);
+          }
+          const c = Math.floor((args.amountCents * w) / wSum);
+          allocated += c;
+          return c;
+        });
+      }
+    }
+
+    const releasedTotal = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
+    const escrowCapCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+    if (releasedTotal > escrowCapCents) {
+      throw new Error(
+        "Dispute payout exceeds available escrow — check economics snapshot and escrow balance."
       );
     }
 
@@ -854,14 +1193,14 @@ export const releaseDisputeFundsToWalletInternal = internalMutation({
         currency: args.currency,
         platformFee: 0,
         netAmount: shareCents / 100,
-        userId: fid,
+        userId: project.clientId,
         recipientId: fid,
         status: "succeeded",
       });
     }
 
     await ctx.db.patch(args.projectId, {
-      escrowedAmount: Math.max(0, (project.escrowedAmount ?? 0) - args.amountCents / 100),
+      escrowedAmount: Math.max(0, (project.escrowedAmount ?? 0) - releasedTotal / 100),
       updatedAt: now,
     });
 

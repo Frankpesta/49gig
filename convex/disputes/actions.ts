@@ -162,34 +162,48 @@ export const releaseDisputeFunds = action({
     }
     
     if (decision === "freelancer_favor") {
-      // Unblock work only — escrow stays until normal monthly approval / auto-release.
       if (dispute.monthlyCycleId) {
         await ctx.runMutation(
-          internal.monthlyBillingCycles.mutations.clearMonthlyCycleDisputeInternal,
-          { monthlyCycleId: dispute.monthlyCycleId }
+          internal.monthlyBillingCycles.mutations
+            .releaseMonthlyCycleAfterFreelancerFavorJudgmentInternal,
+          {
+            disputeId: args.disputeId,
+            monthlyCycleId: dispute.monthlyCycleId,
+          }
         );
+      } else {
+        const { scopeCents } = await ctx.runQuery(
+          internal.disputes.queries.disputeNetScopeFreelancerNetCentsInternal,
+          { disputeId: args.disputeId }
+        );
+        const payCents = Math.min(
+          scopeCents,
+          Math.round(Math.max(0, (project as any).escrowedAmount ?? 0) * 100)
+        );
+        if (payCents > 0) {
+          await ctx.runMutation(
+            internal.monthlyBillingCycles.mutations.releaseDisputeFundsToWalletInternal,
+            {
+              projectId: dispute.projectId,
+              disputeId: args.disputeId,
+              amountCents: payCents,
+              currency,
+              monthlyCycleId: undefined,
+              freelancerIds: isPartialTeam ? (dispute as any).disputedFreelancerIds : undefined,
+            }
+          );
+        }
       }
     } else if (decision === "partial") {
       if (resolutionAmount != null && resolutionAmount > 0) {
-        let scopeCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
-        if (isPartialTeam) {
-          const c = dispute.monthlyCycleId
-            ? await ctx.runQuery(
-                internal.disputes.queries.computeDisputedMonthlyCycleShareCentsInternal,
-                { disputeId: args.disputeId }
-              )
-            : await ctx.runQuery(
-                internal.disputes.queries.computeDisputedTeamEscrowNetCentsFromDisputeInternal,
-                { disputeId: args.disputeId }
-              );
-          scopeCents = c.disputedNetCents;
-        } else if (dispute.monthlyCycleId) {
-          const pond = await ctx.runQuery(
-            internal.disputes.queries.disputeEconomicsBasisPoolFreelancerNetCentsInternal,
-            { disputeId: args.disputeId }
-          );
-          scopeCents = pond.poolCents;
-        }
+        const { scopeCents: scopeFromDispute } = await ctx.runQuery(
+          internal.disputes.queries.disputeNetScopeFreelancerNetCentsInternal,
+          { disputeId: args.disputeId }
+        );
+        const scopeCents = Math.min(
+          scopeFromDispute,
+          Math.round(Math.max(0, (project as any).escrowedAmount ?? 0) * 100)
+        );
 
         const freelancerCents = Math.min(resolutionAmount, scopeCents);
         const clientCents = Math.max(0, scopeCents - freelancerCents);

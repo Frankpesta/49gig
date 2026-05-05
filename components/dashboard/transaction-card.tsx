@@ -17,7 +17,7 @@ import { Id } from "@/convex/_generated/dataModel";
 const TYPE_LABELS: Record<string, string> = {
   pre_funding: "Project Funding",
   top_up: "Add payment",
-  milestone_release: "Milestone Release",
+  milestone_release: "Legacy release",
   monthly_release: "Monthly Release",
   refund: "Refund",
   platform_fee: "Included services",
@@ -44,7 +44,7 @@ export type TransactionCardData = {
   fundingGrossAmount?: number;
   clientWalletCreditApplied?: number;
   project: { _id: Id<"projects">; title: string } | null;
-  milestone: { _id: Id<"milestones">; title: string } | null;
+  monthlyCycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number } | null;
   walletFunding?: {
     fundingGrossAmount: number;
     walletAppliedDollars: number;
@@ -155,10 +155,10 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
                   {transaction.project.title}
                 </p>
               )}
-              {transaction.milestone && (
+              {transaction.monthlyCycle && (
                 <p className="text-sm text-muted-foreground truncate mt-0.5 flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5 shrink-0" />
-                  {transaction.milestone.title}
+                  Month {transaction.monthlyCycle.monthIndex}
                 </p>
               )}
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
@@ -195,6 +195,7 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
                 </span>
               )}
               {(transaction.type === "milestone_release" ||
+                transaction.type === "monthly_release" ||
                 transaction.type === "payout") &&
                 transaction.netAmount != null && (
                   <span className="text-xs text-muted-foreground">

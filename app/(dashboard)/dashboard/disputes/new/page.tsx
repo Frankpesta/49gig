@@ -37,7 +37,7 @@ export default function NewDisputePage() {
     projectId: projectId || "",
     monthlyCycleId: "" as string,
     type: "" as
-      | "milestone_quality"
+      | "deliverable_quality"
       | "payment"
       | "communication"
       | "freelancer_replacement"
@@ -97,7 +97,7 @@ export default function NewDisputePage() {
 
   const projectTeamMembers = useQuery(
     api.projects.queries.getProjectTeamMembers,
-    formData.projectId && isAuthenticated && user?._id && (user.role === "client" || user.role === "freelancer")
+    formData.projectId && isAuthenticated && user?._id && user.role === "client"
       ? { projectId: formData.projectId as any, userId: user._id }
       : "skip"
   );
@@ -121,24 +121,12 @@ export default function NewDisputePage() {
     }
   }, [monthlyCycles, formData.monthlyCycleId, disputeClockMs]);
 
-  // Resolved team member details for partial team selection
-  const [teamMembers, setTeamMembers] = useState<{ id: string; name: string; role?: string }[]>([]);
   useEffect(() => {
-    if (!project || !user?._id) {
-      setTeamMembers([]);
-      return;
-    }
+    if (!project || !user?._id || user.role !== "client") return;
     const ids: string[] = (project as any).matchedFreelancerIds ?? [];
-    if (ids.length === 0) {
-      setTeamMembers([]);
-      return;
-    }
+    if (ids.length === 0) return;
     setDisputeScope("partial");
-    if (user.role === "freelancer") {
-      setDisputedFreelancerIds([String(user._id)]);
-    } else {
-      setDisputedFreelancerIds([]);
-    }
+    setDisputedFreelancerIds([]);
   }, [project?._id, user?._id, user?.role]);
 
   const initiateDispute = useMutation(api.disputes.mutations.initiateDispute);
@@ -189,26 +177,6 @@ export default function NewDisputePage() {
       return;
     }
 
-    if (
-      user?.role === "freelancer" &&
-      isTeamProject &&
-      disputeScope === "partial" &&
-      disputedFreelancerIds.length === 0
-    ) {
-      setError("Select your seat or other members to include, or choose “Entire team”.");
-      return;
-    }
-
-    if (
-      user?.role === "freelancer" &&
-      isTeamProject &&
-      disputeScope === "partial" &&
-      !disputedFreelancerIds.includes(String(user._id))
-    ) {
-      setError('Include yourself in the dispute, or choose “Entire team”.');
-      return;
-    }
-
     if (!user?._id) {
       setError("Not authenticated");
       return;
@@ -232,18 +200,13 @@ export default function NewDisputePage() {
       ];
 
       const isTeamProject = ((project as any)?.matchedFreelancerIds?.length ?? 0) > 0;
-      let partialIds: Id<"users">[] | undefined;
-      if (user.role === "client") {
-        partialIds =
-          isTeamProject && disputeScope === "partial" && disputedFreelancerIds.length > 0
-            ? (disputedFreelancerIds as Id<"users">[])
-            : undefined;
-      } else if (user.role === "freelancer") {
-        partialIds =
-          isTeamProject && disputeScope === "partial" && disputedFreelancerIds.length > 0
-            ? (disputedFreelancerIds as Id<"users">[])
-            : undefined;
-      }
+      const partialIds: Id<"users">[] | undefined =
+        user.role === "client" &&
+        isTeamProject &&
+        disputeScope === "partial" &&
+        disputedFreelancerIds.length > 0
+          ? (disputedFreelancerIds as Id<"users">[])
+          : undefined;
 
       const disputeId = await initiateDispute({
         projectId: formData.projectId as any,
@@ -252,7 +215,7 @@ export default function NewDisputePage() {
         reason: formData.reason,
         description: formData.description,
         evidence: evidence.length > 0 ? evidence : undefined,
-        disputedFreelancerIds: partialIds,
+        ...(user.role === "client" ? { disputedFreelancerIds: partialIds } : {}),
         userId: user._id,
       });
 
@@ -371,14 +334,26 @@ export default function NewDisputePage() {
               )}
             </div>
 
-            {/* Team member selection: team hires (clients and freelancers) */}
-            {formData.projectId && (projectTeamMembers?.length ?? 0) > 0 && (
+            {/* Freelancer vs client only (team hires): no other freelancers as parties */}
+            {formData.projectId &&
+              user?.role === "freelancer" &&
+              ((project as { matchedFreelancerIds?: string[] })?.matchedFreelancerIds?.length ?? 0) > 1 && (
+                <div className="rounded-lg border border-border/60 bg-muted/15 px-4 py-3 text-sm text-muted-foreground leading-relaxed">
+                  <p className="font-medium text-foreground">You and the client</p>
+                  <p className="mt-1">
+                    This dispute is between you and the client only. Only <strong className="text-foreground">your</strong>{" "}
+                    portion of pay for this billing period or hire is in scope. Teammates are not part of this case.
+                  </p>
+                </div>
+              )}
+
+            {/* Team member selection: clients only */}
+            {user?.role === "client" && formData.projectId && (projectTeamMembers?.length ?? 0) > 0 && (
               <div className="space-y-3">
                 <Label>Team members in scope *</Label>
                 <p className="text-xs text-muted-foreground">
-                  {user?.role === "client"
-                    ? "This is a team hire. Dispute the entire team or only the people you select. Funds and enforcement follow the scope you choose."
-                    : "By default only your seat is in scope (your share of the pool is locked). Choose “Entire team” if the dispute covers everyone on the hire."}
+                  This is a team hire. Dispute the entire team or only the people you select. Funds and enforcement follow
+                  the scope you choose.
                 </p>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -387,7 +362,10 @@ export default function NewDisputePage() {
                       name="disputeScope"
                       value="all"
                       checked={disputeScope === "all"}
-                      onChange={() => { setDisputeScope("all"); setDisputedFreelancerIds([]); }}
+                      onChange={() => {
+                        setDisputeScope("all");
+                        setDisputedFreelancerIds([]);
+                      }}
                       className="accent-primary"
                     />
                     <span className="text-sm font-medium">Entire team</span>
@@ -398,12 +376,7 @@ export default function NewDisputePage() {
                       name="disputeScope"
                       value="partial"
                       checked={disputeScope === "partial"}
-                      onChange={() => {
-                        setDisputeScope("partial");
-                        if (user?.role === "freelancer" && user._id) {
-                          setDisputedFreelancerIds([String(user._id)]);
-                        }
-                      }}
+                      onChange={() => setDisputeScope("partial")}
                       className="accent-primary"
                     />
                     <span className="text-sm font-medium">Specific member(s)</span>
@@ -411,16 +384,14 @@ export default function NewDisputePage() {
                 </div>
                 {disputeScope === "all" && (
                   <p className="text-xs text-muted-foreground">
-                    {user?.role === "client"
-                      ? "If the dispute is resolved in your favor, every matched team member may be removed and you&apos;ll replace the full team."
-                      : "The dispute covers the full team’s share of the billing pool (not only your seat)."}
+                    If the dispute is resolved in your favor, every matched team member may be removed and you&apos;ll
+                    replace the full team.
                   </p>
                 )}
                 {disputeScope === "partial" && (
                   <p className="text-xs text-muted-foreground">
-                    {user?.role === "client"
-                      ? "Only the people you select can be removed if the dispute is resolved in your favor; everyone else stays on the hire."
-                      : "Only the seats you select are in dispute; other members’ pay is not locked for this case."}
+                    Only the people you select can be removed if the dispute is resolved in your favor; everyone else
+                    stays on the hire.
                   </p>
                 )}
                 {disputeScope === "partial" && (

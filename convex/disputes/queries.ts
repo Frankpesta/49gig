@@ -792,6 +792,19 @@ export const disputeEconomicsBasisPoolFreelancerNetCentsInternal = internalQuery
   },
 });
 
+/** Disputed freelancer-net pool cents (full hire or partial team) — matches judgment validation. */
+export const disputeNetScopeFreelancerNetCentsInternal = internalQuery({
+  args: { disputeId: v.id("disputes") },
+  handler: async (ctx, args) => {
+    const dispute = await ctx.db.get(args.disputeId);
+    if (!dispute) return { scopeCents: 0 as const };
+    const project = await ctx.db.get(dispute.projectId);
+    if (!project) return { scopeCents: 0 as const };
+    const scopeCents = await disputeNetScopeFreelancerNetCents(ctx, project, dispute);
+    return { scopeCents };
+  },
+});
+
 /**
  * Enforcement audit rows for staff dashboards.
  */

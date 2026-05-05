@@ -50,38 +50,6 @@ export interface Project {
   };
 }
 
-export interface Milestone {
-  _id: Id<"milestones">;
-  projectId: Id<"projects">;
-  title: string;
-  description: string;
-  order: number;
-  amount: number;
-  currency: string;
-  status:
-    | "pending"
-    | "in_progress"
-    | "submitted"
-    | "approved"
-    | "rejected"
-    | "paid"
-    | "disputed";
-  dueDate: number;
-  deliverables?: Array<{
-    name: string;
-    fileId?: Id<"_storage">;
-    url?: string;
-    submittedAt: number;
-  }>;
-  approvedBy?: Id<"users">;
-  approvedAt?: number;
-  rejectionReason?: string;
-  submittedAt?: number;
-  paidAt?: number;
-  createdAt: number;
-  updatedAt: number;
-}
-
 interface ProjectState {
   // Projects
   projects: Project[];
