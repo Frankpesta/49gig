@@ -505,67 +505,6 @@ export default defineSchema({
     .index("by_created", ["createdAt"])
     .index("by_awaiting_match", ["awaitingMatch"]),
 
-  milestones: defineTable({
-    // Project
-    projectId: v.id("projects"),
-
-    // Details
-    title: v.string(),
-    description: v.string(),
-    order: v.number(), // Sequential order
-
-    // Payment
-    amount: v.number(),
-    currency: v.string(),
-
-    // Status
-    status: v.union(
-      v.literal("pending"),
-      v.literal("in_progress"),
-      v.literal("submitted"),
-      v.literal("approved"),
-      v.literal("rejected"),
-      v.literal("paid"),
-      v.literal("disputed")
-    ),
-
-    // Deliverables
-    deliverables: v.optional(
-      v.array(
-        v.object({
-          name: v.string(),
-          fileId: v.optional(v.id("_storage")),
-          url: v.optional(v.string()),
-          submittedAt: v.number(),
-        })
-      )
-    ),
-
-    // Approval
-    approvedBy: v.optional(v.id("users")),
-    approvedAt: v.optional(v.number()),
-    rejectionReason: v.optional(v.string()),
-
-    // Flutterwave
-    flutterwaveTransactionId: v.optional(v.string()),
-    flutterwaveTransferId: v.optional(v.string()),
-
-    // Dates
-    dueDate: v.number(),
-    submittedAt: v.optional(v.number()),
-    paidAt: v.optional(v.number()),
-
-    // Auto-release
-    autoReleaseAt: v.optional(v.number()), // 48h after approval
-
-    // Audit
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_project", ["projectId"])
-    .index("by_status", ["status"])
-    .index("by_auto_release", ["autoReleaseAt"]),
-
   chats: defineTable({
     // Type
     type: v.union(
@@ -1040,8 +979,6 @@ export default defineSchema({
     // Project
     projectId: v.id("projects"),
 
-    // Milestone (legacy - deprecated; use monthlyCycleId for monthly payments)
-    milestoneId: v.optional(v.id("milestones")),
     // Monthly billing cycle (for monthly payment disputes)
     monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
 
@@ -1060,7 +997,8 @@ export default defineSchema({
 
     // Type (legacy shared literals + role-specific; validated in initiateDispute)
     type: v.union(
-      v.literal("milestone_quality"),
+      v.literal("milestone_quality"), // legacy rows only
+      v.literal("deliverable_quality"),
       v.literal("payment"),
       v.literal("communication"),
       v.literal("freelancer_replacement"),
@@ -1085,11 +1023,11 @@ export default defineSchema({
         type: v.union(
           v.literal("message"),
           v.literal("file"),
-          v.literal("milestone_deliverable")
+          v.literal("deliverable"),
+          v.literal("milestone_deliverable"),
         ),
         messageId: v.optional(v.id("messages")),
         fileId: v.optional(v.id("_storage")),
-        milestoneId: v.optional(v.id("milestones")),
         description: v.optional(v.string()),
       })
     ),
@@ -1399,10 +1337,6 @@ export default defineSchema({
     // Project (optional for payout from wallet)
     projectId: v.optional(v.id("projects")),
 
-    // Milestone (legacy - deprecated)
-    milestoneId: v.optional(v.id("milestones")),
-
-    // Monthly cycle (new)
     monthlyCycleId: v.optional(v.id("monthlyBillingCycles")),
 
     // Type
@@ -1464,7 +1398,6 @@ export default defineSchema({
     processedAt: v.optional(v.number()),
   })
     .index("by_project", ["projectId"])
-    .index("by_milestone", ["milestoneId"])
     .index("by_status", ["status"])
     .index("by_flutterwave_transaction", ["flutterwaveTransactionId"])
     .index("by_flutterwave_transfer", ["flutterwaveTransferId"])

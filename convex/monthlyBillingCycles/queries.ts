@@ -205,3 +205,14 @@ export const getCyclesReadyForAutoReleaseInternal = internalQuery({
     return ready;
   },
 });
+
+/** Internal: all billing cycles for a project (matching / stats). */
+export const getMonthlyCyclesForProjectInternal = internalQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("monthlyBillingCycles")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+  },
+});

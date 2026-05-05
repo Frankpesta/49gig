@@ -114,29 +114,37 @@ async function calculatePastPerformance(
 
   if (completedProjects.length === 0) return 50; // Neutral for new freelancers
 
-  // Calculate on-time delivery rate
-  const milestones = await Promise.all(
+  const AUTO_RELEASE_DELAY_MS = 48 * 60 * 60 * 1000;
+
+  // On-time monthly approvals: client approved before auto-release deadline
+  const cyclesLists = await Promise.all(
     completedProjects.map((p: any) =>
-      ctx.runQuery(internal.projects.queries.getProjectMilestonesInternal, {
+      ctx.runQuery(internal.monthlyBillingCycles.queries.getMonthlyCyclesForProjectInternal, {
         projectId: p._id,
       })
     )
   );
 
   let onTimeCount = 0;
-  let totalMilestones = 0;
+  let totalCycles = 0;
 
-  for (const projectMilestones of milestones) {
-    if (!projectMilestones) continue;
-    for (const milestone of projectMilestones) {
-      totalMilestones++;
-      if (milestone.submittedAt && milestone.submittedAt <= milestone.dueDate) {
+  for (const projectCycles of cyclesLists) {
+    if (!projectCycles?.length) continue;
+    for (const cycle of projectCycles) {
+      if (cycle.status === "cancelled") continue;
+      totalCycles++;
+      const deadline = cycle.autoReleaseAt ?? cycle.monthEndDate + AUTO_RELEASE_DELAY_MS;
+      if (
+        cycle.status === "approved" &&
+        cycle.approvedAt != null &&
+        cycle.approvedAt <= deadline
+      ) {
         onTimeCount++;
       }
     }
   }
 
-  const onTimeRate = totalMilestones > 0 ? (onTimeCount / totalMilestones) * 100 : 50;
+  const onTimeRate = totalCycles > 0 ? (onTimeCount / totalCycles) * 100 : 50;
 
   // Combine with project completion rate
   const completionRate = (completedProjects.length / (projects?.length || 1)) * 100;

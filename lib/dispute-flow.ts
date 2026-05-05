@@ -22,7 +22,7 @@ export type EvidenceOwner = "client" | "freelancer" | "both";
 
 export type DisputeReasonPolicy = {
   id:
-    | "milestone_quality"
+    | "deliverable_quality"
     | "payment"
     | "communication"
     | "freelancer_replacement"
@@ -54,6 +54,37 @@ export type DisputeReasonPolicy = {
 const DAY_HOURS = 24;
 
 export const DISPUTE_REASON_POLICIES: DisputeReasonPolicy[] = [
+  {
+    id: "deliverable_quality",
+    label: "Deliverable or work quality",
+    openedBy: "both",
+    summary: "Use when completed work is disputed on quality, completeness, or alignment with scope.",
+    fastTrackEligible: false,
+    negotiationHours: 6,
+    evidenceHours: 48,
+    objectionHours: DAY_HOURS,
+    requiredEvidence: [
+      {
+        id: "expected_scope",
+        owner: "client",
+        label: "Expected scope",
+        description: "Attach the agreed requirements, acceptance criteria, or project messages.",
+      },
+      {
+        id: "delivered_work",
+        owner: "both",
+        label: "Delivered work",
+        description: "Attach files, links, screenshots, or messages that show what was delivered.",
+      },
+      {
+        id: "counter_response",
+        owner: "both",
+        label: "Other party response",
+        description: "Each side should explain their position with supporting proof.",
+      },
+    ],
+    outcomes: ["client_favor", "freelancer_favor", "partial", "replacement"],
+  },
   {
     id: "client_payment_billing",
     label: "Payment or billing issue",
@@ -174,7 +205,7 @@ export const DISPUTE_REASON_POLICIES: DisputeReasonPolicy[] = [
         id: "agreed_timeline",
         owner: "client",
         label: "Agreed timeline or scope",
-        description: "Attach the agreement, project brief, milestone, or chat records.",
+        description: "Attach the agreement, project brief, deliverables list, or chat records.",
       },
       {
         id: "timeline_response",
@@ -282,9 +313,10 @@ export const DISPUTE_REASON_POLICIES: DisputeReasonPolicy[] = [
 ];
 
 export function getDisputeReasonPolicy(type: string): DisputeReasonPolicy {
+  const normalized = type === "milestone_quality" ? "deliverable_quality" : type;
   return (
-    DISPUTE_REASON_POLICIES.find((policy) => policy.id === type) ?? {
-      id: type as DisputeReasonPolicy["id"],
+    DISPUTE_REASON_POLICIES.find((policy) => policy.id === normalized) ?? {
+      id: normalized as DisputeReasonPolicy["id"],
       label: type.replace(/_/g, " "),
       openedBy: "both",
       summary: "Provide details and evidence for this dispute.",

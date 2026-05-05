@@ -13,12 +13,9 @@ import { escrowNetToClientLockedGross } from "../disputes/amounts";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
 import { isFreelancerInMatchingPool } from "../../lib/freelancer-matching-readiness";
 import {
-  calculateSkillOverlapPercent,
-  freelancerHasExactSoftwareSubField,
-  isFreelancerEligibleForProjectMatch,
-  normalizeRequiredSkillsForMatching,
-  projectPrimaryRoleId,
-} from "../../lib/matching-skill-utils";
+  buildReplacementGateContext,
+  rankAdminReplacementCandidates,
+} from "../matching/adminReplacementScore";
 
 /**
  * Helper function to get current user in queries
@@ -657,115 +654,6 @@ export const getTeamHireEscrowBudgetBreakdown = query({
 });
 
 /**
- * Get milestones for a project.
- * Accepts projectId as string (e.g. from URL) and normalizes to support external IDs.
- */
-export const getProjectMilestones = query({
-  args: {
-    projectId: v.string(),
-    userId: v.optional(v.id("users")),
-  },
-  handler: async (ctx, args) => {
-    const projectId = ctx.db.normalizeId("projects", args.projectId);
-    if (!projectId) {
-      return [];
-    }
-
-    const user = await getCurrentUserInQuery(ctx, args.userId);
-    if (!user) {
-      return [];
-    }
-
-    const project = await ctx.db.get(projectId);
-    if (!project) {
-      return [];
-    }
-
-    // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
-    let canViewMilestones =
-      user.role === "admin" ||
-      user.role === "moderator" ||
-      project.clientId === user._id ||
-      project.matchedFreelancerId === user._id ||
-      (project.matchedFreelancerIds && project.matchedFreelancerIds.includes(user._id));
-
-    if (!canViewMilestones && user.role === "freelancer") {
-      const match = await ctx.db
-        .query("matches")
-        .withIndex("by_project", (q) => q.eq("projectId", projectId))
-        .filter((q) => q.eq(q.field("freelancerId"), user._id))
-        .first();
-      if (match && (match.status === "pending" || match.status === "accepted")) {
-        canViewMilestones = true;
-      }
-    }
-
-    if (!canViewMilestones) {
-      return [];
-    }
-
-    const milestones = await ctx.db
-      .query("milestones")
-      .withIndex("by_project", (q) => q.eq("projectId", projectId))
-      .order("asc")
-      .collect();
-
-    return milestones;
-  },
-});
-
-/**
- * Get a single milestone by ID
- */
-export const getMilestoneById = query({
-  args: {
-    milestoneId: v.id("milestones"),
-    userId: v.optional(v.id("users")),
-  },
-  handler: async (ctx, args) => {
-    const user = await getCurrentUserInQuery(ctx, args.userId);
-    if (!user) {
-      throw new Error("Not authenticated");
-    }
-
-    const milestone = await ctx.db.get(args.milestoneId);
-    if (!milestone) {
-      throw new Error("Milestone not found");
-    }
-
-    // Get project for authorization
-    const project = await ctx.db.get(milestone.projectId);
-    if (!project) {
-      throw new Error("Project not found");
-    }
-
-    // Authorization: client, matched freelancer, freelancer with pending/accepted match, admin, or moderator
-    let canViewMilestone =
-      user.role === "admin" ||
-      user.role === "moderator" ||
-      project.clientId === user._id ||
-      project.matchedFreelancerId === user._id;
-
-    if (!canViewMilestone && user.role === "freelancer") {
-      const match = await ctx.db
-        .query("matches")
-        .withIndex("by_project", (q) => q.eq("projectId", milestone.projectId))
-        .filter((q) => q.eq(q.field("freelancerId"), user._id))
-        .first();
-      if (match && (match.status === "pending" || match.status === "accepted")) {
-        canViewMilestone = true;
-      }
-    }
-
-    if (!canViewMilestone) {
-      throw new Error("Not authorized to view this milestone");
-    }
-
-    return milestone;
-  },
-});
-
-/**
  * Get project (internal - no auth required)
  */
 export const getProjectInternal = internalQuery({
@@ -809,55 +697,6 @@ export const getFreelancerIdsWithActiveProjects = internalQuery({
       if (p.matchedFreelancerIds) for (const id of p.matchedFreelancerIds) ids.add(id);
     }
     return Array.from(ids);
-  },
-});
-
-/**
- * Get project milestones (internal)
- */
-export const getProjectMilestonesInternal = internalQuery({
-  args: {
-    projectId: v.id("projects"),
-  },
-  handler: async (ctx, args) => {
-    const milestones = await ctx.db
-      .query("milestones")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .order("asc")
-      .collect();
-    return milestones;
-  },
-});
-
-/**
- * Get milestones ready for auto-release (approved, autoReleaseAt <= now)
- * Used by cron to release payments 48h after client approval
- */
-export const getMilestonesReadyForAutoRelease = internalQuery({
-  args: {
-    now: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const candidates = await ctx.db
-      .query("milestones")
-      .withIndex("by_auto_release", (q) => q.lte("autoReleaseAt", args.now))
-      .collect();
-    return candidates.filter(
-      (m) => m.status === "approved" && m.autoReleaseAt != null && m.autoReleaseAt <= args.now
-    );
-  },
-});
-
-/**
- * Get milestone by ID (internal - no auth required)
- */
-export const getMilestoneByIdInternal = internalQuery({
-  args: {
-    milestoneId: v.id("milestones"),
-  },
-  handler: async (ctx, args) => {
-    const milestone = await ctx.db.get(args.milestoneId);
-    return milestone;
   },
 });
 
@@ -1173,88 +1012,68 @@ export const getAdminReplacementCandidates = query({
     projectId: v.id("projects"),
     oldFreelancerId: v.optional(v.id("users")),
     userId: v.optional(v.id("users")),
+    /** How many candidates to return from the top of the ranked list (min 1, max 100). */
+    limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const empty = {
+      candidates: [] as Array<Record<string, unknown>>,
+      hasMore: false,
+      replacingSeatLabel: undefined as string | undefined,
+    };
+
     const user = await getCurrentUserInQuery(ctx, args.userId);
-    if (!user || user.role !== "admin") return [];
+    if (!user || user.role !== "admin") return empty;
     const project = await ctx.db.get(args.projectId);
-    if (!project) return [];
+    if (!project) return empty;
 
-    const roster = new Set([
-      ...(project.matchedFreelancerId ? [String(project.matchedFreelancerId)] : []),
-      ...(project.matchedFreelancerIds ?? []).map(String),
-    ]);
-    const excluded = new Set((project.permanentlyExcludedFreelancerIds ?? []).map(String));
-    const normalizedSkills = normalizeRequiredSkillsForMatching(project.intakeForm);
-    const projectRoleId = projectPrimaryRoleId(project.intakeForm);
-    const requestedSoftwareSubField = project.intakeForm.softwareDevFields?.[0];
+    const gate = await buildReplacementGateContext(ctx, project, args.oldFreelancerId);
+    const ranked = await rankAdminReplacementCandidates(ctx, project, gate);
+    const cap = Math.min(100, Math.max(1, Math.floor(args.limit ?? 10)));
+    const page = ranked.slice(0, cap);
+    const hasMore = ranked.length > cap;
 
-    const users = await ctx.db.query("users").withIndex("by_role", (q) => q.eq("role", "freelancer")).collect();
-    const filtered = users.filter((freelancer) => {
-      if (!isFreelancerInMatchingPool(freelancer)) return false;
-      if (roster.has(String(freelancer._id))) return false;
-      if (excluded.has(String(freelancer._id))) return false;
-      if (
-        !isFreelancerEligibleForProjectMatch(freelancer, normalizedSkills, projectRoleId)
-      ) {
-        return false;
-      }
-      if (
-        requestedSoftwareSubField &&
-        !freelancerHasExactSoftwareSubField(freelancer, requestedSoftwareSubField)
-      ) {
-        return false;
-      }
-      return true;
+    const candidates = page.map((row) => {
+      const freelancer = row.freelancer;
+      const p = freelancer.profile;
+      return {
+        _id: freelancer._id,
+        name: freelancer.name,
+        email: freelancer.email,
+        primaryRole: p?.primaryRole,
+        experienceLevel: p?.experienceLevel,
+        skills: p?.skills ?? [],
+        skillOverlap: row.breakdown.skillOverlap,
+        score: row.score,
+        confidence: row.confidence,
+        explanation: row.explanation,
+        scoringBreakdown: row.breakdown,
+        techField: p?.techField,
+        softwareDevFields: p?.softwareDevFields,
+        bio: p?.bio,
+        resumeBio: freelancer.resumeBio,
+        timezone: p?.timezone,
+        country: p?.country,
+        availability: p?.availability,
+        weeklyHours: p?.weeklyHours,
+        languagesWritten: p?.languagesWritten,
+        imageUrl: p?.imageUrl,
+        portfolioUrl: p?.portfolioUrl,
+        githubUrl: p?.githubUrl,
+        behanceUrl: p?.behanceUrl,
+        linkedinUrl: p?.linkedinUrl,
+        resumeUrl: freelancer.resumeUrl,
+        verificationStatus: freelancer.verificationStatus,
+        kycStatus: freelancer.kycStatus,
+        vettingOverallScore: row.vettingOverallScore,
+        vettingStatus: row.vettingStatus,
+      };
     });
 
-    const sorted = filtered
-      .map((freelancer) => ({
-        freelancer,
-        skillOverlap: calculateSkillOverlapPercent(
-          normalizedSkills,
-          freelancer.profile?.skills ?? []
-        ),
-      }))
-      .sort((a, b) => b.skillOverlap - a.skillOverlap || a.freelancer.name.localeCompare(b.freelancer.name))
-      .slice(0, 50);
-
-    return await Promise.all(
-      sorted.map(async ({ freelancer, skillOverlap }) => {
-        const vetting = await ctx.db
-          .query("vettingResults")
-          .withIndex("by_freelancer", (q) => q.eq("freelancerId", freelancer._id))
-          .first();
-        const p = freelancer.profile;
-        return {
-          _id: freelancer._id,
-          name: freelancer.name,
-          email: freelancer.email,
-          primaryRole: p?.primaryRole,
-          experienceLevel: p?.experienceLevel,
-          skills: p?.skills ?? [],
-          skillOverlap,
-          techField: p?.techField,
-          softwareDevFields: p?.softwareDevFields,
-          bio: p?.bio,
-          resumeBio: freelancer.resumeBio,
-          timezone: p?.timezone,
-          country: p?.country,
-          availability: p?.availability,
-          weeklyHours: p?.weeklyHours,
-          languagesWritten: p?.languagesWritten,
-          imageUrl: p?.imageUrl,
-          portfolioUrl: p?.portfolioUrl,
-          githubUrl: p?.githubUrl,
-          behanceUrl: p?.behanceUrl,
-          linkedinUrl: p?.linkedinUrl,
-          resumeUrl: freelancer.resumeUrl,
-          verificationStatus: freelancer.verificationStatus,
-          kycStatus: freelancer.kycStatus,
-          vettingOverallScore: vetting?.overallScore,
-          vettingStatus: vetting?.status,
-        };
-      })
-    );
+    return {
+      candidates,
+      hasMore,
+      replacingSeatLabel: gate.replacingSeatLabel,
+    };
   },
 });

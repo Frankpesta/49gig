@@ -1,11 +1,11 @@
 /**
- * Comprehensive Payment Calculation System
- * Handles different billing models: fixed-price, milestone-based, hourly, and hybrid
+ * Comprehensive payment calculation for quotes and checkout UI.
+ * Billing phases are illustrative slices of the total (escrow uses monthly cycles in production).
  */
 
 import type { ExperienceLevel, ProjectType, HireType, TeamSize } from "./budget-calculator";
 
-export type BillingModel = "fixed_price" | "milestone_based" | "hourly" | "hybrid";
+export type BillingModel = "fixed_price" | "phased" | "hourly" | "hybrid";
 
 export interface PaymentCalculationParams {
   totalAmount: number;
@@ -25,13 +25,13 @@ export interface PaymentBreakdown {
   platformFeePercentage: number;
   netAmount: number; // Amount after platform fee (what freelancer receives)
   billingModel: BillingModel;
-  milestones?: MilestonePayment[];
+  phases?: BillingPhase[];
   hourlyRate?: number;
   estimatedHours?: number;
   currency: string;
 }
 
-export interface MilestonePayment {
+export interface BillingPhase {
   title: string;
   description: string;
   amount: number;
@@ -49,33 +49,27 @@ export function determineBillingModel(params: PaymentCalculationParams): Billing
     (params.endDate.getTime() - params.startDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  // Simple projects (< $500) - fixed price
   if (totalAmount < 500) {
     return "fixed_price";
   }
 
-  // Ongoing projects - hourly
   if (projectType === "ongoing") {
     return "hourly";
   }
 
-  // Projects with clear deliverables - milestone-based
   if (deliverables && deliverables.length > 0 && deliverables.length <= 5) {
-    return "milestone_based";
+    return "phased";
   }
 
-  // Long-term projects (> 3 months) - hourly or hybrid
   if (durationDays > 90) {
     return estimatedHours ? "hourly" : "hybrid";
   }
 
-  // Complex projects with multiple phases - milestone-based
   if (complexity === "complex" || (deliverables && deliverables.length > 3)) {
-    return "milestone_based";
+    return "phased";
   }
 
-  // Default: milestone-based for one-time projects
-  return "milestone_based";
+  return "phased";
 }
 
 /**
@@ -90,18 +84,17 @@ export function calculatePlatformFee(totalAmount: number): {
 }
 
 /**
- * Auto-split project into milestones based on deliverables or project phases
+ * Auto-split project into illustrative payment phases (deliverables or timeline).
  */
-export function autoSplitMilestones(
+export function autoSplitPhases(
   params: PaymentCalculationParams,
   billingModel: BillingModel
-): MilestonePayment[] {
+): BillingPhase[] {
   const { totalAmount, deliverables, startDate, endDate, projectType } = params;
   const durationDays = Math.ceil(
     (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  // Fixed price projects: single milestone
   if (billingModel === "fixed_price") {
     return [
       {
@@ -115,42 +108,36 @@ export function autoSplitMilestones(
     ];
   }
 
-  // Hourly projects: no milestones (billed as work progresses)
   if (billingModel === "hourly") {
     return [];
   }
 
-  // Milestone-based: split by deliverables or phases
   if (deliverables && deliverables.length > 0) {
     return splitByDeliverables(deliverables, totalAmount, startDate, endDate);
   }
 
-  // Default: split by project phases
   return splitByPhases(totalAmount, durationDays, startDate, endDate, projectType);
 }
 
-/**
- * Split milestones by deliverables
- */
 function splitByDeliverables(
   deliverables: string[],
   totalAmount: number,
   startDate: Date,
   endDate: Date
-): MilestonePayment[] {
-  const milestoneCount = Math.min(deliverables.length, 5); // Max 5 milestones
-  const amountPerMilestone = totalAmount / milestoneCount;
+): BillingPhase[] {
+  const phaseCount = Math.min(deliverables.length, 5);
+  const amountPerPhase = totalAmount / phaseCount;
   const durationMs = endDate.getTime() - startDate.getTime();
-  const intervalMs = durationMs / milestoneCount;
+  const intervalMs = durationMs / phaseCount;
 
-  return deliverables.slice(0, milestoneCount).map((deliverable, index) => {
+  return deliverables.slice(0, phaseCount).map((deliverable, index) => {
     const dueDate = new Date(startDate.getTime() + (index + 1) * intervalMs);
-    const percentage = (1 / milestoneCount) * 100;
+    const percentage = (1 / phaseCount) * 100;
 
     return {
       title: deliverable,
       description: `Deliverable: ${deliverable}`,
-      amount: Math.round(amountPerMilestone * 100) / 100, // Round to 2 decimals
+      amount: Math.round(amountPerPhase * 100) / 100,
       percentage: Math.round(percentage * 100) / 100,
       order: index + 1,
       dueDate: dueDate.getTime(),
@@ -158,33 +145,27 @@ function splitByDeliverables(
   });
 }
 
-/**
- * Split milestones by project phases (for projects without clear deliverables)
- */
 function splitByPhases(
   totalAmount: number,
   durationDays: number,
   startDate: Date,
   endDate: Date,
   projectType: ProjectType
-): MilestonePayment[] {
+): BillingPhase[] {
   let phases: Array<{ name: string; percentage: number }>;
 
   if (durationDays <= 7) {
-    // Short projects: 2 milestones (50/50)
     phases = [
       { name: "Initial Development", percentage: 50 },
       { name: "Final Delivery", percentage: 50 },
     ];
   } else if (durationDays <= 30) {
-    // Medium projects: 3 milestones (30/40/30)
     phases = [
       { name: "Planning & Setup", percentage: 30 },
       { name: "Development", percentage: 40 },
       { name: "Testing & Delivery", percentage: 30 },
     ];
   } else if (durationDays <= 90) {
-    // Longer projects: 4 milestones (20/30/30/20)
     phases = [
       { name: "Planning & Design", percentage: 20 },
       { name: "Core Development", percentage: 30 },
@@ -192,7 +173,6 @@ function splitByPhases(
       { name: "Final Delivery", percentage: 20 },
     ];
   } else {
-    // Long-term projects: 5 milestones (15/20/25/25/15)
     phases = [
       { name: "Planning & Design", percentage: 15 },
       { name: "Initial Development", percentage: 20 },
@@ -219,9 +199,6 @@ function splitByPhases(
   });
 }
 
-/**
- * Calculate hourly rate from total amount and estimated hours
- */
 export function calculateHourlyRate(
   totalAmount: number,
   estimatedHours: number,
@@ -229,7 +206,6 @@ export function calculateHourlyRate(
 ): number {
   const calculatedRate = totalAmount / estimatedHours;
 
-  // Ensure minimum rates by experience level
   const minimumRates: Record<ExperienceLevel, number> = {
     junior: 3,
     mid: 5,
@@ -240,9 +216,6 @@ export function calculateHourlyRate(
   return Math.max(calculatedRate, minimumRates[experienceLevel]);
 }
 
-/**
- * Main payment calculation function
- */
 export function calculatePayment(params: PaymentCalculationParams): PaymentBreakdown {
   const { totalAmount, estimatedHours, experienceLevel } = params;
   const billingModel = determineBillingModel(params);
@@ -259,16 +232,14 @@ export function calculatePayment(params: PaymentCalculationParams): PaymentBreak
     currency: "usd",
   };
 
-  // Add milestones for milestone-based and fixed-price projects
-  if (billingModel === "milestone_based" || billingModel === "fixed_price") {
-    breakdown.milestones = autoSplitMilestones(params, billingModel);
+  if (billingModel === "phased" || billingModel === "fixed_price") {
+    breakdown.phases = autoSplitPhases(params, billingModel);
   }
 
-  // Add hourly rate for hourly and hybrid projects
   if (billingModel === "hourly" || billingModel === "hybrid") {
     if (estimatedHours) {
       breakdown.hourlyRate = calculateHourlyRate(
-        netAmount, // Use net amount (what freelancer receives)
+        netAmount,
         estimatedHours,
         experienceLevel
       );
@@ -279,9 +250,6 @@ export function calculatePayment(params: PaymentCalculationParams): PaymentBreak
   return breakdown;
 }
 
-/**
- * Format payment breakdown for display
- */
 export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
   summary: string;
   details: Array<{ label: string; value: string; description?: string }>;
@@ -304,13 +272,11 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
     });
   }
 
-  if (breakdown.milestones && breakdown.milestones.length > 0) {
+  if (breakdown.phases && breakdown.phases.length > 0) {
     details.push({
-      label: "Payment Structure",
-      value: `${breakdown.milestones.length} Milestone${breakdown.milestones.length > 1 ? "s" : ""}`,
-      description: breakdown.milestones
-        .map((m) => `${m.percentage}%`)
-        .join(", "),
+      label: "Payment structure (illustrative)",
+      value: `${breakdown.phases.length} phase${breakdown.phases.length > 1 ? "s" : ""}`,
+      description: breakdown.phases.map((m) => `${m.percentage}%`).join(", "),
     });
   }
 
@@ -319,9 +285,6 @@ export function formatPaymentBreakdown(breakdown: PaymentBreakdown): {
   return { summary, details };
 }
 
-/**
- * Format currency
- */
 export function formatCurrency(amount: number, currency: string = "USD"): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -331,20 +294,17 @@ export function formatCurrency(amount: number, currency: string = "USD"): string
   }).format(amount);
 }
 
-/**
- * Validate milestone amounts sum to total
- */
-export function validateMilestones(
-  milestones: MilestonePayment[],
+export function validateBillingPhases(
+  phases: BillingPhase[],
   totalAmount: number
 ): { valid: boolean; error?: string } {
-  const total = milestones.reduce((sum, m) => sum + m.amount, 0);
+  const total = phases.reduce((sum, m) => sum + m.amount, 0);
   const difference = Math.abs(total - totalAmount);
 
   if (difference > 0.01) {
     return {
       valid: false,
-      error: `Milestone amounts (${formatCurrency(total)}) don't match project total (${formatCurrency(totalAmount)}). Difference: ${formatCurrency(difference)}`,
+      error: `Phase amounts (${formatCurrency(total)}) don't match project total (${formatCurrency(totalAmount)}). Difference: ${formatCurrency(difference)}`,
     };
   }
 

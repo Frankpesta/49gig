@@ -29,7 +29,7 @@ export function PaymentBreakdownDisplay({
 
   const billingModelLabels: Record<PaymentBreakdown["billingModel"], string> = {
     fixed_price: "Fixed Price",
-    milestone_based: "Deliverable-Based",
+    phased: "Phased (illustrative schedule)",
     hourly: "Hourly Rate",
     hybrid: "Hybrid (Hourly + Deliverables)",
   };
@@ -37,7 +37,7 @@ export function PaymentBreakdownDisplay({
   const billingModelIcons: Record<PaymentBreakdown["billingModel"], typeof DollarSign> = {
     fixed_price: DollarSign,
     hourly: Clock,
-    milestone_based: DollarSign,
+    phased: DollarSign,
     hybrid: Users,
   };
 

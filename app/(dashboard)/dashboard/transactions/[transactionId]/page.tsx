@@ -35,7 +35,7 @@ import { Id } from "@/convex/_generated/dataModel";
 const TYPE_LABELS: Record<string, string> = {
   pre_funding: "Project Funding",
   top_up: "Add payment (months)",
-  milestone_release: "Milestone Release",
+  milestone_release: "Legacy release",
   monthly_release: "Monthly Release",
   refund: "Refund",
   platform_fee: "Included services",
@@ -370,7 +370,7 @@ export default function TransactionDetailPage() {
                   <Building2 className="h-5 w-5 text-primary" />
                   Project Information
                 </CardTitle>
-                <CardDescription>Related project and milestone</CardDescription>
+                <CardDescription>Related project and billing period</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -388,20 +388,21 @@ export default function TransactionDetailPage() {
                     <p className="text-sm">{transaction.project.description}</p>
                   </div>
                 )}
-                {transaction.milestone && (
+                {transaction.monthlyCycle && (
                   <>
                     <Separator />
                     <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-1">Milestone</div>
-                      <div className="font-semibold">{transaction.milestone.title}</div>
-                      {transaction.milestone.description && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {transaction.milestone.description}
-                        </p>
+                      <div className="text-sm font-medium text-muted-foreground mb-1">Billing month</div>
+                      <div className="font-semibold">Month {transaction.monthlyCycle.monthIndex}</div>
+                      {transaction.monthlyCycle.amountCents != null && (
+                        <div className="text-sm text-muted-foreground mt-2">
+                          Pool: $
+                          {(transaction.monthlyCycle.amountCents / 100).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
                       )}
-                      <div className="text-sm text-muted-foreground mt-2">
-                        Amount: ${transaction.milestone.amount.toLocaleString()}
-                      </div>
                     </div>
                   </>
                 )}
