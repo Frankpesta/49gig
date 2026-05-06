@@ -31,8 +31,9 @@ async function getCurrentUserInQuery(
 
 /**
  * Clients and staff see client-gross USD (`dispute.lockedAmount` snapshot at filing).
- * Freelancers each see freelancer-net USD for **their seat** from `lockedEconomicsFreelancerNetPoolCents`
- * (fallback: legacy monthly-cycle / escrow rules), subdivided consistently with initiation.
+ * Freelancers see escrow-based freelancer-net for their seat: share of the dispute snapshot pool
+ * (`lockedEconomicsFreelancerNetPoolCents`), capped to **remaining escrow** when the dispute was
+ * opened—not the original contract total. Same basis as payouts.
  */
 async function clientOrStaffVisibleLockedGrossUsd(
   ctx: QueryCtx,

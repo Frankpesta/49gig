@@ -14,9 +14,8 @@ import {
 export type DbLikeCtx = QueryCtx | MutationCtx;
 
 /**
- * Snapshot pool (freelancer net, integer cents) used when opening the dispute to compute
- * `lockedAmount` and per-seat splits. Prefer this over recomputing from live escrow so seat
- * numbers stay aligned with filing + client gross snapshot across time.
+ * Snapshot pool (freelancer net, integer cents) frozen when the dispute is opened. Must not
+ * exceed **remaining escrow** at filing (`initiateDispute` caps monthly nominals to current escrow).
  *
  * Fallback (legacy disputes): monthly cycle → `amountCents`; else → current project escrow net.
  */

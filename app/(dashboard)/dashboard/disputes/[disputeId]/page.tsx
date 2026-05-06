@@ -1220,7 +1220,11 @@ export default function DisputeDetailPage() {
             <CardHeader className="border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
               <CardTitle className="text-base font-semibold sm:text-lg">Financial details</CardTitle>
               <CardDescription>
-                Amount in scope for this dispute. The figure is shown in the form that applies to your role.
+                {user.role === "freelancer"
+                  ? "Your seat’s freelancer-net share of the amount **frozen when this dispute opened**—from **money still in escrow** then, not money already paid out in earlier months."
+                  : user.role === "client"
+                    ? "Client-total (gross) amount in scope—includes the platform fee portion; freelancer pools are carved from net escrow."
+                    : "Client-total (gross) snapshot in scope at filing; freelancers see their net share from the same escrow-based snapshot."}
               </CardDescription>
             </CardHeader>
             <CardContent className="px-4 py-4 sm:px-6 sm:py-5">

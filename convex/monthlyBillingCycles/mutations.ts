@@ -7,6 +7,7 @@ import type { MutationCtx } from "../_generated/server";
 import { getDurationMonths } from "../../lib/project-duration";
 import { assertUsdCurrency } from "../currencyPolicy";
 import { teamBasisUserIdsForDispute, computeTeamPoolShareCentsByFreelancerId } from "../teamEscrowShares";
+import { resolvedLockedEconomicsFreelancerNetPoolCents } from "../disputes/lockingBasis";
 
 const apiModule = require("../_generated/api");
 const api = apiModule as {
@@ -116,50 +117,45 @@ async function creditWalletInline(
   return { walletId: wallet._id, newBalanceCents: newBalance };
 }
 
-/** Roster split for a cycle (same rules as client approve). */
+/** Roster split for a cycle (same proportional weights as escrow / disputes) — capped to current escrow. */
 async function computeMonthlyCycleRosterShareCents(
   ctx: MutationCtx,
   cycle: Doc<"monthlyBillingCycles">,
   project: Doc<"projects">,
-  freelancerIds: Doc<"users">["_id"][]
-): Promise<number[]> {
-  const breakdown = project.teamBudgetBreakdown;
-  let shareCentsByFreelancer: number[];
-
-  if (breakdown && Object.keys(breakdown).length > 0 && freelancerIds.length > 1) {
-    const acceptedMatches = await ctx.db
-      .query("matches")
-      .withIndex("by_project", (q) => q.eq("projectId", cycle.projectId))
-      .collect();
-    const acceptedByFreelancer = new Map(
-      acceptedMatches
-        .filter((m) => m.status === "accepted" && freelancerIds.includes(m.freelancerId))
-        .map((m) => [m.freelancerId, m])
-    );
-
-    const equalShare = Math.floor(cycle.amountCents / freelancerIds.length);
-    shareCentsByFreelancer = freelancerIds.map((fid) => {
-      const match = acceptedByFreelancer.get(fid);
-      const role = match?.teamRole;
-      const roleAmount = role && breakdown[role] != null ? breakdown[role] : equalShare;
-      return Math.max(0, roleAmount);
-    });
-
-    const totalAllocated = shareCentsByFreelancer.reduce((a, b) => a + b, 0);
-    const remainder = cycle.amountCents - totalAllocated;
-    if (remainder !== 0 && shareCentsByFreelancer.length > 0) {
-      shareCentsByFreelancer = [...shareCentsByFreelancer];
-      shareCentsByFreelancer[0] += remainder;
-    }
-  } else {
-    const amountPerFreelancerCents = Math.floor(cycle.amountCents / freelancerIds.length);
-    const remainder = cycle.amountCents - amountPerFreelancerCents * freelancerIds.length;
-    shareCentsByFreelancer = freelancerIds.map((_, i) =>
-      amountPerFreelancerCents + (i === 0 ? remainder : 0)
-    );
+  freelancerIds: Doc<"users">["_id"][],
+  opts?: {
+    /** Freelancer-net pool ceiling (e.g. dispute snapshot at open). Split uses min(cycle amount, this). */
+    capPoolFreelancerNetCents?: number | null;
   }
-
-  return shareCentsByFreelancer;
+): Promise<number[]> {
+  const nominal = Math.max(0, Math.round(cycle.amountCents ?? 0));
+  const cap = opts?.capPoolFreelancerNetCents;
+  const poolBasis =
+    cap != null && Number.isFinite(cap)
+      ? Math.min(nominal, Math.max(0, Math.round(cap)))
+      : nominal;
+  const shareMap = await computeTeamPoolShareCentsByFreelancerId(
+    ctx,
+    cycle.projectId,
+    freelancerIds,
+    project.teamBudgetBreakdown,
+    poolBasis
+  );
+  let shares = freelancerIds.map((fid) => shareMap.get(String(fid)) ?? 0);
+  const escrowCapCents = Math.round(Math.max(0, project.escrowedAmount ?? 0) * 100);
+  const total = shares.reduce((a, b) => a + b, 0);
+  if (total > escrowCapCents && total > 0) {
+    let allocated = 0;
+    shares = shares.map((s, i) => {
+      if (i === shares.length - 1) {
+        return Math.max(0, escrowCapCents - allocated);
+      }
+      const scaled = Math.floor((s * escrowCapCents) / total);
+      allocated += scaled;
+      return scaled;
+    });
+  }
+  return shares;
 }
 
 type MonthlyPayoutKind =
@@ -677,11 +673,17 @@ export const releaseMonthlyCycleAfterFreelancerFavorJudgmentInternal = internalM
 
     const onlyPay: Doc<"users">["_id"][] | null = isPartialTeam ? disputedRaw : null;
 
+    const snapshotPoolCents = await resolvedLockedEconomicsFreelancerNetPoolCents(
+      ctx,
+      dispute,
+      project
+    );
     const shareCentsByFreelancer = await computeMonthlyCycleRosterShareCents(
       ctx,
       cycle,
       project,
-      freelancerIds
+      freelancerIds,
+      { capPoolFreelancerNetCents: snapshotPoolCents }
     );
 
     const pauseState = await getActiveBillingPauseState(ctx, cycle.projectId);

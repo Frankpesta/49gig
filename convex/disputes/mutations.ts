@@ -458,20 +458,26 @@ export const initiateDispute = mutation({
     }
 
     const escrowNetWhole = Math.max(0, project.escrowedAmount ?? 0);
+    const escrowNetCents = Math.max(0, Math.round(escrowNetWhole * 100));
     const platformFeePct = await effectivePlatformFeePercentForProject(
       ctx,
       project.platformFee
     );
 
-    /** Freelancer-net pool (cents) this dispute attaches to — cycle slice or full hire escrow net. */
+    /**
+     * Freelancer-net pool (cents) this dispute attaches to — never more than **money still in
+     * escrow** at filing. Month N disputes use min(that month’s scheduled pool, remaining escrow)
+     * so already-released months are excluded. Hire-wide disputes use current escrow only.
+     */
     let basisPoolFreelancerNetCents: number;
     if (monthlyCycleDoc != null) {
-      basisPoolFreelancerNetCents = Math.max(
+      const nominalMonthPoolCents = Math.max(
         0,
         Math.round(monthlyCycleDoc.amountCents ?? 0)
       );
+      basisPoolFreelancerNetCents = Math.min(nominalMonthPoolCents, escrowNetCents);
     } else {
-      basisPoolFreelancerNetCents = Math.round(escrowNetWhole * 100);
+      basisPoolFreelancerNetCents = escrowNetCents;
     }
 
     const basisFreelancerNetUsd =
