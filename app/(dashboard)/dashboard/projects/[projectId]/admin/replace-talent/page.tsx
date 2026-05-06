@@ -144,12 +144,25 @@ export default function AdminReplaceTalentPage() {
     (api as any)["projects/mutations"].adminReplaceFreelancer
   );
 
+  const adminReplacementRoster = (
+    project as {
+      adminReplacementRoster?: Array<{
+        _id: Id<"users">;
+        name: string;
+        teamRole?: string;
+      }>;
+    }
+  ).adminReplacementRoster;
+
   const assignedFreelancers = useMemo((): Array<{
     _id: Id<"users">;
     name: string;
     teamRole?: string;
   }> => {
     if (!project) return [];
+    if (adminReplacementRoster && adminReplacementRoster.length > 0) {
+      return adminReplacementRoster;
+    }
     const confirmed =
       (
         project as {
@@ -159,7 +172,7 @@ export default function AdminReplaceTalentPage() {
     if (confirmed.length > 0) return confirmed;
     const f = project.freelancer;
     return f ? [{ _id: f._id, name: f.name }] : [];
-  }, [project]);
+  }, [project, adminReplacementRoster]);
 
   const qpOld = searchParams.get("oldFreelancerId");
 
@@ -276,7 +289,9 @@ export default function AdminReplaceTalentPage() {
   }
 
   const canReplace =
-    project.status === "matched" || project.status === "in_progress";
+    project.status === "matched" ||
+    project.status === "in_progress" ||
+    project.status === "awaiting_freelancer";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 pb-24">
@@ -307,7 +322,8 @@ export default function AdminReplaceTalentPage() {
         <CardContent className="space-y-6">
           {!canReplace ? (
             <p className="text-sm text-amber-700 dark:text-amber-400">
-              Replacement is only available when the hire is matched or in progress.
+              Replacement is only available when the hire is matched, in progress, or waiting for freelancer
+              acceptance.
             </p>
           ) : null}
 
