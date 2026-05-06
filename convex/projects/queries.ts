@@ -455,6 +455,59 @@ export const getProject = query({
       });
     }
 
+    /** Admin/moderator: who can be swapped via manual replacement (includes client-picked pending invites). */
+    let adminReplacementRoster:
+      | Array<{
+          _id: Doc<"users">["_id"];
+          name: string;
+          teamRole?: string;
+        }>
+      | undefined;
+    if (user.role === "admin" || user.role === "moderator") {
+      const rosterMap = new Map<
+        string,
+        { _id: Doc<"users">["_id"]; name: string; teamRole?: string }
+      >();
+      for (const m of matchRows) {
+        const onRoster =
+          (m.status === "accepted" && m.freelancerAction === "accepted") ||
+          (m.status === "pending" && m.clientAction === "accepted");
+        if (!onRoster) continue;
+        const u = await ctx.db.get(m.freelancerId);
+        if (!u) continue;
+        rosterMap.set(String(u._id), {
+          _id: u._id,
+          name: u.name,
+          teamRole: m.teamRole ?? undefined,
+        });
+      }
+      if (project.matchedFreelancerId) {
+        const u = await ctx.db.get(project.matchedFreelancerId);
+        if (u && !rosterMap.has(String(u._id))) {
+          rosterMap.set(String(u._id), { _id: u._id, name: u.name });
+        }
+      }
+      for (const fid of project.matchedFreelancerIds ?? []) {
+        const u = await ctx.db.get(fid);
+        if (u && !rosterMap.has(String(u._id))) {
+          rosterMap.set(String(u._id), { _id: u._id, name: u.name });
+        }
+      }
+      if (project.selectedFreelancerId) {
+        const u = await ctx.db.get(project.selectedFreelancerId);
+        if (u && !rosterMap.has(String(u._id))) {
+          rosterMap.set(String(u._id), { _id: u._id, name: u.name });
+        }
+      }
+      for (const fid of project.selectedFreelancerIds ?? []) {
+        const u = await ctx.db.get(fid);
+        if (u && !rosterMap.has(String(u._id))) {
+          rosterMap.set(String(u._id), { _id: u._id, name: u.name });
+        }
+      }
+      adminReplacementRoster = Array.from(rosterMap.values());
+    }
+
     // Get client and freelancer info
     const client = await ctx.db.get(project.clientId);
     const freelancer = project.matchedFreelancerId
@@ -542,6 +595,9 @@ export const getProject = query({
             openDisputeOnHire,
             viewerIsDisputePartyOnHire,
           }
+        : {}),
+      ...(user.role === "admin" || user.role === "moderator"
+        ? { adminReplacementRoster }
         : {}),
     };
   },

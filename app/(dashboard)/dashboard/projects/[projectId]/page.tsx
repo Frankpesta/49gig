@@ -499,6 +499,23 @@ export default function ProjectDetailPage() {
       : project.freelancer
         ? [{ _id: project.freelancer._id, name: project.freelancer.name }]
         : [];
+  const adminReplacementRoster = (
+    project as {
+      adminReplacementRoster?: Array<{
+        _id: Id<"users">;
+        name: string;
+        teamRole?: string;
+      }>;
+    }
+  ).adminReplacementRoster;
+  const freelancersForAdminReplace =
+    isAdmin && adminReplacementRoster && adminReplacementRoster.length > 0
+      ? adminReplacementRoster
+      : assignedFreelancers;
+  const adminManualReplaceStatuses =
+    project.status === "matched" ||
+    project.status === "in_progress" ||
+    project.status === "awaiting_freelancer";
   const activeBillingPauses = ((billingPauses ?? []) as Array<{
     _id: string;
     scope: "project" | "freelancer";
@@ -1038,9 +1055,9 @@ export default function ProjectDetailPage() {
                     </Button>
                   )}
                 </div>
-                {assignedFreelancers.length > 0 && (
+                {freelancersForAdminReplace.length > 0 && (
                   <div className="space-y-2">
-                    {assignedFreelancers.map((freelancer) => {
+                    {freelancersForAdminReplace.map((freelancer) => {
                       const paused = pausedFreelancerIds.has(String(freelancer._id));
                       const busy = pausingKey === String(freelancer._id);
                       return (
@@ -1056,7 +1073,7 @@ export default function ProjectDetailPage() {
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
-                            {(project.status === "matched" || project.status === "in_progress") && (
+                            {adminManualReplaceStatuses ? (
                               <Button variant="outline" size="sm" asChild>
                                 <Link
                                   href={`/dashboard/projects/${project._id}/admin/replace-talent?oldFreelancerId=${freelancer._id}`}
@@ -1064,7 +1081,7 @@ export default function ProjectDetailPage() {
                                   Replace seat
                                 </Link>
                               </Button>
-                            )}
+                            ) : null}
                             {paused ? (
                               <Button
                                 variant="outline"
@@ -1094,8 +1111,8 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </div>
-            {assignedFreelancers.length > 0 &&
-              (project.status === "matched" || project.status === "in_progress") && (
+            {freelancersForAdminReplace.length > 0 &&
+              adminManualReplaceStatuses && (
                 <Button variant="outline" className="min-h-11 w-full touch-manipulation sm:w-auto" asChild>
                   <Link href={`/dashboard/projects/${project._id}/admin/replace-talent`}>
                     <UserSearch className="mr-2 h-4 w-4" />

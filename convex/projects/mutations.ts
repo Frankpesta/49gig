@@ -923,8 +923,14 @@ export const adminReplaceFreelancer = mutation({
 
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Project not found");
-    if (project.status !== "matched" && project.status !== "in_progress") {
-      throw new Error("Admin replacement is only available for matched or in-progress hires");
+    if (
+      project.status !== "matched" &&
+      project.status !== "in_progress" &&
+      project.status !== "awaiting_freelancer"
+    ) {
+      throw new Error(
+        "Admin replacement is only available for matched, in-progress, or awaiting-freelancer hires"
+      );
     }
 
     const replacement = await ctx.db.get(args.replacementFreelancerId);
@@ -932,9 +938,14 @@ export const adminReplaceFreelancer = mutation({
       throw new Error("Replacement freelancer is not active");
     }
 
-    const currentRoster = project.matchedFreelancerId
-      ? [project.matchedFreelancerId]
-      : project.matchedFreelancerIds ?? [];
+    const currentRoster: Doc<"users">["_id"][] =
+      project.matchedFreelancerId != null
+        ? [project.matchedFreelancerId]
+        : (project.matchedFreelancerIds?.length ?? 0) > 0
+          ? [...project.matchedFreelancerIds!]
+          : project.selectedFreelancerId != null
+            ? [project.selectedFreelancerId]
+            : [...(project.selectedFreelancerIds ?? [])];
     if (!currentRoster.some((id) => String(id) === String(args.oldFreelancerId))) {
       throw new Error("Old freelancer is not currently assigned to this hire");
     }
@@ -947,12 +958,12 @@ export const adminReplaceFreelancer = mutation({
       .query("matches")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
-    const oldAcceptedMatch = projectMatches.find(
+    const oldMatchRow = projectMatches.find(
       (m) =>
         String(m.freelancerId) === String(args.oldFreelancerId) &&
-        m.status === "accepted"
+        (m.status === "accepted" || m.status === "pending")
     );
-    const replacementTeamRole = oldAcceptedMatch?.teamRole;
+    const replacementTeamRole = oldMatchRow?.teamRole;
 
     for (const m of projectMatches) {
       if (String(m.freelancerId) === String(args.oldFreelancerId)) {
@@ -990,8 +1001,6 @@ export const adminReplaceFreelancer = mutation({
 
     const rosterPatch: Partial<Doc<"projects">> = {
       matchedAt: project.matchedAt ?? now,
-      selectedFreelancerId: undefined,
-      selectedFreelancerIds: undefined,
       contractFileId: undefined,
       contractGeneratedAt: undefined,
       contractSignedAt: undefined,
@@ -1009,14 +1018,41 @@ export const adminReplaceFreelancer = mutation({
       updatedAt: now,
     };
 
-    if (project.matchedFreelancerId) {
+    if (project.matchedFreelancerId != null) {
       rosterPatch.matchedFreelancerId = args.replacementFreelancerId;
-    } else {
-      rosterPatch.matchedFreelancerIds = (project.matchedFreelancerIds ?? []).map((fid) =>
+      rosterPatch.selectedFreelancerId = undefined;
+      rosterPatch.selectedFreelancerIds = undefined;
+    } else if ((project.matchedFreelancerIds?.length ?? 0) > 0) {
+      rosterPatch.matchedFreelancerIds = project.matchedFreelancerIds!.map((fid) =>
         String(fid) === String(args.oldFreelancerId)
           ? args.replacementFreelancerId
           : fid
       );
+      rosterPatch.selectedFreelancerId = undefined;
+      rosterPatch.selectedFreelancerIds = undefined;
+    } else if (
+      project.selectedFreelancerId != null &&
+      String(project.selectedFreelancerId) === String(args.oldFreelancerId)
+    ) {
+      rosterPatch.matchedFreelancerId = args.replacementFreelancerId;
+      rosterPatch.selectedFreelancerId = undefined;
+      rosterPatch.selectedFreelancerIds = undefined;
+      if (project.status === "awaiting_freelancer") {
+        rosterPatch.status = "matched";
+      }
+    } else if (
+      (project.selectedFreelancerIds?.length ?? 0) > 0 &&
+      project.selectedFreelancerIds!.some(
+        (fid) => String(fid) === String(args.oldFreelancerId)
+      )
+    ) {
+      rosterPatch.selectedFreelancerIds = project.selectedFreelancerIds!.map((fid) =>
+        String(fid) === String(args.oldFreelancerId)
+          ? args.replacementFreelancerId
+          : fid
+      );
+    } else {
+      throw new Error("Could not update hire roster for this replacement");
     }
     await ctx.db.patch(args.projectId, rosterPatch);
 
