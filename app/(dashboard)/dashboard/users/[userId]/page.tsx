@@ -58,6 +58,7 @@ import {
   Award,
   CreditCard,
   Loader2,
+  Trash2,
   UserCheck,
   Github,
   Linkedin,
@@ -224,6 +225,9 @@ export default function UserDetailPage() {
   const [suspendDuration, setSuspendDuration] = useState("permanent");
   const [isActioning, setIsActioning] = useState(false);
 
+  const [reviewDeleteId, setReviewDeleteId] = useState<Id<"reviews"> | null>(null);
+  const [isDeletingReview, setIsDeletingReview] = useState(false);
+
   const profileData = useQuery(
     api.users.queries.getUserProfileForAdmin,
     isAuthenticated && currentUser?._id && (currentUser.role === "admin" || currentUser.role === "moderator")
@@ -281,6 +285,7 @@ export default function UserDetailPage() {
 
   const updateUserRole = useMutation(api.users.mutations.updateUserRole);
   const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
+  const adminDeleteFreelancerReview = useMutation(api.reviews.mutations.adminDeleteFreelancerReview);
 
   if (!isAuthenticated || !currentUser) {
     return <DashboardEmptyState icon={User} title="Please log in" iconTone="muted" />;
@@ -385,6 +390,23 @@ export default function UserDetailPage() {
       toast.error(getUserFriendlyError(err) || "Failed to reactivate user");
     } finally {
       setIsActioning(false);
+    }
+  };
+
+  const handleConfirmDeleteReview = async () => {
+    if (!reviewDeleteId || !currentUser?._id || currentUser.role !== "admin") return;
+    setIsDeletingReview(true);
+    try {
+      await adminDeleteFreelancerReview({
+        reviewId: reviewDeleteId,
+        userId: currentUser._id,
+      });
+      toast.success("Review removed from this freelancer’s record.");
+      setReviewDeleteId(null);
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not delete review");
+    } finally {
+      setIsDeletingReview(false);
     }
   };
 
@@ -664,7 +686,7 @@ export default function UserDetailPage() {
                     Client ratings
                   </CardTitle>
                   <CardDescription className="text-xs">
-                    Ratings left by hiring clients (staff-only — not shown on public or client surfaces).
+                    Client ratings (staff view). Admins can remove a rating so it no longer affects matching.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -698,9 +720,23 @@ export default function UserDetailPage() {
                                 <p className="text-sm font-semibold tabular-nums">
                                   {r.rating}/5
                                 </p>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(r.createdAt, { addSuffix: true })}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDistanceToNow(r.createdAt, { addSuffix: true })}
+                                  </span>
+                                  {currentUser.role === "admin" ? (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 text-destructive hover:text-destructive"
+                                      onClick={() => setReviewDeleteId(r._id)}
+                                    >
+                                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                      Remove
+                                    </Button>
+                                  ) : null}
+                                </div>
                               </div>
                               {r.comment ? (
                                 <p className="text-sm text-foreground mt-1 leading-relaxed whitespace-pre-wrap wrap-break-word">
@@ -910,6 +946,30 @@ export default function UserDetailPage() {
               {isActioning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Suspend user
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={reviewDeleteId != null} onOpenChange={(open) => !open && setReviewDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this rating?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It will be permanently deleted and will no longer affect this freelancer’s average score or matching
+              eligibility.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingReview}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isDeletingReview}
+              onClick={() => void handleConfirmDeleteReview()}
+            >
+              {isDeletingReview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Remove rating
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -6,7 +6,6 @@ import { makeFunctionReference } from "convex/server";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -27,7 +26,7 @@ type SubmitStructuredEvidenceArgs = {
   disputeId: Id<"disputes">;
   checklistItemId?: string;
   evidenceRequestId?: Id<"disputeEvidenceRequests">;
-  title: string;
+  title?: string;
   description?: string;
   evidenceType:
     | "message"
@@ -99,8 +98,8 @@ export function RespondEvidenceDialog({
   const handleSubmit = async () => {
     if (!evidenceRequestId) return;
     const trimmed = response.trim();
-    if (!trimmed) {
-      toast.error("Please type a response before submitting.");
+    if (!trimmed || trimmed.length < 20) {
+      toast.error("Please write at least a few sentences (minimum 20 characters).");
       return;
     }
 
@@ -137,15 +136,9 @@ export function RespondEvidenceDialog({
           ? "link"
           : "other";
 
-      const titlePreview = trimmed.split(/\s+/).slice(0, 8).join(" ");
-      const title = titlePreview.length > 0
-        ? titlePreview.length < trimmed.length ? `${titlePreview}…` : titlePreview
-        : "Response to evidence request";
-
       await submitStructuredEvidence({
         disputeId,
         evidenceRequestId,
-        title,
         description: trimmed,
         evidenceType,
         fileId,
@@ -168,9 +161,6 @@ export function RespondEvidenceDialog({
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Respond to evidence request</DialogTitle>
-          <DialogDescription>
-            Type your response below. You can optionally attach a file or share a link.
-          </DialogDescription>
         </DialogHeader>
 
         {requestDescription && (
@@ -193,14 +183,12 @@ export function RespondEvidenceDialog({
               id="evidence-response"
               value={response}
               onChange={(e) => setResponse(e.target.value)}
-              placeholder="Explain in your own words. Be specific — include dates, amounts, and what was agreed."
-              rows={6}
-              maxLength={4000}
+              placeholder="Explain in your own words. Include dates, amounts, and what was agreed."
+              rows={10}
+              maxLength={8000}
+              className="min-h-[220px] resize-y"
               autoFocus
             />
-            <p className="text-[11px] text-muted-foreground">
-              {response.length}/4000
-            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -259,7 +247,7 @@ export function RespondEvidenceDialog({
           </Button>
           <Button
             onClick={() => void handleSubmit()}
-            disabled={isSubmitting || !response.trim() || !evidenceRequestId}
+            disabled={isSubmitting || response.trim().length < 20 || !evidenceRequestId}
           >
             {isSubmitting ? (
               <>

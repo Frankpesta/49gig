@@ -895,12 +895,30 @@ export const addEvidence = mutation({
   },
 });
 
+function deriveDisputeEvidenceTitle(args: {
+  title?: string;
+  description?: string;
+  evidenceType: string;
+  messageId?: string;
+}): string {
+  const supplied = args.title?.trim() ?? "";
+  if (supplied.length > 0) return supplied;
+  const desc = args.description?.trim() ?? "";
+  if (desc.length > 0) {
+    return desc.length > 120 ? `${desc.slice(0, 117)}…` : desc;
+  }
+  if (args.evidenceType === "file") return "File attachment";
+  if (args.evidenceType === "link") return "Link";
+  if (args.evidenceType === "message" && args.messageId) return "Chat message";
+  return "Evidence";
+}
+
 export const submitStructuredEvidence = mutation({
   args: {
     disputeId: v.id("disputes"),
     checklistItemId: v.optional(v.string()),
     evidenceRequestId: v.optional(v.id("disputeEvidenceRequests")),
-    title: v.string(),
+    title: v.optional(v.string()),
     description: v.optional(v.string()),
     evidenceType: v.union(
       v.literal("message"),
@@ -929,8 +947,23 @@ export const submitStructuredEvidence = mutation({
     if (!project) throw new Error("Project not found");
     assertDisputeThreadAccess(user, project, dispute);
 
-    const title = args.title.trim();
-    if (!title) throw new Error("Evidence title is required.");
+    const description = args.description?.trim() ?? "";
+    const isMessageFromChat =
+      args.evidenceType === "message" && args.messageId != null;
+
+    if (!isMessageFromChat && description.length < 20) {
+      throw new Error(
+        "Please explain your position in at least a few sentences (minimum 20 characters)."
+      );
+    }
+
+    const title = deriveDisputeEvidenceTitle({
+      title: args.title,
+      description: args.description,
+      evidenceType: args.evidenceType,
+      messageId: args.messageId as string | undefined,
+    });
+
     if (args.evidenceType === "file" && !args.fileId) {
       throw new Error("A file is required for file evidence.");
     }
@@ -969,7 +1002,7 @@ export const submitStructuredEvidence = mutation({
       checklistItemId: args.checklistItemId,
       evidenceRequestId: args.evidenceRequestId,
       title,
-      description: args.description,
+      description: description.length > 0 ? description : undefined,
       evidenceType: args.evidenceType,
       messageId: args.messageId,
       fileId: args.fileId,
