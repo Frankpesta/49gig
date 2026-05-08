@@ -114,3 +114,45 @@ export const submitFreelancerRating = mutation({
     });
   },
 });
+
+/**
+ * Admin-only: remove a client rating so it no longer affects matching scores or profile aggregates.
+ */
+export const adminDeleteFreelancerReview = mutation({
+  args: {
+    reviewId: v.id("reviews"),
+    userId: v.optional(v.id("users")),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) throw new Error("Not authenticated");
+    if (user.role !== "admin") {
+      throw new Error("Only admins can delete freelancer reviews.");
+    }
+
+    const review = await ctx.db.get(args.reviewId);
+    if (!review) throw new Error("Review not found");
+
+    await ctx.db.delete(args.reviewId);
+
+    await ctx.db.insert("auditLogs", {
+      action: "admin_freelancer_review_deleted",
+      actionType: "admin",
+      actorId: user._id,
+      actorRole: "admin",
+      targetType: "review",
+      targetId: String(args.reviewId),
+      details: {
+        projectId: review.projectId,
+        clientId: review.clientId,
+        freelancerId: review.freelancerId,
+        rating: review.rating,
+        reason: args.reason?.trim() || undefined,
+      },
+      createdAt: Date.now(),
+    });
+
+    return { ok: true as const };
+  },
+});

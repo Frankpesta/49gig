@@ -612,16 +612,17 @@ export default function DisputeDetailPage() {
                   <div className="flex items-start gap-3">
                     <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">Communication stays on the project</p>
-                      <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                        Continue conversations in the project chat. Use this page to track the dispute, add evidence,
-                        and respond to staff requests.
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Use <strong className="text-foreground">Add evidence</strong> on this page to submit your written
+                        explanation and optional attachments. You can still use{" "}
+                        <Link
+                          href={`/dashboard/projects/${String(dispute.projectId)}#chat`}
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          project chat
+                        </Link>{" "}
+                        for day-to-day discussion.
                       </p>
-                      <Button variant="link" className="h-auto p-0 mt-2 text-sm font-semibold" asChild>
-                        <Link href={`/dashboard/projects/${String(dispute.projectId)}#chat`}>
-                          Open project chat
-                        </Link>
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -661,8 +662,8 @@ export default function DisputeDetailPage() {
                       </CardTitle>
                       <CardDescription className="text-sm leading-relaxed">
                         {isModerator
-                          ? "Ask the client, freelancer(s), or specific seats to write a response or attach evidence."
-                          : "49GIG staff have asked you for more details. Reply in writing — and optionally attach a file or link."}
+                          ? "Ask parties to submit a written response and optional attachments."
+                          : "Staff are waiting for your written response and optional attachments."}
                       </CardDescription>
                     </div>
                     {canRequestEvidenceFromParties && (
@@ -823,7 +824,11 @@ export default function DisputeDetailPage() {
                           <div key={evidence._id} className="rounded-xl border border-border/50 bg-muted/10 p-3">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-baseline justify-between gap-2 gap-y-1">
-                                <p className="text-sm font-semibold">{evidence.title}</p>
+                                <p className="text-sm font-semibold leading-snug">
+                                  {evidence.description?.trim()
+                                    ? evidence.description.trim()
+                                    : evidence.title}
+                                </p>
                                 <span className="text-[11px] text-muted-foreground tabular-nums">
                                   {new Date(evidence.createdAt).toLocaleString()}
                                 </span>
@@ -841,11 +846,10 @@ export default function DisputeDetailPage() {
                                   {evidence.evidenceType.replace(/_/g, " ")}
                                 </span>
                               </p>
-                              {evidence.description && (
-                                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                                  {evidence.description}
-                                </p>
-                              )}
+                              {evidence.description?.trim() &&
+                              evidence.title !== evidence.description.trim() ? (
+                                <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{evidence.title}</p>
+                              ) : null}
                               {evidence.messageId ? (
                                 <Link
                                   href={`/dashboard/chat?message=${evidence.messageId}`}
@@ -1217,16 +1221,9 @@ export default function DisputeDetailPage() {
 
           {/* Financial Info */}
           <Card className="overflow-hidden rounded-2xl border-border/60 shadow-sm">
-            <CardHeader className="border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
-              <CardTitle className="text-base font-semibold sm:text-lg">Financial details</CardTitle>
-              <CardDescription>
-                {user.role === "freelancer"
-                  ? "Your seat’s freelancer-net share of the amount **frozen when this dispute opened**—from **money still in escrow** then, not money already paid out in earlier months."
-                  : user.role === "client"
-                    ? "Client-total (gross) amount in scope—includes the platform fee portion; freelancer pools are carved from net escrow."
-                    : "Client-total (gross) snapshot in scope at filing; freelancers see their net share from the same escrow-based snapshot."}
-              </CardDescription>
-            </CardHeader>
+          <CardHeader className="border-b border-border/50 bg-muted/15 px-4 py-4 sm:px-6 sm:py-5">
+            <CardTitle className="text-base font-semibold sm:text-lg">Financial details</CardTitle>
+          </CardHeader>
             <CardContent className="px-4 py-4 sm:px-6 sm:py-5">
               <div className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/10 px-4 py-3">
                 <span className="text-sm text-muted-foreground">Locked amount</span>
