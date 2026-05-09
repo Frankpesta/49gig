@@ -658,6 +658,21 @@ export const updateProjectStatus = mutation({
 
     await ctx.db.patch(args.projectId, updates);
 
+    if (
+      isAdmin &&
+      args.status === "matching" &&
+      project.permanentlyExcludedFreelancerIds &&
+      project.permanentlyExcludedFreelancerIds.length > 0
+    ) {
+      await ctx.runMutation(
+        internalAny.projects.mutations.sweepFreelancersRemovedFromProjectInternal,
+        {
+          projectId: args.projectId,
+          freelancerIds: project.permanentlyExcludedFreelancerIds,
+        }
+      );
+    }
+
     if (args.status === "completed") {
       await ctx.scheduler.runAfter(
         0,
@@ -954,6 +969,7 @@ export const adminReplaceFreelancer = mutation({
     }
 
     const now = Date.now();
+    let syncTeamRosterAfterSelectedIdsReplace = false;
     const projectMatches = await ctx.db
       .query("matches")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -1051,10 +1067,43 @@ export const adminReplaceFreelancer = mutation({
           ? args.replacementFreelancerId
           : fid
       );
+      syncTeamRosterAfterSelectedIdsReplace = true;
     } else {
       throw new Error("Could not update hire roster for this replacement");
     }
     await ctx.db.patch(args.projectId, rosterPatch);
+
+    if (syncTeamRosterAfterSelectedIdsReplace) {
+      const proj = await ctx.db.get(args.projectId);
+      if (proj?.intakeForm.hireType === "team") {
+        const rows = await ctx.db
+          .query("matches")
+          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+          .collect();
+        const acceptedIds = [
+          ...new Set(
+            rows
+              .filter(
+                (m) =>
+                  m.status === "accepted" &&
+                  m.freelancerAction === "accepted" &&
+                  m.clientAction === "accepted"
+              )
+              .map((m) => m.freelancerId)
+          ),
+        ];
+        const teamExtra: Partial<Doc<"projects">> = { updatedAt: now };
+        if (acceptedIds.length > 0) {
+          teamExtra.matchedFreelancerIds = acceptedIds;
+        }
+        if (proj.status === "awaiting_freelancer" && acceptedIds.length > 0) {
+          teamExtra.status = "matched";
+        }
+        if (Object.keys(teamExtra).length > 1) {
+          await ctx.db.patch(args.projectId, teamExtra);
+        }
+      }
+    }
 
     await ensureFreelancerPause(ctx, {
       projectId: args.projectId,
@@ -1985,6 +2034,50 @@ export const sweepFreelancersRemovedFromProjectInternal = internalMutation({
       const parts = chat.participants.filter((p) => !removedSet.has(String(p)));
       if (parts.length !== chat.participants.length) {
         await ctx.db.patch(chat._id, { participants: parts, updatedAt: now });
+      }
+    }
+
+    const project = await ctx.db.get(args.projectId);
+    if (project) {
+      const rosterPatch: Record<string, unknown> = { updatedAt: now };
+      if (
+        project.matchedFreelancerId &&
+        removedSet.has(String(project.matchedFreelancerId))
+      ) {
+        rosterPatch.matchedFreelancerId = undefined;
+      }
+      if (project.matchedFreelancerIds?.length) {
+        const next = project.matchedFreelancerIds.filter(
+          (id) => !removedSet.has(String(id))
+        );
+        rosterPatch.matchedFreelancerIds =
+          next.length > 0 ? next : undefined;
+      }
+      if (project.selectedFreelancerId) {
+        if (removedSet.has(String(project.selectedFreelancerId))) {
+          rosterPatch.selectedFreelancerId = undefined;
+        }
+      }
+      if (project.selectedFreelancerIds?.length) {
+        const nextSel = project.selectedFreelancerIds.filter(
+          (id) => !removedSet.has(String(id))
+        );
+        rosterPatch.selectedFreelancerIds =
+          nextSel.length > 0 ? nextSel : undefined;
+      }
+      const sigs = project.freelancerContractSignatures?.filter(
+        (s) => !removedSet.has(String(s.freelancerId))
+      );
+      if (
+        project.freelancerContractSignatures?.length &&
+        (sigs?.length ?? 0) !== project.freelancerContractSignatures.length
+      ) {
+        rosterPatch.freelancerContractSignatures =
+          sigs && sigs.length > 0 ? sigs : undefined;
+      }
+      const keys = Object.keys(rosterPatch).filter((k) => k !== "updatedAt");
+      if (keys.length > 0) {
+        await ctx.db.patch(args.projectId, rosterPatch as Partial<Doc<"projects">>);
       }
     }
 

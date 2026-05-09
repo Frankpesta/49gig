@@ -1,6 +1,6 @@
 import { Doc, Id } from "./_generated/dataModel";
 
-/** Merge removed freelancer ids into the project's permanent exclusion list (this hire only). */
+/** Merge removed freelancer ids into this hire's exclusion list (does not change account status). */
 export function mergePermanentExclusions(
   existing: Id<"users">[] | undefined,
   toAdd: Id<"users">[]
@@ -12,8 +12,8 @@ export function mergePermanentExclusions(
 }
 
 /**
- * Who is removed from the hire when a dispute resolves for client favor or replacement,
- * before project matched fields are cleared (same rules as resolveDispute patches).
+ * Who is removed from the hire when a dispute resolves for client favor or replacement.
+ * Per-hire only — freelancers remain eligible for other projects; there is no global suspension from judgments.
  */
 export function freelancersRemovedForPermanentExclusion(
   project: Doc<"projects">,

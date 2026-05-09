@@ -8,6 +8,7 @@ import {
   isTeamProject,
 } from "./manualMatchEligibility";
 import { viewerIsDisputeParty } from "../disputes/partyAccess";
+import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 import { computeTeamPoolShareCentsByFreelancerId } from "../teamEscrowShares";
 import { escrowNetToClientLockedGross } from "../disputes/amounts";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
@@ -280,8 +281,7 @@ export const getProjects = query({
 });
 
 /**
- * Admins: hires in the matching pipeline — `awaitingMatch` (draft through funded) or status `matching`,
- * where manual adding a candidate is still meaningful (solo: nobody matched; team: open role/headcount).
+ * Admins: hires in the matching pipeline (draft through disputed rematch) where adding a candidate still makes sense.
  */
 export const listManualMatchProjectsAdmin = query({
   args: { userId: v.optional(v.id("users")) },
@@ -302,7 +302,9 @@ export const listManualMatchProjectsAdmin = query({
           q.eq(q.field("status"), "draft"),
           q.eq(q.field("status"), "pending_funding"),
           q.eq(q.field("status"), "funded"),
-          q.eq(q.field("status"), "matching")
+          q.eq(q.field("status"), "matching"),
+          q.eq(q.field("status"), "awaiting_freelancer"),
+          q.eq(q.field("status"), "disputed")
         )
       )
       .collect();
@@ -312,11 +314,27 @@ export const listManualMatchProjectsAdmin = query({
       .withIndex("by_status", (q) => q.eq("status", "matching"))
       .collect();
 
+    const awaitingFreelancerRows = await ctx.db
+      .query("projects")
+      .withIndex("by_status", (q) => q.eq("status", "awaiting_freelancer"))
+      .collect();
+
+    const disputedRows = await ctx.db
+      .query("projects")
+      .withIndex("by_status", (q) => q.eq("status", "disputed"))
+      .collect();
+
     const byId = new Map<string, Doc<"projects">>();
     for (const p of awaitingRows) {
       byId.set(p._id, p);
     }
     for (const p of matchingRows) {
+      byId.set(p._id, p);
+    }
+    for (const p of awaitingFreelancerRows) {
+      byId.set(p._id, p);
+    }
+    for (const p of disputedRows) {
       byId.set(p._id, p);
     }
 
@@ -425,6 +443,14 @@ export const getProject = query({
       }
     }
 
+    if (
+      canView &&
+      user.role === "freelancer" &&
+      isFreelancerPermanentlyExcluded(project, user._id as string)
+    ) {
+      canView = false;
+    }
+
     if (!canView) {
       return null;
     }
@@ -448,6 +474,7 @@ export const getProject = query({
       seenConfirmedFreelancer.add(fid);
       const u = await ctx.db.get(m.freelancerId);
       if (!u) continue;
+      if (isFreelancerPermanentlyExcluded(project, fid)) continue;
       confirmedTeamMembers.push({
         _id: u._id,
         name: u.name,
