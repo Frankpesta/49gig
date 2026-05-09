@@ -127,9 +127,29 @@ export const signContract = mutation({
       createdAt: now,
     });
 
-    const updatedProject = await ctx.db.get(projectId);
+    let updatedProject = await ctx.db.get(projectId);
     if (!updatedProject) {
       return { success: true };
+    }
+
+    const rosterFreelancerIds = updatedProject.matchedFreelancerId
+      ? [updatedProject.matchedFreelancerId]
+      : updatedProject.matchedFreelancerIds ?? [];
+    const rosterSet = new Set(rosterFreelancerIds.map(String));
+    const rawSigs = updatedProject.freelancerContractSignatures ?? [];
+    const prunedSigs = rawSigs.filter((s) =>
+      rosterSet.has(String(s.freelancerId))
+    );
+    if (prunedSigs.length !== rawSigs.length) {
+      await ctx.db.patch(projectId, {
+        freelancerContractSignatures:
+          prunedSigs.length > 0 ? prunedSigs : undefined,
+        updatedAt: Date.now(),
+      });
+      updatedProject = await ctx.db.get(projectId);
+      if (!updatedProject) {
+        return { success: true };
+      }
     }
 
     const clientSigned = !!updatedProject.clientContractSignedAt;
@@ -152,7 +172,7 @@ export const signContract = mutation({
     );
 
     // When both parties have signed and project is still "matched", transition to in_progress
-    if (project.status === "matched" && fullyExecuted) {
+    if (updatedProject.status === "matched" && fullyExecuted) {
       await ctx.db.patch(projectId, {
         status: "in_progress",
         startedAt: updatedProject.startedAt ?? now,

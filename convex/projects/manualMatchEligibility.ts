@@ -35,12 +35,14 @@ export async function openTeamRoleLabelsForProject(
   return labels.filter((l) => !filled.has(l));
 }
 
-/** Statuses where matching work can happen (see matching/queries getProjectsAwaitingMatch). */
+/** Statuses where admin manual matching is meaningful (pre–in_progress pipeline). */
 export const MANUAL_MATCH_PROJECT_STATUSES = [
   "draft",
   "pending_funding",
   "funded",
   "matching",
+  "awaiting_freelancer",
+  "disputed",
 ] as const;
 
 export type ManualMatchProjectStatus = (typeof MANUAL_MATCH_PROJECT_STATUSES)[number];
@@ -66,10 +68,25 @@ export async function projectEligibleForAdminManualMatch(
     return false;
   }
 
-  const hasAwaitingFlag = project.awaitingMatch === true;
-  const isMatchingStatus = project.status === "matching";
-  if (!hasAwaitingFlag && !isMatchingStatus) {
-    return false;
+  if (project.status === "disputed") {
+    const rematching =
+      project.awaitingMatch === true ||
+      project.replacementMatchingAt != null ||
+      matchedHeadcount(project) === 0;
+    if (!rematching) {
+      return false;
+    }
+  } else if (project.status === "funded") {
+    if (project.awaitingMatch === false && matchedHeadcount(project) > 0) {
+      return false;
+    }
+  } else if (
+    project.status === "draft" ||
+    project.status === "pending_funding"
+  ) {
+    if (project.awaitingMatch === false) {
+      return false;
+    }
   }
 
   if (!isTeamProject(project)) {

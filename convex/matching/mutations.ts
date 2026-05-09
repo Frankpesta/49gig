@@ -823,7 +823,7 @@ export const adminManualMatch = mutation({
     if (!project) throw new Error("Project not found");
     if (!(await projectEligibleForAdminManualMatch(ctx, project))) {
       throw new Error(
-        "Manual matching is only for hires with awaitingMatch (draft–funded queue) or status matching, with no one matched yet on single hires, or open team role/headcount on team hires."
+        "Manual matching is only for hires still in the matching pipeline (e.g. draft through funded, matching, awaiting freelancer confirmation, or disputed rematch), with open capacity on single or team hires."
       );
     }
 
@@ -844,7 +844,7 @@ export const adminManualMatch = mutation({
 
     if (isFreelancerPermanentlyExcluded(project, args.freelancerId as string)) {
       throw new Error(
-        "This freelancer was removed from this hire after a dispute and cannot be suggested again."
+        "This freelancer was removed from this hire after a dispute and cannot be suggested again for this same hire."
       );
     }
 

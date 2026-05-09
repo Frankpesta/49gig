@@ -17,8 +17,10 @@ function formatDate() {
   });
 }
 
+const CONTACT_ENQUIRY_INBOX = "support@49gig.com";
+
 /**
- * Submit contact enquiry from public form. Inserts to DB and notifies admins.
+ * Submit contact enquiry from public form. Inserts to DB and notifies support.
  */
 export const submitContactEnquiry = action({
   args: {
@@ -38,38 +40,31 @@ export const submitContactEnquiry = action({
       enquiry
     );
 
-    const admins = await ctx.runQuery(
-      internal.users.queries.getModeratorsAndAdminsInternal,
-      {}
-    );
-    if (admins && admins.length > 0) {
-      const adminEmails = admins.map((a: { email: string }) => a.email);
-      const appUrl =
-        process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://49gig.com";
-      const dashboardUrl = `${appUrl}/dashboard/enquiries`;
-      const date = formatDate();
+    const appUrl =
+      process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://49gig.com";
+    const dashboardUrl = `${appUrl}/dashboard/enquiries`;
+    const date = formatDate();
 
-      await sendEmail({
-        to: adminEmails,
-        subject: `[49GIG] New contact enquiry: ${args.subject}`,
-        react: React.createElement(SystemNoticeEmail, {
-          name: "team",
-          appUrl,
-          logoUrl: `${appUrl}/logo-light.png`,
-          date,
-          heroLabel: "Contact Enquiry",
-          headline: "New contact enquiry",
-          details: [
-            { label: "From", value: `${args.name} <${args.email}>` },
-            { label: "Category", value: args.category },
-            { label: "Subject", value: args.subject },
-          ],
-          bodyText: args.message,
-          ctaHref: dashboardUrl,
-          ctaLabel: "View and reply",
-        }),
-      });
-    }
+    await sendEmail({
+      to: CONTACT_ENQUIRY_INBOX,
+      subject: `[49GIG] New contact enquiry: ${args.subject}`,
+      react: React.createElement(SystemNoticeEmail, {
+        name: "team",
+        appUrl,
+        logoUrl: `${appUrl}/logo-light.png`,
+        date,
+        heroLabel: "Contact Enquiry",
+        headline: "New contact enquiry",
+        details: [
+          { label: "From", value: `${args.name} <${args.email}>` },
+          { label: "Category", value: args.category },
+          { label: "Subject", value: args.subject },
+        ],
+        bodyText: args.message,
+        ctaHref: dashboardUrl,
+        ctaLabel: "View and reply",
+      }),
+    });
 
     return enquiryId;
   },

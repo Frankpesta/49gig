@@ -575,12 +575,18 @@ export default function ProjectDetailPage() {
       project.status === "matching" ||
       project.status === "funded");
 
-  const matchedFreelancerIdsForPendingSigs = project.matchedFreelancerId
-    ? [project.matchedFreelancerId]
-    : project.matchedFreelancerIds ?? [];
+  const permExcl = (
+    project as { permanentlyExcludedFreelancerIds?: Id<"users">[] }
+  ).permanentlyExcludedFreelancerIds;
+  const excludedFreelancerIds = new Set((permExcl ?? []).map(String));
+  const matchedFreelancerIdsForContractSigs = (
+    project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? []
+  ).filter((fid: Id<"users">) => !excludedFreelancerIds.has(String(fid)));
   const hasPendingFreelancerContractSignature =
-    matchedFreelancerIdsForPendingSigs.length > 0 &&
-    matchedFreelancerIdsForPendingSigs.some(
+    matchedFreelancerIdsForContractSigs.length > 0 &&
+    matchedFreelancerIdsForContractSigs.some(
       (fid: Id<"users">) =>
         !project.freelancerContractSignatures?.some(
           (s: { freelancerId: Id<"users"> }) => s.freelancerId === fid
