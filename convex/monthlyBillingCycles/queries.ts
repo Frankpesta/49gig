@@ -48,12 +48,9 @@ export const getCyclesByProjectId = query({
       return [];
     }
 
-    const monthlyBillingVisibleStatuses = new Set<
-      Doc<"projects">["status"]
-    >(["in_progress", "completed", "disputed"]);
-    if (!monthlyBillingVisibleStatuses.has(project.status)) {
-      return [];
-    }
+    // Do not hide cycles by hire status: authorized viewers (client, roster, staff) should see
+    // rows that exist — e.g. manual fixes in dashboard or hires not yet `in_progress`.
+    // Mutations such as `approveMonthlyCycle` still enforce `in_progress`, disputes, and timing.
 
     return await ctx.db
       .query("monthlyBillingCycles")

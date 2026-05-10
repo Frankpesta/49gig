@@ -1529,7 +1529,13 @@ export default function ProjectDetailPage() {
                 )}
               </CardHeader>
               <CardContent>
-                {monthlyCycles && monthlyCycles.length > 0 ? (
+                {monthlyCycles === undefined ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : monthlyCycles.length > 0 ? (
                 <div className="space-y-4">
                   {(() => {
                     const approvedCount = monthlyCycles.filter((c: { status: string }) => c.status === "approved").length;
