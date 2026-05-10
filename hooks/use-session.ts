@@ -35,9 +35,19 @@ export function useSessionRotation() {
           const result = await rotateToken({
             refreshToken: refreshTokenRef.current,
           });
-          // Token rotated successfully
-          // Store new session token if needed
-          console.log("Session token rotated");
+          if (
+            result &&
+            typeof result === "object" &&
+            "sessionToken" in result &&
+            typeof (result as { sessionToken: unknown }).sessionToken ===
+              "string" &&
+            typeof window !== "undefined"
+          ) {
+            localStorage.setItem(
+              "sessionToken",
+              (result as { sessionToken: string }).sessionToken
+            );
+          }
         } catch (error) {
           console.error("Failed to rotate token:", error);
           // Token rotation failed - user may need to re-authenticate
