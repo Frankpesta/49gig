@@ -184,6 +184,15 @@ export const sendMessage = mutation({
       throw new Error("Unauthorized");
     }
 
+    if (chat.type === "support") {
+      const legacyArchived = chat.status === "archived";
+      const markedResolved =
+        chat.supportResolvedAt != null && chat.supportResolvedAt > 0;
+      if (legacyArchived || markedResolved) {
+        throw new Error("This support conversation has been resolved. Start a new support chat if you need more help.");
+      }
+    }
+
     // Resolve attachment URLs if not provided
     const attachments = args.attachments?.length
       ? await Promise.all(
@@ -657,6 +666,47 @@ export const assignSupportChatModerator = mutation({
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Mark a support chat as resolved for the customer. Keeps the thread in Messages; use `supportResolvedAt` instead of archiving.
+ */
+export const resolveSupportChat = mutation({
+  args: {
+    chatId: v.id("chats"),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUserInMutation(ctx, args.userId);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+
+    const chat = await ctx.db.get(args.chatId);
+    if (!chat) {
+      throw new Error("Chat not found");
+    }
+    if (chat.type !== "support") {
+      throw new Error("Only support chats can be marked resolved");
+    }
+
+    const isParticipant = chat.participants.includes(user._id);
+    const isAdminOrModerator =
+      user.role === "admin" || user.role === "moderator";
+
+    if (!isParticipant && !isAdminOrModerator) {
+      throw new Error("Unauthorized");
+    }
+
+    const now = Date.now();
+    await ctx.db.patch(args.chatId, {
+      supportResolvedAt: now,
+      status: "active",
+      updatedAt: now,
+    });
+
+    return { success: true, resolvedAt: now };
   },
 });
 

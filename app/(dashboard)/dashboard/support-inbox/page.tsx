@@ -37,6 +37,7 @@ type SupportChat = {
   _id: Id<"chats">;
   title?: string;
   status: string;
+  supportResolvedAt?: number;
   lastMessageAt?: number;
   lastMessagePreview?: string;
   openerName?: string | null;
@@ -51,6 +52,13 @@ const STATUS_STYLES: Record<string, string> = {
   archived: "bg-muted text-muted-foreground",
   deleted: "bg-muted text-muted-foreground",
 };
+
+function isSupportResolved(c: SupportChat) {
+  return (
+    (c.supportResolvedAt != null && c.supportResolvedAt > 0) ||
+    c.status === "archived"
+  );
+}
 
 function formatChatListTime(ts: number) {
   const d = new Date(ts);
@@ -125,8 +133,10 @@ export default function SupportInboxPage() {
 
   const chats = supportChats as SupportChat[];
   const total = chats.length;
-  const openCount = chats.filter((c) => c.status === "active").length;
-  const resolvedCount = chats.filter((c) => c.status !== "active").length;
+  const openCount = chats.filter(
+    (c) => c.status === "active" && !isSupportResolved(c)
+  ).length;
+  const resolvedCount = chats.filter(isSupportResolved).length;
 
   const filtered = chats.filter((c) => {
     const matchesSearch =
@@ -135,8 +145,8 @@ export default function SupportInboxPage() {
         .some((val) => val?.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "active" && c.status === "active") ||
-      (statusFilter === "resolved" && c.status !== "active");
+      (statusFilter === "active" && c.status === "active" && !isSupportResolved(c)) ||
+      (statusFilter === "resolved" && isSupportResolved(c));
     return matchesSearch && matchesStatus;
   });
 
@@ -266,9 +276,13 @@ export default function SupportInboxPage() {
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_STYLES[chat.status] ?? "bg-muted text-muted-foreground"}`}
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
+                          isSupportResolved(chat)
+                            ? STATUS_STYLES.archived
+                            : STATUS_STYLES.active ?? "bg-muted text-muted-foreground"
+                        }`}
                       >
-                        {chat.status === "active" ? "Open" : "Resolved"}
+                        {isSupportResolved(chat) ? "Resolved" : "Open"}
                       </span>
                       <span className="text-[11px] text-muted-foreground truncate">
                         {openedBy}
@@ -290,7 +304,9 @@ export default function SupportInboxPage() {
                     )}
                   </div>
                 </Link>
-                {isAdmin && chat.status === "active" ? (
+                {isAdmin &&
+                chat.status === "active" &&
+                !isSupportResolved(chat) ? (
                   <div className="flex shrink-0 items-center border-l border-border/60 bg-muted/20 px-2">
                     <Button
                       type="button"

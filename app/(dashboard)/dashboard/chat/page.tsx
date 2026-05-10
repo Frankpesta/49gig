@@ -79,6 +79,10 @@ function UserChatListRow({ chat }: { chat: ChatWithUnread }) {
     chat.type === "support"
       ? `/dashboard/chat/support/${chat._id}`
       : `/dashboard/chat/${chat._id}`;
+  const supportResolved =
+    chat.type === "support" &&
+    ((chat.supportResolvedAt != null && chat.supportResolvedAt > 0) ||
+      chat.status === "archived");
 
   return (
     <Link
@@ -99,14 +103,21 @@ function UserChatListRow({ chat }: { chat: ChatWithUnread }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <h3
-            className={cn(
-              "min-w-0 truncate text-[15px] leading-tight",
-              unread > 0 ? "font-semibold" : "font-medium"
-            )}
-          >
-            {chat.title || "Chat"}
-          </h3>
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <h3
+              className={cn(
+                "min-w-0 truncate text-[15px] leading-tight",
+                unread > 0 ? "font-semibold" : "font-medium"
+              )}
+            >
+              {chat.title || "Chat"}
+            </h3>
+            {supportResolved ? (
+              <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950/45 dark:text-amber-100">
+                Resolved
+              </span>
+            ) : null}
+          </div>
           {chat.lastMessageAt != null && (
             <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
               {formatChatListTime(chat.lastMessageAt)}

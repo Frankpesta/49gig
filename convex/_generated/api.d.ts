@@ -11,6 +11,7 @@
 import type * as analytics_queries from "../analytics/queries.js";
 import type * as audit_queries from "../audit/queries.js";
 import type * as auth from "../auth.js";
+import type * as auth_actionQueries from "../auth/actionQueries.js";
 import type * as auth_actions from "../auth/actions.js";
 import type * as auth_mutations from "../auth/mutations.js";
 import type * as auth_oauth from "../auth/oauth.js";
@@ -120,6 +121,9 @@ import type * as vetting_skillTestComplexity from "../vetting/skillTestComplexit
 import type * as vetting_skillTestSession from "../vetting/skillTestSession.js";
 import type * as vetting_staffEmails from "../vetting/staffEmails.js";
 import type * as vetting_testSessions from "../vetting/testSessions.js";
+import type * as walletWithdrawals_actions from "../walletWithdrawals/actions.js";
+import type * as walletWithdrawals_mutations from "../walletWithdrawals/mutations.js";
+import type * as walletWithdrawals_queries from "../walletWithdrawals/queries.js";
 import type * as wallets_actions from "../wallets/actions.js";
 import type * as wallets_clientBalanceMath from "../wallets/clientBalanceMath.js";
 import type * as wallets_mutations from "../wallets/mutations.js";
@@ -135,6 +139,7 @@ declare const fullApi: ApiFromModules<{
   "analytics/queries": typeof analytics_queries;
   "audit/queries": typeof audit_queries;
   auth: typeof auth;
+  "auth/actionQueries": typeof auth_actionQueries;
   "auth/actions": typeof auth_actions;
   "auth/mutations": typeof auth_mutations;
   "auth/oauth": typeof auth_oauth;
@@ -244,6 +249,9 @@ declare const fullApi: ApiFromModules<{
   "vetting/skillTestSession": typeof vetting_skillTestSession;
   "vetting/staffEmails": typeof vetting_staffEmails;
   "vetting/testSessions": typeof vetting_testSessions;
+  "walletWithdrawals/actions": typeof walletWithdrawals_actions;
+  "walletWithdrawals/mutations": typeof walletWithdrawals_mutations;
+  "walletWithdrawals/queries": typeof walletWithdrawals_queries;
   "wallets/actions": typeof wallets_actions;
   "wallets/clientBalanceMath": typeof wallets_clientBalanceMath;
   "wallets/mutations": typeof wallets_mutations;

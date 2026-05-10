@@ -536,6 +536,9 @@ export default defineSchema({
       v.literal("deleted")
     ),
 
+    /** Support: set when staff marks resolved; chat stays `status: active` and remains in the Messages list. */
+    supportResolvedAt: v.optional(v.number()),
+
     // Audit
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -1332,6 +1335,33 @@ export default defineSchema({
   })
     .index("by_user", ["userId", "createdAt"])
     .index("by_status", ["status"]),
+
+  /**
+   * Freelancer (and future) wallet bank withdrawal: user requests, admin approves, then Flutterwave transfer.
+   */
+  walletBankWithdrawalRequests: defineTable({
+    userId: v.id("users"),
+    amountCents: v.number(),
+    currency: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("completed"),
+      v.literal("rejected"),
+      v.literal("failed")
+    ),
+    adminNote: v.optional(v.string()),
+    processedBy: v.optional(v.id("users")),
+    processedAt: v.optional(v.number()),
+    paymentId: v.optional(v.id("payments")),
+    flutterwaveTransferRef: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_status", ["status"])
+    .index("by_user_status", ["userId", "status"]),
 
   payments: defineTable({
     // Project (optional for payout from wallet)

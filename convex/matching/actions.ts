@@ -1066,11 +1066,11 @@ export const generateMatchesForDraft = action({
 
     const rolesMissing: string[] = [];
     /**
-     * For duplicate seats that share the same role template (e.g. two "Ui Designer" slots),
-     * each freelancer must appear in at most one seat's shortlist. Keyed by intake `roleKey`
-     * so we do not block the same person from both "Backend" and "Frontend" groups.
+     * Per seat label (e.g. "UI Designer #1" vs "UI Designer #2"), not per budget role key.
+     * Keying by roleKey would make seat #2 reuse seat #1's "used" set and skip every freelancer
+     * already shortlisted for #1 — leaving duplicate roles with no matches when the pool is small.
      */
-    const teamShortlistFreelancersByRoleKey = new Map<string, Set<string>>();
+    const teamShortlistFreelancersBySeatLabel = new Map<string, Set<string>>();
 
     // Unified spec list: each entry drives one seat's matching and post-loop availability check.
     // Both the slot-based path and the skill-grouping path populate this.
@@ -1144,14 +1144,14 @@ export const generateMatchesForDraft = action({
         );
 
         let addedThisSeat = 0;
-        let usedThisRoleKey = teamShortlistFreelancersByRoleKey.get(spec.roleKey);
-        if (!usedThisRoleKey) {
-          usedThisRoleKey = new Set();
-          teamShortlistFreelancersByRoleKey.set(spec.roleKey, usedThisRoleKey);
+        let usedThisSeat = teamShortlistFreelancersBySeatLabel.get(spec.teamRoleLabel);
+        if (!usedThisSeat) {
+          usedThisSeat = new Set();
+          teamShortlistFreelancersBySeatLabel.set(spec.teamRoleLabel, usedThisSeat);
         }
         for (const match of eligibleOrdered) {
           const fid = String(match.freelancer._id);
-          if (usedThisRoleKey.has(fid)) continue;
+          if (usedThisSeat.has(fid)) continue;
           if (addedThisSeat >= 10) break;
 
           const explanation = generateExplanation(match.breakdown, match.freelancer.name, intakeForm.title);
@@ -1166,7 +1166,7 @@ export const generateMatchesForDraft = action({
             expiresAt,
             teamRole: spec.teamRoleLabel,
           });
-          usedThisRoleKey.add(fid);
+          usedThisSeat.add(fid);
           matchIds.push(matchId);
           addedThisSeat++;
         }

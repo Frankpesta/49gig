@@ -62,7 +62,6 @@ export default function WalletPage() {
   const wallet = useQuery(api.wallets.queries.getMyWallet, user?._id ? { userId: user._id } : "skip");
   const walletStats = useQuery(api.wallets.queries.getWalletStats, user?._id ? { userId: user._id } : "skip");
   const transactions = useQuery(api.wallets.queries.getMyWalletTransactions, user?._id ? { limit: 50, userId: user._id } : "skip");
-  const withdrawFromWallet = useAction(api.payments.actions.withdrawFromWallet);
   const reconcileWallet = useAction(api.wallets.actions.reconcileWalletFromPayments);
   const clientWalletBreakdown = useQuery(
     api.wallets.queries.getMyClientPrefundingWalletBreakdown,
@@ -82,6 +81,13 @@ export default function WalletPage() {
   );
   const markCompleted = useMutation(api.referrals.mutations.markClientPayoutCompleted);
   const rejectPayout = useMutation(api.referrals.mutations.rejectClientPayout);
+  const requestFreelancerBankWithdraw = useMutation(
+    api.walletWithdrawals.mutations.requestFreelancerBankWithdrawal
+  );
+  const myWithdrawalRequests = useQuery(
+    api.walletWithdrawals.queries.getMyWalletWithdrawalRequests,
+    user?.role === "freelancer" ? {} : "skip"
+  );
   const [isReconciling, setIsReconciling] = useState(false);
 
   const handleWithdraw = async () => {
@@ -98,9 +104,11 @@ export default function WalletPage() {
     }
     setIsWithdrawing(true);
     try {
-      await withdrawFromWallet({ amountCents, userId: user._id });
+      await requestFreelancerBankWithdraw({ amountCents });
       trackEvent("withdraw", { value: amountCents / 100, currency: "USD" });
-      toast.success("Withdrawal initiated. Funds will be transferred to your bank account.");
+      toast.success(
+        "Withdrawal request submitted. An admin will review and send funds to your linked bank account."
+      );
       setWithdrawAmount("");
     } catch (err) {
       toast.error(getUserFriendlyError(err) || "Withdrawal failed");
@@ -137,30 +145,6 @@ export default function WalletPage() {
       clientWalletBreakdown?.bankWithdrawableCents ?? 0;
     const walletAvailable = walletStats?.availableCents ?? 0;
     const walletPending = walletStats?.pendingCents ?? 0;
-
-    const handleClientBankWithdraw = async () => {
-      if (!user?._id) return;
-      const amount = parseFloat(withdrawAmount);
-      if (isNaN(amount) || amount < 1) {
-        toast.error("Please enter a valid amount (minimum $1.00)");
-        return;
-      }
-      const amountCents = Math.round(amount * 100);
-      if (amountCents > clientBankWithdrawable) {
-        toast.error("Amount exceeds withdrawable balance");
-        return;
-      }
-      setIsWithdrawing(true);
-      try {
-        await withdrawFromWallet({ amountCents, userId: user._id });
-        toast.success("Withdrawal initiated to your linked bank account.");
-        setWithdrawAmount("");
-      } catch (err) {
-        toast.error(getUserFriendlyError(err) || "Withdrawal failed");
-      } finally {
-        setIsWithdrawing(false);
-      }
-    };
 
     const handleCryptoRequest = async () => {
       if (!user?._id) return;
@@ -268,8 +252,8 @@ export default function WalletPage() {
           <CardHeader>
             <CardTitle>Withdrawable balance</CardTitle>
             <CardDescription>
-              Cash you can withdraw (bank, PayPal, or crypto). Legacy hiring-only referral
-              credits apply at checkout only and are not included here.
+              Amount you can request via PayPal or crypto. Legacy hiring-only referral credits apply at
+              checkout only and are not included here.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -278,32 +262,6 @@ export default function WalletPage() {
             ) : (
               <p className="text-3xl font-bold">{formatDollars(clientBankWithdrawable)}</p>
             )}
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-xl overflow-hidden">
-          <CardHeader>
-            <CardTitle>Withdraw to bank</CardTitle>
-            <CardDescription>Uses your payout account from Settings.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="flex-1 max-w-xs space-y-2">
-              <Label htmlFor="client-withdraw">Amount (USD)</Label>
-              <Input
-                id="client-withdraw"
-                type="number"
-                min="1"
-                step="0.01"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-              />
-            </div>
-            <Button
-              onClick={handleClientBankWithdraw}
-              disabled={isWithdrawing || clientBankWithdrawable < 100}
-            >
-              {isWithdrawing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Withdraw"}
-            </Button>
           </CardContent>
         </Card>
 
@@ -418,7 +376,14 @@ export default function WalletPage() {
                   <div key={r._id} className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
                     <div>
                       <p className="text-sm font-medium">
-                        {formatDollars(r.amountCents)} → {r.method === "crypto" ? `${r.cryptoNetwork}: ${r.cryptoAddress?.slice(0, 12)}…` : r.paypalEmail}
+                        {formatDollars(r.amountCents)} →{" "}
+                        {r.method === "crypto"
+                          ? `${r.cryptoNetwork}: ${r.cryptoAddress?.slice(0, 12)}…`
+                          : r.method === "paypal"
+                            ? (r.paypalEmail ?? "PayPal")
+                            : r.method === "bank"
+                              ? "Bank (legacy)"
+                              : r.paypalEmail ?? String(r.method ?? "payout")}
                       </p>
                       <p className="text-xs text-muted-foreground">{formatDistanceToNow(r.createdAt, { addSuffix: true })}</p>
                       {r.adminNote && <p className="text-xs text-muted-foreground mt-1">Note: {r.adminNote}</p>}
@@ -474,7 +439,7 @@ export default function WalletPage() {
       <div className="space-y-6 animate-in fade-in-50 duration-300">
         <DashboardPageHeader
           title="Referral Payout Requests"
-          description="Review and manually disburse client referral earnings via PayPal."
+          description="Review and manually disburse client referral payouts (PayPal or crypto)."
           icon={Wallet}
         />
 
@@ -482,7 +447,7 @@ export default function WalletPage() {
         <Card className="rounded-xl overflow-hidden">
           <CardHeader>
             <CardTitle>Pending requests ({pendingRequests.length})</CardTitle>
-            <CardDescription>Send payment via PayPal, then mark as paid here to update the client's balance.</CardDescription>
+            <CardDescription>Send payment via the client&apos;s chosen method, then mark as paid here to update their wallet.</CardDescription>
           </CardHeader>
           <CardContent>
             {adminPayoutRequests === undefined ? (
@@ -497,13 +462,15 @@ export default function WalletPage() {
                       <div className="space-y-1">
                         <p className="font-semibold text-lg">{formatDollars(r.amountCents)}</p>
                         <p className="text-sm text-muted-foreground">{r.clientName} · {r.clientEmail}</p>
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-2 text-sm flex-wrap">
                           {r.method === "crypto" ? (
                             <>
                               <Bitcoin className="h-3.5 w-3.5 text-primary" />
                               <span className="font-medium">Crypto ({r.cryptoNetwork}):</span>
                               <span className="text-primary font-mono text-xs break-all">{r.cryptoAddress}</span>
                             </>
+                          ) : r.method === "bank" ? (
+                            <span className="text-muted-foreground">Bank (legacy request)</span>
                           ) : (
                             <>
                               <Mail className="h-3.5 w-3.5 text-primary" />
@@ -580,7 +547,14 @@ export default function WalletPage() {
                   <div key={r._id} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/10 px-4 py-3">
                     <div>
                       <p className="text-sm font-medium">
-                        {r.clientName} — {formatDollars(r.amountCents)} → {r.method === "crypto" ? `${r.cryptoNetwork}: ${r.cryptoAddress?.slice(0, 16)}…` : r.paypalEmail}
+                        {r.clientName} — {formatDollars(r.amountCents)} →{" "}
+                        {r.method === "crypto"
+                          ? `${r.cryptoNetwork}: ${r.cryptoAddress?.slice(0, 16)}…`
+                          : r.method === "paypal"
+                            ? r.paypalEmail
+                            : r.method === "bank"
+                              ? "Bank (legacy)"
+                              : r.paypalEmail ?? String(r.method ?? "")}
                       </p>
                       <p className="text-xs text-muted-foreground">{formatDistanceToNow(r.createdAt, { addSuffix: true })}</p>
                       {r.adminNote && <p className="text-xs text-muted-foreground">Note: {r.adminNote}</p>}
@@ -608,6 +582,14 @@ export default function WalletPage() {
       </div>
     );
   }
+
+  const withdrawalRequestRows: Doc<"walletBankWithdrawalRequests">[] = (
+    myWithdrawalRequests ?? []
+  ) as Doc<"walletBankWithdrawalRequests">[];
+
+  const pendingBankWithdrawal = withdrawalRequestRows.some(
+    (r) => r.status === "pending" || r.status === "processing"
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
@@ -677,7 +659,7 @@ export default function WalletPage() {
             Withdraw Funds
           </CardTitle>
           <CardDescription>
-            Funds from approved monthly payments go to your wallet. Withdraw to your bank account when you're ready.
+            Submit a bank withdrawal request with the amount you want. An admin will review and approve the transfer to your linked account (Flutterwave).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -700,6 +682,29 @@ export default function WalletPage() {
             </div>
           )}
 
+          {pendingBankWithdrawal && (
+            <p className="text-sm text-amber-700 dark:text-amber-500">
+              You already have a withdrawal request being processed. Submit a new one after it is completed or rejected.
+            </p>
+          )}
+          {withdrawalRequestRows.length > 0 && (
+            <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+              <p className="text-sm font-medium">Your bank withdrawal requests</p>
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                {withdrawalRequestRows.slice(0, 5).map((r) => (
+                  <li key={r._id} className="flex justify-between gap-2">
+                    <span>
+                      {formatDollars(r.amountCents)} — {formatDistanceToNow(r.createdAt, { addSuffix: true })}
+                    </span>
+                    <Badge variant={r.status === "completed" ? "default" : r.status === "rejected" ? "destructive" : "secondary"}>
+                      {r.status}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Withdraw Form */}
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1 max-w-xs space-y-2">
@@ -716,7 +721,12 @@ export default function WalletPage() {
             </div>
             <Button
               onClick={handleWithdraw}
-              disabled={isWithdrawing || walletStats == null || (walletStats?.availableCents ?? 0) < 100}
+              disabled={
+                isWithdrawing ||
+                walletStats == null ||
+                (walletStats?.availableCents ?? 0) < 100 ||
+                pendingBankWithdrawal
+              }
               className="gap-2"
             >
               {isWithdrawing ? (

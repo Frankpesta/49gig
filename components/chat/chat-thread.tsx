@@ -20,6 +20,13 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { Doc, Id } from "@/convex/_generated/dataModel";
 
+function isSupportThreadResolved(
+  chat: Pick<Doc<"chats">, "type" | "status" | "supportResolvedAt">
+) {
+  if (chat.type !== "support") return false;
+  if (chat.supportResolvedAt != null && chat.supportResolvedAt > 0) return true;
+  return chat.status === "archived";
+}
 export type ChatThreadKind = "project" | "support";
 
 export function ChatThread({
@@ -91,7 +98,7 @@ export function ChatThread({
   const sendMessage = useMutation(api.chat.mutations.sendMessage);
   const markAsRead = useMutation(api.chat.mutations.markAsRead);
   const generateUploadUrl = useMutation(api.chat.mutations.generateUploadUrl);
-  const archiveChat = useMutation(api.chat.mutations.archiveChat);
+  const resolveSupportChat = useMutation(api.chat.mutations.resolveSupportChat);
 
   const isStaff = user?.role === "admin" || user?.role === "moderator";
   const defaultBack =
@@ -268,7 +275,7 @@ export function ChatThread({
     if (!chat?._id || !user?._id || threadKind !== "support") return;
     setIsArchiving(true);
     try {
-      await archiveChat({ chatId: chat._id, userId: user._id });
+      await resolveSupportChat({ chatId: chat._id, userId: user._id });
       router.refresh();
     } catch (e) {
       console.error(e);
@@ -342,7 +349,7 @@ export function ChatThread({
         <div className="flex shrink-0 items-center gap-1.5">
           {threadKind === "support" &&
             isStaff &&
-            chat.status === "active" && (
+            !isSupportThreadResolved(chat) && (
               <Button
                 type="button"
                 variant="secondary"
@@ -371,9 +378,17 @@ export function ChatThread({
         </div>
       </div>
 
-      {threadKind === "support" && chat.status === "archived" && (
-        <div className="shrink-0 border-b border-border bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground">
-          This support conversation is resolved (archived). Replies are disabled.
+      {threadKind === "support" && isSupportThreadResolved(chat) && (
+        <div
+          className="shrink-0 border-b border-amber-300/80 bg-amber-50 px-3 py-2.5 text-center text-sm text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-50"
+          role="status"
+        >
+          <p className="font-medium">This request is resolved</p>
+          <p className="mt-0.5 text-xs leading-snug text-amber-900/90 dark:text-amber-100/90">
+            Our team has closed your support request. You can read the full conversation here; new
+            messages cannot be added to this thread. If you need anything else, start a new support
+            chat from Messages whenever you&apos;re ready.
+          </p>
         </div>
       )}
 
@@ -544,7 +559,7 @@ export function ChatThread({
               disabled={
                 isUploading ||
                 isSending ||
-                (threadKind === "support" && chat.status === "archived")
+                (threadKind === "support" && isSupportThreadResolved(chat))
               }
               title="Attach file or image"
             >
@@ -555,7 +570,7 @@ export function ChatThread({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyPress}
-              disabled={isSending || (threadKind === "support" && chat.status === "archived")}
+              disabled={isSending || (threadKind === "support" && isSupportThreadResolved(chat))}
               rows={1}
               className="min-h-11 max-h-40 flex-1 resize-none rounded-2xl border-border/80 bg-background px-4 py-2.5 text-base leading-relaxed overflow-y-auto"
             />
@@ -566,7 +581,7 @@ export function ChatThread({
               disabled={
                 isSending ||
                 isUploading ||
-                (threadKind === "support" && chat.status === "archived") ||
+                (threadKind === "support" && isSupportThreadResolved(chat)) ||
                 (!message.trim() && pendingFiles.length === 0)
               }
               aria-label="Send"

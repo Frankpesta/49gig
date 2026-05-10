@@ -835,111 +835,6 @@ export const refundPaymentIntent = action({
 });
 
 /**
- * Withdraw from wallet to bank (freelancer action)
- * Uses stored bank details from subaccount setup
- */
-export const withdrawFromWallet = action({
-  args: {
-    amountCents: v.number(),
-    userId: v.id("users"),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
-      userId: args.userId,
-    });
-
-    if (!user || (user.role !== "freelancer" && user.role !== "client")) {
-      throw new Error("Only clients and freelancers can withdraw from wallet");
-    }
-
-    const userDoc = user as typeof user & {
-      flutterwavePayoutBankCode?: string;
-      flutterwavePayoutAccountNumber?: string;
-    };
-
-    if (!userDoc.flutterwavePayoutBankCode || !userDoc.flutterwavePayoutAccountNumber) {
-      throw new Error(
-        "Please set up your bank account in Settings before withdrawing."
-      );
-    }
-
-    if (args.amountCents < 100) {
-      throw new Error("Minimum withdrawal is 1.00 USD");
-    }
-
-    const wallet = await ctx.runQuery(internalAny.wallets.queries.getWalletByUserIdInternal, {
-      userId: args.userId,
-    });
-
-    if (!wallet || wallet.balanceCents < args.amountCents) {
-      throw new Error("Insufficient wallet balance");
-    }
-
-    if (user.role === "client") {
-      const spendable = await ctx.runQuery(
-        internalAny.wallets.queries.getClientSpendableWalletCentsInternal,
-        { userId: args.userId, currency: "usd" }
-      );
-      const hiringOnly = await ctx.runQuery(
-        internalAny.wallets.queries.getClientReferralHiringBalanceCentsInternal,
-        { userId: args.userId, currency: "usd" }
-      );
-      const maxWithdraw = Math.max(0, spendable - hiringOnly);
-      if (args.amountCents > maxWithdraw) {
-        throw new Error(
-          "That amount exceeds your withdrawable wallet balance. Anything marked for hire checkout only must be used toward a project first."
-        );
-      }
-    }
-
-    const amountDollars = args.amountCents / 100;
-    const transferRef = `49gig-wallet-${args.userId}-${Date.now()}`;
-
-    const transferData = await flutterwave.createTransfer({
-      account_bank: userDoc.flutterwavePayoutBankCode,
-      account_number: userDoc.flutterwavePayoutAccountNumber,
-      amount: amountDollars,
-      narration:
-        user.role === "client"
-          ? `49GIG client wallet withdrawal`
-          : `49GIG wallet withdrawal`,
-      currency: "USD",
-      reference: transferRef,
-      beneficiary_name: user.name,
-    });
-
-    await ctx.runMutation(internalAny.wallets.mutations.debitWallet, {
-      userId: args.userId,
-      amountCents: args.amountCents,
-      currency: "usd",
-      description:
-        user.role === "client" ? `Wallet withdrawal to bank` : `Withdrawal to bank`,
-      flutterwaveTransferId: transferRef,
-      category: user.role === "client" ? "withdrawal_referral" : undefined,
-    });
-
-    const paymentId = await ctx.runMutation(internalAny.payments.mutations.createPayment, {
-      type: "payout",
-      amount: amountDollars,
-      currency: "usd",
-      platformFee: 0,
-      netAmount: amountDollars,
-      flutterwaveTransferId: transferRef,
-      flutterwaveSubaccountId: (user as { flutterwaveSubaccountId?: string }).flutterwaveSubaccountId,
-      userId: args.userId,
-      recipientId: args.userId,
-      status: transferData.data.status === "NEW" ? "processing" : "succeeded",
-    });
-
-    return {
-      success: true,
-      transferId: transferRef,
-      paymentId,
-    };
-  },
-});
-
-/**
  * Create a Flutterwave transfer/payout to a freelancer
  */
 export const createPayoutTransfer = action({
@@ -1007,17 +902,38 @@ export const createPayoutTransfer = action({
 export const createSubaccount = action({
   args: {
     freelancerId: v.id("users"),
-    businessName: v.string(), // Business name
-    businessEmail: v.string(),
-    businessMobile: v.string(),
-    accountNumber: v.string(), // Bank account number
-    accountBank: v.string(), // Bank code
-    country: v.string(), // Country code like "NG", "KE", etc.
+    accountNumber: v.string(),
+    accountBank: v.string(),
+    country: v.string(),
     splitType: v.union(v.literal("percentage"), v.literal("flat")),
-    splitValue: v.number(), // Percentage or flat amount
+    splitValue: v.number(),
   },
+  returns: v.object({
+    success: v.literal(true),
+    subaccountId: v.string(),
+    accountReference: v.string(),
+    bankName: v.string(),
+  }),
   handler: async (ctx, args) => {
-    // Verify freelancer
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) {
+      throw new Error("Not authenticated");
+    }
+    const viewer = await ctx.runQuery(
+      internalAny.auth.actionQueries.getActiveUserByEmailInternal,
+      { email: identity.email }
+    );
+    if (!viewer || viewer.status !== "active") {
+      throw new Error("Not authenticated");
+    }
+    const isPrivilegedAdmin = viewer.role === "admin";
+    if (
+      !isPrivilegedAdmin &&
+      (viewer.role !== "freelancer" || viewer._id !== args.freelancerId)
+    ) {
+      throw new Error("Not authorized");
+    }
+
     const freelancer = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.freelancerId,
     });
@@ -1026,8 +942,21 @@ export const createSubaccount = action({
       throw new Error("Only freelancers can create subaccounts");
     }
 
+    const phoneDigits = freelancer.phoneE164?.replace(/\D/g, "").trim() ?? "";
+    if (!phoneDigits || phoneDigits.length < 8) {
+      throw new Error(
+        "Verify your phone number (SMS verification) in Settings before adding a payout account."
+      );
+    }
+
+    const businessName = freelancer.name.trim();
+    const businessEmail = freelancer.email.trim().toLowerCase();
+    const businessMobile = phoneDigits;
+    if (!businessName || !businessEmail) {
+      throw new Error("Your profile name and email must be set before adding a payout account.");
+    }
+
     // Verify account number before creating subaccount
-    // This ensures the account number is valid and belongs to the specified bank
     try {
       const accountVerification = await flutterwave.verifyAccountNumber({
         account_number: args.accountNumber,
@@ -1038,7 +967,6 @@ export const createSubaccount = action({
         throw new Error("Unable to verify account number. Please check your account number and bank selection.");
       }
     } catch (error) {
-      // Re-throw with user-friendly message
       if (error instanceof Error) {
         if (error.message.includes("couldn't verify") || error.message.includes("verify")) {
           throw new Error("Invalid account number. Please ensure the account number matches the selected bank.");
@@ -1049,9 +977,9 @@ export const createSubaccount = action({
     }
 
     const subaccountData = await flutterwave.createSubaccount({
-      business_name: args.businessName,
-      business_email: args.businessEmail,
-      business_mobile: args.businessMobile,
+      business_name: businessName,
+      business_email: businessEmail,
+      business_mobile: businessMobile,
       account_number: args.accountNumber,
       account_bank: args.accountBank,
       country: args.country,
@@ -1059,7 +987,6 @@ export const createSubaccount = action({
       split_value: args.splitValue,
     });
 
-    // Update user with subaccount ID and bank details (for later transfers)
     await ctx.runMutation(internalAny.payments.mutations.updateUserFlutterwaveSubaccountId, {
       userId: args.freelancerId,
       flutterwaveSubaccountId: subaccountData.data.id.toString(),
@@ -1068,7 +995,7 @@ export const createSubaccount = action({
     });
 
     return {
-      success: true,
+      success: true as const,
       subaccountId: subaccountData.data.id.toString(),
       accountReference: subaccountData.data.account_reference,
       bankName: subaccountData.data.bank_name,
@@ -1083,7 +1010,36 @@ export const getSubaccountStatus = action({
   args: {
     freelancerId: v.id("users"),
   },
+  returns: v.union(
+    v.object({
+      connected: v.literal(false),
+      error: v.optional(v.string()),
+    }),
+    v.object({
+      connected: v.literal(true),
+      subaccountId: v.string(),
+      accountName: v.optional(v.string()),
+      accountReference: v.string(),
+      bankName: v.optional(v.string()),
+      bankCode: v.optional(v.string()),
+    })
+  ),
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) {
+      throw new Error("Not authenticated");
+    }
+    const viewer = await ctx.runQuery(
+      internalAny.auth.actionQueries.getActiveUserByEmailInternal,
+      { email: identity.email }
+    );
+    if (!viewer || viewer.status !== "active") {
+      throw new Error("Not authenticated");
+    }
+    if (viewer.role !== "admin" && viewer._id !== args.freelancerId) {
+      throw new Error("Not authorized");
+    }
+
     const freelancer = await ctx.runQuery(internalAny.payments.queries.verifyUser, {
       userId: args.freelancerId,
     });
@@ -1097,14 +1053,14 @@ export const getSubaccountStatus = action({
     };
 
     if (!freelancerDoc.flutterwaveSubaccountId) {
-      return { connected: false };
+      return { connected: false as const };
     }
 
     try {
       const subaccountData = await flutterwave.getSubaccount(freelancerDoc.flutterwaveSubaccountId);
       const data = subaccountData.data;
       return {
-        connected: true,
+        connected: true as const,
         subaccountId: data.id.toString(),
         accountName: data.account_name,
         accountReference: data.account_reference,
@@ -1113,7 +1069,7 @@ export const getSubaccountStatus = action({
       };
     } catch (error) {
       console.error("Failed to get subaccount status:", error);
-      return { connected: false, error: "Failed to fetch subaccount details" };
+      return { connected: false as const, error: "Failed to fetch subaccount details" };
     }
   },
 });
