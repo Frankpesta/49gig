@@ -44,9 +44,40 @@ function formatDollars(cents: number) {
 export default function AdminWithdrawalApprovalsPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const requests = useQuery(api.walletWithdrawals.queries.getWalletWithdrawalRequests, {
-    limit: 200,
-  });
+  const [sessionToken, setSessionToken] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null
+  );
+
+  function sessionTokenForConvex(): string | null {
+    if (typeof window !== "undefined") {
+      const fromStorage = localStorage.getItem("sessionToken");
+      if (fromStorage) return fromStorage;
+    }
+    return sessionToken;
+  }
+
+  useEffect(() => {
+    const read = () => {
+      if (typeof window === "undefined") return;
+      setSessionToken(localStorage.getItem("sessionToken"));
+    };
+    read();
+    window.addEventListener("storage", read);
+    return () => window.removeEventListener("storage", read);
+  }, []);
+
+  const convexSessionToken = sessionTokenForConvex();
+
+  const requests = useQuery(
+    api.walletWithdrawals.queries.getWalletWithdrawalRequests,
+    user?.role === "admin" && user._id
+      ? {
+          limit: 200,
+          viewerUserId: user._id,
+          ...(convexSessionToken ? { sessionToken: convexSessionToken } : {}),
+        }
+      : "skip"
+  );
   const rejectMutation = useMutation(
     api.walletWithdrawals.mutations.rejectFreelancerBankWithdrawal
   );
@@ -74,10 +105,10 @@ export default function AdminWithdrawalApprovalsPage() {
   const history = list.filter((r) => r.status !== "pending");
 
   const handleApproveConfirm = async () => {
-    if (!approveId) return;
+    if (!approveId || !user?._id) return;
     setBusy(true);
     try {
-      await approveAction({ requestId: approveId });
+      await approveAction({ requestId: approveId, viewerUserId: user._id });
       toast.success("Withdrawal approved; Flutterwave transfer was initiated.");
       setApproveId(null);
     } catch (e) {
@@ -88,12 +119,15 @@ export default function AdminWithdrawalApprovalsPage() {
   };
 
   const handleRejectConfirm = async () => {
-    if (!rejectRow) return;
+    if (!rejectRow || !user?._id) return;
     setBusy(true);
     try {
+      const tok = sessionTokenForConvex();
       await rejectMutation({
         requestId: rejectRow,
         adminNote: rejectNote.trim() || undefined,
+        viewerUserId: user._id,
+        ...(tok ? { sessionToken: tok } : {}),
       });
       toast.success("Withdrawal request rejected.");
       setRejectRow(null);

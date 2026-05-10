@@ -1,6 +1,6 @@
 import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser, resolveAuthenticatedUser } from "../auth";
+import { resolveAuthenticatedUser } from "../auth";
 import type { Doc } from "../_generated/dataModel";
 
 const requestRowValidator = v.object({
@@ -64,11 +64,17 @@ export const getWalletWithdrawalRequests = query({
       )
     ),
     limit: v.optional(v.number()),
+    /** Email/password admins: pass from client (Convex Auth JWT is often absent). */
+    viewerUserId: v.optional(v.id("users")),
+    sessionToken: v.optional(v.string()),
   },
   returns: v.array(enrichedValidator),
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.role !== "admin") {
+    const viewer = await resolveAuthenticatedUser(ctx, {
+      userId: args.viewerUserId,
+      sessionToken: args.sessionToken,
+    });
+    if (!viewer || viewer.role !== "admin") {
       return [];
     }
 

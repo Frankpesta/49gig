@@ -8,16 +8,32 @@ const internalAny: any = require("../_generated/api").internal;
 
 async function adminApproveFreelancerBankWithdrawalHandler(
   ctx: ActionCtx,
-  args: { requestId: Id<"walletBankWithdrawalRequests"> }
-): Promise<{ success: true; transferRef: string; paymentId: Id<"payments"> }> {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity?.email) {
-    throw new Error("Only admins can approve withdrawals");
+  args: {
+    requestId: Id<"walletBankWithdrawalRequests">;
+    viewerUserId?: Id<"users">;
   }
-  const admin = await ctx.runQuery(
-    internalAny.auth.actionQueries.getActiveUserByEmailInternal,
-    { email: identity.email }
-  );
+): Promise<{ success: true; transferRef: string; paymentId: Id<"payments"> }> {
+  let admin:
+    | { _id: Id<"users">; status: string; role: string; email?: string }
+    | null
+    | undefined = null;
+
+  if (args.viewerUserId) {
+    admin = await ctx.runQuery(
+      internalAny.auth.actionQueries.getActiveUserByIdInternal,
+      { userId: args.viewerUserId }
+    );
+  } else {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) {
+      throw new Error("Only admins can approve withdrawals");
+    }
+    admin = await ctx.runQuery(
+      internalAny.auth.actionQueries.getActiveUserByEmailInternal,
+      { email: identity.email }
+    );
+  }
+
   if (!admin || admin.status !== "active" || admin.role !== "admin") {
     throw new Error("Only admins can approve withdrawals");
   }
@@ -191,6 +207,8 @@ async function adminApproveFreelancerBankWithdrawalHandler(
 export const adminApproveFreelancerBankWithdrawal = action({
   args: {
     requestId: v.id("walletBankWithdrawalRequests"),
+    /** Email/password admins: pass logged-in admin id (JWT often absent in actions). */
+    viewerUserId: v.optional(v.id("users")),
   },
   returns: v.object({
     success: v.literal(true),

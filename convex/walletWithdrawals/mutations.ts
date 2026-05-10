@@ -1,7 +1,7 @@
 import { mutation, internalMutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser, resolveAuthenticatedUser } from "../auth";
+import { resolveAuthenticatedUser } from "../auth";
 import type { Id } from "../_generated/dataModel";
 
 async function rejectIfPendingWithdrawalExists(
@@ -95,10 +95,15 @@ export const rejectFreelancerBankWithdrawal = mutation({
   args: {
     requestId: v.id("walletBankWithdrawalRequests"),
     adminNote: v.optional(v.string()),
+    viewerUserId: v.optional(v.id("users")),
+    sessionToken: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const admin = await getCurrentUser(ctx);
+    const admin = await resolveAuthenticatedUser(ctx, {
+      userId: args.viewerUserId,
+      sessionToken: args.sessionToken,
+    });
     if (!admin || admin.role !== "admin") {
       throw new Error("Only admins can reject withdrawals");
     }
