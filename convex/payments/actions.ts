@@ -1005,18 +1005,37 @@ export const createSubaccount = action({
       split_value: args.splitValue,
     });
 
+    const d = subaccountData.data as {
+      id: number;
+      account_name?: string;
+      account_reference?: string;
+      bank_name?: string;
+      [key: string]: unknown;
+    };
+
+    const accountReferenceRaw =
+      (typeof d.account_reference === "string" && d.account_reference.trim()) ||
+      (typeof d.accountReference === "string" && d.accountReference.trim()) ||
+      (typeof d.account_name === "string" && d.account_name.trim()) ||
+      "";
+    const bankNameRaw =
+      (typeof d.bank_name === "string" && d.bank_name.trim()) ||
+      (typeof d.bankName === "string" && d.bankName.trim()) ||
+      "";
+
     await ctx.runMutation(internalAny.payments.mutations.updateUserFlutterwaveSubaccountId, {
       userId: args.freelancerId,
-      flutterwaveSubaccountId: subaccountData.data.id.toString(),
+      flutterwaveSubaccountId: d.id.toString(),
       bankCode: args.accountBank,
       accountNumber: args.accountNumber,
     });
 
     return {
       success: true as const,
-      subaccountId: subaccountData.data.id.toString(),
-      accountReference: subaccountData.data.account_reference,
-      bankName: subaccountData.data.bank_name,
+      subaccountId: d.id.toString(),
+      accountReference:
+        accountReferenceRaw || `subaccount-${d.id}`,
+      bankName: bankNameRaw || "Unknown bank",
     };
   },
 });
@@ -1092,12 +1111,26 @@ export const getSubaccountStatus = action({
 
     try {
       const subaccountData = await flutterwave.getSubaccount(freelancerDoc.flutterwaveSubaccountId);
-      const data = subaccountData.data;
+      const data = subaccountData.data as {
+        id: number;
+        account_name?: string;
+        account_reference?: string;
+        bank_name?: string;
+        bank_code?: string;
+        account_bank?: string;
+        [key: string]: unknown;
+      };
+      const accountReferenceRaw =
+        (typeof data.account_reference === "string" && data.account_reference.trim()) ||
+        (typeof data.accountReference === "string" && data.accountReference.trim()) ||
+        (typeof data.account_name === "string" && data.account_name.trim()) ||
+        "";
       return {
         connected: true as const,
         subaccountId: data.id.toString(),
         accountName: data.account_name,
-        accountReference: data.account_reference,
+        accountReference:
+          accountReferenceRaw || `subaccount-${data.id}`,
         bankName: data.bank_name,
         bankCode: data.account_bank ?? data.bank_code,
       };

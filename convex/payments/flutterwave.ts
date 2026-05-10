@@ -292,10 +292,14 @@ export async function createSubaccount(data: {
   data: {
     id: number;
     account_name: string;
-    account_reference: string;
+    /** Present for most regions; some responses omit this field. */
+    account_reference?: string;
     bank_name: string;
     bank_code: string;
     created_at: string;
+    /** Some API variants use camelCase. */
+    accountReference?: string;
+    bankName?: string;
   };
 }> {
   // Flutterwave expects bank code as string with leading zeros preserved (e.g., "044")
@@ -340,9 +344,10 @@ export async function getSubaccount(subaccountId: string): Promise<{
   message: string;
   data: {
     id: number;
-    account_name: string;
-    account_reference: string;
-    bank_name: string;
+    account_name?: string;
+    /** Often omitted in live API responses; use fallbacks when displaying. */
+    account_reference?: string;
+    bank_name?: string;
     bank_code?: string;
     account_bank?: string; // Flutterwave may return bank code as account_bank
     account_number?: string;
@@ -354,6 +359,8 @@ export async function getSubaccount(subaccountId: string): Promise<{
     mobilization_number?: string;
     country?: string;
     created_at?: string;
+    accountReference?: string;
+    bankName?: string;
   };
 }> {
   const response = await fetch(
