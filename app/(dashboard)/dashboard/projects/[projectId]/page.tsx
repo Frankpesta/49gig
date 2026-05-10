@@ -259,7 +259,7 @@ export default function ProjectDetailPage() {
 
   const monthlyCycles = useQuery(
     api.monthlyBillingCycles.queries.getCyclesByProjectId,
-    projectId ? { projectId } : "skip"
+    projectId && user?._id ? { projectId, userId: user._id } : "skip"
   );
 
   const moneyAudit = useQuery(
@@ -1606,7 +1606,10 @@ export default function ProjectDetailPage() {
                                 onClick={async () => {
                                   setApprovingCycleId(cycle._id);
                                   try {
-                                    await approveMonthlyCycle({ monthlyCycleId: cycle._id });
+                                    await approveMonthlyCycle({
+                                      monthlyCycleId: cycle._id,
+                                      userId: user._id,
+                                    });
                                     toast.success("Month approved");
                                   } catch (e) {
                                     toast.error(getUserFriendlyError(e) || "Approval failed");

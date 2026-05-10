@@ -1,6 +1,6 @@
 import { mutation, internalMutation } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "../auth";
+import { resolveViewerUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 import type { MutationCtx } from "../_generated/server";
@@ -19,14 +19,7 @@ async function getCurrentUserInMutation(
   ctx: MutationCtx,
   userId?: Doc<"users">["_id"]
 ): Promise<Doc<"users"> | null> {
-  if (userId) {
-    const user = await ctx.db.get(userId);
-    if (!user || (user as Doc<"users">).status !== "active") return null;
-    return user as Doc<"users">;
-  }
-  const user = await getCurrentUser(ctx);
-  if (!user || (user as Doc<"users">).status !== "active") return null;
-  return user as Doc<"users">;
+  return resolveViewerUser(ctx, userId);
 }
 
 async function getActiveBillingPauseState(
@@ -514,9 +507,10 @@ export const applyPartialDisputeCycleReductionInternal = internalMutation({
 export const approveMonthlyCycle = mutation({
   args: {
     monthlyCycleId: v.id("monthlyBillingCycles"),
+    userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
+    const user = await getCurrentUserInMutation(ctx, args.userId);
     if (!user || (user as Doc<"users">).status !== "active") {
       throw new Error("Not authenticated");
     }

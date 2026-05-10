@@ -902,6 +902,8 @@ export const createPayoutTransfer = action({
 export const createSubaccount = action({
   args: {
     freelancerId: v.id("users"),
+    /** Email/password sessions omit Convex Auth identity; pass the logged-in user id from the client. */
+    viewerUserId: v.optional(v.id("users")),
     accountNumber: v.string(),
     accountBank: v.string(),
     country: v.string(),
@@ -915,14 +917,30 @@ export const createSubaccount = action({
     bankName: v.string(),
   }),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) {
-      throw new Error("Not authenticated");
+    let viewer:
+      | {
+          _id: Id<"users">;
+          email: string;
+          role: string;
+          status: string;
+        }
+      | null
+      | undefined = null;
+
+    if (args.viewerUserId) {
+      viewer = await ctx.runQuery(internalAny.auth.actionQueries.getActiveUserByIdInternal, {
+        userId: args.viewerUserId,
+      });
+    } else {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity?.email) {
+        throw new Error("Not authenticated");
+      }
+      viewer = await ctx.runQuery(internalAny.auth.actionQueries.getActiveUserByEmailInternal, {
+        email: identity.email,
+      });
     }
-    const viewer = await ctx.runQuery(
-      internalAny.auth.actionQueries.getActiveUserByEmailInternal,
-      { email: identity.email }
-    );
+
     if (!viewer || viewer.status !== "active") {
       throw new Error("Not authenticated");
     }
@@ -1009,6 +1027,7 @@ export const createSubaccount = action({
 export const getSubaccountStatus = action({
   args: {
     freelancerId: v.id("users"),
+    viewerUserId: v.optional(v.id("users")),
   },
   returns: v.union(
     v.object({
@@ -1025,14 +1044,29 @@ export const getSubaccountStatus = action({
     })
   ),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) {
-      throw new Error("Not authenticated");
+    let viewer:
+      | {
+          _id: Id<"users">;
+          role: string;
+          status: string;
+        }
+      | null
+      | undefined = null;
+
+    if (args.viewerUserId) {
+      viewer = await ctx.runQuery(internalAny.auth.actionQueries.getActiveUserByIdInternal, {
+        userId: args.viewerUserId,
+      });
+    } else {
+      const identity = await ctx.auth.getUserIdentity();
+      if (!identity?.email) {
+        throw new Error("Not authenticated");
+      }
+      viewer = await ctx.runQuery(internalAny.auth.actionQueries.getActiveUserByEmailInternal, {
+        email: identity.email,
+      });
     }
-    const viewer = await ctx.runQuery(
-      internalAny.auth.actionQueries.getActiveUserByEmailInternal,
-      { email: identity.email }
-    );
+
     if (!viewer || viewer.status !== "active") {
       throw new Error("Not authenticated");
     }

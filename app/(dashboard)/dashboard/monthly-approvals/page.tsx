@@ -23,17 +23,19 @@ export default function MonthlyApprovalsPage() {
     const id = window.setInterval(() => setApprovalClockMs(Date.now()), 60_000);
     return () => window.clearInterval(id);
   }, []);
-  const pendingCycles = useQuery(api.monthlyBillingCycles.queries.getPendingCyclesForClient, {
-    clockMs: approvalClockMs,
-  });
+  const pendingCycles = useQuery(
+    api.monthlyBillingCycles.queries.getPendingCyclesForClient,
+    user?._id ? { clockMs: approvalClockMs, userId: user._id } : "skip"
+  );
   const approveCycle = useMutation(api.monthlyBillingCycles.mutations.approveMonthlyCycle);
 
   const [approvingId, setApprovingId] = useState<Id<"monthlyBillingCycles"> | null>(null);
 
   const handleApprove = async (cycleId: Id<"monthlyBillingCycles">) => {
+    if (!user?._id) return;
     setApprovingId(cycleId);
     try {
-      await approveCycle({ monthlyCycleId: cycleId });
+      await approveCycle({ monthlyCycleId: cycleId, userId: user._id });
       toast.success("Month approved. Funds have been released to the freelancer's wallet. They can withdraw to their bank.");
     } catch (err) {
       toast.error(getUserFriendlyError(err) || "Approval failed");

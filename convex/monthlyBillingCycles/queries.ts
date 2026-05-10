@@ -1,6 +1,6 @@
 import { query, internalQuery, QueryCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "../auth";
+import { resolveViewerUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 
 async function projectHasActiveProjectPause(ctx: QueryCtx, projectId: Doc<"projects">["_id"]) {
@@ -27,10 +27,13 @@ export const getCycleById = query({
  * Get monthly cycles for a project by project ID
  */
 export const getCyclesByProjectId = query({
-  args: { projectId: v.id("projects") },
+  args: {
+    projectId: v.id("projects"),
+    userId: v.optional(v.id("users")),
+  },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || (user as Doc<"users">).status !== "active") return [];
+    const user = await resolveViewerUser(ctx, args.userId);
+    if (!user) return [];
 
     const project = await ctx.db.get(args.projectId);
     if (!project) return [];
@@ -61,15 +64,19 @@ export const getCyclesByProjectId = query({
 
 /**
  * Get pending cycles awaiting client approval (client dashboard only).
- * Returns all pending months for in-progress hires so the schedule is visible; clients enable Approve in the
- * UI only when `monthEndDate <= clockMs`, matching `approveMonthlyCycle` server checks.
+ * Uses optional userId for session-token auth (same pattern as projects/queries.getProject).
+ * Includes hires that are `in_progress` or `matched` so manually seeded cycles still surface during QA.
+ * Clients enable Approve in the UI only when `monthEndDate <= clockMs`, matching `approveMonthlyCycle` server checks.
  * Sort: periods that have ended (ready to approve) first, then by month start.
  */
 export const getPendingCyclesForClient = query({
-  args: { clockMs: v.optional(v.number()) },
+  args: {
+    clockMs: v.optional(v.number()),
+    userId: v.optional(v.id("users")),
+  },
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || (user as Doc<"users">).status !== "active") return [];
+    const user = await resolveViewerUser(ctx, args.userId);
+    if (!user) return [];
 
     if ((user as Doc<"users">).role !== "client") return [];
 
@@ -80,7 +87,7 @@ export const getPendingCyclesForClient = query({
       .withIndex("by_client", (q) => q.eq("clientId", clientId))
       .collect();
     const projectIds = myProjects
-      .filter((p) => p.status === "in_progress")
+      .filter((p) => p.status === "in_progress" || p.status === "matched")
       .map((p) => p._id);
     const allCycles: Doc<"monthlyBillingCycles">[] = [];
     for (const pid of projectIds) {
