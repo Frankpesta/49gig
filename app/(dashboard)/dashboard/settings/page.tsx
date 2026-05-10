@@ -278,6 +278,7 @@ export default function SettingsPage() {
     try {
       const result = await createSubaccount({
         freelancerId: user._id,
+        viewerUserId: user._id,
         accountNumber: subaccountForm.accountNumber,
         accountBank: subaccountForm.accountBank,
         country: subaccountForm.country,
@@ -306,7 +307,10 @@ export default function SettingsPage() {
   const handleRefreshFlutterwaveStatus = async () => {
     setIsFlutterwaveStatusLoading(true);
     try {
-      const result = await getSubaccountStatus({ freelancerId: user._id });
+      const result = await getSubaccountStatus({
+        freelancerId: user._id,
+        viewerUserId: user._id,
+      });
       setFlutterwaveStatus(result || null);
     } catch (error) {
       toast.error(getUserFriendlyError(error) || "Failed to refresh status");
@@ -321,7 +325,7 @@ export default function SettingsPage() {
     }
     let isMounted = true;
     setIsFlutterwaveStatusLoading(true);
-    getSubaccountStatus({ freelancerId: user._id })
+    getSubaccountStatus({ freelancerId: user._id, viewerUserId: user._id })
       .then((result) => {
         if (isMounted) {
           setFlutterwaveStatus(result || null);

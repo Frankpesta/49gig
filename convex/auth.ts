@@ -1,5 +1,29 @@
 import { query, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
+
+/**
+ * Resolve the signed-in users row for queries/mutations that accept optional `userId` from the client.
+ * Email/password sessions use localStorage + `verifySession` and do not populate Convex Auth identity;
+ * those callers must pass `userId`. OAuth / Convex Auth can omit `userId` and fall back to identity email.
+ */
+export async function resolveViewerUser(
+  ctx: QueryCtx | MutationCtx,
+  userId?: Id<"users">
+): Promise<Doc<"users"> | null> {
+  if (userId) {
+    const user = await ctx.db.get(userId);
+    if (!user) return null;
+    const doc = user as Doc<"users">;
+    if (doc.status !== "active") return null;
+    return doc;
+  }
+  const user = await getCurrentUser(ctx);
+  if (!user) return null;
+  const doc = user as Doc<"users">;
+  if (doc.status !== "active") return null;
+  return doc;
+}
 
 /**
  * Helper function to get current user from context

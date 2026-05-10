@@ -92,7 +92,9 @@ export default function NewDisputePage() {
 
   const monthlyCycles = useQuery(
     (api as any)["monthlyBillingCycles/queries"].getCyclesByProjectId,
-    formData.projectId ? { projectId: formData.projectId as any } : "skip"
+    formData.projectId && isAuthenticated && user?._id
+      ? { projectId: formData.projectId as any, userId: user._id }
+      : "skip"
   );
 
   const projectTeamMembers = useQuery(
