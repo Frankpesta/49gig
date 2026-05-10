@@ -150,6 +150,18 @@ export async function hardDeleteUserAccount(
     }
   }
 
+  const bankWithdrawReqs = await ctx.db
+    .query("walletBankWithdrawalRequests")
+    .withIndex("by_user", (q) => q.eq("userId", targetUserId))
+    .collect();
+  for (const r of bankWithdrawReqs) {
+    if (r.status === "pending" || r.status === "processing") {
+      throw new Error(
+        "Cannot delete this account: pending bank withdrawal requests must be completed, rejected, or resolved first."
+      );
+    }
+  }
+
   for (const disputeStatus of ["open", "under_review"] as const) {
     const openBatch = await ctx.db
       .query("disputes")

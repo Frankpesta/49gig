@@ -37,7 +37,9 @@ export default function SupportChatPage() {
     if (chats) {
       const supportChat = chats.find(
         (chat: Doc<"chats">) =>
-          chat.type === "support" && chat.status === "active"
+          chat.type === "support" &&
+          chat.status === "active" &&
+          (chat.supportResolvedAt == null || chat.supportResolvedAt === 0)
       );
       if (supportChat) {
         router.replace(`/dashboard/chat/support/${supportChat._id}`);
@@ -76,7 +78,10 @@ export default function SupportChatPage() {
 
   // If redirecting to existing chat, show loading
   const supportChat = chats?.find(
-    (chat: Doc<"chats">) => chat.type === "support" && chat.status === "active"
+    (chat: Doc<"chats">) =>
+      chat.type === "support" &&
+      chat.status === "active" &&
+      (chat.supportResolvedAt == null || chat.supportResolvedAt === 0)
   );
   if (supportChat) {
     return <DashboardLoadingState label="Loading" />;

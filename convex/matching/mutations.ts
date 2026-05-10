@@ -77,31 +77,6 @@ export const createMatch = internalMutation({
       .filter((q) => q.eq(q.field("freelancerId"), args.freelancerId))
       .collect();
 
-    // Team hire: at most one active (pending/accepted) shortlist row per freelancer per
-    // *template role* (e.g. ui_ux), not per seat label (Ui Designer #1 vs #2). Different
-    // templates (frontend vs backend) may still shortlist the same person.
-    if (args.teamRole !== undefined && project) {
-      const incomingKey = budgetRoleKeyForMatchTeamRole(
-        args.teamRole,
-        project.intakeForm?.teamSlots as TeamSlotIntake[] | undefined
-      );
-      const otherSeatActive = existingList.find((m) => {
-        if (m.teamRole === undefined || m.teamRole === args.teamRole) return false;
-        if (m.status !== "pending" && m.status !== "accepted") return false;
-        const existingKey = budgetRoleKeyForMatchTeamRole(
-          m.teamRole,
-          project.intakeForm?.teamSlots as TeamSlotIntake[] | undefined
-        );
-        if (incomingKey != null && existingKey != null) {
-          return incomingKey === existingKey;
-        }
-        return false;
-      });
-      if (otherSeatActive) {
-        return otherSeatActive._id;
-      }
-    }
-
     const existing =
       args.teamRole !== undefined
         ? existingList.find((m) => m.teamRole === args.teamRole)

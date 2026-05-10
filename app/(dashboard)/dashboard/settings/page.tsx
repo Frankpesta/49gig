@@ -84,9 +84,6 @@ export default function SettingsPage() {
   const [isFlutterwaveStatusLoading, setIsFlutterwaveStatusLoading] = useState(false);
   const [showSubaccountForm, setShowSubaccountForm] = useState(false);
   const [subaccountForm, setSubaccountForm] = useState({
-    businessName: "",
-    businessEmail: "",
-    businessMobile: "",
     accountNumber: "",
     accountBank: "",
     country: "NG", // Default to Nigeria
@@ -262,19 +259,25 @@ export default function SettingsPage() {
   };
 
   const handleCreateSubaccount = async () => {
-    if (!subaccountForm.businessName || !subaccountForm.businessEmail || 
-        !subaccountForm.businessMobile || !subaccountForm.accountNumber || 
-        !subaccountForm.accountBank) {
-      toast.error("Please fill in all required fields");
+    if (!user?._id) return;
+    const phoneE164 =
+      (user && "phoneE164" in user ? (user as { phoneE164?: string }).phoneE164 : undefined)?.trim() ??
+      "";
+    const phoneDigits = phoneE164.replace(/\D/g, "");
+    if (
+      !subaccountForm.accountNumber ||
+      !subaccountForm.accountBank ||
+      phoneDigits.length < 8
+    ) {
+      toast.error(
+        "Complete bank details and verify your phone number in Settings (SMS) before submitting a payout account."
+      );
       return;
     }
     setIsSaving(true);
     try {
       const result = await createSubaccount({
         freelancerId: user._id,
-        businessName: subaccountForm.businessName,
-        businessEmail: subaccountForm.businessEmail || user.email,
-        businessMobile: subaccountForm.businessMobile,
         accountNumber: subaccountForm.accountNumber,
         accountBank: subaccountForm.accountBank,
         country: subaccountForm.country,
@@ -286,9 +289,6 @@ export default function SettingsPage() {
         toast.success("Account details submitted successfully");
         setShowSubaccountForm(false);
         setSubaccountForm({ 
-          businessName: "", 
-          businessEmail: "", 
-          businessMobile: "", 
           accountNumber: "", 
           accountBank: "", 
           country: "NG" 
@@ -692,45 +692,49 @@ export default function SettingsPage() {
                   </Button>
                 ) : (
                   <div className="space-y-4 rounded-lg border border-border p-4">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Your legal name, account email, and SMS-verified phone are sent to the payment processor as-is and cannot be edited here—this reduces fraudulent payout details.
+                    </p>
                     <div className="space-y-2">
-                      <Label htmlFor="businessName">Business Name *</Label>
+                      <Label htmlFor="payout-display-name">Name on payout account</Label>
                       <Input
-                        id="businessName"
-                        placeholder="Your business or account name"
-                        value={subaccountForm.businessName}
-                        onChange={(e) =>
-                          setSubaccountForm((prev) => ({ ...prev, businessName: e.target.value }))
-                        }
+                        id="payout-display-name"
+                        readOnly
+                        disabled
+                        className="bg-muted/60 cursor-not-allowed"
+                        value={user?.name ?? ""}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="businessEmail">Business Email *</Label>
+                      <Label htmlFor="payout-display-email">Email</Label>
                       <Input
-                        id="businessEmail"
-                        type="email"
-                        placeholder={user.email || "your@email.com"}
-                        value={subaccountForm.businessEmail}
-                        onChange={(e) =>
-                          setSubaccountForm((prev) => ({ ...prev, businessEmail: e.target.value }))
+                        id="payout-display-email"
+                        readOnly
+                        disabled
+                        className="bg-muted/60 cursor-not-allowed"
+                        value={user?.email ?? ""}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="payout-display-phone">Verified phone (SMS)</Label>
+                      <Input
+                        id="payout-display-phone"
+                        readOnly
+                        disabled
+                        className="bg-muted/60 cursor-not-allowed"
+                        value={
+                          (user && "phoneE164" in user
+                            ? (user as { phoneE164?: string }).phoneE164
+                            : "") ?? ""
                         }
                       />
-                      {user.email && (
-                        <p className="text-xs text-muted-foreground">
-                          Defaults to your account email if not provided
+                      {!(user && "phoneE164" in user
+                        ? (user as { phoneE164?: string }).phoneE164?.trim()
+                        : "") && (
+                        <p className="text-xs text-destructive">
+                          Complete SMS phone verification in Settings before you can submit payout bank details.
                         </p>
                       )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="businessMobile">Phone Number *</Label>
-                      <Input
-                        id="businessMobile"
-                        type="tel"
-                        placeholder="+234 800 000 0000"
-                        value={subaccountForm.businessMobile}
-                        onChange={(e) =>
-                          setSubaccountForm((prev) => ({ ...prev, businessMobile: e.target.value }))
-                        }
-                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="accountBank">Bank *</Label>
@@ -809,9 +813,6 @@ export default function SettingsPage() {
                         onClick={() => {
                           setShowSubaccountForm(false);
                           setSubaccountForm({ 
-                            businessName: "", 
-                            businessEmail: "", 
-                            businessMobile: "", 
                             accountNumber: "", 
                             accountBank: "", 
                             country: "NG" 
@@ -823,7 +824,15 @@ export default function SettingsPage() {
                       </Button>
                       <Button
                         onClick={handleCreateSubaccount}
-                        disabled={isSaving}
+                        disabled={
+                          isSaving ||
+                          !(
+                            user &&
+                            "phoneE164" in user &&
+                            (((user as { phoneE164?: string }).phoneE164 ?? "").replace(/\D/g, "").length >=
+                              8)
+                          )
+                        }
                         className="flex-1"
                       >
                         {isSaving ? (

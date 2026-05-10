@@ -38,6 +38,13 @@ async function attachUnreadCounts<T extends Doc<"chats">>(
   );
 }
 
+/** Chats shown in Messages: active rows, legacy archived support, and resolved support (`supportResolvedAt`, still active). */
+function includeChatInMessagesList(chat: Doc<"chats">): boolean {
+  if (chat.status === "active") return true;
+  if (chat.type === "support" && chat.status === "archived") return true;
+  return false;
+}
+
 /**
  * Get all chats for the current user
  * Returns project chats, support chats, and system chats
@@ -57,14 +64,22 @@ export const getChats = query({
 
     const isStaff = user.role === "admin" || user.role === "moderator";
 
-    // Get all chats where user is a participant
-    // Note: participants is an array, so we need to filter instead of using index
-    const allChats = await ctx.db
+    const activeChats = await ctx.db
       .query("chats")
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
 
-    const chats = allChats.filter((chat) => chat.participants.includes(user._id));
+    const legacyArchivedSupport = await ctx.db
+      .query("chats")
+      .withIndex("by_type", (q) => q.eq("type", "support"))
+      .filter((q) => q.eq(q.field("status"), "archived"))
+      .collect();
+
+    const listPool = [...activeChats, ...legacyArchivedSupport].filter(
+      includeChatInMessagesList
+    );
+
+    const chats = listPool.filter((chat) => chat.participants.includes(user._id));
 
     // For admins/moderators, also include all chats
     if (isStaff) {
@@ -77,8 +92,10 @@ export const getChats = query({
 
       // Merge and deduplicate
       const chatMap = new Map<string, Doc<"chats">>();
-      [...chats, ...staffChats].forEach((chat) => {
-        chatMap.set(chat._id, chat);
+      [...chats, ...staffChats, ...legacyArchivedSupport].forEach((chat) => {
+        if (includeChatInMessagesList(chat)) {
+          chatMap.set(chat._id, chat);
+        }
       });
       const sorted = Array.from(chatMap.values()).sort(
         (a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)
@@ -492,14 +509,22 @@ export const getUnreadCount = query({
       return 0;
     }
 
-    // Get all user's chats
-    // Note: participants is an array, so we need to filter instead of using index
-    const allChats = await ctx.db
+    const activeChats = await ctx.db
       .query("chats")
       .filter((q) => q.eq(q.field("status"), "active"))
       .collect();
-    
-    const chats = allChats.filter((chat) => chat.participants.includes(user._id));
+
+    const legacyArchivedSupport = await ctx.db
+      .query("chats")
+      .withIndex("by_type", (q) => q.eq("type", "support"))
+      .filter((q) => q.eq(q.field("status"), "archived"))
+      .collect();
+
+    const pool = [...activeChats, ...legacyArchivedSupport].filter(
+      includeChatInMessagesList
+    );
+
+    const chats = pool.filter((chat) => chat.participants.includes(user._id));
 
     let unreadCount = 0;
 

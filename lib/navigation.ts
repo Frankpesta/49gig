@@ -23,6 +23,7 @@ import {
   Mail,
   Send,
   Wallet,
+  Banknote,
   CalendarCheck,
   BookOpen,
   Gift,
@@ -118,6 +119,14 @@ export const navigationItems: NavItem[] = [
     roles: ["admin"],
   },
 
+  {
+    title: "Withdrawal approvals",
+    url: "/dashboard/admin/withdrawal-approvals",
+    icon: Banknote,
+    section: "menu",
+    roles: ["admin"],
+  },
+
   // Chat (All roles)
   {
     title: "Messages",
@@ -128,7 +137,7 @@ export const navigationItems: NavItem[] = [
     roles: ["client", "freelancer", "admin", "moderator"],
   },
 
-  // Wallet (freelancers: earnings; clients: referral cash withdrawals; admin: payout management)
+  // Wallet (freelancers: earnings + bank requests; clients: PayPal/crypto payout requests; admin: referral queue)
   {
     title: "Wallet",
     staffTitle: "Payout Requests",

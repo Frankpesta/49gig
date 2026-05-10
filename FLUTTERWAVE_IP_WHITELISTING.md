@@ -59,6 +59,10 @@ Then only that environment will be able to create transfers until you add more I
 | Testing from your own server/PC | Add your server’s or PC’s public IP in Flutterwave **Whitelisted IP addresses**. |
 | Need static IPs for Convex | Contact Convex support for egress IP info, or run transfers via a proxy with a fixed IP. |
 
+## Freelancer or end-user IPs
+
+Flutterwave **does not** use each freelancer's browser or home IP for the Transfer API. Whitelisting is only for **servers** that call `create transfer` (here: Convex actions). You cannot (and do not need to) add a freelancer's IP per withdrawal request for settlement; if you want IP for fraud signals, log it in your own app (for example from a Next.js route using `x-forwarded-for`) for audit only.
+
 ## References
 
 - [Flutterwave: How to whitelist IP addresses](https://flutterwave.com/ng/support/integrations/how-to-whitelist-ip-addresses-on-your-flutterwave-dashboard)
