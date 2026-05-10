@@ -1,6 +1,6 @@
 import { query, internalQuery } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "../auth";
+import { getCurrentUser, resolveAuthenticatedUser } from "../auth";
 import type { Doc } from "../_generated/dataModel";
 
 const requestRowValidator = v.object({
@@ -113,12 +113,18 @@ export const getWithdrawalRequestInternal = internalQuery({
   },
 });
 
-/** Current freelancer's recent bank withdrawal requests. */
+/** Freelancer's recent bank withdrawal requests. Prefer `{ userId }` (matches wallet queries); `{}` is accepted for backwards compatibility and yields []. */
 export const getMyWalletWithdrawalRequests = query({
-  args: {},
+  args: {
+    userId: v.optional(v.id("users")),
+    sessionToken: v.optional(v.string()),
+  },
   returns: v.array(requestRowValidator),
-  handler: async (ctx) => {
-    const user = await getCurrentUser(ctx);
+  handler: async (ctx, args) => {
+    const user = await resolveAuthenticatedUser(ctx, {
+      userId: args.userId,
+      sessionToken: args.sessionToken,
+    });
     if (!user || user.role !== "freelancer") {
       return [];
     }

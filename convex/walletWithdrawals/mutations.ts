@@ -1,7 +1,7 @@
 import { mutation, internalMutation } from "../_generated/server";
 import type { MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
-import { getCurrentUser } from "../auth";
+import { getCurrentUser, resolveAuthenticatedUser } from "../auth";
 import type { Id } from "../_generated/dataModel";
 
 async function rejectIfPendingWithdrawalExists(
@@ -27,14 +27,24 @@ async function rejectIfPendingWithdrawalExists(
 export const requestFreelancerBankWithdrawal = mutation({
   args: {
     amountCents: v.number(),
+    /** Omitted when Convex Auth has identity; email/password sessions pass this and often `sessionToken`. */
+    userId: v.optional(v.id("users")),
+    /** Same pattern as `users/mutations` profile uploads when JWT identity is absent. */
+    sessionToken: v.optional(v.string()),
   },
   returns: v.object({
     success: v.literal(true),
     requestId: v.id("walletBankWithdrawalRequests"),
   }),
   handler: async (ctx, args) => {
-    const user = await getCurrentUser(ctx);
-    if (!user || user.status !== "active" || user.role !== "freelancer") {
+    const user = await resolveAuthenticatedUser(ctx, {
+      userId: args.userId,
+      sessionToken: args.sessionToken,
+    });
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "freelancer") {
       throw new Error("Only freelancers can request a bank withdrawal");
     }
     if (args.amountCents < 100) {

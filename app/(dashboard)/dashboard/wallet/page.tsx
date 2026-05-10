@@ -41,6 +41,28 @@ const TYPE_LABELS: Record<string, string> = {
 export default function WalletPage() {
   const router = useRouter();
   const { user } = useAuth();
+  /** Email/password auth — Convex mutations see no JWT; mirror session into query/mutation args. */
+  const [sessionToken, setSessionToken] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem("sessionToken") : null
+  );
+
+  function sessionTokenForConvex(): string | null {
+    if (typeof window !== "undefined") {
+      const fromStorage = localStorage.getItem("sessionToken");
+      if (fromStorage) return fromStorage;
+    }
+    return sessionToken;
+  }
+
+  useEffect(() => {
+    const read = () => {
+      if (typeof window === "undefined") return;
+      setSessionToken(localStorage.getItem("sessionToken"));
+    };
+    read();
+    window.addEventListener("storage", read);
+    return () => window.removeEventListener("storage", read);
+  }, []);
 
   useEffect(() => {
     if (user?.role === "moderator") router.replace("/dashboard");
@@ -58,6 +80,8 @@ export default function WalletPage() {
   const [adminActionId, setAdminActionId] = useState<Id<"clientReferralPayoutRequests"> | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [adminActioning, setAdminActioning] = useState(false);
+
+  const convexSessionToken = sessionTokenForConvex();
 
   const wallet = useQuery(api.wallets.queries.getMyWallet, user?._id ? { userId: user._id } : "skip");
   const walletStats = useQuery(api.wallets.queries.getWalletStats, user?._id ? { userId: user._id } : "skip");
@@ -86,7 +110,12 @@ export default function WalletPage() {
   );
   const myWithdrawalRequests = useQuery(
     api.walletWithdrawals.queries.getMyWalletWithdrawalRequests,
-    user?.role === "freelancer" ? {} : "skip"
+    user?.role === "freelancer" && user._id
+      ? {
+          userId: user._id,
+          ...(convexSessionToken ? { sessionToken: convexSessionToken } : {}),
+        }
+      : "skip"
   );
   const [isReconciling, setIsReconciling] = useState(false);
 
@@ -104,7 +133,12 @@ export default function WalletPage() {
     }
     setIsWithdrawing(true);
     try {
-      await requestFreelancerBankWithdraw({ amountCents });
+      const tok = sessionTokenForConvex();
+      await requestFreelancerBankWithdraw({
+        amountCents,
+        userId: user._id,
+        ...(tok ? { sessionToken: tok } : {}),
+      });
       trackEvent("withdraw", { value: amountCents / 100, currency: "USD" });
       toast.success(
         "Withdrawal request submitted. An admin will review and send funds to your linked bank account."

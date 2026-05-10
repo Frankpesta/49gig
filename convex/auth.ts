@@ -26,6 +26,51 @@ export async function resolveViewerUser(
 }
 
 /**
+ * Canonical viewer resolution for mutations/queries that mirror email/password + Convex Auth.
+ * Order:
+ * 1. `sessionToken` (when present) — source of truth for custom sessions; avoids acting on a
+ *    stale `userId` when the browser row is still valid (e.g. React state vs localStorage).
+ * 2. `userId` — active row from DB (matches `getMyWallet`, etc.).
+ * 3. Convex Auth identity (`getCurrentUser`) when neither applies.
+ */
+export async function resolveAuthenticatedUser(
+  ctx: QueryCtx | MutationCtx,
+  opts: { userId?: Id<"users">; sessionToken?: string }
+): Promise<Doc<"users"> | null> {
+  const token = opts.sessionToken?.trim();
+  if (token) {
+    const now = Date.now();
+    const session = await ctx.db
+      .query("sessions")
+      .withIndex("by_token", (q) => q.eq("sessionToken", token))
+      .first();
+    if (
+      session &&
+      session.isActive &&
+      session.expiresAt >= now &&
+      !session.revokedAt
+    ) {
+      const sessionUser = await ctx.db.get(session.userId);
+      if (
+        sessionUser &&
+        (sessionUser as Doc<"users">).status === "active"
+      ) {
+        return sessionUser as Doc<"users">;
+      }
+    }
+  }
+
+  if (opts.userId) {
+    const byId = await ctx.db.get(opts.userId);
+    if (byId && (byId as Doc<"users">).status === "active") {
+      return byId as Doc<"users">;
+    }
+  }
+
+  return resolveViewerUser(ctx, undefined);
+}
+
+/**
  * Helper function to get current user from context
  * Can be used in queries, mutations, and actions
  */

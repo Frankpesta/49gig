@@ -20,6 +20,10 @@ export const verifySession = query({
       return null;
     }
 
+    if (session.revokedAt) {
+      return null;
+    }
+
     // Check if session is expired
     if (session.expiresAt < Date.now()) {
       return null;
