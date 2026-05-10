@@ -59,6 +59,7 @@ import type * as match_exclusions from "../match_exclusions.js";
 import type * as matching_actions from "../matching/actions.js";
 import type * as matching_adminReplacementScore from "../matching/adminReplacementScore.js";
 import type * as matching_autoAssign from "../matching/autoAssign.js";
+import type * as matching_internalMutations from "../matching/internalMutations.js";
 import type * as matching_mutations from "../matching/mutations.js";
 import type * as matching_postFundPipeline from "../matching/postFundPipeline.js";
 import type * as matching_queries from "../matching/queries.js";
@@ -187,6 +188,7 @@ declare const fullApi: ApiFromModules<{
   "matching/actions": typeof matching_actions;
   "matching/adminReplacementScore": typeof matching_adminReplacementScore;
   "matching/autoAssign": typeof matching_autoAssign;
+  "matching/internalMutations": typeof matching_internalMutations;
   "matching/mutations": typeof matching_mutations;
   "matching/postFundPipeline": typeof matching_postFundPipeline;
   "matching/queries": typeof matching_queries;
