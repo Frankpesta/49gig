@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { convexApiAny } from "@/lib/convex-api-runtime";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { useSessionRotation } from "@/hooks/use-session";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -21,7 +21,7 @@ function OAuthCallbackContent() {
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const handleCallback = useAction((api as any)["auth/oauth"].handleGoogleCallback);
+  const handleCallback = useAction(convexApiAny["auth/oauth"].handleGoogleCallback);
   const { setRefreshToken } = useSessionRotation();
   const { trackEvent } = useAnalytics();
 

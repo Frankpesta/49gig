@@ -56,6 +56,14 @@ crons.interval(
   internal.matching.autoAssign.retryAwaitingMatchProjects
 );
 
+// Team hires stuck in awaiting_freelancer (e.g. historic duplicate match rows): advance to matched when safe
+crons.interval(
+  "reconcile stuck team match state",
+  { hours: 6 },
+  internal.matching.internalMutations.reconcileStuckTeamMatchesBatchInternal,
+  { maxProjects: 50 }
+);
+
 // Referral rewards: first funding net × % after hire active 7 days
 crons.interval(
   "referral rewards eligibility",

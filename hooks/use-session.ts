@@ -2,16 +2,42 @@
 
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import type { FunctionReference } from "convex/server";
+import { convexApiAny } from "@/lib/convex-api-runtime";
+
+/** Mirrors `getActiveSessions` payload. */
+export type ActiveSessionSummary = {
+  _id: string;
+  createdAt: number;
+  lastRotatedAt: number;
+  expiresAt: number;
+  ipAddress?: string;
+  userAgent?: string;
+  rotationCount: number;
+};
+
+const rawAuthSessions = convexApiAny.auth.sessions as Record<string, unknown>;
+
+const rotateSessionTokenMutation = rawAuthSessions.rotateSessionToken as unknown as FunctionReference<
+  "mutation",
+  "public",
+  { refreshToken: string },
+  { sessionToken: string; expiresAt: number; rotationCount: number }
+>;
+
+const getActiveSessionsQuery = rawAuthSessions.getActiveSessions as unknown as FunctionReference<
+  "query",
+  "public",
+  Record<string, never>,
+  ActiveSessionSummary[]
+>;
 
 /**
  * Hook to manage session token rotation
  * Automatically rotates tokens before they expire
  */
 export function useSessionRotation() {
-  const rotateToken = useMutation(
-    (api as any)["auth/sessions"].rotateSessionToken
-  );
+  const rotateToken = useMutation(rotateSessionTokenMutation);
   const refreshTokenRef = useRef<string | null>(null);
   const rotationIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -86,13 +112,10 @@ export function useSessionRotation() {
  * Hook to get active sessions
  */
 export function useActiveSessions() {
-  const sessions = useQuery(
-    (api as any)["auth/sessions"].getActiveSessions
-  );
+  const sessions = useQuery(getActiveSessionsQuery);
 
   return {
-    sessions: sessions || [],
+    sessions: sessions ?? [],
     isLoading: sessions === undefined,
   };
 }
-

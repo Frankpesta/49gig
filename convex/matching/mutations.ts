@@ -530,8 +530,12 @@ export const respondToMatchAsFreelancer = mutation({
 
       const intake = project.intakeForm;
       const isTeam = intake.hireType === "team";
+      // Only pending/accepted rows: duplicate seat rows stay `clientAction: "accepted"` when
+      // auto-rejected (same freelancer), and would otherwise block team completion checks.
       const clientAcceptedMatches = allProjectMatches.filter(
-        (m) => m.clientAction === "accepted"
+        (m) =>
+          m.clientAction === "accepted" &&
+          (m.status === "pending" || m.status === "accepted")
       );
       const allFreelancerAcceptedOnClientPicks = clientAcceptedMatches.every(
         (m) => m.freelancerAction === "accepted"

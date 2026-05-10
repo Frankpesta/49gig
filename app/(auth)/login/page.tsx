@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { convexApiAny } from "@/lib/convex-api-runtime";
 import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
 import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
 import { useSessionRotation } from "@/hooks/use-session";
@@ -29,8 +29,12 @@ export default function LoginPage() {
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const signinWithRecaptchaAction = useAction(api.auth.actions.signinWithRecaptcha);
-  const verifyTwoFactorSignin = useMutation((api as any)["auth/mutations"].verifyTwoFactorSignin);
+  const signinWithRecaptchaAction = useAction(
+    convexApiAny.auth.actions.signinWithRecaptcha
+  );
+  const verifyTwoFactorSignin = useMutation(
+    convexApiAny.auth.mutations.verifyTwoFactorSignin
+  );
   const { setRefreshToken } = useSessionRotation();
   const { signInWithGoogle, isGoogleLoading } = useOAuth();
 

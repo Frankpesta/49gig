@@ -1759,7 +1759,14 @@ export const confirmRemainingTeamSelections = mutation({
       if ((project.matchedFreelancerIds ?? []).includes(id)) {
         throw new Error("This freelancer is already confirmed on the team");
       }
-      if (allMatches.some((m) => m.freelancerId === id && m.clientAction === "accepted")) {
+      if (
+        allMatches.some(
+          (m) =>
+            m.freelancerId === id &&
+            m.clientAction === "accepted" &&
+            (m.status === "pending" || m.status === "accepted")
+        )
+      ) {
         throw new Error("This freelancer is already selected for this hire");
       }
     }
@@ -1800,7 +1807,9 @@ export const confirmRemainingTeamSelections = mutation({
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .collect();
     const committedCount = allMatchesAfter.filter(
-      (m) => m.clientAction === "accepted"
+      (m) =>
+        m.clientAction === "accepted" &&
+        (m.status === "pending" || m.status === "accepted")
     ).length;
     const remaining = targetHeadcount - committedCount;
 
@@ -1823,7 +1832,11 @@ export const confirmRemainingTeamSelections = mutation({
       const allRoleLabels = getRoleLabelsForProjectIntake(intake);
       const clientAcceptedRoleLower = new Set<string>();
       for (const m of allMatchesAfter) {
-        if (m.clientAction === "accepted" && m.teamRole) {
+        if (
+          m.clientAction === "accepted" &&
+          (m.status === "pending" || m.status === "accepted") &&
+          m.teamRole
+        ) {
           clientAcceptedRoleLower.add(m.teamRole.toLowerCase());
         }
       }
