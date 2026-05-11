@@ -472,7 +472,8 @@ export default function ChatPage() {
   );
 
   const enquiriesRaw = useMemo(
-    () => contactEnquiriesStaff ?? [],
+    (): Doc<"contactEnquiries">[] =>
+      (contactEnquiriesStaff ?? []) as Doc<"contactEnquiries">[],
     [contactEnquiriesStaff]
   );
 
