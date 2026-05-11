@@ -87,6 +87,9 @@ function StatusBadge({ status }: { status: string }) {
     not_submitted: "outline",
     id_rejected: "destructive",
     address_rejected: "destructive",
+    pending: "secondary",
+    pending_admin: "secondary",
+    flagged: "secondary",
   };
   return (
     <Badge variant={variants[status] ?? "outline"} className="capitalize">
@@ -95,34 +98,133 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/** Freelancer skill/English tests + admin gate — not email verification. */
-function PlatformVerificationBadge({ status }: { status?: string }) {
-  const s = status ?? "not_started";
-  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    not_started: "outline",
-    in_progress: "secondary",
-    pending_review: "secondary",
-    approved: "default",
-    rejected: "destructive",
-    suspended: "destructive",
-  };
-  const label: Record<string, string> = {
-    not_started: "Not started",
-    in_progress: "Tests in progress",
-    pending_review: "Awaiting admin review",
-    approved: "Tests passed · Admin approved",
-    rejected: "Rejected / failed tests",
-    suspended: "Suspended",
-  };
+/** Login / lifecycle — not freelancer platform vetting */
+function AccountStatusBadge({ status }: { status: string }) {
+  if (status === "active") {
+    return (
+      <Badge
+        variant="outline"
+        className="border-border text-muted-foreground"
+        title="Account is enabled on the platform (not the same as matching eligibility)"
+      >
+        Account active
+      </Badge>
+    );
+  }
+  return <StatusBadge status={status} />;
+}
+
+/** Same rules as vetting/queries.isFreelancerVerified: user doc + vetting row + KYC */
+function FreelancerPlatformVerifiedBadge({
+  verificationStatus,
+  kycStatus,
+  vettingResultStatus,
+  vettingLoaded,
+}: {
+  verificationStatus?: string;
+  kycStatus?: string;
+  vettingResultStatus?: string;
+  vettingLoaded: boolean;
+}) {
+  if (!vettingLoaded) {
+    return (
+      <Badge variant="outline" className="animate-pulse text-muted-foreground">
+        Loading verification…
+      </Badge>
+    );
+  }
+
+  const v = verificationStatus ?? "not_started";
+  const kyc = kycStatus ?? "not_submitted";
+  const vetting = vettingResultStatus;
+
+  const fullyApproved =
+    v === "approved" &&
+    kyc === "approved" &&
+    vetting === "approved";
+
+  if (fullyApproved) {
+    return (
+      <Badge
+        variant="outline"
+        className="gap-1 border-emerald-500/50 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200"
+        title="Approved by admin — tests passed, KYC cleared (matching eligibility)"
+      >
+        <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+        Verified
+      </Badge>
+    );
+  }
+
+  if (v === "rejected" || vetting === "rejected") {
+    return (
+      <Badge variant="destructive" className="gap-1" title="Not eligible for matching">
+        <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
+        Verification failed
+      </Badge>
+    );
+  }
+
+  if (vetting !== "approved") {
+    const label =
+      vetting === "pending_review"
+        ? "Tests pending admin"
+        : vetting === "pending_admin"
+          ? "Tests awaiting admin"
+        : vetting === "pending"
+          ? "Tests pending start"
+        : vetting === "flagged"
+          ? "Assessment flagged"
+        : vetting === "in_progress"
+          ? "Tests in progress"
+          : vetting != null
+            ? `Assessment: ${String(vetting).replace(/_/g, " ")}`
+            : "Assessment not finished";
+    return (
+      <Badge variant="secondary" className="max-w-56 text-left font-normal" title={label}>
+        {label}
+      </Badge>
+    );
+  }
+
+  if (v === "approved" && kyc !== "approved") {
+    const label =
+      kyc === "pending_review"
+        ? "KYC in review"
+        : kyc === "not_submitted"
+          ? "KYC required"
+          : `KYC: ${kyc.replace(/_/g, " ")}`;
+    return (
+      <Badge variant="secondary" className="font-normal" title={label}>
+        {label}
+      </Badge>
+    );
+  }
+
+  const label =
+    v === "in_progress"
+      ? "Verification in progress"
+      : v === "pending_review"
+        ? "Profile pending admin"
+        : `Status: ${v.replace(/_/g, " ")}`;
   return (
-    <Badge
-      variant={variants[s] ?? "outline"}
-      className="text-xs font-medium"
-      title="English & skill assessments, then admin approval — separate from email verification"
-    >
-      <ShieldCheck className="h-3 w-3 mr-1 shrink-0" />
-      {label[s] ?? s.replace(/_/g, " ")}
+    <Badge variant="outline" className="font-normal" title={label}>
+      {label}
     </Badge>
+  );
+}
+
+function isFreelancerMatchingGateCleared(
+  profileData: Doc<"users">,
+  vettingLoaded: boolean,
+  vettingResultStatus?: string | null
+): boolean | null {
+  if (profileData.role !== "freelancer") return null;
+  if (!vettingLoaded) return null;
+  return (
+    profileData.verificationStatus === "approved" &&
+    profileData.kycStatus === "approved" &&
+    vettingResultStatus === "approved"
   );
 }
 
@@ -321,6 +423,11 @@ export default function UserDetailPage() {
   const isFreelancer = profileData.role === "freelancer";
   const isClient = profileData.role === "client";
   const initials = profileData.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
+  const matchingGateCleared = isFreelancerMatchingGateCleared(
+    profileData,
+    vettingData !== undefined,
+    vettingData?.vettingResult?.status
+  );
 
   const handleRoleUpdate = async () => {
     if (!newRole || !currentUser?._id) return;
@@ -447,7 +554,7 @@ export default function UserDetailPage() {
                 <p className="text-sm text-muted-foreground">{profileData.email}</p>
                 <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                   <Badge variant="outline" className="capitalize">{profileData.role}</Badge>
-                  <StatusBadge status={profileData.status} />
+                  <AccountStatusBadge status={profileData.status} />
                   {profileData.emailVerified && (
                     <Badge
                       variant="outline"
@@ -459,7 +566,12 @@ export default function UserDetailPage() {
                     </Badge>
                   )}
                   {isFreelancer && (
-                    <PlatformVerificationBadge status={profileData.verificationStatus} />
+                    <FreelancerPlatformVerifiedBadge
+                      verificationStatus={profileData.verificationStatus}
+                      kycStatus={profileData.kycStatus}
+                      vettingResultStatus={vettingData?.vettingResult?.status}
+                      vettingLoaded={vettingData !== undefined}
+                    />
                   )}
                 </div>
               </div>
@@ -777,14 +889,34 @@ export default function UserDetailPage() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-lg bg-muted/30 px-4 py-3">
-                      <p className="text-xs text-muted-foreground">Verification</p>
-                      <StatusBadge status={profileData.verificationStatus ?? "not_started"} />
+                      <p className="text-xs text-muted-foreground">Vetting (tests)</p>
+                      {vettingData === undefined ? (
+                        <span className="text-sm text-muted-foreground">Loading…</span>
+                      ) : vettingData.vettingResult ? (
+                        <StatusBadge status={vettingData.vettingResult.status} />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">No test record</span>
+                      )}
                     </div>
                     <div className="rounded-lg bg-muted/30 px-4 py-3">
-                      <p className="text-xs text-muted-foreground">KYC Status</p>
+                      <p className="text-xs text-muted-foreground">KYC status</p>
                       <StatusBadge status={profileData.kycStatus ?? "not_submitted"} />
                     </div>
                   </div>
+                  <div className="rounded-lg bg-muted/30 px-4 py-3">
+                    <p className="text-xs text-muted-foreground">Admin profile approval</p>
+                    <StatusBadge status={profileData.verificationStatus ?? "not_started"} />
+                  </div>
+                  {matchingGateCleared === true && (
+                    <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                      Fully cleared for matching (tests + KYC + admin approval).
+                    </p>
+                  )}
+                  {matchingGateCleared === false && (
+                    <p className="text-xs text-muted-foreground">
+                      Matching requires vetting approved, KYC approved, and admin profile approval — one or more steps are still pending.
+                    </p>
+                  )}
 
                   {vettingData?.vettingResult && (
                     <div className="space-y-3 pt-2">
