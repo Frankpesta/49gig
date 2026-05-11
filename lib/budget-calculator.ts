@@ -119,6 +119,12 @@ export interface BudgetCalculationParams {
   softwareDevFields?: string[];
   /** Per-freelancer seats (team hires). When set, composition is derived exactly from slots. */
   teamSlots?: TeamSlotIntake[];
+  /**
+   * When set (e.g. from intake `projectDuration` via `getDurationMonths`), discount tier and
+   * total duration use this count instead of ceil(calendar span / 30). Keeps totals, fund-upfront
+   * months, and UI copy aligned.
+   */
+  durationMonthsForPricing?: number;
 }
 
 /** Per-role breakdown for team projects */
@@ -327,6 +333,9 @@ function calculateDurationDays(startDate: Date, endDate: Date): number {
  * Formula (single hire):
  *   total = hourlyRate × hoursPerMonth × durationMonths × (1 − durationDiscount/100)
  *
+ * `durationMonths` is normally ceil((endDate − startDate) / 30 days), unless
+ * `durationMonthsForPricing` is set (recommended for intake presets so it matches
+ * `getDurationMonths(projectDuration)`).
  * Formula (team hire):
  *   total = sum_of_per_seat(hourlyRate × hoursPerMonth) × durationMonths × (1 − durationDiscount/100)
  *
@@ -353,11 +362,17 @@ export function calculateProjectBudget(
     selectedSkillNames = [],
     softwareDevFields,
     teamSlots,
+    durationMonthsForPricing,
   } = params;
 
   const targetTeamSize = resolveTargetTeamSize(teamMemberCount, teamSize);
   const durationDays = calculateDurationDays(startDate, endDate);
-  const durationMonths = Math.max(1, Math.ceil(durationDays / 30));
+  const durationMonths =
+    durationMonthsForPricing != null &&
+    Number.isFinite(durationMonthsForPricing) &&
+    durationMonthsForPricing > 0
+      ? Math.max(1, Math.floor(durationMonthsForPricing))
+      : Math.max(1, Math.ceil(durationDays / 30));
   const discountPct = getDurationDiscount(durationMonths);
   const discountMultiplier = 1 - discountPct / 100;
 

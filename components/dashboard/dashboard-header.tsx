@@ -53,30 +53,34 @@ export function DashboardHeader() {
 
   if (!user) return null;
 
+  const isStaff = user.role === "admin" || user.role === "moderator";
+
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-4 border-b border-border/60 bg-background/95 px-4 backdrop-blur-md supports-backdrop-filter:bg-background/90 sm:gap-6">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-primary/30 via-secondary/15 to-transparent" />
       <div className="flex flex-1 items-center gap-2 min-w-0">
         <SidebarTrigger className="-ml-1 shrink-0" />
-        {/* Centered search - reference style */}
-        <form
-          onSubmit={handleSearch}
-          className="flex-1 max-w-xl mx-auto hidden sm:block"
-        >
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search any record by ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 pr-20 h-9 rounded-xl bg-muted/50 border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20"
-            />
-            <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-0.5 rounded border border-border/80 bg-muted/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground md:inline-flex">
-              ⌘K
-            </kbd>
-          </div>
-        </form>
+        {/* Staff-only: global record search */}
+        {isStaff ? (
+          <form
+            onSubmit={handleSearch}
+            className="flex-1 max-w-xl mx-auto hidden sm:block"
+          >
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search any record by ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-20 h-9 rounded-xl bg-muted/50 border-border/80 focus-visible:ring-2 focus-visible:ring-primary/20"
+              />
+              <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden h-5 select-none items-center gap-0.5 rounded border border-border/80 bg-muted/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground md:inline-flex">
+                ⌘K
+              </kbd>
+            </div>
+          </form>
+        ) : null}
       </div>
 
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">

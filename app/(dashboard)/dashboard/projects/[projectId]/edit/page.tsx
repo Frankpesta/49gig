@@ -336,6 +336,7 @@ export default function EditProjectPage() {
               ? categoriesForBudget
               : ["Software Development"],
           selectedSkillNames: allSkillsFromTeamSlots(slots),
+          durationMonthsForPricing: getDurationMonths(formData.projectDuration),
         });
       } else {
         if (!formData.selectedRoles.length) return null;
@@ -353,6 +354,7 @@ export default function EditProjectPage() {
           roleType: formData.roleType,
           skillsRequired: categoriesForBudget,
           selectedSkillNames: Object.values(formData.roleSkills).flat(),
+          durationMonthsForPricing: getDurationMonths(formData.projectDuration),
         });
       }
       return calc;

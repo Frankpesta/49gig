@@ -7,6 +7,7 @@ import { Search, ExternalLink } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,12 +23,41 @@ type SearchRow = {
 export default function DashboardSearchPage() {
   const params = useSearchParams();
   const q = (params.get("q") || "").trim();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+
+  const isStaff = user?.role === "admin" || user?.role === "moderator";
 
   const results = useQuery(
     (api as any).dashboard.queries.searchByIdAdmin,
-    user?._id && q ? { id: q, userId: user._id } : "skip"
+    user?._id && isStaff && q ? { id: q, userId: user._id } : "skip"
   );
+
+  if (!isAuthenticated || !user) {
+    return (
+      <DashboardEmptyState
+        icon={Search}
+        title="Please log in"
+        description="Sign in to use the dashboard."
+        iconTone="muted"
+      />
+    );
+  }
+
+  if (!isStaff) {
+    return (
+      <DashboardEmptyState
+        icon={Search}
+        title="Access restricted"
+        description="Only admins and moderators can search records by ID."
+        iconTone="muted"
+        action={
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link href="/dashboard">Back to dashboard</Link>
+          </Button>
+        }
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
@@ -46,7 +76,7 @@ export default function DashboardSearchPage() {
         <CardContent className="space-y-3">
           {!q && (
             <p className="text-sm text-muted-foreground">
-              Enter an ID in the dashboard header search bar.
+              Enter an ID in the dashboard header search (staff toolbar).
             </p>
           )}
           {q && results === undefined && (

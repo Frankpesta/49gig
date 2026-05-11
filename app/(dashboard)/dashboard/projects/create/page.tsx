@@ -245,6 +245,7 @@ export default function CreateProjectPage() {
               ? categoriesForBudget
               : ["Software Development"],
           selectedSkillNames: allRequiredSkills,
+          durationMonthsForPricing: getDurationMonths(formData.projectDuration),
         });
       } else {
         if (formData.selectedRoles.length === 0) return null;
@@ -267,6 +268,7 @@ export default function CreateProjectPage() {
             formData.softwareDevFields.length > 0
               ? formData.softwareDevFields
               : undefined,
+          durationMonthsForPricing: getDurationMonths(formData.projectDuration),
         });
       }
       if (!Number.isFinite(calc.estimatedBudget) || calc.estimatedBudget <= 0) return null;
