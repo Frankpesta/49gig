@@ -19,7 +19,6 @@ import { useAction } from "convex/react";
 import { makeFunctionReference } from "convex/server";
 import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
 import { RecaptchaNotice } from "@/components/auth/recaptcha-notice";
-import { useOAuth } from "@/hooks/use-oauth";
 import { AuthTwoColumnLayout } from "@/components/auth/auth-two-column-layout";
 import {
   PLATFORM_CATEGORIES,
@@ -94,8 +93,6 @@ export default function FreelancerSignupPage() {
       SignupWithRecaptchaResult
     >("auth/actions:signupWithRecaptcha")
   );
-  const { signInWithGoogle, isGoogleLoading } = useOAuth();
-
   const categorySkills =
     freelancerDraft.techField === "software_development"
       ? freelancerDraft.softwareDevField
@@ -288,19 +285,15 @@ export default function FreelancerSignupPage() {
       subline="Enter your personal data to create your account."
     >
       <form onSubmit={handleSubmit} className="w-full space-y-5">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full h-11 rounded-lg text-sm font-medium border-border/60 bg-muted/30 hover:bg-muted/50"
-          disabled={isLoading || isGoogleLoading}
-          onClick={() => signInWithGoogle("freelancer")}
-        >
-          {isGoogleLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Redirecting...
-            </span>
-          ) : (
+        <div className="space-y-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            disabled
+            aria-disabled
+            title="Google sign-up is not available for freelancers."
+            className="w-full h-11 rounded-lg text-sm font-medium border-border/60 bg-muted/30"
+          >
             <>
               <svg className="mr-2.5 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
@@ -310,8 +303,11 @@ export default function FreelancerSignupPage() {
               </svg>
               Continue with Google
             </>
-          )}
-        </Button>
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Freelancer accounts: use email and password. Google is not available for this path.
+          </p>
+        </div>
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
@@ -677,7 +673,7 @@ export default function FreelancerSignupPage() {
 
         <p className="text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-primary hover:underline">Login</Link>
+          <Link href="/login?intent=freelancer" className="font-semibold text-primary hover:underline">Login</Link>
         </p>
       </form>
     </AuthTwoColumnLayout>

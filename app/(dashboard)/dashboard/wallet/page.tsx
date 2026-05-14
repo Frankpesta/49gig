@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +40,8 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function WalletPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightTxId = searchParams.get("highlight");
   const { user } = useAuth();
   /** Email/password auth — Convex mutations see no JWT; mirror session into query/mutation args. */
   const [sessionToken, setSessionToken] = useState<string | null>(() =>
@@ -118,6 +120,23 @@ export default function WalletPage() {
       : "skip"
   );
   const [isReconciling, setIsReconciling] = useState(false);
+
+  useEffect(() => {
+    if (!highlightTxId) return;
+    if (transactions === undefined) return;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`wallet-tx-${highlightTxId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("ring-2", "ring-primary/50", "rounded-lg", "transition-shadow");
+        window.setTimeout(
+          () => el.classList.remove("ring-2", "ring-primary/50", "rounded-lg"),
+          2600
+        );
+      }
+    }, 150);
+    return () => window.clearTimeout(timer);
+  }, [highlightTxId, transactions]);
 
   const handleWithdraw = async () => {
     if (!user?._id) return;
@@ -808,6 +827,7 @@ export default function WalletPage() {
               {transactions.map((tx: Doc<"walletTransactions">) => (
                 <div
                   key={tx._id}
+                  id={`wallet-tx-${tx._id}`}
                   className="flex items-center justify-between py-3 border-b border-border/60 last:border-0"
                 >
                   <div>

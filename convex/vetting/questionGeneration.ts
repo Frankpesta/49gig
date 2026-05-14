@@ -43,7 +43,7 @@ export const getOrGenerateSkillMcqQuestions = internalAction({
     }
 
     const openai = getOpenAI();
-    const difficulty = mapLevelToDifficulty(args.experienceLevel);
+    const difficulty = mapLevelToDifficulty(args.experienceLevel, args.categoryId);
     const topics =
       args.skillTopics.length > 0
         ? args.skillTopics.join(", ")
@@ -95,7 +95,7 @@ export const getOrGenerateCodingPrompts = internalAction({
     }
 
     const openai = getOpenAI();
-    const difficulty = mapLevelToDifficulty(args.experienceLevel);
+    const difficulty = mapLevelToDifficulty(args.experienceLevel, args.categoryId);
     const prompts = await generateCodingPromptsWithOpenAI(openai, {
       categoryId: args.categoryId,
       language: args.language,
@@ -122,19 +122,54 @@ function getOpenAI(): OpenAI {
 }
 
 function mapLevelToDifficulty(
+  level: "junior" | "mid" | "senior" | "expert",
+  categoryId?: string
+): string {
+  if (categoryId === "ui_ux_design") {
+    return mapUiUxDifficulty(level);
+  }
+  switch (level) {
+    case "junior":
+      return "easy–medium fundamentals: minimal pure definitions; favor correct application in short scenarios with light judgment calls.";
+    case "mid":
+      return "firmly medium, often edging hard: ambiguous requirements, trade-offs, debugging-style reasoning typical of shipped work.";
+    case "senior":
+      return "mostly hard with expert-level outliers: systemic design, edge-case correctness, and subtle distractors that tempt experienced practitioners.";
+    case "expert":
+      return "deep expert: rare edge cases, cross-layer interactions, standards and failure modes seen only after years of ownership.";
+    default:
+      return "medium";
+  }
+}
+
+/** UI/UX is MCQ-only for this stack — widen the gap sharply between tiers. */
+function mapUiUxDifficulty(
   level: "junior" | "mid" | "senior" | "expert"
 ): string {
   switch (level) {
     case "junior":
-      return "easy to medium";
+      return [
+        "UI/UX — JUNIOR: layout hierarchy, common patterns, typography scale basics, Nielsen heuristics at a recognition level, simple flow fixes.",
+        "Use applied mini-scenarios (reading a rough wireframe, spotting obvious friction). Wrong answers plausible; avoid WCAG conformance nuance or research-program design.",
+      ].join(" ");
     case "mid":
-      return "medium to hard";
+      return [
+        "UI/UX — MID: information architecture, prototyping fidelity, empty/error/mobile states, form UX, heuristic evaluation with rationale.",
+        "Basic accessibility reasoning (labels, focus, touch targets); qualitative vs quantitative trade-offs. Distractors = common practitioner mistakes.",
+      ].join(" ");
     case "senior":
-      return "hard";
+      return [
+        "UI/UX — SENIOR: research validity (bias, sampling, moderation), synthesizing qualitative + quantitative signals, design systems at scale, tokens/consistency governance.",
+        "WCAG 2.x intent-level knowledge (Conformance A/AA distinctions, SC categories), inclusive design tensions, pragmatic metrics (task success, SUS caveats).",
+        "Questions ask for the BEST option under constraints; wrong answers reflect sophisticated-but-wrong reasoning.",
+      ].join(" ");
     case "expert":
-      return "very hard / expert";
+      return [
+        "UI/UX — EXPERT: org-level UX strategy, experimentation ethics, accessibility program maturity, cross-functional/regulatory constraints, systemic remediation of design debt.",
+        "Critique study designs and success metrics like a Staff/Principal IC. Avoid trivial tooling trivia.",
+      ].join(" ");
     default:
-      return "medium";
+      return mapUiUxDifficulty("mid");
   }
 }
 
@@ -161,15 +196,22 @@ async function generateMcqWithOpenAI(
     correctOptionIndex: number;
   }>
 > {
+  const uiAugment =
+    params.categoryId === "ui_ux_design"
+      ? "\n- UI/UX: scenario-first stems (product + user + constraints). Distractors reflect real team disagreements. Do not ask pure definition-matching unless the concept must be applied immediately after."
+      : "";
+
   const sys = `You are an expert technical assessor. Generate multiple-choice questions (MCQ) for skill verification.
 Rules:
 - Output valid JSON only, no markdown.
 - Each question has: "question", "options" (array of 4 strings), "correctIndex" (0-based).
 - Prioritize multi-step reasoning, edge cases, debugging scenarios, trade-offs, and applied problem solving — not textbook definitions.
-- Do not repeat the same idea. Cover different aspects of the topics.`;
+- Do not repeat the same idea. Cover different aspects of the topics.${uiAugment}`;
 
-  const user = `Generate exactly ${params.count} MCQ questions on: ${params.topics}.
-Difficulty: ${params.difficulty} (make most items challenging even for experienced practitioners).
+  const user = `Difficulty calibration — follow strictly; every question must fit this band:
+${params.difficulty}
+
+Generate exactly ${params.count} MCQ questions on: ${params.topics}.
 Return a JSON array of objects: [ { "question": "...", "options": ["A", "B", "C", "D"], "correctIndex": 0 }, ... ]`;
 
   const completion = await openai.chat.completions.create({
