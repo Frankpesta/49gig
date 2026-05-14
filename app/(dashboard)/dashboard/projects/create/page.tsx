@@ -30,6 +30,7 @@ import {
   calculateProjectBudget,
   formatBudget,
   computeTeamBudgetBreakdown,
+  getDurationDiscount,
   getSoftwareDevRoleDisplayName,
   MIN_TEAM_MEMBER_COUNT,
   MAX_TEAM_MEMBER_COUNT,
@@ -909,7 +910,10 @@ export default function CreateProjectPage() {
               <div>
                 <Label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Duration</Label>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose how long this hire runs (from 1 month up). Longer engagements may receive a lower effective monthly rate through built-in term discounts.
+                  Choose how long this hire runs (from one month up). A{' '}
+                  <span className="font-medium text-foreground">2% term discount on the total contract value</span>{' '}
+                  applies only when the commitment is{' '}
+                  <span className="font-medium text-foreground">12 months or longer</span> — it is reflected in the estimate below as a smaller total spread over the same number of months.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {PROJECT_DURATIONS.map((d) => (
@@ -1026,8 +1030,12 @@ export default function CreateProjectPage() {
                 )
               ) : effectiveBudget ? (
                 (() => {
-                  const durMonths = getDurationMonths(formData.projectDuration);
-                  const effectiveMonthly = durMonths > 0 ? effectiveBudget / durMonths : 0;
+                  const pricingMonths =
+                    budgetCalculation.breakdown?.durationMonths ??
+                    getDurationMonths(formData.projectDuration);
+                  const effectiveMonthly =
+                    pricingMonths > 0 ? effectiveBudget / pricingMonths : 0;
+                  const termPct = getDurationDiscount(pricingMonths);
                   return (
                     <div className="rounded-xl border border-primary/20 bg-gradient-to-b from-primary/5 to-transparent shadow-sm overflow-hidden">
                       {/* Header */}
@@ -1088,11 +1096,10 @@ export default function CreateProjectPage() {
                       {/* Footer note */}
                       <div className="px-5 py-3 bg-muted/20 border-t border-border/40">
                         <p className="text-xs text-muted-foreground">
-                          Total you pay. {formData.projectDuration === "1" && "No term discount on 1-month engagements."}
-                          {formData.projectDuration === "3" && "1% discount applied for 3-month commitment."}
-                          {formData.projectDuration === "6" && "2% discount applied for 6-month commitment."}
-                          {["12", "12+", "24", "36", "48", "60"].includes(formData.projectDuration) &&
-                            `3% discount applied for ${formatDurationDisplay(formData.projectDuration)} commitment.`}
+                          Total you pay for this hire.
+                          {termPct > 0
+                            ? ` Includes a ${termPct}% term discount on the full contract total (${formatDurationDisplay(formData.projectDuration)}).`
+                            : " No term discount; the 2% term discount applies only to engagements of 12 months or longer."}
                         </p>
                       </div>
                     </div>

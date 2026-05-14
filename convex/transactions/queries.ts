@@ -27,33 +27,12 @@ async function getCurrentUserInQuery(
 
 /**
  * Get all transactions for the current user
- * - Clients see payments for their projects
- * - Freelancers see payouts for their projects
- * - Admins/Moderators see all transactions
+ * - Clients: project payments + their wallet ledger + referral cash-out requests (pending)
+ * - Freelancers: releases/payouts for their projects + wallet ledger + bank withdrawal requests (pending)
+ * - Admins/Moderators: all payments + recent global wallet ledger + withdrawal requests (pending)
  */
 export const getTransactions = query({
   args: {
-    type: v.optional(
-      v.union(
-        v.literal("pre_funding"),
-        v.literal("top_up"),
-        v.literal("milestone_release"),
-        v.literal("monthly_release"),
-        v.literal("refund"),
-        v.literal("platform_fee"),
-        v.literal("payout")
-      )
-    ),
-    status: v.optional(
-      v.union(
-        v.literal("pending"),
-        v.literal("processing"),
-        v.literal("succeeded"),
-        v.literal("failed"),
-        v.literal("refunded"),
-        v.literal("cancelled")
-      )
-    ),
     userId: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
@@ -62,30 +41,17 @@ export const getTransactions = query({
       throw new Error("Not authenticated");
     }
 
-    let payments;
+    let payments: Doc<"payments">[] = [];
 
     if (user.role === "admin" || user.role === "moderator") {
-      // Admins and moderators see all transactions
-      payments = await ctx.db
-        .query("payments")
-        .order("desc")
-        .collect();
+      payments = await ctx.db.query("payments").order("desc").collect();
     } else if (user.role === "client") {
-      // Clients see payments for their projects
       const userProjects = await ctx.db
         .query("projects")
         .withIndex("by_client", (q) => q.eq("clientId", user._id))
         .collect();
-
       const projectIds = userProjects.map((p) => p._id);
-      
-      if (projectIds.length === 0) {
-        return [];
-      }
-
-      // Get all payments for user's projects
-      // We need to query each project separately since we can't filter by array
-      const allPayments: any[] = [];
+      const allPayments: Doc<"payments">[] = [];
       for (const projectId of projectIds) {
         const projectPayments = await ctx.db
           .query("payments")
@@ -93,13 +59,20 @@ export const getTransactions = query({
           .collect();
         allPayments.push(...projectPayments);
       }
-
       payments = allPayments;
-    } else if (user.role === "freelancer") {
-      // Freelancers see milestone/monthly releases and payouts
-      const allPayments: any[] = [];
 
-      // From projects (milestone_release, monthly_release, project payouts)
+      const noProjectPayments = await ctx.db
+        .query("payments")
+        .withIndex("by_recipient", (q) => q.eq("recipientId", user._id))
+        .filter((q) => q.eq(q.field("type"), "payout"))
+        .collect();
+      for (const p of noProjectPayments) {
+        if (!p.projectId && !payments.some((x) => x._id === p._id)) {
+          payments.push(p);
+        }
+      }
+    } else if (user.role === "freelancer") {
+      const allPayments: Doc<"payments">[] = [];
       const singleProjects = await ctx.db
         .query("projects")
         .withIndex("by_freelancer", (q) => q.eq("matchedFreelancerId", user._id))
@@ -112,20 +85,21 @@ export const getTransactions = query({
         ...singleProjects.map((p) => p._id),
         ...teamProjectIds,
       ]);
-      const projectIds = Array.from(projectIdsSet);
 
-      for (const projectId of projectIds) {
+      for (const projectId of projectIdsSet) {
         const projectPayments = await ctx.db
           .query("payments")
           .withIndex("by_project", (q) => q.eq("projectId", projectId))
           .collect();
         const filteredPayments = projectPayments.filter(
-          (p) => p.type === "milestone_release" || p.type === "monthly_release" || p.type === "payout"
+          (p) =>
+            p.type === "milestone_release" ||
+            p.type === "monthly_release" ||
+            p.type === "payout"
         );
         allPayments.push(...filteredPayments);
       }
 
-      // Payments by recipientId (monthly_release, payout) - for payments that have recipientId set
       const byRecipient = await ctx.db
         .query("payments")
         .withIndex("by_recipient", (q) => q.eq("recipientId", user._id))
@@ -137,7 +111,9 @@ export const getTransactions = query({
         )
         .collect();
       for (const p of byRecipient) {
-        if (!allPayments.some((a) => a._id === p._id)) allPayments.push(p);
+        if (!allPayments.some((a) => a._id === p._id)) {
+          allPayments.push(p);
+        }
       }
 
       payments = allPayments;
@@ -145,52 +121,304 @@ export const getTransactions = query({
       return [];
     }
 
-    // Apply filters
-    if (args.type) {
-      payments = payments.filter((p) => p.type === args.type);
-    }
-
-    if (args.status) {
-      payments = payments.filter((p) => p.status === args.status);
-    }
-
-    // Sort by creation date (newest first)
     payments.sort((a, b) => b.createdAt - a.createdAt);
 
-    // Enrich with project and billing context
-    const enrichedTransactions = await Promise.all(
-      payments.map(async (payment) => {
-        const project = payment.projectId
-          ? (await ctx.db.get(payment.projectId) as Doc<"projects"> | null)
-          : null;
-        const monthlyCycle = payment.monthlyCycleId
-          ? (await ctx.db.get(payment.monthlyCycleId) as Doc<"monthlyBillingCycles"> | null)
-          : null;
+    /** Skip wallet ledger rows that duplicate a payment doc already in the user's feed */
+    function shouldSkipWalletTransaction(
+      wt: Doc<"walletTransactions">,
+      payDocs: Doc<"payments">[]
+    ): boolean {
+      if (wt.paymentId) {
+        return payDocs.some((p) => p._id === wt.paymentId);
+      }
+      if (
+        wt.type === "credit" &&
+        wt.projectId &&
+        wt.monthlyCycleId &&
+        !wt.category
+      ) {
+        return payDocs.some(
+          (p) =>
+            p.type === "monthly_release" &&
+            p.status === "succeeded" &&
+            p.projectId === wt.projectId &&
+            p.monthlyCycleId === wt.monthlyCycleId &&
+            p.recipientId === wt.userId &&
+            Math.abs(
+              Math.round((p.netAmount ?? p.amount) * 100) - wt.amountCents
+            ) <= 2
+        );
+      }
+      if (wt.type === "debit" && wt.flutterwaveTransferId) {
+        return payDocs.some(
+          (p) =>
+            p.type === "payout" &&
+            p.recipientId === wt.userId &&
+            p.flutterwaveTransferId === wt.flutterwaveTransferId &&
+            Math.abs(
+              Math.round((p.netAmount ?? p.amount) * 100) - wt.amountCents
+            ) <= 2
+        );
+      }
+      return false;
+    }
 
-        const walletFunding = walletFundingBreakdown(payment);
-        return {
-          ...payment,
-          project: project
-            ? {
-                _id: project._id,
-                title: project.intakeForm?.title || "Untitled Project",
-                clientId: project.clientId,
-              }
-            : null,
-          monthlyCycle: monthlyCycle
-            ? {
-                _id: monthlyCycle._id,
-                monthIndex: monthlyCycle.monthIndex,
-                monthStartDate: monthlyCycle.monthStartDate,
-                monthEndDate: monthlyCycle.monthEndDate,
-              }
-            : null,
-          walletFunding,
-        };
-      })
+    async function enrichPayment(payment: Doc<"payments">) {
+      const project = payment.projectId
+        ? ((await ctx.db.get(payment.projectId)) as Doc<"projects"> | null)
+        : null;
+      const monthlyCycle = payment.monthlyCycleId
+        ? ((await ctx.db.get(payment.monthlyCycleId)) as Doc<
+            "monthlyBillingCycles"
+          > | null)
+        : null;
+      const walletFunding = walletFundingBreakdown(payment);
+      return {
+        ledgerKind: "payment" as const,
+        listingType: payment.type,
+        ...payment,
+        project: project
+          ? {
+              _id: project._id,
+              title: project.intakeForm?.title || "Untitled Project",
+              clientId: project.clientId,
+            }
+          : null,
+        monthlyCycle: monthlyCycle
+          ? {
+              _id: monthlyCycle._id,
+              monthIndex: monthlyCycle.monthIndex,
+              monthStartDate: monthlyCycle.monthStartDate,
+              monthEndDate: monthlyCycle.monthEndDate,
+            }
+          : null,
+        walletFunding,
+      };
+    }
+
+    async function enrichWalletTx(wt: Doc<"walletTransactions">) {
+      const project = wt.projectId
+        ? ((await ctx.db.get(wt.projectId)) as Doc<"projects"> | null)
+        : null;
+      const monthlyCycle = wt.monthlyCycleId
+        ? ((await ctx.db.get(wt.monthlyCycleId)) as Doc<
+            "monthlyBillingCycles"
+          > | null)
+        : null;
+      const cat = wt.category ?? "none";
+      const listingType = `wallet_${wt.type}_${cat}` as const;
+      const amountDollars = wt.amountCents / 100;
+      const signed = wt.type === "debit" ? -amountDollars : amountDollars;
+      const statusMap: Record<
+        string,
+        | "pending"
+        | "processing"
+        | "succeeded"
+        | "failed"
+        | "refunded"
+        | "cancelled"
+      > = {
+        completed: "succeeded",
+        pending: "pending",
+        failed: "failed",
+      };
+      return {
+        ledgerKind: "wallet" as const,
+        listingType,
+        _id: wt._id,
+        walletTransactionId: wt._id,
+        type: listingType,
+        amount: Math.abs(amountDollars),
+        signedAmount: signed,
+        currency: wt.currency,
+        status: statusMap[wt.status] ?? "succeeded",
+        createdAt: wt.createdAt,
+        netAmount: Math.abs(amountDollars),
+        walletDescription: wt.description,
+        walletTxnType: wt.type,
+        walletCategory: wt.category ?? null,
+        project: project
+          ? {
+              _id: project._id,
+              title: project.intakeForm?.title || "Untitled Project",
+              clientId: project.clientId,
+            }
+          : null,
+        monthlyCycle: monthlyCycle
+          ? {
+              _id: monthlyCycle._id,
+              monthIndex: monthlyCycle.monthIndex,
+              monthStartDate: monthlyCycle.monthStartDate,
+              monthEndDate: monthlyCycle.monthEndDate,
+            }
+          : null,
+        walletFunding: null as null,
+      };
+    }
+
+    let walletTxnRows: Doc<"walletTransactions">[] = [];
+    let withdrawalSynth: Array<Record<string, unknown>> = [];
+
+    if (user.role === "admin" || user.role === "moderator") {
+      walletTxnRows = await ctx.db
+        .query("walletTransactions")
+        .withIndex("by_created_at")
+        .order("desc")
+        .take(3000);
+
+      const bankReqs = await ctx.db.query("walletBankWithdrawalRequests").order("desc").take(600);
+      for (const r of bankReqs) {
+        if (r.status === "completed") continue;
+        withdrawalSynth.push({
+          ledgerKind: "withdrawal_request" as const,
+          listingType: "withdrawal_bank" as const,
+          type: "withdrawal_bank",
+          requestKind: "freelancer_bank" as const,
+          requestId: r._id,
+          _id: r._id,
+          amount: r.amountCents / 100,
+          currency: r.currency,
+          status:
+            r.status === "pending"
+              ? ("pending" as const)
+              : r.status === "processing"
+                ? ("processing" as const)
+                : r.status === "failed"
+                  ? ("failed" as const)
+                  : ("cancelled" as const),
+          createdAt: r.createdAt,
+          adminNote: r.adminNote ?? null,
+          errorMessage: r.errorMessage ?? null,
+          freelancerUserId: r.userId,
+        });
+      }
+
+      const referralReqs = await ctx.db
+        .query("clientReferralPayoutRequests")
+        .order("desc")
+        .take(600);
+      for (const r of referralReqs) {
+        if (r.status === "completed") continue;
+        withdrawalSynth.push({
+          ledgerKind: "withdrawal_request" as const,
+          listingType: "withdrawal_referral_cashout" as const,
+          type: "withdrawal_referral_cashout",
+          requestKind: "client_referral" as const,
+          requestId: r._id,
+          _id: r._id,
+          amount: r.amountCents / 100,
+          currency: r.currency,
+          status:
+            r.status === "pending"
+              ? ("pending" as const)
+              : r.status === "processing"
+                ? ("processing" as const)
+                : ("cancelled" as const),
+          createdAt: r.createdAt,
+          adminNote: r.adminNote ?? null,
+          clientUserId: r.userId,
+        });
+      }
+    } else {
+      const walletDoc = await ctx.db
+        .query("wallets")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .first();
+
+      if (walletDoc) {
+        walletTxnRows = await ctx.db
+          .query("walletTransactions")
+          .withIndex("by_wallet", (q) => q.eq("walletId", walletDoc._id))
+          .order("desc")
+          .take(2000);
+      }
+
+      if (user.role === "freelancer") {
+        const reqs = await ctx.db
+          .query("walletBankWithdrawalRequests")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .order("desc")
+          .take(40);
+        for (const r of reqs) {
+          if (r.status === "completed") continue;
+          withdrawalSynth.push({
+            ledgerKind: "withdrawal_request" as const,
+            listingType: "withdrawal_bank" as const,
+            type: "withdrawal_bank",
+            requestKind: "freelancer_bank" as const,
+            requestId: r._id,
+            _id: r._id,
+            amount: r.amountCents / 100,
+            currency: r.currency,
+            status:
+              r.status === "pending"
+                ? ("pending" as const)
+                : r.status === "processing"
+                  ? ("processing" as const)
+                  : r.status === "failed"
+                    ? ("failed" as const)
+                    : ("cancelled" as const),
+            createdAt: r.createdAt,
+            adminNote: r.adminNote ?? null,
+            errorMessage: r.errorMessage ?? null,
+            freelancerUserId: r.userId,
+          });
+        }
+      }
+
+      if (user.role === "client") {
+        const reqs = await ctx.db
+          .query("clientReferralPayoutRequests")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .order("desc")
+          .take(40);
+        for (const r of reqs) {
+          if (r.status === "completed") continue;
+          withdrawalSynth.push({
+            ledgerKind: "withdrawal_request" as const,
+            listingType: "withdrawal_referral_cashout" as const,
+            type: "withdrawal_referral_cashout",
+            requestKind: "client_referral" as const,
+            requestId: r._id,
+            _id: r._id,
+            amount: r.amountCents / 100,
+            currency: r.currency,
+            status:
+              r.status === "pending"
+                ? ("pending" as const)
+                : r.status === "processing"
+                  ? ("processing" as const)
+                  : ("cancelled" as const),
+            createdAt: r.createdAt,
+            adminNote: r.adminNote ?? null,
+            clientUserId: r.userId,
+          });
+        }
+      }
+    }
+
+    const walletRowsOut: Array<Awaited<ReturnType<typeof enrichWalletTx>>> = [];
+    for (const wt of walletTxnRows) {
+      if (shouldSkipWalletTransaction(wt, payments)) continue;
+      if (user.role === "client" && wt.userId !== user._id) continue;
+      if (user.role === "freelancer" && wt.userId !== user._id) continue;
+      walletRowsOut.push(await enrichWalletTx(wt));
+    }
+
+    const enrichedPayments = await Promise.all(payments.map(enrichPayment));
+
+    const combined = [
+      ...enrichedPayments,
+      ...walletRowsOut,
+      ...withdrawalSynth,
+    ] as Array<Record<string, unknown>>;
+
+    combined.sort(
+      (a, b) =>
+        (b.createdAt as number) - (a.createdAt as number)
     );
 
-    return enrichedTransactions;
+    return combined;
   },
 });
 
@@ -235,9 +463,14 @@ export const getTransaction = query({
     }
 
     const isClient = project.clientId === user._id;
+    const freelancerOnTeam = (project.matchedFreelancerIds ?? []).some(
+      (fid) => fid === user._id
+    );
     const isFreelancer =
-      project.matchedFreelancerId === user._id &&
-      (payment.type === "milestone_release" || payment.type === "monthly_release" || payment.type === "payout");
+      (project.matchedFreelancerId === user._id || freelancerOnTeam) &&
+      (payment.type === "milestone_release" ||
+        payment.type === "monthly_release" ||
+        payment.type === "payout");
 
     if (!isAdmin && !isModerator && !isClient && !isFreelancer) {
       return null;

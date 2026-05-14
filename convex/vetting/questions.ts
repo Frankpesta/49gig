@@ -1502,23 +1502,18 @@ export const getSkillMCQQuestions = query({
   handler: async (ctx, args) => {
     const skillQuestions = SKILL_QUESTIONS[args.skillName] || [];
 
-    // Map experience level to difficulty
-    const difficultyMap: Record<string, QuestionDifficulty> = {
-      junior: "easy",
-      mid: "medium",
-      senior: "hard",
-      expert: "expert",
+    const difficultyBands: Record<ExperienceLevel, QuestionDifficulty[]> = {
+      junior: ["easy", "medium"],
+      mid: ["medium", "hard"],
+      senior: ["hard", "expert"],
+      expert: ["expert"],
     };
 
-    const targetDifficulty = difficultyMap[args.experienceLevel] || "medium";
+    const allowedDifficulties: QuestionDifficulty[] =
+      difficultyBands[args.experienceLevel as ExperienceLevel] ?? ["medium", "hard"];
 
-    // Filter by difficulty (include easier questions too for comprehensive assessment)
-    const difficultyOrder = ["easy", "medium", "hard", "expert"];
-    const targetIndex = difficultyOrder.indexOf(targetDifficulty);
-    const allowedDifficulties = difficultyOrder.slice(0, targetIndex + 1);
-
-    let filtered = skillQuestions.filter(
-      (q) => allowedDifficulties.includes(q.difficulty)
+    let filtered = skillQuestions.filter((q) =>
+      allowedDifficulties.includes(q.difficulty)
     );
 
     // Exclude already used questions

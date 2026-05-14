@@ -898,7 +898,8 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_wallet", ["walletId", "createdAt"])
-    .index("by_user", ["userId", "createdAt"]),
+    .index("by_user", ["userId", "createdAt"])
+    .index("by_created_at", ["createdAt"]),
 
   // Monthly billing cycles (replaces milestones)
   monthlyBillingCycles: defineTable({

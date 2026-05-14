@@ -22,6 +22,8 @@ const TYPE_LABELS: Record<string, string> = {
   refund: "Refund",
   platform_fee: "Included services",
   payout: "Payout",
+  withdrawal_bank: "Bank withdrawal (requested)",
+  withdrawal_referral_cashout: "Referral cash-out (requested)",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -34,7 +36,13 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export type TransactionCardData = {
-  _id: Id<"payments">;
+  ledgerKind?: "payment" | "wallet" | "withdrawal_request";
+  listingType?: string;
+  walletDescription?: string;
+  walletTxnType?: string;
+  walletCategory?: string | null;
+  signedAmount?: number;
+  _id: string;
   type: string;
   amount: number;
   currency: string;
@@ -56,6 +64,40 @@ export type TransactionCardData = {
   } | null;
 };
 
+function rowTypeLabel(transaction: TransactionCardData): string {
+  const kind = transaction.ledgerKind ?? "payment";
+  if (kind === "payment") {
+    return TYPE_LABELS[transaction.type] || transaction.type;
+  }
+  if (kind === "withdrawal_request") {
+    if (transaction.listingType === "withdrawal_bank") {
+      return "Bank withdrawal (requested)";
+    }
+    return "Referral cash-out (requested)";
+  }
+  if (transaction.walletDescription?.trim()) {
+    return transaction.walletDescription.trim();
+  }
+  const wc = [transaction.walletTxnType, transaction.walletCategory]
+    .filter(Boolean)
+    .join(" · ");
+  return wc ? `Wallet — ${wc}` : "Wallet";
+}
+
+function cardDetailHref(transaction: TransactionCardData): string | null {
+  const kind = transaction.ledgerKind ?? "payment";
+  if (kind === "payment") {
+    return `/dashboard/transactions/${transaction._id}`;
+  }
+  if (kind === "wallet") {
+    return `/dashboard/wallet?highlight=${encodeURIComponent(transaction._id)}`;
+  }
+  if (kind === "withdrawal_request") {
+    return "/dashboard/wallet";
+  }
+  return null;
+}
+
 function walletFundingModeLabel(
   wf: NonNullable<TransactionCardData["walletFunding"]>
 ): string {
@@ -70,6 +112,10 @@ function walletFundingModeLabel(
 }
 
 function cardComparableAmount(t: TransactionCardData): number {
+  if ((t.ledgerKind ?? "payment") === "withdrawal_request") return Math.abs(t.amount ?? 0);
+  if (t.ledgerKind === "wallet" && typeof t.signedAmount === "number") {
+    return Math.abs(t.signedAmount);
+  }
   if (t.walletFunding) return t.walletFunding.fundingGrossAmount;
   if ((t.type === "pre_funding" || t.type === "top_up") && t.fundingGrossAmount != null) {
     return t.fundingGrossAmount;
@@ -120,6 +166,7 @@ const DEFAULT_ACCENT = {
 };
 
 export function TransactionCard({ transaction }: { transaction: TransactionCardData }) {
+  const detailHref = cardDetailHref(transaction);
   const mapStatusTone = (status: string) => {
     if (status === "succeeded") return "success";
     if (status === "failed" || status === "cancelled") return "danger";
@@ -129,21 +176,13 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
 
   const accent = STATUS_ACCENT[transaction.status] ?? DEFAULT_ACCENT;
 
-  return (
-    <Card
-      className={cn(
-        "group rounded-xl border border-border/60 overflow-hidden transition-all hover:shadow-md",
-        accent.border,
-        "hover:border-primary/30"
-      )}
-    >
-      <Link href={`/dashboard/transactions/${transaction._id}`}>
-        <CardContent className="p-4 sm:p-5">
+  const Inner = (
+    <CardContent className="p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge variant="outline" className="font-medium">
-                  {TYPE_LABELS[transaction.type] || transaction.type}
+                <Badge variant="outline" className="font-medium max-w-full whitespace-normal leading-snug text-left">
+                  {rowTypeLabel(transaction)}
                 </Badge>
                 <DashboardStatusBadge
                   label={STATUS_LABELS[transaction.status] || transaction.status}
@@ -202,14 +241,28 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
                     Net: ${transaction.netAmount.toLocaleString()}
                   </span>
                 )}
-              <span className="inline-flex items-center text-sm font-medium text-primary mt-2 sm:mt-0 group-hover:underline">
-                View
-                <ArrowRight className="ml-1.5 h-4 w-4" />
-              </span>
+              {detailHref ? (
+                <span className="inline-flex items-center text-sm font-medium text-primary mt-2 sm:mt-0 group-hover:underline">
+                  View
+                  <ArrowRight className="ml-1.5 h-4 w-4" />
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground mt-2 sm:mt-0">Open Wallet for details</span>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Link>
+    </CardContent>
+  );
+
+  return (
+    <Card
+      className={cn(
+        "group rounded-xl border border-border/60 overflow-hidden transition-all hover:shadow-md",
+        accent.border,
+        detailHref ? "hover:border-primary/30" : "opacity-95"
+      )}
+    >
+      {detailHref ? <Link href={detailHref}>{Inner}</Link> : <div>{Inner}</div>}
     </Card>
   );
 }

@@ -70,17 +70,11 @@ export const HOURS_PER_MONTH: Record<RoleType, number> = {
 };
 
 /**
- * Loyalty discount (%) for longer-duration hires.
- *   1 month  → 0 %
- *   3 months → 1 %
- *   6 months → 2 %
- *  12+ months → 3 %
+ * Term discount on total contract value (single and team hires).
+ * Applies only to commitments of **12+ months** (1+ year presets). **2%** off the full total.
  */
 export function getDurationDiscount(months: number): number {
-  if (months >= 12) return 3;
-  if (months >= 6)  return 2;
-  if (months >= 3)  return 1;
-  return 0;
+  return months >= 12 ? 2 : 0;
 }
 
 function getRates(
@@ -120,8 +114,8 @@ export interface BudgetCalculationParams {
   /** Per-freelancer seats (team hires). When set, composition is derived exactly from slots. */
   teamSlots?: TeamSlotIntake[];
   /**
-   * When set (e.g. from intake `projectDuration` via `getDurationMonths`), discount tier and
-   * total duration use this count instead of ceil(calendar span / 30). Keeps totals, fund-upfront
+   * When set (e.g. from intake `projectDuration` via `getDurationMonths`), term discount eligibility
+   * and duration use this count instead of ceil(calendar span / 30). Keeps totals, fund-upfront
    * months, and UI copy aligned.
    */
   durationMonthsForPricing?: number;
@@ -153,7 +147,7 @@ interface BudgetResult {
     teamMembers?: TeamMemberBreakdown[];
     /** Number of calendar months this hire spans */
     durationMonths?: number;
-    /** Loyalty discount percentage applied (0 | 1 | 2 | 3) */
+    /** Loyalty discount percentage applied (0 or 2 when 12+ mo) */
     durationDiscount?: number;
   };
   currency: string;
@@ -339,8 +333,7 @@ function calculateDurationDays(startDate: Date, endDate: Date): number {
  * Formula (team hire):
  *   total = sum_of_per_seat(hourlyRate × hoursPerMonth) × durationMonths × (1 − durationDiscount/100)
  *
- * Duration discount (loyalty):
- *   1 month → 0%,  3 months → 1%,  6 months → 2%,  12+ months → 3%
+ * Duration discount (loyalty): **2%** off the **full total** only when the hire is **12+ months** (1+ year).
  *
  * Platform fee is stored separately on the project and deducted at payout time.
  * No timeline multipliers, project-type multipliers, or milestone complexity factors.

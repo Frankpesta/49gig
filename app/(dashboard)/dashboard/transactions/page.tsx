@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -47,6 +47,8 @@ import {
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 
+type LedgerKind = "payment" | "wallet" | "withdrawal_request";
+
 type WalletFunding = {
   fundingGrossAmount: number;
   walletAppliedDollars: number;
@@ -58,7 +60,13 @@ type WalletFunding = {
 };
 
 type Transaction = {
-  _id: Id<"payments">;
+  ledgerKind?: LedgerKind;
+  listingType?: string;
+  walletDescription?: string;
+  walletTxnType?: string;
+  walletCategory?: string | null;
+  signedAmount?: number;
+  _id: string;
   type: string;
   amount: number;
   currency: string;
@@ -78,7 +86,43 @@ type Transaction = {
   walletFunding?: WalletFunding | null;
 };
 
+const WALLET_ACTIVITY_FILTER = "__wallet_activity__";
+
+function displayTypeLabel(t: Transaction): string {
+  const kind = t.ledgerKind ?? "payment";
+  if (kind === "payment") {
+    return TYPE_LABELS[t.type] || t.type;
+  }
+  if (kind === "withdrawal_request") {
+    if (t.listingType === "withdrawal_bank") return "Bank withdrawal (requested)";
+    return "Referral cash-out (requested)";
+  }
+  if (t.walletDescription?.trim()) {
+    return t.walletDescription.trim();
+  }
+  const wc = [t.walletTxnType, t.walletCategory].filter(Boolean).join(" · ");
+  return wc ? `Wallet — ${wc}` : "Wallet";
+}
+
+function transactionDetailHref(t: Transaction): string | null {
+  const kind = t.ledgerKind ?? "payment";
+  if (kind === "payment") {
+    return `/dashboard/transactions/${t._id}`;
+  }
+  if (kind === "wallet") {
+    return `/dashboard/wallet?highlight=${encodeURIComponent(t._id)}`;
+  }
+  if (kind === "withdrawal_request") {
+    return "/dashboard/wallet";
+  }
+  return null;
+}
+
 function comparableTransactionAmount(t: Transaction): number {
+  if (t.ledgerKind === "withdrawal_request") return Math.abs(t.amount ?? 0);
+  if (t.ledgerKind === "wallet" && typeof t.signedAmount === "number") {
+    return Math.abs(t.signedAmount);
+  }
   if (t.walletFunding) return t.walletFunding.fundingGrossAmount;
   if ((t.type === "pre_funding" || t.type === "top_up") && t.fundingGrossAmount != null) {
     return t.fundingGrossAmount;
@@ -102,22 +146,6 @@ function walletFundingModeLabel(wf: WalletFunding): string {
 
 type SortField = "date" | "amount" | "status" | "type";
 type SortDirection = "asc" | "desc";
-
-type PaymentTypeArg =
-  | "pre_funding"
-  | "top_up"
-  | "milestone_release"
-  | "monthly_release"
-  | "refund"
-  | "platform_fee"
-  | "payout";
-type PaymentStatusArg =
-  | "pending"
-  | "processing"
-  | "succeeded"
-  | "failed"
-  | "refunded"
-  | "cancelled";
 
 function TransactionSortIcon({
   field,
@@ -150,6 +178,8 @@ const TYPE_LABELS: Record<string, string> = {
   refund: "Refund",
   platform_fee: "Included services",
   payout: "Payout",
+  withdrawal_bank: "Bank withdrawal (requested)",
+  withdrawal_referral_cashout: "Referral cash-out (requested)",
 };
 
 const STATUS_CONFIG: Record<
@@ -174,10 +204,6 @@ export default function TransactionsPage() {
 
   const { user } = useAuth();
   const router = useRouter();
-
-  useEffect(() => {
-    if (user?.role === "moderator") router.replace("/dashboard");
-  }, [user?.role, router]);
   const searchParams = useSearchParams();
 
   // Filters
@@ -203,33 +229,46 @@ export default function TransactionsPage() {
   // Fetch transactions
   const transactions = useQuery(
     transactionsQueries.getTransactions,
-    user?._id
-      ? {
-          userId: user._id,
-          ...(typeFilter !== "all" ? { type: typeFilter as PaymentTypeArg } : {}),
-          ...(statusFilter !== "all" ? { status: statusFilter as PaymentStatusArg } : {}),
-        }
-      : "skip"
+    user?._id ? { userId: user._id } : "skip"
   );
 
   // Filter and sort transactions
   const filteredAndSortedTransactions = useMemo(() => {
     if (!transactions) return [];
 
-    let filtered = [...transactions];
+    let filtered: Transaction[] = (transactions as Transaction[]).map((t) => ({
+      ...t,
+      ledgerKind: (t.ledgerKind ?? "payment") as LedgerKind,
+    }));
+
+    // Type filter (client-side — includes ledger + payment rows)
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((t: Transaction) => {
+        if (typeFilter === WALLET_ACTIVITY_FILTER) {
+          return t.ledgerKind === "wallet" || t.ledgerKind === "withdrawal_request";
+        }
+        return t.ledgerKind === "payment" && t.type === typeFilter;
+      });
+    }
+
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((t: Transaction) => t.status === statusFilter);
+    }
 
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (t: Transaction) =>
-          t.project?.title.toLowerCase().includes(query) ||
+          (t.project?.title?.toLowerCase().includes(query) ?? false) ||
           (t.monthlyCycle && `month ${t.monthlyCycle.monthIndex}`.includes(query)) ||
           t._id.toLowerCase().includes(query) ||
+          displayTypeLabel(t).toLowerCase().includes(query) ||
           TYPE_LABELS[t.type]?.toLowerCase().includes(query) ||
           (t.walletFunding?.summary && t.walletFunding.summary.toLowerCase().includes(query)) ||
           (t.walletFunding &&
-            walletFundingModeLabel(t.walletFunding).toLowerCase().includes(query))
+            walletFundingModeLabel(t.walletFunding).toLowerCase().includes(query)) ||
+          (t.walletDescription && t.walletDescription.toLowerCase().includes(query))
       );
     }
 
@@ -252,8 +291,8 @@ export default function TransactionsPage() {
           bValue = b.status;
           break;
         case "type":
-          aValue = a.type;
-          bValue = b.type;
+          aValue = displayTypeLabel(a).toLowerCase();
+          bValue = displayTypeLabel(b).toLowerCase();
           break;
         default:
           return 0;
@@ -265,7 +304,7 @@ export default function TransactionsPage() {
     });
 
     return filtered;
-  }, [transactions, searchQuery, sortField, sortDirection]);
+  }, [transactions, searchQuery, sortField, sortDirection, typeFilter, statusFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedTransactions.length / itemsPerPage);
@@ -278,7 +317,10 @@ export default function TransactionsPage() {
   const stats = useMemo(() => {
     if (!transactions) return null;
 
-    const succeeded = transactions.filter((t: Transaction) => t.status === "succeeded");
+    const payOnly = transactions.filter(
+      (t: Transaction) => (t.ledgerKind ?? "payment") === "payment"
+    );
+    const succeeded = payOnly.filter((t: Transaction) => t.status === "succeeded");
     const isClient = user?.role === "client";
     const isFreelancer = user?.role === "freelancer";
 
@@ -320,7 +362,7 @@ export default function TransactionsPage() {
       {/* Header */}
       <DashboardPageHeader
         title="Transactions"
-        description="View, filter, and inspect all payment transactions."
+        description="Unified ledger: hires and checkout (payments), in-platform wallet movements, and open withdrawal requests—scoped to what your role should see."
         icon={Receipt}
       />
 
@@ -413,6 +455,7 @@ export default function TransactionsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value={WALLET_ACTIVITY_FILTER}>Wallet & withdrawal requests</SelectItem>
                 {Object.entries(TYPE_LABELS).map(([value, label]) => (
                   <SelectItem key={value} value={value}>
                     {label}
@@ -490,7 +533,10 @@ export default function TransactionsPage() {
             <div className="space-y-6">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {paginatedTransactions.map((transaction: Transaction) => (
-                  <TransactionCard key={transaction._id} transaction={transaction} />
+                  <TransactionCard
+                    key={`${transaction.ledgerKind ?? "payment"}-${transaction._id}`}
+                    transaction={transaction}
+                  />
                 ))}
               </div>
               <TablePagination
@@ -528,7 +574,7 @@ export default function TransactionsPage() {
                     onSort={() => handleSort("amount")}
                   >
                     <span className="inline-flex items-center">
-                      Client gross
+                      Amount
                       <TransactionSortIcon field="amount" sortField={sortField} sortDirection={sortDirection} />
                     </span>
                   </DataTableHead>
@@ -545,11 +591,19 @@ export default function TransactionsPage() {
                 </DataTableHeader>
                 <DataTableBody>
                   {paginatedTransactions.map((transaction: Transaction) => {
-                    const statusConfig = STATUS_CONFIG[transaction.status] || STATUS_CONFIG.pending;
+                    const statusConfig =
+                      STATUS_CONFIG[transaction.status] || STATUS_CONFIG.pending;
+                    const kind = transaction.ledgerKind ?? "payment";
+                    const detailHref = transactionDetailHref(transaction);
                     return (
                       <DataTableRow
-                        key={transaction._id}
-                        onClick={() => router.push(`/dashboard/transactions/${transaction._id}`)}
+                        key={`${kind}-${transaction._id}`}
+                        className={
+                          detailHref ? "cursor-pointer" : "cursor-default opacity-95"
+                        }
+                        onClick={() => {
+                          if (detailHref) router.push(detailHref);
+                        }}
                       >
                         <DataTableCell>
                           <div>
@@ -560,8 +614,8 @@ export default function TransactionsPage() {
                           </div>
                         </DataTableCell>
                         <DataTableCell>
-                          <Badge variant="outline">
-                            {TYPE_LABELS[transaction.type] || transaction.type}
+                          <Badge variant="outline" className="max-w-[260px] text-left whitespace-normal leading-snug">
+                            {displayTypeLabel(transaction)}
                           </Badge>
                         </DataTableCell>
                         <DataTableCell>
@@ -574,7 +628,7 @@ export default function TransactionsPage() {
                               {transaction.project.title}
                             </Link>
                           ) : (
-                            <span className="text-muted-foreground">N/A</span>
+                            <span className="text-muted-foreground">{kind !== "payment" ? "—" : "N/A"}</span>
                           )}
                         </DataTableCell>
                         <DataTableCell className="align-top">
@@ -618,25 +672,74 @@ export default function TransactionsPage() {
                         </DataTableCell>
                         <DataTableCell>
                           <div className="font-semibold tabular-nums">
-                            {transaction.type === "pre_funding" || transaction.type === "top_up"
-                              ? `$${comparableTransactionAmount(transaction).toLocaleString(undefined, {
+                            {kind === "wallet" &&
+                            typeof transaction.signedAmount === "number" ? (
+                              <>
+                                <span
+                                  className={
+                                    transaction.signedAmount < 0
+                                      ? "text-rose-600 dark:text-rose-400"
+                                      : "text-emerald-700 dark:text-emerald-400"
+                                  }
+                                >
+                                  {transaction.signedAmount > 0
+                                    ? "+"
+                                    : transaction.signedAmount < 0
+                                      ? "-"
+                                      : ""}
+                                  $
+                                  {Math.abs(transaction.signedAmount).toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}{" "}
+                                  {transaction.currency.toUpperCase()}
+                                </span>
+                                <span className="block text-[10px] font-normal text-muted-foreground normal-case">
+                                  wallet movement
+                                </span>
+                              </>
+                            ) : kind === "withdrawal_request" ? (
+                              <>
+                                $
+                                {transaction.amount.toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
-                                })}`
-                              : `$${transaction.amount.toLocaleString(undefined, {
+                                })}{" "}
+                                {transaction.currency.toUpperCase()}
+                                <span className="block text-[10px] font-normal text-muted-foreground normal-case">
+                                  requested withdrawal
+                                </span>
+                              </>
+                            ) : transaction.type === "pre_funding" || transaction.type === "top_up" ? (
+                              <>
+                                $
+                                {comparableTransactionAmount(transaction).toLocaleString(undefined, {
                                   minimumFractionDigits: 2,
                                   maximumFractionDigits: 2,
-                                })}`}{" "}
-                            {transaction.currency.toUpperCase()}
-                            {transaction.type === "pre_funding" || transaction.type === "top_up" ? (
-                              <span className="block text-[10px] font-normal text-muted-foreground normal-case">
-                                total client gross
-                              </span>
-                            ) : null}
+                                })}{" "}
+                                {transaction.currency.toUpperCase()}
+                                <span className="block text-[10px] font-normal text-muted-foreground normal-case">
+                                  total client gross
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                $
+                                {transaction.amount.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                {transaction.currency.toUpperCase()}
+                              </>
+                            )}
                           </div>
-                          {transaction.type === "milestone_release" || transaction.type === "payout" ? (
+                          {(transaction.ledgerKind ?? "payment") === "payment" &&
+                          (transaction.type === "milestone_release" ||
+                            transaction.type === "monthly_release" ||
+                            transaction.type === "payout") ? (
                             <div className="text-xs text-muted-foreground">
-                              Net: ${transaction.netAmount?.toLocaleString() || transaction.amount.toLocaleString()}
+                              Net: $
+                              {(transaction.netAmount ?? transaction.amount).toLocaleString()}
                             </div>
                           ) : null}
                           {(transaction.type === "pre_funding" || transaction.type === "top_up") &&
@@ -651,15 +754,22 @@ export default function TransactionsPage() {
                           ) : null}
                         </DataTableCell>
                         <DataTableCell>
-                          <DashboardStatusBadge label={statusConfig.label} tone={mapStatusTone(transaction.status)} />
+                          <DashboardStatusBadge
+                            label={statusConfig.label}
+                            tone={mapStatusTone(transaction.status)}
+                          />
                         </DataTableCell>
                         <DataTableCell className="text-right">
-                          <Button variant="ghost" size="sm" asChild className="rounded-lg">
-                            <Link href={`/dashboard/transactions/${transaction._id}`} onClick={(e) => e.stopPropagation()}>
-                              View
-                              <ArrowRight className="ml-2 h-4 w-4" />
-                            </Link>
-                          </Button>
+                          {detailHref ? (
+                            <Button variant="ghost" size="sm" asChild className="rounded-lg">
+                              <Link href={detailHref} onClick={(e) => e.stopPropagation()}>
+                                View
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                              </Link>
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </DataTableCell>
                       </DataTableRow>
                     );
