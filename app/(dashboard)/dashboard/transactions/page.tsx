@@ -622,10 +622,13 @@ export default function TransactionsPage() {
                             </div>
                           </div>
                         </DataTableCell>
-                        <DataTableCell>
-                          <Badge variant="outline" className="max-w-[260px] text-left whitespace-normal leading-snug">
+                        <DataTableCell className="align-top max-w-[10rem] min-w-0 sm:max-w-[14rem]">
+                          <span
+                            className="block break-words text-sm leading-snug text-foreground"
+                            title={displayTypeLabel(transaction)}
+                          >
                             {displayTypeLabel(transaction)}
-                          </Badge>
+                          </span>
                         </DataTableCell>
                         <DataTableCell>
                           {transaction.project ? (
