@@ -81,7 +81,10 @@ import {
   teamSlotsToMatchSpecs,
   type TeamSlotIntake,
 } from "@/lib/team-slots";
-import { freelancerEngagementNetTotalUsd } from "@/lib/project-freelancer-earnings";
+import {
+  freelancerEngagementNetTotalUsd,
+  freelancerMonthlyNetPoolShareCents,
+} from "@/lib/project-freelancer-earnings";
 import { FreelancerReplacementBanner } from "@/components/dashboard/freelancer-replacement-banner";
 
 const STATUS_CONFIG: Record<
@@ -1547,7 +1550,7 @@ export default function ProjectDetailPage() {
                       </p>
                     );
                   })()}
-                  {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; monthEndDate: number; amountCents: number; currency: string; status: string }) => {
+                  {monthlyCycles.map((cycle: { _id: Id<"monthlyBillingCycles">; monthIndex: number; monthStartDate: number; monthEndDate: number; amountCents: number; currency: string; status: string; releasedFreelancerCents?: Record<string, number> }) => {
                     const monthLabel = new Date(cycle.monthStartDate).toLocaleString("default", { month: "long", year: "numeric" });
                     const isPending = cycle.status === "pending";
                     const matured = isBillingPeriodMature(cycle.monthEndDate, billingPeriodClockMs);
@@ -1578,10 +1581,34 @@ export default function ProjectDetailPage() {
                               ? "Cancelled"
                               : cycle.status;
                     const durMonths = getDurationMonths(project?.intakeForm?.projectDuration) || monthlyCycles.length || 1;
+                    const viewerTeamShareUsd =
+                      isMatchedFreelancer &&
+                      user?.role === "freelancer" &&
+                      !isStaff &&
+                      project &&
+                      project.intakeForm.hireType === "team"
+                        ? freelancerMonthlyNetPoolShareCents({
+                            project: {
+                              intakeForm: project.intakeForm,
+                              matchedFreelancerIds: project.matchedFreelancerIds,
+                              matchedFreelancerId: project.matchedFreelancerId,
+                              teamBudgetBreakdown: project.teamBudgetBreakdown,
+                            },
+                            confirmedTeamMembers: confirmedTeamMembers.map((m) => ({
+                              _id: String(m._id),
+                              teamRole: m.teamRole,
+                            })),
+                            poolCents: cycle.amountCents,
+                            releasedFreelancerCents: cycle.releasedFreelancerCents,
+                            viewerUserId: String(user._id),
+                          }) / 100
+                        : null;
                     const displayAmount =
                       isClient && project
                         ? project.totalAmount / durMonths
-                        : cycle.amountCents / 100;
+                        : viewerTeamShareUsd != null
+                          ? viewerTeamShareUsd
+                          : cycle.amountCents / 100;
                     return (
                       <div
                         key={cycle._id}

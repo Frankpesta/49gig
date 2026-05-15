@@ -84,6 +84,11 @@ type Transaction = {
     monthIndex: number;
   } | null;
   walletFunding?: WalletFunding | null;
+  paymentRecipient?: {
+    _id: Id<"users">;
+    name: string;
+    teamRole?: string;
+  } | null;
 };
 
 const WALLET_ACTIVITY_FILTER = "__wallet_activity__";
@@ -268,7 +273,11 @@ export default function TransactionsPage() {
           (t.walletFunding?.summary && t.walletFunding.summary.toLowerCase().includes(query)) ||
           (t.walletFunding &&
             walletFundingModeLabel(t.walletFunding).toLowerCase().includes(query)) ||
-          (t.walletDescription && t.walletDescription.toLowerCase().includes(query))
+          (t.walletDescription && t.walletDescription.toLowerCase().includes(query)) ||
+          (t.paymentRecipient?.name &&
+            t.paymentRecipient.name.toLowerCase().includes(query)) ||
+          (t.paymentRecipient?.teamRole &&
+            t.paymentRecipient.teamRole.toLowerCase().includes(query))
       );
     }
 
@@ -620,13 +629,26 @@ export default function TransactionsPage() {
                         </DataTableCell>
                         <DataTableCell>
                           {transaction.project ? (
-                            <Link
-                              href={`/dashboard/projects/${transaction.project._id}`}
-                              className="hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {transaction.project.title}
-                            </Link>
+                            <>
+                              <Link
+                                href={`/dashboard/projects/${transaction.project._id}`}
+                                className="hover:underline"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {transaction.project.title}
+                              </Link>
+                              {(transaction.type === "monthly_release" ||
+                                transaction.type === "milestone_release" ||
+                                transaction.type === "payout") &&
+                                transaction.paymentRecipient?.name && (
+                                  <span className="mt-1 block max-w-[16rem] text-[11px] leading-snug text-muted-foreground whitespace-normal">
+                                    {transaction.paymentRecipient.name}
+                                    {transaction.paymentRecipient.teamRole
+                                      ? ` · ${transaction.paymentRecipient.teamRole}`
+                                      : ""}
+                                  </span>
+                                )}
+                            </>
                           ) : (
                             <span className="text-muted-foreground">{kind !== "payment" ? "—" : "N/A"}</span>
                           )}

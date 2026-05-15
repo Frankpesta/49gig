@@ -1,7 +1,35 @@
 import { query } from "../_generated/server";
 import { v } from "convex/values";
-import { Doc } from "../_generated/dataModel";
+import { Doc, Id } from "../_generated/dataModel";
 import { walletFundingBreakdown } from "./walletFundingBreakdown";
+
+/** Monthly / milestone payout rows: freelancer only sees their own seat (recipient), never teammates'. */
+function releasePaymentVisibleToFreelancer(
+  p: Doc<"payments">,
+  viewerId: Id<"users">,
+  project: Doc<"projects">
+): boolean {
+  const teamIds =
+    project.matchedFreelancerIds && project.matchedFreelancerIds.length > 0
+      ? project.matchedFreelancerIds
+      : project.matchedFreelancerId
+        ? [project.matchedFreelancerId]
+        : [];
+  const onRoster =
+    teamIds.some((fid) => fid === viewerId) ||
+    project.matchedFreelancerId === viewerId;
+  if (!onRoster) return false;
+
+  if (
+    p.type === "monthly_release" ||
+    p.type === "payout" ||
+    p.type === "milestone_release"
+  ) {
+    if (p.recipientId) return p.recipientId === viewerId;
+    return teamIds.length <= 1;
+  }
+  return false;
+}
 
 /**
  * Helper function to get current user in queries
@@ -87,15 +115,18 @@ export const getTransactions = query({
       ]);
 
       for (const projectId of projectIdsSet) {
+        const proj = await ctx.db.get(projectId as Id<"projects">);
+        if (!proj) continue;
         const projectPayments = await ctx.db
           .query("payments")
           .withIndex("by_project", (q) => q.eq("projectId", projectId))
           .collect();
         const filteredPayments = projectPayments.filter(
           (p) =>
-            p.type === "milestone_release" ||
-            p.type === "monthly_release" ||
-            p.type === "payout"
+            (p.type === "milestone_release" ||
+              p.type === "monthly_release" ||
+              p.type === "payout") &&
+            releasePaymentVisibleToFreelancer(p, user._id, proj)
         );
         allPayments.push(...filteredPayments);
       }
@@ -119,6 +150,51 @@ export const getTransactions = query({
       payments = allPayments;
     } else {
       return [];
+    }
+
+    /** Admins/moderators: identical monthly_release rows per seat/cycle explode the ledger; keep newest. */
+    if (user.role === "admin" || user.role === "moderator") {
+      const groupSizes = new Map<string, number>();
+      for (const p of payments) {
+        if (
+          p.type !== "monthly_release" ||
+          !p.projectId ||
+          !p.monthlyCycleId ||
+          !p.recipientId
+        ) {
+          continue;
+        }
+        const fp = `${p.projectId}:${p.monthlyCycleId}:${p.recipientId}`;
+        groupSizes.set(fp, (groupSizes.get(fp) ?? 0) + 1);
+      }
+      const latestByFp = new Map<string, Doc<"payments">>();
+      for (const p of payments) {
+        if (
+          p.type !== "monthly_release" ||
+          !p.projectId ||
+          !p.monthlyCycleId ||
+          !p.recipientId
+        ) {
+          continue;
+        }
+        const fp = `${p.projectId}:${p.monthlyCycleId}:${p.recipientId}`;
+        if ((groupSizes.get(fp) ?? 0) <= 1) continue;
+        const prev = latestByFp.get(fp);
+        if (!prev || p.createdAt >= prev.createdAt) latestByFp.set(fp, p);
+      }
+      payments = payments.filter((p) => {
+        if (
+          p.type !== "monthly_release" ||
+          !p.projectId ||
+          !p.monthlyCycleId ||
+          !p.recipientId
+        ) {
+          return true;
+        }
+        const fp = `${p.projectId}:${p.monthlyCycleId}:${p.recipientId}`;
+        if ((groupSizes.get(fp) ?? 0) <= 1) return true;
+        return latestByFp.get(fp)?._id === p._id;
+      });
     }
 
     payments.sort((a, b) => b.createdAt - a.createdAt);
@@ -172,11 +248,39 @@ export const getTransactions = query({
             "monthlyBillingCycles"
           > | null)
         : null;
+      const payoutRecipient =
+        payment.recipientId != null
+          ? ((await ctx.db.get(payment.recipientId)) as Doc<"users"> | null)
+          : null;
+      let recipientTeamRole: string | undefined;
+      if (payment.recipientId != null && payment.projectId != null) {
+        const projectIdMatch = payment.projectId;
+        const recipientIdMatch = payment.recipientId;
+        const m = await ctx.db
+          .query("matches")
+          .withIndex("by_project", (q) => q.eq("projectId", projectIdMatch))
+          .filter((q) => q.eq(q.field("freelancerId"), recipientIdMatch))
+          .first();
+        recipientTeamRole = m?.teamRole ?? undefined;
+      }
       const walletFunding = walletFundingBreakdown(payment);
+      const flutterwaveCustomerEmailForViewer =
+        user != null && user.role === "freelancer"
+          ? undefined
+          : payment.flutterwaveCustomerEmail;
       return {
         ledgerKind: "payment" as const,
         listingType: payment.type,
         ...payment,
+        flutterwaveCustomerEmail: flutterwaveCustomerEmailForViewer,
+        paymentRecipient:
+          payoutRecipient && payment.recipientId
+            ? {
+                _id: payoutRecipient._id,
+                name: payoutRecipient.name ?? "Freelancer",
+                ...(recipientTeamRole ? { teamRole: recipientTeamRole } : {}),
+              }
+            : null,
         project: project
           ? {
               _id: project._id,
@@ -443,12 +547,22 @@ export const getTransaction = query({
 
     const isAdmin = user.role === "admin";
     const isModerator = user.role === "moderator";
+    const privilegedParties = isAdmin || isModerator;
 
-    // Wallet payout (no project) - check recipientId
+    const sanitizePaymentDoc = (doc: Doc<"payments">) =>
+      ({
+        ...doc,
+        flutterwaveCustomerEmail:
+          user.role === "freelancer"
+            ? undefined
+            : doc.flutterwaveCustomerEmail,
+      }) as Doc<"payments">;
+
     if (!payment.projectId && payment.type === "payout") {
       if (payment.recipientId === user._id || isAdmin || isModerator) {
+        const p = sanitizePaymentDoc(payment);
         return {
-          ...payment,
+          ...p,
           project: null,
           monthlyCycle: null,
           walletFunding: walletFundingBreakdown(payment),
@@ -457,70 +571,113 @@ export const getTransaction = query({
       return null;
     }
 
-    const project = await ctx.db.get(payment.projectId!);
+    const project = payment.projectId
+      ? await ctx.db.get(payment.projectId)
+      : null;
     if (!project) {
       return null;
     }
 
     const isClient = project.clientId === user._id;
-    const freelancerOnTeam = (project.matchedFreelancerIds ?? []).some(
-      (fid) => fid === user._id
-    );
-    const isFreelancer =
-      (project.matchedFreelancerId === user._id || freelancerOnTeam) &&
-      (payment.type === "milestone_release" ||
-        payment.type === "monthly_release" ||
-        payment.type === "payout");
+    const billingTypes =
+      payment.type === "pre_funding" ||
+      payment.type === "top_up" ||
+      payment.type === "refund" ||
+      payment.type === "platform_fee";
 
-    if (!isAdmin && !isModerator && !isClient && !isFreelancer) {
+    const releaseTypes =
+      payment.type === "milestone_release" ||
+      payment.type === "monthly_release" ||
+      payment.type === "payout";
+
+    if (!billingTypes && !releaseTypes) {
       return null;
     }
 
-    // Billing period context (e.g. monthly release)
-    const monthlyCycle = payment.monthlyCycleId
+    if (billingTypes) {
+      if (!isAdmin && !isModerator && !isClient) return null;
+    } else if (releaseTypes) {
+      if (!isAdmin && !isModerator && !isClient) {
+        if (!releasePaymentVisibleToFreelancer(payment, user._id, project)) {
+          return null;
+        }
+      }
+    }
+
+    const monthlyCycleDoc = payment.monthlyCycleId
       ? await ctx.db.get(payment.monthlyCycleId)
       : null;
 
-    // Get project client
-    const client = await ctx.db.get(project.clientId);
+    const clientUser = await ctx.db.get(project.clientId);
 
-    // Get freelancer if applicable
-    const freelancer = project.matchedFreelancerId
-      ? await ctx.db.get(project.matchedFreelancerId)
+    const recipientId =
+      payment.recipientId ?? project.matchedFreelancerId ?? null;
+    const recipientDoc = recipientId ? await ctx.db.get(recipientId) : null;
+
+    let recipientTeamRole: string | undefined;
+    if (recipientId) {
+      const projectMatches = await ctx.db
+        .query("matches")
+        .withIndex("by_project", (q) => q.eq("projectId", project._id))
+        .collect();
+      recipientTeamRole = projectMatches.find(
+        (m) =>
+          m.freelancerId === recipientId &&
+          (m.status === "accepted" || m.status === "pending")
+      )?.teamRole;
+    }
+
+    const hideMonthlyPoolFromFreelancer =
+      user.role === "freelancer" &&
+      payment.type === "monthly_release" &&
+      !isAdmin &&
+      !isModerator;
+
+    const clientParty = clientUser
+      ? {
+          _id: clientUser._id,
+          name: clientUser.name ?? "Client",
+          ...((privilegedParties || isClient) && clientUser.email
+            ? { email: clientUser.email }
+            : {}),
+        }
       : null;
 
+    const freelancerParty =
+      recipientDoc && recipientId
+        ? {
+            _id: recipientDoc._id,
+            name: recipientDoc.name ?? "Freelancer",
+            ...(recipientTeamRole ? { teamRole: recipientTeamRole } : {}),
+            ...(privilegedParties && recipientDoc.email
+              ? { email: recipientDoc.email }
+              : {}),
+          }
+        : null;
+
     const walletFunding = walletFundingBreakdown(payment);
+    const p = sanitizePaymentDoc(payment);
 
     return {
-      ...payment,
+      ...p,
       walletFunding,
       project: {
         _id: project._id,
         title: project.intakeForm.title,
         description: project.intakeForm.description,
         clientId: project.clientId,
-        client: client
-          ? {
-              _id: client._id,
-              name: client.name,
-              email: client.email,
-            }
-          : null,
-        freelancer: freelancer
-          ? {
-              _id: freelancer._id,
-              name: freelancer.name,
-              email: freelancer.email,
-            }
-          : null,
+        client: clientParty,
+        freelancer: freelancerParty,
       },
-      monthlyCycle: monthlyCycle
+      monthlyCycle: monthlyCycleDoc
         ? {
-            _id: monthlyCycle._id,
-            monthIndex: monthlyCycle.monthIndex,
-            monthStartDate: monthlyCycle.monthStartDate,
-            monthEndDate: monthlyCycle.monthEndDate,
-            amountCents: monthlyCycle.amountCents,
+            _id: monthlyCycleDoc._id,
+            monthIndex: monthlyCycleDoc.monthIndex,
+            monthStartDate: monthlyCycleDoc.monthStartDate,
+            monthEndDate: monthlyCycleDoc.monthEndDate,
+            ...(hideMonthlyPoolFromFreelancer
+              ? {}
+              : { amountCents: monthlyCycleDoc.amountCents }),
           }
         : null,
     };

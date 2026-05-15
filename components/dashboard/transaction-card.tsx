@@ -62,6 +62,11 @@ export type TransactionCardData = {
     isPartialWalletFunding?: boolean;
     isGatewayOnly?: boolean;
   } | null;
+  paymentRecipient?: {
+    _id: Id<"users">;
+    name: string;
+    teamRole?: string;
+  } | null;
 };
 
 function rowTypeLabel(transaction: TransactionCardData): string {
@@ -200,6 +205,17 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
                   Month {transaction.monthlyCycle.monthIndex}
                 </p>
               )}
+              {(transaction.type === "monthly_release" ||
+                transaction.type === "milestone_release" ||
+                transaction.type === "payout") &&
+                transaction.paymentRecipient?.name && (
+                  <p className="text-[11px] text-muted-foreground truncate mt-0.5 whitespace-normal leading-snug">
+                    {transaction.paymentRecipient.name}
+                    {transaction.paymentRecipient.teamRole
+                      ? ` · ${transaction.paymentRecipient.teamRole}`
+                      : ""}
+                  </p>
+                )}
               <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 shrink-0" />
                 {new Date(transaction.createdAt).toLocaleDateString()}
