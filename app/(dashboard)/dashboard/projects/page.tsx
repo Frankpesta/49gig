@@ -252,8 +252,6 @@ export default function ProjectsPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project: Doc<"projects"> & {
             freelancerHireDisplayStatus?: string;
-            openDisputeOnHire?: boolean;
-            viewerIsDisputePartyOnHire?: boolean;
             viewerMatchTeamRole?: string;
           }) => {
             const displayStatus =
@@ -307,13 +305,6 @@ export default function ProjectsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {user?.role === "freelancer" &&
-                    project.openDisputeOnHire &&
-                    project.viewerIsDisputePartyOnHire === false && (
-                      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-                        A dispute is open on this hire involving other team members. You are not part of that dispute and can continue your work.
-                      </p>
-                    )}
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-1 text-muted-foreground">
                       <DollarSign className="h-4 w-4" />

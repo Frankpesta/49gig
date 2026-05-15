@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { DashboardStatusBadge } from "@/components/dashboard/dashboard-status-badge";
 import { cn } from "@/lib/utils";
 import {
@@ -185,10 +184,13 @@ export function TransactionCard({ transaction }: { transaction: TransactionCardD
     <CardContent className="p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge variant="outline" className="font-medium max-w-full whitespace-normal leading-snug text-left">
+              <div className="flex flex-wrap items-start gap-2 mb-2">
+                <span
+                  className="min-w-0 max-w-full break-words text-sm font-medium leading-snug text-foreground"
+                  title={rowTypeLabel(transaction)}
+                >
                   {rowTypeLabel(transaction)}
-                </Badge>
+                </span>
                 <DashboardStatusBadge
                   label={STATUS_LABELS[transaction.status] || transaction.status}
                   tone={mapStatusTone(transaction.status)}

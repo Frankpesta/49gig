@@ -229,7 +229,9 @@ export const getProjects = query({
           }
 
           freelancerHireDisplayStatus = project.status;
-          if (project.status === "disputed" && openDisputes.length > 0) {
+          if (openDisputeOnHire && viewerIsDisputePartyOnHire) {
+            freelancerHireDisplayStatus = "disputed";
+          } else if (project.status === "disputed" && openDisputes.length > 0) {
             const d = openDisputes[0];
             const teamIds = project.matchedFreelancerId
               ? [project.matchedFreelancerId]
@@ -576,7 +578,9 @@ export const getProject = query({
       }
 
       freelancerHireDisplayStatus = project.status;
-      if (project.status === "disputed" && openDisputes.length > 0) {
+      if (openDisputeOnHire && viewerIsDisputePartyOnHire) {
+        freelancerHireDisplayStatus = "disputed";
+      } else if (project.status === "disputed" && openDisputes.length > 0) {
         const d = openDisputes[0];
         const teamIds = project.matchedFreelancerId
           ? [project.matchedFreelancerId]
