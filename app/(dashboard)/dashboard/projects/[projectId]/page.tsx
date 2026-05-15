@@ -429,10 +429,7 @@ export default function ProjectDetailPage() {
   }
 
   const displayStatus =
-    user.role === "freelancer" &&
-    (project as { freelancerHireDisplayStatus?: string }).freelancerHireDisplayStatus
-      ? (project as { freelancerHireDisplayStatus: string }).freelancerHireDisplayStatus
-      : project.status;
+    (project as { hireDisplayStatus?: string }).hireDisplayStatus ?? project.status;
   const statusConfig = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
   const isAdmin = user.role === "admin";

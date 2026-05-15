@@ -251,13 +251,10 @@ export default function ProjectsPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project: Doc<"projects"> & {
-            freelancerHireDisplayStatus?: string;
+            hireDisplayStatus?: string;
             viewerMatchTeamRole?: string;
           }) => {
-            const displayStatus =
-              user?.role === "freelancer" && project.freelancerHireDisplayStatus
-                ? project.freelancerHireDisplayStatus
-                : project.status;
+            const displayStatus = project.hireDisplayStatus ?? project.status;
             const statusConfig = STATUS_CONFIG[displayStatus] || STATUS_CONFIG.draft;
             const StatusIcon = statusConfig.icon;
             const amountForViewer =

@@ -50,6 +50,78 @@ async function getCurrentUserInQuery(
   return userDoc;
 }
 
+/** Active dispute workflow stages that should surface as an open case on the hire. */
+function filterOpenDisputes(disputes: Doc<"disputes">[]): Doc<"disputes">[] {
+  return disputes.filter(
+    (d) =>
+      d.status === "open" ||
+      d.status === "under_review" ||
+      d.status === "escalated"
+  );
+}
+
+/**
+ * Per-viewer hire status for clients and freelancers (e.g. partial team disputes leave `projects.status`
+ * as in_progress while a case is open — parties and dispute initiators should still see Disputed).
+ */
+function computeHireDisplayFields(args: {
+  project: Doc<"projects">;
+  viewerUserId: Doc<"users">["_id"];
+  viewerRole: "client" | "freelancer";
+  openDisputes: Doc<"disputes">[];
+}): {
+  hireDisplayStatus: Doc<"projects">["status"];
+  openDisputeOnHire: boolean;
+  viewerIsDisputePartyOnHire: boolean;
+} {
+  const { project, viewerUserId, openDisputes } = args;
+
+  let viewerIsDisputePartyOnHire = false;
+  for (const d of openDisputes) {
+    if (viewerIsDisputeParty(viewerUserId, project, d)) {
+      viewerIsDisputePartyOnHire = true;
+      break;
+    }
+  }
+
+  const viewerIsDisputeInitiatorOnHire = openDisputes.some(
+    (d) => String(d.initiatorId) === String(viewerUserId)
+  );
+
+  const openDisputeOnHire = openDisputes.length > 0;
+
+  let hireDisplayStatus: Doc<"projects">["status"] = project.status;
+
+  if (
+    openDisputeOnHire &&
+    (viewerIsDisputePartyOnHire || viewerIsDisputeInitiatorOnHire)
+  ) {
+    hireDisplayStatus = "disputed";
+  } else if (project.status === "disputed" && openDisputes.length > 0) {
+    const d = openDisputes[0];
+    const teamIds = project.matchedFreelancerId
+      ? [project.matchedFreelancerId]
+      : project.matchedFreelancerIds ?? [];
+    const disputed = d.disputedFreelancerIds ?? [];
+    const isPartialTeamDispute =
+      teamIds.length > 1 &&
+      disputed.length > 0 &&
+      disputed.length < teamIds.length;
+    if (
+      isPartialTeamDispute &&
+      !viewerIsDisputeParty(viewerUserId, project, d)
+    ) {
+      hireDisplayStatus = "in_progress";
+    }
+  }
+
+  return {
+    hireDisplayStatus,
+    openDisputeOnHire,
+    viewerIsDisputePartyOnHire,
+  };
+}
+
 /**
  * Get all projects for the current user
  * - Clients see their own projects
@@ -197,9 +269,6 @@ export const getProjects = query({
           ? await ctx.db.get(project.matchedFreelancerId)
           : null;
 
-        let freelancerHireDisplayStatus: Doc<"projects">["status"] | undefined;
-        let openDisputeOnHire = false;
-        let viewerIsDisputePartyOnHire = false;
         let viewerMatchTeamRole: string | undefined;
 
         if (user.role === "freelancer") {
@@ -209,46 +278,35 @@ export const getProjects = query({
             .filter((q) => q.eq(q.field("freelancerId"), user._id))
             .first();
           viewerMatchTeamRole = mine?.teamRole ?? undefined;
-
-          const disputesOnProject = await ctx.db
-            .query("disputes")
-            .withIndex("by_project", (q) => q.eq("projectId", project._id))
-            .collect();
-          const openDisputes = disputesOnProject.filter(
-            (d) =>
-              d.status === "open" ||
-              d.status === "under_review" ||
-              d.status === "escalated"
-          );
-          openDisputeOnHire = openDisputes.length > 0;
-          for (const d of openDisputes) {
-            if (viewerIsDisputeParty(user._id, project, d)) {
-              viewerIsDisputePartyOnHire = true;
-              break;
-            }
-          }
-
-          freelancerHireDisplayStatus = project.status;
-          if (openDisputeOnHire && viewerIsDisputePartyOnHire) {
-            freelancerHireDisplayStatus = "disputed";
-          } else if (project.status === "disputed" && openDisputes.length > 0) {
-            const d = openDisputes[0];
-            const teamIds = project.matchedFreelancerId
-              ? [project.matchedFreelancerId]
-              : project.matchedFreelancerIds ?? [];
-            const disputed = d.disputedFreelancerIds ?? [];
-            const isPartialTeamDispute =
-              teamIds.length > 1 &&
-              disputed.length > 0 &&
-              disputed.length < teamIds.length;
-            if (
-              isPartialTeamDispute &&
-              !viewerIsDisputeParty(user._id, project, d)
-            ) {
-              freelancerHireDisplayStatus = "in_progress";
-            }
-          }
         }
+
+        const viewerIsClientOnProject =
+          user.role === "client" && project.clientId === user._id;
+        const viewerIsFreelancerOnProject =
+          user.role === "freelancer" &&
+          (project.matchedFreelancerId === user._id ||
+            (project.matchedFreelancerIds?.some(
+              (id) => String(id) === String(user._id)
+            ) ??
+              false));
+
+        const needsHireDisplay =
+          viewerIsClientOnProject || viewerIsFreelancerOnProject;
+
+        const hireDisplay =
+          needsHireDisplay
+            ? computeHireDisplayFields({
+                project,
+                viewerUserId: user._id,
+                viewerRole: viewerIsClientOnProject ? "client" : "freelancer",
+                openDisputes: filterOpenDisputes(
+                  await ctx.db
+                    .query("disputes")
+                    .withIndex("by_project", (q) => q.eq("projectId", project._id))
+                    .collect()
+                ),
+              })
+            : null;
 
         return {
           ...project,
@@ -266,14 +324,14 @@ export const getProjects = query({
                 email: freelancer.email,
               }
             : null,
-          ...(user.role === "freelancer"
+          ...(hireDisplay
             ? {
-                freelancerHireDisplayStatus,
-                openDisputeOnHire,
-                viewerIsDisputePartyOnHire,
-                viewerMatchTeamRole,
+                hireDisplayStatus: hireDisplay.hireDisplayStatus,
+                openDisputeOnHire: hireDisplay.openDisputeOnHire,
+                viewerIsDisputePartyOnHire: hireDisplay.viewerIsDisputePartyOnHire,
               }
             : {}),
+          ...(user.role === "freelancer" ? { viewerMatchTeamRole } : {}),
         };
       })
     );
@@ -554,50 +612,35 @@ export const getProject = query({
       viewerMatchTeamRole = mine?.teamRole ?? undefined;
     }
 
-    let freelancerHireDisplayStatus: Doc<"projects">["status"] | undefined;
-    let openDisputeOnHire = false;
-    let viewerIsDisputePartyOnHire = false;
+    const viewerIsClientOnProject =
+      user.role === "client" && project.clientId === user._id;
+    const viewerIsFreelancerOnProject =
+      user.role === "freelancer" &&
+      (project.matchedFreelancerId === user._id ||
+        (project.matchedFreelancerIds?.some(
+          (id) => String(id) === String(user._id)
+        ) ??
+          false));
 
-    if (user.role === "freelancer") {
-      const disputesOnProject = await ctx.db
-        .query("disputes")
-        .withIndex("by_project", (q) => q.eq("projectId", projectId))
-        .collect();
-      const openDisputes = disputesOnProject.filter(
-        (d) =>
-          d.status === "open" ||
-          d.status === "under_review" ||
-          d.status === "escalated"
-      );
-      openDisputeOnHire = openDisputes.length > 0;
-      for (const d of openDisputes) {
-        if (viewerIsDisputeParty(user._id, project, d)) {
-          viewerIsDisputePartyOnHire = true;
-          break;
-        }
-      }
+    const disputesOnProjectForDisplay =
+      viewerIsClientOnProject || viewerIsFreelancerOnProject
+        ? await ctx.db
+            .query("disputes")
+            .withIndex("by_project", (q) => q.eq("projectId", projectId))
+            .collect()
+        : [];
 
-      freelancerHireDisplayStatus = project.status;
-      if (openDisputeOnHire && viewerIsDisputePartyOnHire) {
-        freelancerHireDisplayStatus = "disputed";
-      } else if (project.status === "disputed" && openDisputes.length > 0) {
-        const d = openDisputes[0];
-        const teamIds = project.matchedFreelancerId
-          ? [project.matchedFreelancerId]
-          : project.matchedFreelancerIds ?? [];
-        const disputed = d.disputedFreelancerIds ?? [];
-        const isPartialTeamDispute =
-          teamIds.length > 1 &&
-          disputed.length > 0 &&
-          disputed.length < teamIds.length;
-        if (
-          isPartialTeamDispute &&
-          !viewerIsDisputeParty(user._id, project, d)
-        ) {
-          freelancerHireDisplayStatus = "in_progress";
-        }
-      }
-    }
+    const hireDisplay =
+      viewerIsClientOnProject || viewerIsFreelancerOnProject
+        ? computeHireDisplayFields({
+            project,
+            viewerUserId: user._id,
+            viewerRole: viewerIsClientOnProject ? "client" : "freelancer",
+            openDisputes: filterOpenDisputes(
+              disputesOnProjectForDisplay
+            ),
+          })
+        : null;
 
     return {
       ...project,
@@ -620,11 +663,11 @@ export const getProject = query({
             profile: freelancer.profile,
           }
         : null,
-      ...(user.role === "freelancer"
+      ...(hireDisplay
         ? {
-            freelancerHireDisplayStatus,
-            openDisputeOnHire,
-            viewerIsDisputePartyOnHire,
+            hireDisplayStatus: hireDisplay.hireDisplayStatus,
+            openDisputeOnHire: hireDisplay.openDisputeOnHire,
+            viewerIsDisputePartyOnHire: hireDisplay.viewerIsDisputePartyOnHire,
           }
         : {}),
       ...(user.role === "admin" || user.role === "moderator"
