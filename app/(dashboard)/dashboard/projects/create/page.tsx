@@ -1035,6 +1035,11 @@ export default function CreateProjectPage() {
                     getDurationMonths(formData.projectDuration);
                   const effectiveMonthly =
                     pricingMonths > 0 ? effectiveBudget / pricingMonths : 0;
+                  const averagePerMonthUsd =
+                    formData.hireType === "single" &&
+                    typeof budgetCalculation.breakdown?.monthlyRate === "number"
+                      ? budgetCalculation.breakdown.monthlyRate
+                      : effectiveMonthly;
                   const termPct = getDurationDiscount(pricingMonths);
                   return (
                     <div className="rounded-xl border border-primary/20 bg-gradient-to-b from-primary/5 to-transparent shadow-sm overflow-hidden">
@@ -1086,7 +1091,7 @@ export default function CreateProjectPage() {
                           <div className="flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3">
                             <span className="text-sm text-muted-foreground">Average per month</span>
                             <span className="text-lg font-semibold tabular-nums text-foreground">
-                              {formatBudget(effectiveMonthly)}
+                              {formatBudget(averagePerMonthUsd)}
                               <span className="text-sm font-normal text-muted-foreground">/mo</span>
                             </span>
                           </div>

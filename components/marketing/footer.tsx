@@ -3,7 +3,14 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { ChevronDown, Instagram, Linkedin, Twitter, Youtube } from "lucide-react";
+import {
+  ChevronDown,
+  Facebook,
+  Instagram,
+  Linkedin,
+  Twitter,
+  Youtube,
+} from "lucide-react";
 
 const footerSections = [
   {
@@ -55,6 +62,11 @@ const socialLinks = [
     label: "Instagram",
     href: "https://www.instagram.com/49gigdotcom?igsh=eDl2cmM1emZ1aTB2",
     icon: Instagram,
+  },
+  {
+    label: "Facebook",
+    href: "https://www.facebook.com/share/1B4rLn6FSL/?mibextid=wwXIfr",
+    icon: Facebook,
   },
   { label: "X", href: "https://x.com/49gigdotcom?s=21", icon: Twitter },
   {

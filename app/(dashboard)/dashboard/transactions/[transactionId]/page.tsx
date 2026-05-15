@@ -394,15 +394,27 @@ export default function TransactionDetailPage() {
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-1">Billing month</div>
                       <div className="font-semibold">Month {transaction.monthlyCycle.monthIndex}</div>
-                      {transaction.monthlyCycle.amountCents != null && (
+                      {user.role === "freelancer" &&
+                      transaction.type === "monthly_release" ? (
                         <div className="text-sm text-muted-foreground mt-2">
-                          Pool: $
-                          {(transaction.monthlyCycle.amountCents / 100).toLocaleString(undefined, {
+                          Your payout for this period (after platform fee): $
+                          {(transaction.netAmount ?? transaction.amount).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </div>
-                      )}
+                      ) : typeof (transaction.monthlyCycle as { amountCents?: number }).amountCents ===
+                        "number" ? (
+                        <div className="text-sm text-muted-foreground mt-2">
+                          Pool for this billing period (team net total): $
+                          {(
+                            (transaction.monthlyCycle as { amountCents: number }).amountCents / 100
+                          ).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </div>
+                      ) : null}
                     </div>
                   </>
                 )}
@@ -482,7 +494,8 @@ export default function TransactionDetailPage() {
                     <div className="font-mono text-sm break-all">{transaction.flutterwaveRefundId}</div>
                   </div>
                 )}
-                {transaction.flutterwaveCustomerEmail && (
+                {transaction.flutterwaveCustomerEmail &&
+                  user.role !== "freelancer" && (
                   <div>
                     <div className="text-sm font-medium text-muted-foreground">Customer email</div>
                     <div className="text-sm">{transaction.flutterwaveCustomerEmail}</div>
@@ -518,9 +531,11 @@ export default function TransactionDetailPage() {
                     Client
                   </div>
                   <div className="text-sm">{transaction.project.client.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {transaction.project.client.email}
-                  </div>
+                  {"email" in transaction.project.client &&
+                    typeof transaction.project.client.email === "string" &&
+                    transaction.project.client.email.length > 0 && (
+                      <div className="text-xs text-muted-foreground">{transaction.project.client.email}</div>
+                    )}
                 </div>
               )}
               {transaction.project?.freelancer && (
@@ -532,9 +547,18 @@ export default function TransactionDetailPage() {
                       Freelancer
                     </div>
                     <div className="text-sm">{transaction.project.freelancer.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {transaction.project.freelancer.email}
-                    </div>
+                    {"teamRole" in transaction.project.freelancer &&
+                      typeof transaction.project.freelancer.teamRole === "string" &&
+                      transaction.project.freelancer.teamRole.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Role: {transaction.project.freelancer.teamRole}
+                      </div>
+                    )}
+                    {"email" in transaction.project.freelancer &&
+                      typeof transaction.project.freelancer.email === "string" &&
+                      transaction.project.freelancer.email.length > 0 && (
+                      <div className="text-xs text-muted-foreground">{transaction.project.freelancer.email}</div>
+                    )}
                   </div>
                 </>
               )}
