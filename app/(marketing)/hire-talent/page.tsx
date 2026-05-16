@@ -38,8 +38,17 @@ import {
   Lightbulb,
   Workflow,
   BarChart3,
-  Rocket
+  Rocket,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Hire individual African freelancers | 49GIG",
+  description:
+    "Find and hire skilled, verified African professionals for your next project. Smart matching, milestone payments, escrow, and transparent contracts.",
+  path: "/hire-talent",
+});
 
 export default function HireTalentPage() {
   const breadcrumbs = [
@@ -108,6 +117,7 @@ export default function HireTalentPage() {
         description="Find and hire skilled African professionals for your next project. From developers to designers, marketers to data scientists—access world-class talent matched to your needs."
         badge={{ icon: Users, text: "Individual Hiring" }}
         breadcrumbs={breadcrumbs}
+        pathname="/hire-talent"
         imageSrc="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=800&q=80"
         imageAlt="Professional collaboration"
         actions={

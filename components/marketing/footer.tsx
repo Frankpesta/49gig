@@ -11,6 +11,7 @@ import {
   Twitter,
   Youtube,
 } from "lucide-react";
+import { SITE_X_PROFILE_URL } from "@/lib/seo/social";
 
 const footerSections = [
   {
@@ -68,7 +69,7 @@ const socialLinks = [
     href: "https://www.facebook.com/share/1B4rLn6FSL/?mibextid=wwXIfr",
     icon: Facebook,
   },
-  { label: "X", href: "https://x.com/49gigdotcom?s=21", icon: Twitter },
+  { label: "X", href: SITE_X_PROFILE_URL, icon: Twitter },
   {
     label: "LinkedIn",
     href: "https://www.linkedin.com/company/49gig/",

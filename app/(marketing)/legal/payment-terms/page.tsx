@@ -1,6 +1,15 @@
 
 import { PageHero } from "@/components/marketing/page-hero";
 import { DollarSign } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Payment terms | 49GIG",
+  description:
+    "Fees, escrow, milestones, freelancer payouts, and how financial transactions work on 49GIG.",
+  path: "/legal/payment-terms",
+});
 
 export default function PaymentTermsPage() {
   const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Payment Terms", icon: DollarSign }];
@@ -12,6 +21,7 @@ export default function PaymentTermsPage() {
         description="Governs all financial transactions on the 49GIG platform. Last updated: January 6, 2026."
         badge={{ icon: DollarSign, text: "Payment Terms" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/payment-terms"
         imageSrc="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&q=80"
         imageAlt="Payment and finance"
       />

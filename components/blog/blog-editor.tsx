@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { BlogRichPaste } from "@/components/blog/blog-paste-extension";
 
 /** Valid empty document for TipTap JSON storage (never use raw `{}`). */
 export const EMPTY_TIPTAP_DOC_JSON = JSON.stringify({ type: "doc", content: [] });
@@ -338,9 +339,14 @@ export function BlogEditor({
   onImageUpload?: (file: File) => Promise<string>;
   className?: string;
 }) {
+  const lastEmittedContentRef = useRef<string | null>(null);
+
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3, 4, 5, 6] },
+      }),
+      BlogRichPaste,
       TextStyle,
       Color,
       Image.configure({ inline: false, allowBase64: false }),
@@ -362,18 +368,20 @@ export function BlogEditor({
       },
     },
     onUpdate: ({ editor: ed }) => {
-      onChange(JSON.stringify(ed.getJSON()));
+      const json = JSON.stringify(ed.getJSON());
+      lastEmittedContentRef.current = json;
+      onChange(json);
     },
   });
 
   useEffect(() => {
     if (!editor) return;
-    const parsed = parseTipTapDocJson(content);
-    const next = JSON.stringify(parsed);
-    const current = JSON.stringify(editor.getJSON());
-    if (next !== current) {
-      editor.commands.setContent(parsed, { emitUpdate: false });
+    if (content === lastEmittedContentRef.current) {
+      lastEmittedContentRef.current = null;
+      return;
     }
+    const parsed = parseTipTapDocJson(content);
+    editor.commands.setContent(parsed, { emitUpdate: false });
   }, [content, editor]);
 
   return (

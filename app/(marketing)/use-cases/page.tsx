@@ -24,6 +24,15 @@ import {
   ShoppingCart,
   Laptop,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Use cases | 49GIG freelance marketplace",
+  description:
+    "Product builds, analytics, content, specialty projects for clients — and steady work, teams, upskilling for freelancers.",
+  path: "/use-cases",
+});
 
 export default function UseCasesPage() {
   const breadcrumbs = [
@@ -132,6 +141,7 @@ export default function UseCasesPage() {
         description="49GIG is more than a freelance marketplace. It's a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients."
         badge={{ icon: Briefcase, text: "Use Cases" }}
         breadcrumbs={breadcrumbs}
+        pathname="/use-cases"
         imageSrc="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
         imageAlt="Business collaboration"
         actions={

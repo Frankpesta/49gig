@@ -2,6 +2,15 @@
 import { PageHero } from "@/components/marketing/page-hero";
 import { Card, CardContent } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Code of Conduct | 49GIG",
+  description:
+    "Community standards for clients and freelancers on 49GIG — professionalism, safety, enforcement, and reporting.",
+  path: "/legal/code-of-conduct",
+});
 
 type ConductSection = {
   id: string;
@@ -131,6 +140,7 @@ export default function CodeOfConductPage() {
         description="Standards of behavior expected from all users."
         badge={{ icon: ShieldCheck, text: "Legal" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/code-of-conduct"
         imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
         imageAlt="Professional conduct"
       />

@@ -17,8 +17,17 @@ import {
   Rocket,
   Eye,
   Handshake,
-  Sparkles
+  Sparkles,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "About 49GIG | African talent marketplace",
+  description:
+    "49GIG connects exceptional African talent with global opportunities through vetting, transparent relationships, milestone delivery, and fair careers.",
+  path: "/about",
+});
 
 export default function AboutPage() {
   const breadcrumbs = [
@@ -66,6 +75,7 @@ export default function AboutPage() {
         description="49GIG connects exceptional African talent with world-class opportunities. We're redefining freelancing by prioritizing vetted quality, transparent relationships, and sustainable careers."
         badge={{ icon: Building2, text: "About 49GIG" }}
         breadcrumbs={breadcrumbs}
+        pathname="/about"
         imageSrc="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
         imageAlt="African professionals collaborating"
         actions={

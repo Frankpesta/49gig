@@ -12,6 +12,15 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Why 49GIG | African freelance marketplace",
+  description:
+    "Eight reasons teams choose 49GIG — vetted talent, fair pricing, milestone delivery, disputes support, and no endless bidding wars.",
+  path: "/why-49gig",
+});
 
 export default function Why49GigPage() {
   const breadcrumbs = [
@@ -118,6 +127,7 @@ export default function Why49GigPage() {
         description="The Smart Choice for Hiring African Talent"
         badge={{ icon: Sparkles, text: "Why 49GIG" }}
         breadcrumbs={breadcrumbs}
+        pathname="/why-49gig"
         imageSrc="https://images.unsplash.com/photo-1552664730-d307ca884978?w=1200&q=80"
         imageAlt="High-performing team in discussion"
         actions={

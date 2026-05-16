@@ -3,6 +3,14 @@ import { PageHero } from "@/components/marketing/page-hero";
 import { CookiePreferences } from "@/components/analytics/cookie-preferences";
 import { Card, CardContent } from "@/components/ui/card";
 import { Cookie } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Cookie Policy | 49GIG",
+  description: "How 49GIG uses cookies and similar technologies on the platform.",
+  path: "/legal/cookie-policy",
+});
 
 type CookieSection = {
   id: string;
@@ -92,6 +100,7 @@ export default function CookiePolicyPage() {
         description="How 49GIG uses cookies and similar technologies."
         badge={{ icon: Cookie, text: "Legal" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/cookie-policy"
         imageSrc="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=800&q=80"
         imageAlt="Cookie policy"
       />

@@ -2,6 +2,14 @@
 import { PageHero } from "@/components/marketing/page-hero";
 import { Card, CardContent } from "@/components/ui/card";
 import { FileText } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Terms of Service | 49GIG",
+  description: "Terms that govern your access to and use of the 49GIG talent marketplace and services.",
+  path: "/legal/terms",
+});
 
 type TermsSection = {
   id: string;
@@ -182,6 +190,7 @@ export default function TermsPage() {
         description="These terms govern your access to and use of 49GIG."
         badge={{ icon: FileText, text: "Legal" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/terms"
         imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
         imageAlt="Terms document"
       />

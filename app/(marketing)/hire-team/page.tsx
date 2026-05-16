@@ -19,6 +19,15 @@ import {
   BarChart3,
   Megaphone,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Hire a dedicated team | 49GIG",
+  description:
+    "Curated, vetted teams from Africa — one coordinated structure and one secure contract. Phased delivery and milestone-backed payments.",
+  path: "/hire-team",
+});
 
 export default function HireTeamPage() {
   const breadcrumbs = [
@@ -156,6 +165,7 @@ export default function HireTeamPage() {
         description="Build high-performing teams from Africa. Scale faster. Spend smarter."
         badge={{ icon: Layers, text: "Team Hiring" }}
         breadcrumbs={breadcrumbs}
+        pathname="/hire-team"
         imageSrc="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80"
         imageAlt="Team collaboration"
         actions={

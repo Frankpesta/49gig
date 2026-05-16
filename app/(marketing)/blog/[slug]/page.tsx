@@ -79,6 +79,7 @@ export default function BlogPostPage() {
           { label: "Blog", href: "/blog", icon: BookOpen },
           { label: post.title },
         ]}
+        pathname={`/blog/${slug}`}
         imageSrc={post.bannerUrl ?? undefined}
         imageAlt={post.title}
         imageUnoptimized={!!post.bannerUrl}
