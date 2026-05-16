@@ -1150,11 +1150,14 @@ export const getBanks = action({
   },
   handler: async (ctx, args) => {
     const banksData = await flutterwave.getBanks(args.country);
-    return {
-      banks: banksData.data.map((bank) => ({
+    const banks = banksData.data
+      .map((bank) => ({
         code: bank.code,
         name: bank.name,
-      })),
-    };
+      }))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+      );
+    return { banks };
   },
 });

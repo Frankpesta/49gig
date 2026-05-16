@@ -48,6 +48,42 @@ type SessionInfo = {
   revokedReason?: string | null;
 };
 
+/** Flutterwave `/banks/:country` — keep in sync with subaccount UI & `createSubaccount`. */
+const FLUTTERWAVE_SUBACCOUNT_COUNTRY_CODES = new Set([
+  "GH",
+  "KE",
+  "NG",
+  "RW",
+  "TZ",
+  "UG",
+  "ZA",
+  "ZM",
+]);
+
+const FLUTTERWAVE_SUBACCOUNT_COUNTRIES_META = (
+  [
+    { code: "GH", label: "Ghana" },
+    { code: "KE", label: "Kenya" },
+    { code: "NG", label: "Nigeria" },
+    { code: "RW", label: "Rwanda" },
+    { code: "TZ", label: "Tanzania" },
+    { code: "UG", label: "Uganda" },
+    { code: "ZA", label: "South Africa" },
+    { code: "ZM", label: "Zambia" },
+  ] as const
+).slice().sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+
+function flutterwaveSubaccountCountryFromProfile(profileCountry?: string | null): string {
+  const c = profileCountry?.trim().toUpperCase();
+  if (c && FLUTTERWAVE_SUBACCOUNT_COUNTRY_CODES.has(c)) return c;
+  return "NG";
+}
+
+function isFlutterwavePayoutMarket(profileCountry?: string | null): boolean {
+  const c = profileCountry?.trim().toUpperCase();
+  return !!c && FLUTTERWAVE_SUBACCOUNT_COUNTRY_CODES.has(c);
+}
+
 export default function SettingsPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -167,6 +203,9 @@ export default function SettingsPage() {
   const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
   const flutterwaveSubaccountId = (currentUser as any)?.flutterwaveSubaccountId;
   const isFreelancer = user.role === "freelancer";
+  const freelancerProfileCountry = (
+    currentUser as { profile?: { country?: string } } | null | undefined
+  )?.profile?.country;
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,10 +328,12 @@ export default function SettingsPage() {
       if (result.success) {
         toast.success("Account details submitted successfully");
         setShowSubaccountForm(false);
-        setSubaccountForm({ 
-          accountNumber: "", 
-          accountBank: "", 
-          country: "NG" 
+        setSubaccountForm({
+          accountNumber: "",
+          accountBank: "",
+          country: flutterwaveSubaccountCountryFromProfile(
+            (currentUser as { profile?: { country?: string } } | undefined)?.profile?.country,
+          ),
         });
         // Refresh status
         handleRefreshFlutterwaveStatus();
@@ -689,7 +730,17 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 {!showSubaccountForm ? (
                   <Button
-                    onClick={() => setShowSubaccountForm(true)}
+                    onClick={() => {
+                      const profileCountry = (
+                        currentUser as { profile?: { country?: string } } | undefined
+                      )?.profile?.country;
+                      setSubaccountForm({
+                        accountNumber: "",
+                        accountBank: "",
+                        country: flutterwaveSubaccountCountryFromProfile(profileCountry),
+                      });
+                      setShowSubaccountForm(true);
+                    }}
                     className="w-full"
                   >
                     Submit Account Details
@@ -739,6 +790,36 @@ export default function SettingsPage() {
                           Complete SMS phone verification in Settings before you can submit payout bank details.
                         </p>
                       )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country *</Label>
+                      <select
+                        id="country"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        value={subaccountForm.country}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSubaccountForm((prev) => ({
+                            ...prev,
+                            country: value,
+                            accountBank: "",
+                          }));
+                        }}
+                      >
+                        {FLUTTERWAVE_SUBACCOUNT_COUNTRIES_META.map(({ code, label }) => (
+                          <option key={code} value={code}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                      {freelancerProfileCountry &&
+                        isFlutterwavePayoutMarket(freelancerProfileCountry) &&
+                        flutterwaveSubaccountCountryFromProfile(freelancerProfileCountry) ===
+                          subaccountForm.country && (
+                          <p className="text-xs text-muted-foreground">
+                            Pre-filled from your profile country ({subaccountForm.country}).
+                          </p>
+                        )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="accountBank">Bank *</Label>
@@ -791,35 +872,18 @@ export default function SettingsPage() {
                         }
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="country">Country *</Label>
-                      <select
-                        id="country"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
-                        value={subaccountForm.country}
-                        onChange={(e) =>
-                          setSubaccountForm((prev) => ({ ...prev, country: e.target.value }))
-                        }
-                      >
-                        <option value="NG">Nigeria</option>
-                        <option value="KE">Kenya</option>
-                        <option value="GH">Ghana</option>
-                        <option value="ZA">South Africa</option>
-                        <option value="UG">Uganda</option>
-                        <option value="TZ">Tanzania</option>
-                        <option value="RW">Rwanda</option>
-                        <option value="ZM">Zambia</option>
-                      </select>
-                    </div>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
                         onClick={() => {
                           setShowSubaccountForm(false);
-                          setSubaccountForm({ 
-                            accountNumber: "", 
-                            accountBank: "", 
-                            country: "NG" 
+                          const profileCountry = (
+                            currentUser as { profile?: { country?: string } } | undefined
+                          )?.profile?.country;
+                          setSubaccountForm({
+                            accountNumber: "",
+                            accountBank: "",
+                            country: flutterwaveSubaccountCountryFromProfile(profileCountry),
                           });
                         }}
                         className="flex-1"
