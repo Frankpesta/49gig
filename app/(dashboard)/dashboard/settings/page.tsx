@@ -203,6 +203,9 @@ export default function SettingsPage() {
   const twoFactorEnabled = (user as any)?.twoFactorEnabled ?? false;
   const flutterwaveSubaccountId = (currentUser as any)?.flutterwaveSubaccountId;
   const isFreelancer = user.role === "freelancer";
+  const freelancerProfileCountry = (
+    currentUser as { profile?: { country?: string } } | null | undefined
+  )?.profile?.country;
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -809,14 +812,10 @@ export default function SettingsPage() {
                           </option>
                         ))}
                       </select>
-                      {(currentUser as { profile?: { country?: string } } | undefined)?.profile
-                        ?.country &&
-                        isFlutterwavePayoutMarket(
-                          (currentUser as { profile?: { country?: string } }).profile.country,
-                        ) &&
-                        flutterwaveSubaccountCountryFromProfile(
-                          (currentUser as { profile?: { country?: string } }).profile.country,
-                        ) === subaccountForm.country && (
+                      {freelancerProfileCountry &&
+                        isFlutterwavePayoutMarket(freelancerProfileCountry) &&
+                        flutterwaveSubaccountCountryFromProfile(freelancerProfileCountry) ===
+                          subaccountForm.country && (
                           <p className="text-xs text-muted-foreground">
                             Pre-filled from your profile country ({subaccountForm.country}).
                           </p>
