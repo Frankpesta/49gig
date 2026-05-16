@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
 import { FlipWords } from "@/components/ui/flip-words";
@@ -33,8 +34,45 @@ import {
   Workflow,
   Cloud,
   Brain,
-  Clock
+  Clock,
 } from "lucide-react";
+import { getCanonicalSiteUrl, absoluteUrl } from "@/lib/seo/site-url";
+import { SITE_TWITTER_CREATOR, SITE_TWITTER_SITE } from "@/lib/seo/social";
+
+const siteOrigin = getCanonicalSiteUrl();
+
+export const metadata: Metadata = {
+  title: "49GIG — Hire world-class African tech talent",
+  description:
+    "49GIG connects you with rigorously vetted African professionals in software engineering, AI, UX/UI, DevOps, cloud, QA, blockchain, machine learning & data analytics. Hire fast with escrow, milestones & secure payouts.",
+  alternates: { canonical: siteOrigin },
+  openGraph: {
+    title: "49GIG — Hire world-class African tech talent",
+    description:
+      "Vetted freelancers and teams for engineering, AI, DevOps, data, blockchain, design & QA. Milestone billing and secure payments.",
+    url: siteOrigin,
+    siteName: "49GIG",
+    locale: "en_US",
+    type: "website",
+    images: [
+      {
+        url: absoluteUrl("/opengraph-image"),
+        width: 1200,
+        height: 630,
+        alt: "49GIG freelance marketplace hero",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    creator: SITE_TWITTER_CREATOR,
+    site: SITE_TWITTER_SITE,
+    title: "49GIG — Hire world-class African tech talent",
+    description:
+      "Verified African freelancers for engineering, AI, design, DevOps & data — with escrow-backed delivery.",
+    images: [absoluteUrl("/opengraph-image")],
+  },
+};
 
 export default function Home() {
 

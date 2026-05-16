@@ -30,8 +30,17 @@ import {
   Star,
   MapPin,
   MessageCircle,
-  ThumbsUp
+  ThumbsUp,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "How 49GIG works | Clients & freelancers | 49GIG",
+  description:
+    "Smart matching, vetted profiles, milestone-based delivery, and secure payments — the end-to-end flow for hiring and freelancing on 49GIG.",
+  path: "/how-it-works",
+});
 
 export default function HowItWorksPage() {
   const breadcrumbs = [{ label: "How It Works", icon: Workflow }];
@@ -43,6 +52,7 @@ export default function HowItWorksPage() {
         description="49GIG removes the stress from hiring and working remotely by using a vetted talent system, smart matching, and milestone-based delivery—so both clients and freelancers can work with confidence."
         badge={{ icon: Workflow, text: "How It Works" }}
         breadcrumbs={breadcrumbs}
+        pathname="/how-it-works"
         imageSrc="https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
         imageAlt="Team collaboration"
         actions={

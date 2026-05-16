@@ -11,7 +11,9 @@ import { cn } from "@/lib/utils";
 import { parseTipTapDocJson } from "@/components/blog/blog-editor";
 
 const extensions = [
-  StarterKit,
+  StarterKit.configure({
+    heading: { levels: [1, 2, 3, 4, 5, 6] },
+  }),
   TextStyle,
   Color,
   Image.configure({ HTMLAttributes: { class: "rounded-lg max-w-full h-auto my-4" } }),

@@ -158,6 +158,7 @@ export default function ContactPage() {
         description="Have questions about hiring talent, joining as a freelancer, or anything else? We're here to help. Reach out to our team and we'll get back to you promptly."
         badge={{ icon: MessageSquare, text: "Contact Us" }}
         breadcrumbs={breadcrumbs}
+        pathname="/contact"
         imageSrc="https://images.unsplash.com/photo-1423666639041-f56000c27a9a?w=800&q=80"
         imageAlt="Team communication"
         actions={

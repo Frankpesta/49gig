@@ -2,6 +2,14 @@
 import { PageHero } from "@/components/marketing/page-hero";
 import { Card, CardContent } from "@/components/ui/card";
 import { Shield } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Privacy Policy | 49GIG",
+  description: "How 49GIG collects, uses, stores, protects, and shares your personal information.",
+  path: "/legal/privacy-policy",
+});
 
 type PrivacySection = {
   id: string;
@@ -145,6 +153,7 @@ export default function PrivacyPolicyPage() {
         description="How 49GIG collects, uses, stores, and protects your data."
         badge={{ icon: Shield, text: "Legal" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/privacy-policy"
         imageSrc="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=800&q=80"
         imageAlt="Privacy and data security"
       />

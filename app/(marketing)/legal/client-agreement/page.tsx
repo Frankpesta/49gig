@@ -1,6 +1,15 @@
 
 import { PageHero } from "@/components/marketing/page-hero";
 import { FileCheck } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Client agreement template | 49GIG",
+  description:
+    "Standard contract terms framing client engagements and projects on the 49GIG platform.",
+  path: "/legal/client-agreement",
+});
 
 export default function ClientAgreementPage() {
   const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Client Agreement", icon: FileCheck }];
@@ -12,6 +21,7 @@ export default function ClientAgreementPage() {
         description="Standard terms for client engagements. Last updated: January 6, 2026."
         badge={{ icon: FileCheck, text: "Client Agreement" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/client-agreement"
         imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
         imageAlt="Client agreement"
       />

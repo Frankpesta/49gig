@@ -3,6 +3,15 @@ import { PageHero } from "@/components/marketing/page-hero";
 import { RefreshCw, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SectionTransition } from "@/components/ui/section-transition";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Refund & cancellation policy | 49GIG",
+  description:
+    "When refunds apply on milestones, cancellations, timelines, and how disputes factor into payouts on 49GIG.",
+  path: "/legal/refund-policy",
+});
 
 export default function RefundPolicyPage() {
   const refundCases = [
@@ -57,6 +66,7 @@ export default function RefundPolicyPage() {
         description="Clear, transparent guidelines for refunds and cancellations on the 49GIG platform."
         badge={{ icon: RefreshCw, text: "Refund Policy" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/refund-policy"
         imageSrc="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&q=80"
         imageAlt="Refunds and payments"
       />

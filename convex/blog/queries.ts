@@ -150,7 +150,7 @@ export const getStorageUrl = query({
 });
 
 /**
- * All published post slugs (for sitemap / SEO)
+ * Published posts for sitemap (includes banner URLs when set for Image extension / indexing).
  */
 export const getAllPublishedSlugs = query({
   args: {},
@@ -160,7 +160,18 @@ export const getAllPublishedSlugs = query({
       .withIndex("by_published", (q) => q.eq("status", "published"))
       .order("desc")
       .collect();
-    return posts.map((p) => ({ slug: p.slug, updatedAt: p.updatedAt }));
+
+    const rows = await Promise.all(
+      posts.map(async (p) => ({
+        slug: p.slug,
+        updatedAt: p.updatedAt,
+        bannerUrl:
+          p.bannerImageId != null
+            ? await ctx.storage.getUrl(p.bannerImageId)
+            : null,
+      })),
+    );
+    return rows;
   },
 });
 

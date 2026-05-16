@@ -34,8 +34,17 @@ import {
   Rocket,
   Workflow,
   Brain,
-  Cloud
+  Cloud,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "For freelancers | Global clients & fair pay | 49GIG",
+  description:
+    "Join a vetted marketplace: matched projects (no bidding), milestone payments, escrow protection, and payouts you can rely on.",
+  path: "/for-freelancers",
+});
 
 export default function ForFreelancersPage() {
   const whyChooseReasons = [
@@ -157,6 +166,7 @@ export default function ForFreelancersPage() {
         description="49GIG is built for skilled African freelancers who want access to serious international clients, fair pay, and structured projects—without job bidding or endless competition."
         badge={{ icon: Users, text: "For Freelancers" }}
         breadcrumbs={breadcrumbs}
+        pathname="/for-freelancers"
         imageSrc="https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&q=80"
         imageAlt="Freelancer working remotely"
         actions={

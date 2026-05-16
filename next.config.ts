@@ -54,14 +54,55 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Marketing pages: allow CDN to cache; revalidate every 60 s
-        source: "/(|hire-talent|for-clients|about|how-it-works|why-49gig|for-freelancers|use-cases|hire-team|talent-categories|pricing|legal/:path*)",
+        source: "/blog",
         headers: [
           {
             key: "Cache-Control",
             value: "public, s-maxage=60, stale-while-revalidate=3600",
           },
         ],
+      },
+      {
+        source: "/blog/:slug*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=60, stale-while-revalidate=3600",
+          },
+        ],
+      },
+      {
+        // Marketing pages: allow CDN to cache; revalidate every 60 s
+        source:
+          "/(about|hire-talent|hire-team|contact|how-it-works|why-49gig|pricing|talent-categories|use-cases|for-clients|for-freelancers)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=60, stale-while-revalidate=3600",
+          },
+        ],
+      },
+      {
+        source: "/",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=60, stale-while-revalidate=3600",
+          },
+        ],
+      },
+      {
+        source: "/legal/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=60, stale-while-revalidate=3600",
+          },
+        ],
+      },
+      {
+        source: "/dashboard/:path*",
+        headers: [{ key: "x-robots-tag", value: "noindex, nofollow, noarchive" }],
       },
     ];
   },

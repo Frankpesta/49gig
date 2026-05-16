@@ -34,8 +34,17 @@ import {
   MessageCircle,
   ThumbsUp,
   MapPin,
-  Workflow
+  Workflow,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "For clients | Hire African freelancers & teams | 49GIG",
+  description:
+    "Hire vetted African talent and teams with milestone payments, secure contracts, and no job-post bidding. Matching, vetting, and delivery you can trust.",
+  path: "/for-clients",
+});
 
 export default function ForClientsPage() {
   const clientStats = [
@@ -161,6 +170,7 @@ export default function ForClientsPage() {
         description="49GIG helps companies around the world hire highly vetted African freelancers and teams—delivering global-standard work at transparent rates. No job postings. No bidding. Just the right talent, matched to your needs."
         badge={{ icon: Briefcase, text: "For Clients" }}
         breadcrumbs={breadcrumbs}
+        pathname="/for-clients"
         imageSrc="https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
         imageAlt="Team collaboration"
         actions={

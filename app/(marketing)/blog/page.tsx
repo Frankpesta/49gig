@@ -18,6 +18,7 @@ export default function BlogListingPage() {
         description="Insights, updates, and stories from the 49GIG team and our community."
         badge={{ icon: BookOpen, text: "Blog" }}
         breadcrumbs={[{ label: "Blog", href: "/blog", icon: BookOpen }]}
+        pathname="/blog"
       />
 
       <section className="relative py-16 sm:py-20 lg:py-24">
@@ -61,7 +62,11 @@ export default function BlogListingPage() {
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={post.bannerUrl}
-                          alt=""
+                          alt={`${post.title} — featured image`}
+                          title={post.title}
+                          loading="lazy"
+                          decoding="async"
+                          fetchPriority="low"
                           className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                       ) : (

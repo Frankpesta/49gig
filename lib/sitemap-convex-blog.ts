@@ -6,8 +6,12 @@
 import { fetchQuery } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 
-export type BlogSlugRow = { slug: string; updatedAt: number };
+export type BlogSitemapEntry = {
+  slug: string;
+  updatedAt: number;
+  bannerUrl: string | null;
+};
 
-export async function fetchPublishedBlogSlugs(): Promise<BlogSlugRow[]> {
-  return (await fetchQuery(api.blog.queries.getAllPublishedSlugs, {})) as BlogSlugRow[];
+export async function fetchPublishedBlogSlugs(): Promise<BlogSitemapEntry[]> {
+  return (await fetchQuery(api.blog.queries.getAllPublishedSlugs, {})) as BlogSitemapEntry[];
 }

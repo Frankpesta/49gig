@@ -1,8 +1,45 @@
-import { ReactNode } from "react";
+import { Fragment, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Home, LucideIcon } from "lucide-react";
+import { absoluteUrl, getCanonicalSiteUrl } from "@/lib/seo/site-url";
+
+function breadcrumbSchemaJsonLd(
+  breadcrumbs: BreadcrumbItem[],
+  pathname: string
+): Record<string, unknown> {
+  const homeUrl = absoluteUrl("/");
+  const leafUrl = absoluteUrl(pathname.startsWith("/") ? pathname : `/${pathname}`);
+
+  const itemListElement: Record<string, unknown>[] = [
+    { "@type": "ListItem", position: 1, name: "Home", item: homeUrl },
+  ];
+
+  let position = 2;
+  for (let i = 0; i < breadcrumbs.length; i++) {
+    const c = breadcrumbs[i];
+    const isLast = i === breadcrumbs.length - 1;
+    const href = typeof c.href === "string" && c.href.trim().length > 0 ? c.href.trim() : undefined;
+    const item =
+      isLast ? leafUrl : href != null ? absoluteUrl(href) : undefined;
+    itemListElement.push({
+      "@type": "ListItem",
+      position: position++,
+      name: c.label,
+      ...(item != null ? { item } : {}),
+    });
+  }
+
+  const baseUrl = getCanonicalSiteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "@id": `${leafUrl}/#breadcrumb`,
+    isPartOf: { "@id": `${baseUrl}/#website` },
+    itemListElement,
+  };
+}
 
 interface BreadcrumbItem {
   label: string;
@@ -27,6 +64,8 @@ interface PageHeroProps {
   /** CTA buttons below description */
   actions?: ReactNode;
   className?: string;
+  /** Current path for Breadcrumb JSON-LD (e.g. "/hire-talent") when breadcrumbs exist */
+  pathname?: string;
 }
 
 export function PageHero({
@@ -40,9 +79,28 @@ export function PageHero({
   imageUnoptimized,
   actions,
   className,
+  pathname,
 }: PageHeroProps) {
+  const breadcrumbsJsonLd =
+    breadcrumbs &&
+    breadcrumbs.length > 0 &&
+    pathname &&
+    pathname.startsWith("/")
+      ? breadcrumbSchemaJsonLd(breadcrumbs, pathname)
+      : null;
+
   return (
-    <section
+    <Fragment>
+      {breadcrumbsJsonLd ? (
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(breadcrumbsJsonLd),
+          }}
+        />
+      ) : null}
+      <section
       className={cn(
         "relative isolate overflow-hidden border-b border-border/40 bg-black",
         className
@@ -120,5 +178,6 @@ export function PageHero({
         </div>
       </div>
     </section>
+    </Fragment>
   );
 }

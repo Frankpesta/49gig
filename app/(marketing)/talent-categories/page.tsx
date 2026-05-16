@@ -16,6 +16,15 @@ import {
   Shield,
   Brain,
 } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Talent categories | 49GIG",
+  description:
+    "Hire verified African freelancers across software, design, data, DevOps, cloud, cybersecurity, AI, ML, blockchain, and QA.",
+  path: "/talent-categories",
+});
 
 export default function TalentCategoriesPage() {
   const breadcrumbs = [
@@ -158,6 +167,7 @@ export default function TalentCategoriesPage() {
         description="Hire Africa’s Top Freelancers Across High-Demand Skills"
         badge={{ icon: Layers, text: "All Categories" }}
         breadcrumbs={breadcrumbs}
+        pathname="/talent-categories"
         imageSrc="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80"
         imageAlt="Professional collaboration"
         actions={

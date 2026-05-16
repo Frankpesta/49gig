@@ -1,6 +1,15 @@
 
 import { PageHero } from "@/components/marketing/page-hero";
 import { FileSignature } from "lucide-react";
+import type { Metadata } from "next";
+import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
+
+export const metadata: Metadata = buildMarketingRouteMetadata({
+  absoluteTitle: "Freelancer agreement template | 49GIG",
+  description:
+    "Standard contract terms framing freelancer engagements facilitated through the 49GIG platform.",
+  path: "/legal/freelancer-agreement",
+});
 
 export default function FreelancerAgreementPage() {
   const breadcrumbs = [{ label: "Legal", href: "/legal/terms" }, { label: "Freelancer Agreement", icon: FileSignature }];
@@ -12,6 +21,7 @@ export default function FreelancerAgreementPage() {
         description="Standard terms for freelancer engagements. Last updated: January 6, 2026."
         badge={{ icon: FileSignature, text: "Freelancer Agreement" }}
         breadcrumbs={breadcrumbs}
+        pathname="/legal/freelancer-agreement"
         imageSrc="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800&q=80"
         imageAlt="Freelancer agreement"
       />
