@@ -7,9 +7,14 @@ import OpenAI from "openai";
 import { extractText, getDocumentProxy } from "unpdf";
 import type { Doc } from "../_generated/dataModel";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+/** Lazy init so deploy analysis does not require OPENAI_API_KEY at module load. */
+function getOpenAI(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not set in Convex environment variables");
+  }
+  return new OpenAI({ apiKey });
+}
 
 /**
  * Generate a signed upload URL for resume PDF uploads.
@@ -137,7 +142,7 @@ export const parseResumeAndBuildBio = action({
       }
 
       // Step 4: Parse with OpenAI GPT-4o-mini
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAI().chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           {
