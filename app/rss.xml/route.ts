@@ -1,5 +1,4 @@
-import { fetchQuery } from "convex/nextjs";
-import { api } from "@/convex/_generated/api";
+import { fetchPublishedBlogPostsForRss } from "@/lib/seo/blog-rss-server";
 import { getCanonicalSiteUrl, absoluteUrl } from "@/lib/seo/site-url";
 
 export const revalidate = 1800;
@@ -19,26 +18,12 @@ function rssDate(ts: number): string {
 export async function GET() {
   const baseUrl = getCanonicalSiteUrl();
   try {
-    const data = await fetchQuery((api as any).blog.queries.listPublished, { limit: 50 });
+    const posts = await fetchPublishedBlogPostsForRss(50);
 
-    const items = (
-      (
-        data as {
-          posts: Array<{
-            slug?: string;
-            title?: string;
-            excerpt?: string;
-            publishedAt?: number;
-            updatedAt?: number;
-            bannerUrl?: string | null;
-          }>;
-        }
-      )?.posts ?? []
-    )
-      .filter((p) => p.slug && p.title && p.publishedAt)
+    const items = posts
       .map((p) => {
-        const link = `${baseUrl}/blog/${encodeURIComponent(p.slug!)}`;
-        const pub = rssDate(p.publishedAt!);
+        const link = `${baseUrl}/blog/${encodeURIComponent(p.slug)}`;
+        const pub = rssDate(p.publishedAt);
         const desc = esc((p.excerpt ?? "").slice(0, 500));
 
         let mediaXml = "";
@@ -50,7 +35,7 @@ export async function GET() {
 
         return `
     <item>
-      <title>${esc(p.title!)}</title>
+      <title>${esc(p.title)}</title>
       <link>${esc(link)}</link>
       <guid isPermaLink="true">${esc(link)}</guid>
       <pubDate>${pub}</pubDate>
