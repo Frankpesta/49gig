@@ -167,8 +167,9 @@ export default defineSchema({
     ),
     kycApprovedAt: v.optional(v.number()),
 
-    /** Freelancer: E.164 after successful SMS verification (Twilio Verify) */
+    /** Legacy: E.164 from former SMS verification (optional; prefer profile.phoneNumber) */
     phoneE164: v.optional(v.string()),
+    /** Legacy: timestamp from former SMS verification */
     phoneVerifiedAt: v.optional(v.number()),
 
     // Flutterwave

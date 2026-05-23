@@ -20,7 +20,6 @@ export type IntakeForRelevance = {
 
 export function freelancerRelevantToProjectIntake(
   freelancer: {
-    phoneVerifiedAt?: number;
     profile?: {
       skills?: string[];
       techField?: string;

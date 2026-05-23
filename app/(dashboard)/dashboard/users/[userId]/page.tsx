@@ -1,5 +1,6 @@
 "use client";
 
+import { getFreelancerPhoneRaw } from "@/lib/freelancer-phone";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id, Doc } from "@/convex/_generated/dataModel";
@@ -757,13 +758,14 @@ export default function UserDetailPage() {
                     <Phone className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                        SMS phone verified
+                        Phone
                       </p>
                       <p className="text-sm font-medium mt-0.5">
-                        {profileData.phoneVerifiedAt != null ? (
-                          <span className="text-green-600 dark:text-green-400">Verified</span>
-                        ) : (
-                          <span className="text-amber-600 dark:text-amber-400">Not verified</span>
+                        {getFreelancerPhoneRaw({
+                          phoneE164: profileData.phoneE164,
+                          profile: profileData.profile,
+                        }) || (
+                          <span className="text-muted-foreground">Not provided</span>
                         )}
                       </p>
                     </div>

@@ -237,32 +237,6 @@ export const markVerificationIncompleteReminderSentInternal = internalMutation({
 });
 
 /**
- * Called from Twilio Verify action after successful SMS code check.
- */
-export const setFreelancerVerifiedPhoneInternal = internalMutation({
-  args: {
-    userId: v.id("users"),
-    phoneE164: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
-    if (!user || user.role !== "freelancer" || user.status !== "active") {
-      throw new Error("User not found");
-    }
-    const now = Date.now();
-    await ctx.db.patch(args.userId, {
-      phoneE164: args.phoneE164,
-      phoneVerifiedAt: now,
-      profile: {
-        ...user.profile,
-        phoneNumber: args.phoneE164,
-      },
-      updatedAt: now,
-    });
-  },
-});
-
-/**
  * Update notification preferences
  */
 export const updateNotificationPreferences = mutation({

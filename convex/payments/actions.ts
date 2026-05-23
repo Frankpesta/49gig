@@ -4,6 +4,7 @@ import { api } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 import * as flutterwave from "./flutterwave";
 import { assertUsdCurrency } from "../currencyPolicy";
+import { getFreelancerPhoneDigits } from "../lib/freelancerPhone";
 
 const internalAny: any = require("../_generated/api").internal;
 const apiAny: any = require("../_generated/api").api;
@@ -960,10 +961,13 @@ export const createSubaccount = action({
       throw new Error("Only freelancers can create subaccounts");
     }
 
-    const phoneDigits = freelancer.phoneE164?.replace(/\D/g, "").trim() ?? "";
+    const phoneDigits = getFreelancerPhoneDigits({
+      phoneE164: freelancer.phoneE164,
+      profile: freelancer.profile,
+    });
     if (!phoneDigits || phoneDigits.length < 8) {
       throw new Error(
-        "Verify your phone number (SMS verification) in Settings before adding a payout account."
+        "Add a working phone number on your profile before adding a payout account."
       );
     }
 

@@ -254,7 +254,7 @@ export default function FreelancerOnboardingPage() {
       }
     }
 
-    // Phone is optional here — the verified number is captured via SMS on the profile page.
+    // Phone is optional at onboarding — freelancers add a working number on their profile.
     const nationalDigits = formData.phoneNumber.replace(/\D/g, "");
     let signupPhoneE164: string | undefined;
     if (nationalDigits) {
@@ -704,7 +704,7 @@ export default function FreelancerOnboardingPage() {
                     )}
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    You&apos;ll SMS-verify your number from your profile later. You can skip this here.
+                    Use a real, working number with country code—clients and support may contact you, and it is required for payouts.
                   </p>
                   <div className="flex gap-2">
                     <div className="w-[min(100%,10rem)] shrink-0">

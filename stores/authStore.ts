@@ -59,8 +59,9 @@ export interface User {
     inApp: boolean;
   };
   status: "active" | "suspended" | "deleted";
-  /** Freelancer: set after Twilio SMS verification */
+  /** Legacy: E.164 from former SMS verification */
   phoneE164?: string;
+  /** Legacy: former SMS verification timestamp */
   phoneVerifiedAt?: number;
   createdAt: number;
   updatedAt: number;

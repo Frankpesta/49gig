@@ -176,24 +176,11 @@ export function applyFreelancerProfileLinkRules(patch: FreelancerProfileLinksInp
 }
 
 /**
- * Hard gate for client matching pools. Category links are collected during onboarding
- * and validated on profile save — they do not block pool entry once the account is approved.
- */
-export function freelancerHasVerifiedPhoneForMatching(freelancer: {
-  phoneVerifiedAt?: number;
-}): boolean {
-  return freelancer.phoneVerifiedAt != null;
-}
-
-/**
- * @deprecated Prefer {@link freelancerHasVerifiedPhoneForMatching} for matching eligibility.
- * Still useful if you need “phone + required portfolio links” for non-matching UX.
+ * @deprecated Still useful if you need portfolio links validated for non-matching UX.
  */
 export function freelancerHasPhoneAndLinksForMatching(freelancer: {
-  phoneVerifiedAt?: number;
   profile?: FreelancerProfileLinksInput | null;
 }): boolean {
-  if (!freelancerHasVerifiedPhoneForMatching(freelancer)) return false;
   const p = freelancer.profile ?? {};
   const tf = p.techField;
 
