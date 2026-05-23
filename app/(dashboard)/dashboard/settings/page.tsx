@@ -35,6 +35,10 @@ import { getUserFriendlyError } from "@/lib/error-handling";
 import { formatDistanceToNow } from "date-fns";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import {
+  getFreelancerPhoneDigits,
+  getFreelancerPhoneRaw,
+} from "@/lib/freelancer-phone";
 
 type SessionInfo = {
   _id: string;
@@ -299,17 +303,18 @@ export default function SettingsPage() {
 
   const handleCreateSubaccount = async () => {
     if (!user?._id) return;
-    const phoneE164 =
-      (user && "phoneE164" in user ? (user as { phoneE164?: string }).phoneE164 : undefined)?.trim() ??
-      "";
-    const phoneDigits = phoneE164.replace(/\D/g, "");
+    const payoutUser = (currentUser ?? user) as {
+      phoneE164?: string;
+      profile?: { phoneNumber?: string };
+    };
+    const phoneDigits = getFreelancerPhoneDigits(payoutUser);
     if (
       !subaccountForm.accountNumber ||
       !subaccountForm.accountBank ||
       phoneDigits.length < 8
     ) {
       toast.error(
-        "Complete bank details and verify your phone number in Settings (SMS) before submitting a payout account."
+        "Add a working phone number on your profile before submitting payout bank details."
       );
       return;
     }
@@ -748,7 +753,7 @@ export default function SettingsPage() {
                 ) : (
                   <div className="space-y-4 rounded-lg border border-border p-4">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Your legal name, account email, and SMS-verified phone are sent to the payment processor as-is and cannot be edited here—this reduces fraudulent payout details.
+                      Your legal name, account email, and profile phone number are sent to the payment processor as-is and cannot be edited here—this reduces fraudulent payout details.
                     </p>
                     <div className="space-y-2">
                       <Label htmlFor="payout-display-name">Name on payout account</Label>
@@ -771,23 +776,31 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="payout-display-phone">Verified phone (SMS)</Label>
+                      <Label htmlFor="payout-display-phone">Phone</Label>
                       <Input
                         id="payout-display-phone"
                         readOnly
                         disabled
                         className="bg-muted/60 cursor-not-allowed"
-                        value={
-                          (user && "phoneE164" in user
-                            ? (user as { phoneE164?: string }).phoneE164
-                            : "") ?? ""
-                        }
+                        value={getFreelancerPhoneRaw(
+                          (currentUser ?? user) as {
+                            phoneE164?: string;
+                            profile?: { phoneNumber?: string };
+                          }
+                        )}
                       />
-                      {!(user && "phoneE164" in user
-                        ? (user as { phoneE164?: string }).phoneE164?.trim()
-                        : "") && (
+                      {getFreelancerPhoneDigits(
+                        (currentUser ?? user) as {
+                          phoneE164?: string;
+                          profile?: { phoneNumber?: string };
+                        }
+                      ).length < 8 && (
                         <p className="text-xs text-destructive">
-                          Complete SMS phone verification in Settings before you can submit payout bank details.
+                          Add a working phone number on your{" "}
+                          <a href="/dashboard/profile" className="underline font-medium">
+                            profile
+                          </a>{" "}
+                          before you can submit payout bank details.
                         </p>
                       )}
                     </div>
@@ -894,12 +907,12 @@ export default function SettingsPage() {
                         onClick={handleCreateSubaccount}
                         disabled={
                           isSaving ||
-                          !(
-                            user &&
-                            "phoneE164" in user &&
-                            (((user as { phoneE164?: string }).phoneE164 ?? "").replace(/\D/g, "").length >=
-                              8)
-                          )
+                          getFreelancerPhoneDigits(
+                            (currentUser ?? user) as {
+                              phoneE164?: string;
+                              profile?: { phoneNumber?: string };
+                            }
+                          ).length < 8
                         }
                         className="flex-1"
                       >

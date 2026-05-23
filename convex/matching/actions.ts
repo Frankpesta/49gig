@@ -328,7 +328,7 @@ export const generateMatches = action({
     // Get all verified freelancers directly from database (includes busy / on other hires — scored lower)
     const allUsers = await ctx.runQuery(internal.users.queries.getAllUsers, {});
 
-    // Global matching-pool gate (active, platform + KYC approved, phone verified)
+    // Global matching-pool gate (active, platform + KYC approved)
     const verifiedFreelancers = (allUsers || []).filter((u: any) =>
       isFreelancerInMatchingPool(u)
     );

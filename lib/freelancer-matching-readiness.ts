@@ -1,6 +1,6 @@
 /**
  * UX copy + routes for “why you might not appear in client matching”.
- * Aligns with lib/matching-skill-utils isFreelancerEligibleForProjectMatch (phone + skill fit).
+ * Aligns with lib/matching-skill-utils isFreelancerEligibleForProjectMatch (skill fit).
  */
 
 export type MatchingReadinessIssue = {
@@ -16,7 +16,6 @@ type FreelancerUserLike = {
   status?: string;
   verificationStatus?: string;
   kycStatus?: string;
-  phoneVerifiedAt?: number;
   profile?: {
     techField?: string;
     githubUrl?: string;
@@ -25,10 +24,6 @@ type FreelancerUserLike = {
     portfolioUrl?: string;
   } | null;
 };
-
-function phoneGap(user: FreelancerUserLike): boolean {
-  return user.phoneVerifiedAt == null;
-}
 
 /**
  * Ordered checklist of blockers for being eligible when clients run matching.
@@ -74,17 +69,6 @@ export function getFreelancerMatchingReadinessIssues(
     });
   }
 
-  if (phoneGap(user)) {
-    issues.push({
-      id: "phone",
-      title: "Phone number not verified",
-      description:
-        "Verify your mobile number so we can confirm it’s you and include you in matching.",
-      actionLabel: "Verify phone",
-      href: "/dashboard/profile",
-    });
-  }
-
   return issues;
 }
 
@@ -102,6 +86,5 @@ export function isFreelancerInMatchingPool(user: FreelancerUserLike): boolean {
   if (user.status !== "active") return false;
   if (user.verificationStatus !== "approved") return false;
   if (user.kycStatus !== "approved") return false;
-  if (user.phoneVerifiedAt == null) return false;
   return true;
 }
