@@ -26,6 +26,7 @@ import {
 import { ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
+import { isInOneStepSignupApprovalQueue } from "@/lib/freelancer-matching-readiness";
 
 const ID_REJECT = [
   "Document is blurry or unreadable",
@@ -73,7 +74,19 @@ export function FreelancerSignupApprovalManageBlock({
       ? String((detail.kyc as { status: string }).status)
       : "";
   const inSignupQueue =
-    detail?.vetting?.status === "pending_admin" && kycStatus === "pending_review";
+    detail?.freelancer &&
+    isInOneStepSignupApprovalQueue(
+      {
+        role: "freelancer",
+        status: "active",
+        verificationStatus: detail.freelancer.verificationStatus,
+        kycStatus: detail.freelancer.kycStatus,
+      },
+      detail.vetting,
+      detail.kyc && typeof detail.kyc === "object" && "status" in detail.kyc
+        ? (detail.kyc as { status: string })
+        : null
+    );
 
   if (detail === undefined) {
     return (

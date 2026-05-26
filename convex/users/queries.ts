@@ -4,6 +4,8 @@ import { Doc, Id } from "../_generated/dataModel";
 import { getCurrentUser } from "../auth";
 import {
   getFreelancerMatchingReadinessIssues,
+  isInOneStepSignupApprovalQueue,
+  needsFreelancerKycOrAdminApproval,
   type MatchingReadinessIssue,
 } from "../../lib/freelancer-matching-readiness";
 
@@ -131,7 +133,7 @@ export const getAllUsersAdmin = query({
         v.literal("deleted")
       )
     ),
-    /** Admin only: restrict the list to freelancers in the signup queue (tests pending_admin + KYC pending_review). */
+    /** Admin only: freelancers missing admin approval and/or KYC approval (user doc fields). */
     signupApprovalQueueOnly: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
   },
@@ -187,33 +189,42 @@ export const getAllUsersAdmin = query({
       }
 
       if (args.signupApprovalQueueOnly === true && currentUser.role === "admin") {
+        list = list.filter(
+          (u) => u.role === "freelancer" && needsFreelancerKycOrAdminApproval(u)
+        );
+
         const kycRows = await ctx.db
           .query("kycSubmissions")
           .withIndex("by_status", (q) => q.eq("status", "pending_review"))
           .collect();
-        const pendingIds = new Set<string>();
-        const submittedAtByUser = new Map<string, number>();
+        const oneStepQueueIds = new Set<string>();
+        const kycSubmittedAtByUser = new Map<string, number>();
         for (const k of kycRows) {
           const f = await ctx.db.get(k.freelancerId);
-          if (!f || f.role !== "freelancer" || f.status !== "active") continue;
-          if (f.verificationStatus === "approved" && f.kycStatus === "approved")
-            continue;
+          if (!f) continue;
           const vetting = await ctx.db
             .query("vettingResults")
             .withIndex("by_freelancer", (q) =>
               q.eq("freelancerId", k.freelancerId)
             )
             .first();
-          if (!vetting || vetting.status !== "pending_admin") continue;
-          pendingIds.add(String(k.freelancerId));
-          submittedAtByUser.set(String(k.freelancerId), k.submittedAt);
+          if (!isInOneStepSignupApprovalQueue(f, vetting, k)) continue;
+          oneStepQueueIds.add(String(k.freelancerId));
+          kycSubmittedAtByUser.set(String(k.freelancerId), k.submittedAt);
         }
-        list = list.filter((u) => pendingIds.has(String(u._id)));
-        list.sort(
-          (a, b) =>
-            (submittedAtByUser.get(String(b._id)) ?? 0) -
-            (submittedAtByUser.get(String(a._id)) ?? 0)
-        );
+
+        list.sort((a, b) => {
+          const aReady = oneStepQueueIds.has(String(a._id));
+          const bReady = oneStepQueueIds.has(String(b._id));
+          if (aReady !== bReady) return aReady ? -1 : 1;
+          if (aReady && bReady) {
+            return (
+              (kycSubmittedAtByUser.get(String(b._id)) ?? 0) -
+              (kycSubmittedAtByUser.get(String(a._id)) ?? 0)
+            );
+          }
+          return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+        });
       }
 
       return list.map((u) => {

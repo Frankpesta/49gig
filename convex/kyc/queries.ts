@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getCurrentUser } from "../auth";
 import { Doc } from "../_generated/dataModel";
 import { weightedVerificationOverall } from "../vetting/scoring";
+import { isInOneStepSignupApprovalQueue } from "../../lib/freelancer-matching-readiness";
 
 /**
  * Get KYC status and submission for current freelancer (or by userId for session auth)
@@ -143,14 +144,13 @@ export const getPendingSignupApprovals = query({
 
     for (const k of kycRows) {
       const f = await ctx.db.get(k.freelancerId);
-      if (!f || f.role !== "freelancer" || f.status !== "active") continue;
-      if (f.verificationStatus === "approved" && f.kycStatus === "approved") continue;
+      if (!f) continue;
 
       const vetting = await ctx.db
         .query("vettingResults")
         .withIndex("by_freelancer", (q) => q.eq("freelancerId", k.freelancerId))
         .first();
-      if (!vetting || vetting.status !== "pending_admin") continue;
+      if (!isInOneStepSignupApprovalQueue(f, vetting, k) || !vetting) continue;
 
       const w = weightedVerificationOverall(vetting) ?? vetting.overallScore ?? 0;
       out.push({

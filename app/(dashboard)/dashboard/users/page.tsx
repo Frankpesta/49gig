@@ -71,6 +71,11 @@ import { DashboardFilterBar } from "@/components/dashboard/dashboard-filter-bar"
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { FreelancerSignupApprovalManageBlock } from "@/components/dashboard/freelancer-signup-approval-manage-block";
+import {
+  needsFreelancerKycOrAdminApproval,
+  normalizeFreelancerKycStatus,
+  normalizeFreelancerVerificationStatus,
+} from "@/lib/freelancer-matching-readiness";
 
 function UsersPageContent() {
   const router = useRouter();
@@ -79,7 +84,7 @@ function UsersPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  /** Admin: filter list to freelancers awaiting one-step signup approval (tests + KYC). */
+  /** Admin: filter to freelancers missing KYC and/or admin profile approval. */
   const [freelancerQueueFilter, setFreelancerQueueFilter] = useState<"all" | "pending_signup">("all");
   const [selectedUser, setSelectedUser] = useState<Doc<"users"> | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -476,8 +481,8 @@ function UsersPageContent() {
         title="User Management"
         description={
           signupQueueOnly
-            ? "Showing freelancers awaiting signup approval (submitted tests and KYC). Open Manage to review documents and approve or reject."
-            : "Manage users, roles, and account status. Filter freelancers awaiting signup approval to process the queue from here."
+            ? "Freelancers who are not fully cleared: missing admin profile approval and/or KYC approval. Rows with “Ready to approve” have tests and KYC documents waiting for one-step signup approval."
+            : "Manage users, roles, and account status. Use the freelancer filter to find accounts still missing KYC or admin approval."
         }
         icon={Users}
       />
@@ -524,8 +529,8 @@ function UsersPageContent() {
                 <SelectValue placeholder="Freelancer queue" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All users (no queue filter)</SelectItem>
-                <SelectItem value="pending_signup">Awaiting signup approval</SelectItem>
+                <SelectItem value="all">All users (no approval filter)</SelectItem>
+                <SelectItem value="pending_signup">Pending KYC or admin approval</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -553,9 +558,14 @@ function UsersPageContent() {
         <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
           <span className="font-semibold text-orange-600">{usersList.filter((u: Doc<"users">) => u.status === "suspended").length}</span> suspended
         </span>
+        {signupQueueOnly && (
+          <span className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-1.5">
+            <span className="font-semibold text-foreground">{filteredUsers.length}</span> pending KYC or admin approval
+          </span>
+        )}
         {pendingSignupRows && pendingSignupRows.length > 0 && (
           <span className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5">
-            <span className="font-semibold text-foreground">{pendingSignupRows.length}</span> awaiting signup approval
+            <span className="font-semibold text-foreground">{pendingSignupRows.length}</span> ready for one-step signup approval
           </span>
         )}
       </div>
@@ -571,7 +581,8 @@ function UsersPageContent() {
               <TableHead>Tech Field</TableHead>
               <TableHead>Experience</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Verification</TableHead>
+              <TableHead>Admin approval</TableHead>
+              <TableHead>KYC</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -579,7 +590,7 @@ function UsersPageContent() {
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
+                <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
                   No users found
                 </TableCell>
               </TableRow>
@@ -617,24 +628,64 @@ function UsersPageContent() {
                       <TableCell>
                         {u.role === "freelancer" ? (
                           <div className="flex flex-col items-start gap-1">
-                            <Badge
-                              variant={
-                                u.verificationStatus === "approved"
-                                  ? "default"
-                                  : u.verificationStatus === "rejected"
-                                  ? "destructive"
-                                  : u.verificationStatus === "pending_review"
-                                  ? "outline"
-                                  : "secondary"
-                              }
-                            >
-                              {u.verificationStatus || "not_started"}
-                            </Badge>
+                            {(() => {
+                              const adminStatus = normalizeFreelancerVerificationStatus(
+                                u.verificationStatus
+                              );
+                              return (
+                                <Badge
+                                  variant={
+                                    adminStatus === "approved"
+                                      ? "default"
+                                      : adminStatus === "rejected"
+                                        ? "destructive"
+                                        : adminStatus === "pending_review"
+                                          ? "outline"
+                                          : "secondary"
+                                  }
+                                >
+                                  {adminStatus.replace(/_/g, " ")}
+                                </Badge>
+                              );
+                            })()}
                             {pendingSignupIdSet.has(String(u._id)) && (
-                              <Badge variant="secondary" className="text-[10px] font-normal">
-                                Signup queue
+                              <Badge variant="default" className="text-[10px] font-normal">
+                                Ready to approve
                               </Badge>
                             )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {u.role === "freelancer" ? (
+                          <div className="flex flex-col items-start gap-1">
+                            {(() => {
+                              const kycStatus = normalizeFreelancerKycStatus(u.kycStatus);
+                              return (
+                                <Badge
+                                  variant={
+                                    kycStatus === "approved"
+                                      ? "default"
+                                      : kycStatus === "pending_review"
+                                        ? "outline"
+                                        : kycStatus === "id_rejected" ||
+                                            kycStatus === "address_rejected"
+                                          ? "destructive"
+                                          : "secondary"
+                                  }
+                                >
+                                  {kycStatus.replace(/_/g, " ")}
+                                </Badge>
+                              );
+                            })()}
+                            {needsFreelancerKycOrAdminApproval(u) &&
+                              !pendingSignupIdSet.has(String(u._id)) && (
+                                <Badge variant="secondary" className="text-[10px] font-normal">
+                                  In progress
+                                </Badge>
+                              )}
                           </div>
                         ) : (
                           <span className="text-muted-foreground">—</span>
