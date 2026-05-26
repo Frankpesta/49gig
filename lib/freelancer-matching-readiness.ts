@@ -88,3 +88,54 @@ export function isFreelancerInMatchingPool(user: FreelancerUserLike): boolean {
   if (user.kycStatus !== "approved") return false;
   return true;
 }
+
+/** Defaults used when user doc fields are unset (legacy rows). */
+export function normalizeFreelancerVerificationStatus(status?: string): string {
+  return status ?? "not_started";
+}
+
+export function normalizeFreelancerKycStatus(status?: string): string {
+  return status ?? "not_submitted";
+}
+
+/**
+ * Admin / matching gate on the user document only (verification + KYC).
+ * Same pair as `isFreelancerInMatchingPool`, without the active-account check.
+ */
+export function isFreelancerKycAndAdminApproved(user: FreelancerUserLike): boolean {
+  if (user.role !== "freelancer") return false;
+  return (
+    user.verificationStatus === "approved" && user.kycStatus === "approved"
+  );
+}
+
+/**
+ * Freelancers who still need admin profile approval and/or KYC approval.
+ * Excludes deleted accounts; includes active and suspended.
+ */
+export function needsFreelancerKycOrAdminApproval(user: FreelancerUserLike): boolean {
+  if (user.role !== "freelancer") return false;
+  if (user.status === "deleted") return false;
+  return !isFreelancerKycAndAdminApproved(user);
+}
+
+export type SignupQueueVettingLike = { status?: string } | null | undefined;
+export type SignupQueueKycSubmissionLike = { status?: string } | null | undefined;
+
+/**
+ * Narrow actionable queue: tests submitted for admin + KYC documents in review.
+ * Used for one-click signup approval and “Signup queue” badges.
+ */
+export function isInOneStepSignupApprovalQueue(
+  user: FreelancerUserLike,
+  vetting?: SignupQueueVettingLike,
+  kycSubmission?: SignupQueueKycSubmissionLike
+): boolean {
+  if (user.role !== "freelancer" || user.status !== "active") return false;
+  if (isFreelancerKycAndAdminApproved(user)) return false;
+  const kycSubmissionStatus =
+    kycSubmission?.status ?? normalizeFreelancerKycStatus(user.kycStatus);
+  return (
+    vetting?.status === "pending_admin" && kycSubmissionStatus === "pending_review"
+  );
+}
