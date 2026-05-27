@@ -5,7 +5,6 @@ import { getCurrentUser } from "../auth";
 import {
   getFreelancerMatchingReadinessIssues,
   isInOneStepSignupApprovalQueue,
-  needsFreelancerKycOrAdminApproval,
   type MatchingReadinessIssue,
 } from "../../lib/freelancer-matching-readiness";
 
@@ -133,7 +132,7 @@ export const getAllUsersAdmin = query({
         v.literal("deleted")
       )
     ),
-    /** Admin only: freelancers missing admin approval and/or KYC approval (user doc fields). */
+    /** Admin only: active freelancers with tests (pending_admin) + KYC submitted (pending_review). */
     signupApprovalQueueOnly: v.optional(v.boolean()),
     userId: v.optional(v.id("users")),
   },
@@ -189,10 +188,6 @@ export const getAllUsersAdmin = query({
       }
 
       if (args.signupApprovalQueueOnly === true && currentUser.role === "admin") {
-        list = list.filter(
-          (u) => u.role === "freelancer" && needsFreelancerKycOrAdminApproval(u)
-        );
-
         const kycRows = await ctx.db
           .query("kycSubmissions")
           .withIndex("by_status", (q) => q.eq("status", "pending_review"))
@@ -213,18 +208,12 @@ export const getAllUsersAdmin = query({
           kycSubmittedAtByUser.set(String(k.freelancerId), k.submittedAt);
         }
 
-        list.sort((a, b) => {
-          const aReady = oneStepQueueIds.has(String(a._id));
-          const bReady = oneStepQueueIds.has(String(b._id));
-          if (aReady !== bReady) return aReady ? -1 : 1;
-          if (aReady && bReady) {
-            return (
-              (kycSubmittedAtByUser.get(String(b._id)) ?? 0) -
-              (kycSubmittedAtByUser.get(String(a._id)) ?? 0)
-            );
-          }
-          return (b.createdAt ?? 0) - (a.createdAt ?? 0);
-        });
+        list = list.filter((u) => oneStepQueueIds.has(String(u._id)));
+        list.sort(
+          (a, b) =>
+            (kycSubmittedAtByUser.get(String(b._id)) ?? 0) -
+            (kycSubmittedAtByUser.get(String(a._id)) ?? 0)
+        );
       }
 
       return list.map((u) => {
