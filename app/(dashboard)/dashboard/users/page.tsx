@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Doc, Id } from "@/convex/_generated/dataModel";
@@ -79,12 +79,11 @@ import {
 
 function UsersPageContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, isAuthenticated } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  /** Admin: filter to freelancers missing KYC and/or admin profile approval. */
+  /** Admin: active freelancers with tests + KYC submitted, awaiting review. */
   const [freelancerQueueFilter, setFreelancerQueueFilter] = useState<"all" | "pending_signup">("all");
   const [selectedUser, setSelectedUser] = useState<Doc<"users"> | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -114,13 +113,6 @@ function UsersPageContent() {
       router.replace("/dashboard");
     }
   }, [isAuthenticated, user?.role, router]);
-
-  useEffect(() => {
-    if (searchParams.get("signup") === "1") {
-      setFreelancerQueueFilter("pending_signup");
-      setRoleFilter("freelancer");
-    }
-  }, [searchParams]);
 
   const signupQueueOnly =
     user?.role === "admin" && freelancerQueueFilter === "pending_signup";
@@ -481,8 +473,8 @@ function UsersPageContent() {
         title="User Management"
         description={
           signupQueueOnly
-            ? "Freelancers who are not fully cleared: missing admin profile approval and/or KYC approval. Rows with “Ready to approve” have tests and KYC documents waiting for one-step signup approval."
-            : "Manage users, roles, and account status. Use the freelancer filter to find accounts still missing KYC or admin approval."
+            ? "Active freelancers who completed verification tests and submitted KYC, awaiting admin review and one-step signup approval."
+            : "Manage users, roles, and account status. Use the freelancer queue filter to review signup approvals."
         }
         icon={Users}
       />
@@ -530,7 +522,7 @@ function UsersPageContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All users (no approval filter)</SelectItem>
-                <SelectItem value="pending_signup">Pending KYC or admin approval</SelectItem>
+                <SelectItem value="pending_signup">Awaiting signup approval</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -560,7 +552,7 @@ function UsersPageContent() {
         </span>
         {signupQueueOnly && (
           <span className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-1.5">
-            <span className="font-semibold text-foreground">{filteredUsers.length}</span> pending KYC or admin approval
+            <span className="font-semibold text-foreground">{filteredUsers.length}</span> awaiting signup approval
           </span>
         )}
         {pendingSignupRows && pendingSignupRows.length > 0 && (
