@@ -288,10 +288,7 @@ export default function AdminReplaceTalentPage() {
     );
   }
 
-  const canReplace =
-    project.status === "matched" ||
-    project.status === "in_progress" ||
-    project.status === "awaiting_freelancer";
+  const canReplace = project.status === "in_progress";
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 pb-24">

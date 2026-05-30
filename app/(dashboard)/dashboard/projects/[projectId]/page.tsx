@@ -435,6 +435,8 @@ export default function ProjectDetailPage() {
   const isAdmin = user.role === "admin";
   const isStaff = user.role === "admin" || user.role === "moderator";
   const isClient = user.role === "client" && project.clientId === user._id;
+  /** Operational admin controls (pause/resume payments, replace talent, money audit) only apply mid-hire. */
+  const isInProgress = project.status === "in_progress";
   const pendingMatchesCount =
     (project as { pendingMatchesCount?: number }).pendingMatchesCount ?? 0;
   const showClientViewMatches =
@@ -509,10 +511,7 @@ export default function ProjectDetailPage() {
     isAdmin && adminReplacementRoster && adminReplacementRoster.length > 0
       ? adminReplacementRoster
       : assignedFreelancers;
-  const adminManualReplaceStatuses =
-    project.status === "matched" ||
-    project.status === "in_progress" ||
-    project.status === "awaiting_freelancer";
+  const adminManualReplaceStatuses = project.status === "in_progress";
   const activeBillingPauses = ((billingPauses ?? []) as Array<{
     _id: string;
     scope: "project" | "freelancer";
@@ -1009,6 +1008,7 @@ export default function ProjectDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            {isInProgress && (
             <div className="w-full rounded-md border border-border bg-card/80 p-3">
               <div className="mb-3 space-y-1">
                 <p className="text-sm font-medium text-foreground">Billing release controls</p>
@@ -1114,6 +1114,7 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </div>
+            )}
             {freelancersForAdminReplace.length > 0 &&
               adminManualReplaceStatuses && (
                 <Button variant="outline" className="min-h-11 w-full touch-manipulation sm:w-auto" asChild>
@@ -1206,7 +1207,7 @@ export default function ProjectDetailPage() {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            {moneyAudit && (
+            {isInProgress && moneyAudit && (
               <div className="mt-4 w-full rounded-md border border-border bg-card/80 p-3 text-sm">
                 <p className="font-medium text-foreground">Money audit (read-only)</p>
                 <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">

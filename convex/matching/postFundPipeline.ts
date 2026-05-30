@@ -21,19 +21,28 @@ export const runPostFundMatchingForProject = internalAction({
       return;
     }
 
-    try {
-      if (project.intakeForm.hireType === "team") {
-        await ctx.runAction(apiAny.matching.actions.generateTeamMatches, {
-          projectId: args.projectId,
-        });
-      } else {
-        await ctx.runAction(apiAny.matching.actions.generateMatches, {
-          projectId: args.projectId,
-          limit: 10,
-        });
+    // Skip auto-generation when automatic matching is disabled; admins match manually.
+    // Still run acceptSelectedMatchInternal below for any pre-selected freelancer(s).
+    const automaticMatchingEnabled = await ctx.runQuery(
+      internalAny.platformSettings.queries.getAutomaticMatchingEnabledInternal,
+      {}
+    );
+
+    if (automaticMatchingEnabled) {
+      try {
+        if (project.intakeForm.hireType === "team") {
+          await ctx.runAction(apiAny.matching.actions.generateTeamMatches, {
+            projectId: args.projectId,
+          });
+        } else {
+          await ctx.runAction(apiAny.matching.actions.generateMatches, {
+            projectId: args.projectId,
+            limit: 10,
+          });
+        }
+      } catch (e) {
+        console.error("[postFundMatching] generate failed", args.projectId, e);
       }
-    } catch (e) {
-      console.error("[postFundMatching] generate failed", args.projectId, e);
     }
 
     await ctx.runMutation(internalAny.projects.mutations.acceptSelectedMatchInternal, {

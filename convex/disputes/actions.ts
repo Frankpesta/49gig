@@ -260,14 +260,21 @@ export const releaseDisputeFunds = action({
         }
       );
       if (result.applied) {
-        if (result.isTeam) {
-          await ctx.runAction(api.matching.actions.generateTeamMatches, {
-            projectId: dispute.projectId,
-          });
-        } else {
-          await ctx.runAction(api.matching.actions.generateMatches, {
-            projectId: dispute.projectId,
-          });
+        // Skip auto-generation when automatic matching is disabled; admin replaces talent manually.
+        const automaticMatchingEnabled = await ctx.runQuery(
+          internal.platformSettings.queries.getAutomaticMatchingEnabledInternal,
+          {}
+        );
+        if (automaticMatchingEnabled) {
+          if (result.isTeam) {
+            await ctx.runAction(api.matching.actions.generateTeamMatches, {
+              projectId: dispute.projectId,
+            });
+          } else {
+            await ctx.runAction(api.matching.actions.generateMatches, {
+              projectId: dispute.projectId,
+            });
+          }
         }
       }
     }

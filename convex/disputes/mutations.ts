@@ -1903,14 +1903,26 @@ export const enqueueJudgmentReplacementCandidates = mutation({
         "internal"
       >;
 
-    if ((project.intakeForm as { hireType?: string } | undefined)?.hireType === "team") {
-      await ctx.scheduler.runAfter(0, generateTeamMatches, {
-        projectId: dispute.projectId,
-      });
-    } else {
-      await ctx.scheduler.runAfter(0, generateMatches, {
-        projectId: dispute.projectId,
-      });
+    // Skip auto-generation when automatic matching is disabled; admin replaces talent manually.
+    const automaticMatchingSetting = await ctx.db
+      .query("platformSettings")
+      .withIndex("by_key", (q) => q.eq("key", "automaticMatchingEnabled"))
+      .first();
+    const automaticMatchingEnabled =
+      typeof automaticMatchingSetting?.value === "boolean"
+        ? automaticMatchingSetting.value
+        : true;
+
+    if (automaticMatchingEnabled) {
+      if ((project.intakeForm as { hireType?: string } | undefined)?.hireType === "team") {
+        await ctx.scheduler.runAfter(0, generateTeamMatches, {
+          projectId: dispute.projectId,
+        });
+      } else {
+        await ctx.scheduler.runAfter(0, generateMatches, {
+          projectId: dispute.projectId,
+        });
+      }
     }
 
     await appendDisputeEnforcementEvent(ctx, {
