@@ -49,6 +49,7 @@ import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import { Checkbox } from "@/components/ui/checkbox";
 import { freelancerRelevantToProjectIntake } from "@/lib/intake-freelancer-relevance";
+import { isFreelancerInMatchingPool } from "@/lib/freelancer-matching-readiness";
 
 /** Open role labels from server (accepted-match basis); fallback to project.rolesAwaitingMatch. */
 function teamRoleOptionsForManualMatch(p: any): string[] {
@@ -75,6 +76,32 @@ export default function AdminManualMatchPage() {
   const [skillRelevantOnly, setSkillRelevantOnly] = useState(true);
 
   const adminManualMatch = useMutation(api.matching.mutations.adminManualMatch);
+  const setAutomaticMatchingEnabled = useMutation(
+    (api as any)["platformSettings/mutations"].setAutomaticMatchingEnabled
+  );
+  const automaticMatchingEnabled = useQuery(
+    (api as any)["platformSettings/queries"].getAutomaticMatchingEnabled,
+    {}
+  );
+  const [togglingAutoMatch, setTogglingAutoMatch] = useState(false);
+
+  const handleToggleAutomaticMatching = async () => {
+    if (!user?._id || automaticMatchingEnabled === undefined) return;
+    setTogglingAutoMatch(true);
+    try {
+      const next = !automaticMatchingEnabled;
+      await setAutomaticMatchingEnabled({ enabled: next, userId: user._id });
+      toast.success(
+        next
+          ? "Automatic matching turned ON. Hires are matched automatically."
+          : "Automatic matching turned OFF. All hires must be matched manually."
+      );
+    } catch (err: any) {
+      toast.error(getUserFriendlyError(err) || "Failed to update automatic matching");
+    } finally {
+      setTogglingAutoMatch(false);
+    }
+  };
 
   const allProjects = useQuery(
     api.projects.queries.listManualMatchProjectsAdmin,
@@ -125,6 +152,8 @@ export default function AdminManualMatchPage() {
     if (!allFreelancers) return [];
     const intake = selectedProject?.intakeForm;
     return (allFreelancers as any[]).filter((f: any) => {
+      // Only fully verified freelancers (admin approved + skill tests passed + KYC approved)
+      if (!isFreelancerInMatchingPool(f)) return false;
       if (freelancerSearch) {
         const q = freelancerSearch.toLowerCase();
         const name = (f.name ?? "").toLowerCase();
@@ -225,6 +254,54 @@ export default function AdminManualMatchPage() {
           </p>
         </div>
       </div>
+
+      {/* Automatic matching global toggle */}
+      <Card
+        className={
+          automaticMatchingEnabled === false
+            ? "border-amber-500/40 bg-amber-500/5"
+            : "border-border/60"
+        }
+      >
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold">Automatic matching</h3>
+              <Badge
+                variant={automaticMatchingEnabled === false ? "outline" : "secondary"}
+                className={
+                  automaticMatchingEnabled === false
+                    ? "border-amber-500 text-amber-700"
+                    : ""
+                }
+              >
+                {automaticMatchingEnabled === undefined
+                  ? "Loading…"
+                  : automaticMatchingEnabled
+                    ? "On"
+                    : "Off"}
+              </Badge>
+            </div>
+            <p className="text-pretty text-xs text-muted-foreground sm:text-sm">
+              {automaticMatchingEnabled === false
+                ? "Automatic matching is OFF. No matches are generated automatically — every hire waits for you to match it manually here."
+                : "Automatic matching is ON. The system suggests matches automatically; you can still add candidates manually below."}
+            </p>
+          </div>
+          <Button
+            variant={automaticMatchingEnabled === false ? "default" : "outline"}
+            className="h-11 w-full shrink-0 touch-manipulation sm:h-10 sm:w-auto"
+            disabled={togglingAutoMatch || automaticMatchingEnabled === undefined}
+            onClick={handleToggleAutomaticMatching}
+          >
+            {togglingAutoMatch
+              ? "Saving…"
+              : automaticMatchingEnabled === false
+                ? "Turn automatic matching ON"
+                : "Turn automatic matching OFF"}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Steps: stacked on phones, row from sm — no horizontal page scroll */}
       <div
@@ -375,7 +452,8 @@ export default function AdminManualMatchPage() {
               <span className="min-w-0">Step 2 — Select freelancer</span>
             </CardTitle>
             <CardDescription>
-              Prioritize people who match this hire&apos;s skills and roles (toggle below). You can still search the full directory when needed.
+              Only fully verified freelancers (admin approved, skill tests passed, and KYC verified) are shown.
+              Prioritize people who match this hire&apos;s skills and roles (toggle below).
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">

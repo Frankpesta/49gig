@@ -13,6 +13,7 @@ import {
 } from "../projects/manualMatchEligibility";
 import { isFreelancerPermanentlyExcluded } from "../match_exclusions";
 import { effectivePlatformFeePercentForProject } from "../platformFeeResolve";
+import { isFreelancerInMatchingPool } from "../../lib/freelancer-matching-readiness";
 
 const api = require("../_generated/api") as {
   api: {
@@ -813,6 +814,11 @@ export const adminManualMatch = mutation({
     if (freelancer.role !== "freelancer") {
       throw new Error("Selected user is not a freelancer");
     }
+    if (!isFreelancerInMatchingPool(freelancer)) {
+      throw new Error(
+        "Only fully verified freelancers (admin approved, skill tests passed, and KYC verified) can be matched."
+      );
+    }
 
     if (
       project.matchedFreelancerId === args.freelancerId ||
@@ -920,6 +926,14 @@ export const adminManualMatch = mutation({
       },
       createdAt: now,
     });
+
+    // Surface the match to the client: the post-fund "View matches" button is gated on this flag.
+    if (project.clientNotifiedOfAvailableMatchesAt == null) {
+      await ctx.db.patch(args.projectId, {
+        clientNotifiedOfAvailableMatchesAt: now,
+        updatedAt: now,
+      });
+    }
 
     // Notify client
     await ctx.scheduler.runAfter(0, sendSystemNotification, {

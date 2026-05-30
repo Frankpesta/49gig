@@ -493,6 +493,10 @@ export default function ProjectMatchesPage() {
     (api as any)["matching/queries"].getMatches,
     user?._id && projectId ? { projectId, userId: user._id } : "skip"
   );
+  const automaticMatchingEnabled = useQuery(
+    (api as any)["platformSettings/queries"].getAutomaticMatchingEnabled,
+    {}
+  );
   const [viewingFreelancerId, setViewingFreelancerId] = useState<Id<"users"> | null>(null);
   const publicProfile = useQuery(
     getFreelancerPublicProfileRef,
@@ -780,6 +784,9 @@ export default function ProjectMatchesPage() {
     // Wait for matches query to resolve; undefined = still loading
     if (matches === undefined) return;
     if (matches.length > 0) return; // already have matches
+    // Wait for the setting to resolve; when auto matching is off, admins match manually.
+    if (automaticMatchingEnabled === undefined) return;
+    if (automaticMatchingEnabled === false) return;
     if (matchingAttemptedRef.current) return; // already attempted (success or failure), avoid infinite retry
     matchingAttemptedRef.current = true;
     setMatchingRunning(true);
@@ -798,6 +805,7 @@ export default function ProjectMatchesPage() {
     project?.status,
     matches?.length,
     matchingRunning,
+    automaticMatchingEnabled,
     generateMatchesForDraft,
   ]);
 
@@ -808,6 +816,9 @@ export default function ProjectMatchesPage() {
     if (project.status !== "matching") return;
     if (matches === undefined) return;
     if (matches.length > 0) return;
+    // Wait for the setting to resolve; when auto matching is off, admins match manually.
+    if (automaticMatchingEnabled === undefined) return;
+    if (automaticMatchingEnabled === false) return;
     if (replacementGenAttemptedRef.current) return;
 
     replacementGenAttemptedRef.current = true;
@@ -836,6 +847,7 @@ export default function ProjectMatchesPage() {
     project?.intakeForm?.hireType,
     matches,
     matchingRunning,
+    automaticMatchingEnabled,
     generateMatches,
     generateTeamMatches,
   ]);
@@ -1433,6 +1445,26 @@ export default function ProjectMatchesPage() {
         )}
 
       {!matchingRunning &&
+        automaticMatchingEnabled === false &&
+        pendingMatches.length === 0 &&
+        !isFreelancerReplacementFlow &&
+        !hasPreFundingSelection && (
+        <Card className="rounded-xl border-primary/30 bg-primary/5">
+          <CardContent className="py-12 px-4 sm:px-8 text-center space-y-4">
+            <p className="font-medium text-foreground text-base sm:text-lg">
+              Our team is hand-picking your matches
+            </p>
+            <div className="text-muted-foreground text-sm sm:text-base space-y-2 max-w-lg mx-auto">
+              <p>Thank you for submitting your hire request!</p>
+              <p>A 49GIG specialist is personally selecting the most qualified freelancers for your hire.</p>
+              <p>You&apos;ll be notified as soon as your matches are ready to review and select.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!matchingRunning &&
+        automaticMatchingEnabled !== false &&
         pendingMatches.length === 0 &&
         !(isTeam && allRoleLabels.length > 0) &&
         !isFreelancerReplacementFlow &&

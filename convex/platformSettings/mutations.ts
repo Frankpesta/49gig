@@ -101,3 +101,48 @@ export const setReferralBonusPercentage = mutation({
     return { success: true, percentage: pct };
   },
 });
+
+/**
+ * Enable/disable automatic matching globally (admin only).
+ * When disabled, no automatic match generation runs and admins manually match all hires.
+ */
+export const setAutomaticMatchingEnabled = mutation({
+  args: {
+    enabled: v.boolean(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = args.userId
+      ? await ctx.db.get(args.userId)
+      : await getCurrentUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "admin") {
+      throw new Error("Only admins can change automatic matching");
+    }
+
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("platformSettings")
+      .withIndex("by_key", (q) => q.eq("key", "automaticMatchingEnabled"))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        value: args.enabled,
+        updatedAt: now,
+        updatedBy: user._id,
+      });
+    } else {
+      await ctx.db.insert("platformSettings", {
+        key: "automaticMatchingEnabled",
+        value: args.enabled,
+        updatedAt: now,
+        updatedBy: user._id,
+      });
+    }
+
+    return { success: true, enabled: args.enabled };
+  },
+});

@@ -468,7 +468,8 @@ export const updateProject = mutation({
 
     await ctx.db.patch(args.projectId, updates);
 
-    // When intake form changes, delete existing matches and regenerate so client sees fresh matches
+    // When intake form changes, delete existing matches and regenerate so client sees fresh matches.
+    // When automatic matching is disabled, clear matches but leave regeneration to admin manual matching.
     if (args.intakeForm) {
       const existingMatches = await ctx.db
         .query("matches")
@@ -477,11 +478,21 @@ export const updateProject = mutation({
       for (const m of existingMatches) {
         await ctx.db.delete(m._id);
       }
-      const generateMatchesRef = api.api.matching.actions
-        .generateMatchesForDraft as unknown as FunctionReference<"action">;
-      await ctx.scheduler.runAfter(0, generateMatchesRef, {
-        projectId: args.projectId,
-      });
+      const automaticMatchingSetting = await ctx.db
+        .query("platformSettings")
+        .withIndex("by_key", (q) => q.eq("key", "automaticMatchingEnabled"))
+        .first();
+      const automaticMatchingEnabled =
+        typeof automaticMatchingSetting?.value === "boolean"
+          ? automaticMatchingSetting.value
+          : true;
+      if (automaticMatchingEnabled) {
+        const generateMatchesRef = api.api.matching.actions
+          .generateMatchesForDraft as unknown as FunctionReference<"action">;
+        await ctx.scheduler.runAfter(0, generateMatchesRef, {
+          projectId: args.projectId,
+        });
+      }
     }
 
     // Log audit

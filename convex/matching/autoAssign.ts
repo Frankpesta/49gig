@@ -151,6 +151,13 @@ async function sendPeriodicClientMatchReminders(ctx: any) {
  */
 async function tryMatchProject(ctx: any, projectId: string): Promise<number> {
   try {
+    // Global kill switch: when automatic matching is off, admins match all hires manually.
+    const automaticMatchingEnabled = await ctx.runQuery(
+      internalAny.platformSettings.queries.getAutomaticMatchingEnabledInternal,
+      {}
+    );
+    if (!automaticMatchingEnabled) return 0;
+
     const project = await ctx.runQuery(internalAny.projects.queries.getProjectInternal, { projectId });
     if (!project) return 0;
 
