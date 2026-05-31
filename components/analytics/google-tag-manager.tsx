@@ -10,20 +10,21 @@ declare global {
 }
 
 interface GoogleTagManagerProps {
-  consent: "granted" | "denied" | null;
   gtmId: string;
 }
 
 /**
  * GTM loads from root layout (gtm-head-script.tsx) with Consent Mode v2.
- * This component pushes page_view on route change and renders noscript fallback.
+ * This component pushes page_view on every route change (for ALL visitors,
+ * regardless of the cookie banner choice — analytics_storage is granted by
+ * default) and renders the noscript fallback.
  */
-export function GoogleTagManager({ consent, gtmId }: GoogleTagManagerProps) {
+export function GoogleTagManager({ gtmId }: GoogleTagManagerProps) {
   const pathname = usePathname();
   const lastPathRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (consent !== "granted" || !gtmId || typeof window === "undefined") return;
+    if (!gtmId || typeof window === "undefined") return;
     if (lastPathRef.current === pathname) return;
     lastPathRef.current = pathname;
 
@@ -34,7 +35,7 @@ export function GoogleTagManager({ consent, gtmId }: GoogleTagManagerProps) {
       page_location: window.location.href,
       page_title: document.title,
     });
-  }, [consent, gtmId, pathname]);
+  }, [gtmId, pathname]);
 
   if (!gtmId) return null;
 

@@ -80,7 +80,7 @@ export default function Home() {
     { prefix: "", value: "3,500", label: "Vetted Professionals", suffix: "+", icon: Users },
     { prefix: "", value: "98", label: "Client Satisfaction", suffix: "%", icon: Trophy },
     { prefix: "", value: "35", label: "Countries Served", suffix: "+", icon: Globe },
-    { prefix: "", value: "25", label: "Faster Time to Hire", suffix: "%", icon: Clock },
+    { prefix: "", value: "50", label: "Faster Time to Hire", suffix: "%", icon: Clock },
   ];
 
   const categories = [
@@ -167,7 +167,7 @@ export default function Home() {
     {
       step: "1",
       icon: Briefcase,
-      title: "Post Your Project",
+      title: "Tell Us Your Hiring Needs",
       description: "Tell us about your project requirements, timeline, and budget. Our smart form takes less than 5 minutes to complete.",
       image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80",
     },
