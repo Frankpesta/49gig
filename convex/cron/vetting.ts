@@ -6,7 +6,7 @@ const internalAny: any = require("../_generated/api").internal;
 
 /**
  * Email freelancers who have not completed verification (tests / onboarding).
- * Run daily; each user receives at most one email per day.
+ * Run daily; each user receives at most one email per 2 days (48h cooldown).
  */
 export const sendIncompleteVerificationReminders = internalAction({
   args: {},

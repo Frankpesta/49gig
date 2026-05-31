@@ -333,7 +333,7 @@ export const listFreelancersNeedingVerificationReminderInternal = internalQuery(
   handler: async (ctx) => {
     const now = Date.now();
     const minAccountAgeMs = 2 * DAY_MS;
-    const reminderCooldownMs = 1 * DAY_MS;
+    const reminderCooldownMs = 2 * DAY_MS;
 
     const freelancers = await ctx.db
       .query("users")
