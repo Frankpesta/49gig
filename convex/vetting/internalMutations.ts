@@ -194,6 +194,20 @@ export const terminateFreelancerVerificationFailure = internalMutation({
     freelancerId: v.id("users"),
     vettingResultId: v.id("vettingResults"),
     reason: v.string(),
+    /** Optional AI coaching to include in the termination email (coding failures). */
+    codingFeedback: v.optional(
+      v.object({
+        overallSummary: v.string(),
+        challenges: v.array(
+          v.object({
+            title: v.string(),
+            passedCases: v.number(),
+            totalCases: v.number(),
+            coaching: v.string(),
+          })
+        ),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const freelancer = await ctx.db.get(args.freelancerId);
@@ -212,7 +226,7 @@ export const terminateFreelancerVerificationFailure = internalMutation({
     await ctx.scheduler.runAfter(
       0,
       internalAny.vetting.staffEmails.sendVerificationTerminatedEmailInternal,
-      { email, name }
+      { email, name, codingFeedback: args.codingFeedback }
     );
 
     try {

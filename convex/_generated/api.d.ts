@@ -106,6 +106,7 @@ import type * as users_hardDeleteUser from "../users/hardDeleteUser.js";
 import type * as users_mutations from "../users/mutations.js";
 import type * as users_queries from "../users/queries.js";
 import type * as vetting_actions from "../vetting/actions.js";
+import type * as vetting_codingFeedback from "../vetting/codingFeedback.js";
 import type * as vetting_completeVerificationCore from "../vetting/completeVerificationCore.js";
 import type * as vetting_engine from "../vetting/engine.js";
 import type * as vetting_internalMutations from "../vetting/internalMutations.js";
@@ -234,6 +235,7 @@ declare const fullApi: ApiFromModules<{
   "users/mutations": typeof users_mutations;
   "users/queries": typeof users_queries;
   "vetting/actions": typeof vetting_actions;
+  "vetting/codingFeedback": typeof vetting_codingFeedback;
   "vetting/completeVerificationCore": typeof vetting_completeVerificationCore;
   "vetting/engine": typeof vetting_engine;
   "vetting/internalMutations": typeof vetting_internalMutations;

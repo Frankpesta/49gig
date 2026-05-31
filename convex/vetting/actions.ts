@@ -2,7 +2,7 @@
 "use node";
 import { action } from "../_generated/server";
 import { v } from "convex/values";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import OpenAI from "openai";
 
 /**
@@ -65,6 +65,73 @@ export const executeCodingChallenge = action({
     });
 
     return results;
+  },
+});
+
+/**
+ * Authoritative coding submission. Unlike the interactive "Run" path, this
+ * re-executes the submitted code server-side against the prompt's test cases
+ * (loaded from the DB, never trusting client-provided results) and then stores
+ * the verified result on the session. This guarantees the grade and the
+ * downstream failure feedback are based on a real run of the submitted code.
+ */
+export const submitCodingChallenge = action({
+  args: {
+    sessionId: v.id("vettingSkillTestSessions"),
+    promptId: v.id("vettingCodingPrompts"),
+    code: v.string(),
+    language: v.string(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const prompt = await ctx.runQuery(
+      internal.vetting.queries.getCodingPromptTestCasesInternal,
+      { promptId: args.promptId }
+    );
+
+    const testCases = (prompt?.testCases ?? []).map(
+      ({ input, expectedOutput }: { input: string; expectedOutput: string }) => ({
+        input,
+        expectedOutput,
+      })
+    );
+
+    let runResult:
+      | {
+          passed: number;
+          total: number;
+          results: Array<{
+            passed: boolean;
+            input: string;
+            expectedOutput: string;
+            actualOutput: string;
+            error?: string;
+            status?: string;
+            failureType?: string;
+          }>;
+        }
+      | undefined;
+
+    if (testCases.length > 0) {
+      runResult = await executeWithJudge0({
+        code: args.code,
+        language: args.language,
+        testCases,
+      });
+    }
+
+    const stored = await ctx.runMutation(
+      internal.vetting.mutations.storeCodingSubmissionInternal,
+      {
+        sessionId: args.sessionId,
+        promptId: args.promptId,
+        code: args.code,
+        runResult,
+        userId: args.userId,
+      }
+    );
+
+    return { ...stored, runResult };
   },
 });
 
@@ -182,6 +249,8 @@ async function executeWithJudge0(params: {
     expectedOutput: string;
     actualOutput: string;
     error?: string;
+    status?: string;
+    failureType?: string;
   }>;
 }> {
   const JUDGE0_API_URL =
@@ -203,6 +272,8 @@ async function executeWithJudge0(params: {
     expectedOutput: string;
     actualOutput: string;
     error?: string;
+    status?: string;
+    failureType?: string;
   }> = [];
 
   // Execute each test case
@@ -218,15 +289,23 @@ async function executeWithJudge0(params: {
         rapidApiHost: JUDGE0_RAPIDAPI_HOST,
       });
 
+      const statusId = submission.status?.id;
+      const statusDescription = submission.status?.description || "";
       const actualOutput = submission.stdout?.trim() || "";
-      const passed = actualOutput === testCase.expectedOutput.trim();
+      const errorText =
+        submission.stderr || submission.compile_output || submission.message || undefined;
+      const passed = statusId === 3 && actualOutput === testCase.expectedOutput.trim();
 
       results.push({
         passed,
         input: testCase.input,
         expectedOutput: testCase.expectedOutput,
         actualOutput,
-        error: submission.stderr || submission.compile_output || undefined,
+        error: errorText,
+        status: statusDescription,
+        failureType: passed
+          ? undefined
+          : classifyJudge0Failure(statusId, actualOutput, testCase.expectedOutput.trim()),
       });
     } catch (error) {
       results.push({
@@ -235,6 +314,7 @@ async function executeWithJudge0(params: {
         expectedOutput: testCase.expectedOutput,
         actualOutput: "",
         error: error instanceof Error ? error.message : "Execution failed",
+        failureType: "execution_error",
       });
     }
   }
@@ -326,22 +406,30 @@ async function submitToJudge0(params: {
     submission = await pollJudge0Submission(baseUrl, submission.token, headers);
   }
 
-  if (submission.status?.id === 3) {
+  // Return any terminal status (Accepted=3, Wrong Answer=4, TLE=5, Compile Error=6,
+  // Runtime Errors>=7) so the caller can classify failure type instead of throwing.
+  // Only queue/processing (1,2) or missing status are treated as failures here.
+  if (submission.status?.id !== undefined && submission.status.id >= 3) {
     return submission;
   }
-  if (submission.status?.id === 6) {
-    throw new Error(`Compilation error: ${submission.compile_output || "Unknown"}`);
-  }
-  if (submission.status?.id === 5) {
-    throw new Error("Time limit exceeded");
-  }
-  if (submission.status?.id === 4) {
-    throw new Error(`Wrong answer or runtime: ${submission.stderr || submission.message || "Unknown"}`);
-  }
-  if (submission.status?.id >= 7) {
-    throw new Error(`Runtime error: ${submission.stderr || submission.message || submission.status?.description || "Unknown"}`);
-  }
   throw new Error(`Execution failed: ${submission.status?.description || "Unknown status"}`);
+}
+
+/**
+ * Classify a Judge0 failure into a coarse category used for feedback grounding.
+ * Never exposes expected output; only the kind of failure.
+ */
+function classifyJudge0Failure(
+  statusId: number | undefined,
+  actualOutput: string,
+  expectedOutput: string
+): string {
+  if (statusId === 6) return "compile_error";
+  if (statusId === 5) return "timeout";
+  if (statusId !== undefined && statusId >= 7) return "runtime_error";
+  if (statusId === 4) return "wrong_output";
+  if (statusId === 3 && actualOutput !== expectedOutput) return "wrong_output";
+  return "error";
 }
 
 /** Poll Judge0 until submission is no longer In Queue (1) or Processing (2) */

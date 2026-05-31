@@ -757,6 +757,34 @@ export default defineSchema({
     /** If automatic finalization (post–skill test) failed; user can call completeVerification again. */
     autoFinalizeError: v.optional(v.string()),
 
+    /**
+     * AI coaching feedback generated when the freelancer fails the coding portion
+     * of the skill test. Durable (survives the skillAssessments reset on retake) so
+     * it can be surfaced in-app and in email. Never contains expected test outputs.
+     */
+    codingFeedback: v.optional(
+      v.object({
+        generatedAt: v.number(),
+        /** Skills attempt round this feedback was generated for (0 = first try). */
+        attemptRound: v.number(),
+        /** Whether this was the final (terminal) failure. */
+        isFinal: v.boolean(),
+        /** Short overall summary across all coding challenges. */
+        overallSummary: v.string(),
+        challenges: v.array(
+          v.object({
+            title: v.string(),
+            passedCases: v.number(),
+            totalCases: v.number(),
+            /** Coarse failure categories, e.g. wrong_output, runtime_error, timeout, compile_error. */
+            failureTypes: v.array(v.string()),
+            /** AI-written constructive guidance (no expected outputs revealed). */
+            coaching: v.string(),
+          })
+        ),
+      })
+    ),
+
     // Immutable Audit
     createdAt: v.number(),
     updatedAt: v.number(),

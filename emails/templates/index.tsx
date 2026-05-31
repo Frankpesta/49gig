@@ -122,6 +122,83 @@ function InfoBlock({
   );
 }
 
+// ─── Coding feedback helper (failure coaching) ────────────────────────────────
+interface CodingFeedbackChallenge {
+  title: string;
+  passedCases: number;
+  totalCases: number;
+  coaching: string;
+}
+interface CodingFeedbackData {
+  overallSummary: string;
+  challenges: CodingFeedbackChallenge[];
+}
+
+function CodingFeedbackBlock({ feedback }: { feedback: CodingFeedbackData }) {
+  return (
+    <Section style={{ marginBottom: "20px" }}>
+      <Text
+        style={{
+          fontFamily: sans,
+          fontSize: "11px",
+          fontWeight: "700",
+          letterSpacing: "1.5px",
+          textTransform: "uppercase" as const,
+          color: tokens.textMuted,
+          margin: "0 0 10px",
+        }}
+      >
+        Feedback on your coding test
+      </Text>
+      {feedback.overallSummary ? (
+        <Text style={{ ...textStyle, marginTop: "0", marginBottom: "14px" }}>
+          {feedback.overallSummary}
+        </Text>
+      ) : null}
+      {feedback.challenges.map((c, i) => (
+        <Section
+          key={i}
+          style={{
+            backgroundColor: tokens.cardBg,
+            border: `1px solid ${tokens.border}`,
+            borderRadius: "10px",
+            padding: "14px 16px",
+            marginBottom: "12px",
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: sans,
+              fontSize: "13.5px",
+              fontWeight: "700",
+              color: tokens.textPrimary,
+              margin: "0 0 4px",
+            }}
+          >
+            {c.title}
+          </Text>
+          <Text
+            style={{
+              fontFamily: sans,
+              fontSize: "11px",
+              fontWeight: "700",
+              letterSpacing: "0.5px",
+              textTransform: "uppercase" as const,
+              color: tokens.textMuted,
+              margin: "0 0 8px",
+            }}
+          >
+            {c.totalCases > 0
+              ? `${c.passedCases} of ${c.totalCases} test cases passed`
+              : "Automated tests did not pass"}
+          </Text>
+          <Text style={{ ...mutedTextStyle, margin: "0" }}>{c.coaching}</Text>
+        </Section>
+      ))}
+    </Section>
+  );
+}
+
 // ─── OTP / code display helper ────────────────────────────────────────────────
 function CodeBlock({ code }: { code: string }) {
   return (
@@ -612,7 +689,8 @@ export function VerificationTerminatedEmail({
   appUrl,
   logoUrl,
   date,
-}: BaseEmailProps) {
+  codingFeedback,
+}: BaseEmailProps & { codingFeedback?: CodingFeedbackData }) {
   return (
     <EmailLayout
       preview="Your 49GIG freelancer verification was not successful"
@@ -632,12 +710,53 @@ export function VerificationTerminatedEmail({
         overall verification outcome did not meet our requirements). Because of that, we cannot approve your
         application at this time and your access to the verification flow has ended.
       </Text>
+      {codingFeedback && codingFeedback.challenges.length > 0 ? (
+        <CodingFeedbackBlock feedback={codingFeedback} />
+      ) : null}
       <Text style={{ ...textStyle, marginTop: "12px" }}>
         You&apos;re welcome to try again in the future if our requirements work for you. If you have questions, contact
         support from our website.
       </Text>
       <Text style={mutedTextStyle}>
         This message was sent on {date}. You can always visit {appUrl} for general information about 49GIG.
+      </Text>
+    </EmailLayout>
+  );
+}
+
+export function CodingFeedbackEmail({
+  name = "there",
+  appUrl,
+  logoUrl,
+  date,
+  codingFeedback,
+}: BaseEmailProps & { codingFeedback: CodingFeedbackData }) {
+  const verifyUrl = `${appUrl}/onboarding/verification`;
+  return (
+    <EmailLayout
+      preview="Feedback on your 49GIG coding test — and your retake"
+      heroLabel="Skill Test"
+      heroTitle="Feedback on your coding test"
+      heroAccent="coding test"
+      heroSubtitle="You didn't pass this attempt, but you have one more try. Here's where to focus."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>,
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        Your skill test didn&apos;t reach our passing bar this time. Below is specific feedback on your coding
+        challenge(s) so you know exactly what to work on. You have <strong>one more attempt</strong> — the retake uses
+        new questions.
+      </Text>
+      <CodingFeedbackBlock feedback={codingFeedback} />
+      <EmailButton href={verifyUrl} message="When you're ready, head back to your verification to take your second attempt.">
+        Take your retake
+      </EmailButton>
+      <Text style={mutedTextStyle}>
+        This message was sent on {date}. If you score below our minimum again, your application will be closed.
       </Text>
     </EmailLayout>
   );

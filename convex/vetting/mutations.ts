@@ -1,4 +1,4 @@
-import { mutation, MutationCtx } from "../_generated/server";
+import { mutation, internalMutation, MutationCtx } from "../_generated/server";
 import { v } from "convex/values";
 import { checkFraudFlags } from "./engine";
 import { runCompleteVerificationForFreelancer } from "./completeVerificationCore";
@@ -1147,10 +1147,15 @@ export const setSessionPortfolioScore = mutation({
 });
 
 /**
- * Submit one coding submission for a session. Runs code via Judge0 (action) and stores result.
- * Client should call the executeCodingChallenge action first to get runResult, then pass it here; or we can call the action from a mutation - we cannot. So the flow is: client runs action executeCodingChallenge with code + test cases, gets result, then calls this mutation with sessionId, promptId, code, runResult.
+ * Internal: store an authoritative coding submission.
+ *
+ * Only ever called by the `submitCodingChallenge` ACTION, which re-runs the
+ * submitted code server-side via Judge0 (it does NOT trust client-provided
+ * results). The result includes per-test-case status/failureType used later for
+ * AI coaching feedback. A prior submission for the same prompt is replaced so a
+ * prompt is never double-counted.
  */
-export const submitCodingSubmission = mutation({
+export const storeCodingSubmissionInternal = internalMutation({
   args: {
     sessionId: v.id("vettingSkillTestSessions"),
     promptId: v.id("vettingCodingPrompts"),
@@ -1169,7 +1174,16 @@ export const submitCodingSubmission = mutation({
       throw new Error("Time's up. This skill test has expired.");
     }
 
-    const existing = session.codingSubmissions ?? [];
+    const promptIds = (session.codingPromptIds ?? []).map(String);
+    if (!promptIds.includes(String(args.promptId))) {
+      throw new Error("Prompt is not part of this session");
+    }
+
+    // Replace any prior submission for this prompt (dedupe) so combined scoring
+    // counts each prompt once.
+    const existing = (session.codingSubmissions ?? []).filter(
+      (s) => String(s.promptId) !== String(args.promptId)
+    );
     const updated = [
       ...existing,
       {
@@ -1189,6 +1203,40 @@ export const submitCodingSubmission = mutation({
     });
 
     return { ok: true, nextStep: allSubmitted ? "mcq" : "coding" };
+  },
+});
+
+/**
+ * Internal: persist AI coaching feedback on the vetting result. Durable so it
+ * survives the skillAssessments reset that happens on a first-attempt failure.
+ */
+export const saveCodingFeedbackInternal = internalMutation({
+  args: {
+    vettingResultId: v.id("vettingResults"),
+    feedback: v.object({
+      generatedAt: v.number(),
+      attemptRound: v.number(),
+      isFinal: v.boolean(),
+      overallSummary: v.string(),
+      challenges: v.array(
+        v.object({
+          title: v.string(),
+          passedCases: v.number(),
+          totalCases: v.number(),
+          failureTypes: v.array(v.string()),
+          coaching: v.string(),
+        })
+      ),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const row = await ctx.db.get(args.vettingResultId);
+    if (!row) return { ok: false as const };
+    await ctx.db.patch(args.vettingResultId, {
+      codingFeedback: args.feedback,
+      updatedAt: Date.now(),
+    });
+    return { ok: true as const };
   },
 });
 

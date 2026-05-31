@@ -187,7 +187,20 @@ export async function runCompleteVerificationForFreelancer(
 
   if (skillsFailed) {
     if (skRound >= 1) {
-      await hardFailVerification("skills_below_minimum_after_retake");
+      // Final skills failure: generate coding coaching first, then terminate with
+      // the feedback attached to the email (the action calls terminate after
+      // generating, so the account is removed once the email is queued).
+      await ctx.scheduler.runAfter(
+        0,
+        internalAny.vetting.codingFeedback.generateAndDeliverCodingFeedback,
+        {
+          freelancerId: fr._id,
+          vettingResultId: vettingRow._id,
+          attemptRound: skRound,
+          isFinal: true,
+          reason: "skills_below_minimum_after_retake",
+        },
+      );
       return {
         success: false,
         accountDeleted: true,
@@ -236,6 +249,20 @@ export async function runCompleteVerificationForFreelancer(
       },
       createdAt: Date.now(),
     });
+    // First skills failure: generate AI coaching for the coding portion, persist
+    // it (durable across the skillAssessments reset above), and email a retake note.
+    await ctx.scheduler.runAfter(
+      0,
+      internalAny.vetting.codingFeedback.generateAndDeliverCodingFeedback,
+      {
+        freelancerId: fr._id,
+        vettingResultId: vettingRow._id,
+        attemptRound: 0,
+        isFinal: false,
+        email: fr.email ?? undefined,
+        name: fr.name ?? undefined,
+      },
+    );
     return {
       success: false,
       accountDeleted: false,
