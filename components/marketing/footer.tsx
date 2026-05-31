@@ -32,7 +32,6 @@ const footerSections = [
       { label: "Hire Talent", href: "/signup/client" },
       { label: "Hire a Team", href: "/hire-team" },
       { label: "Use Cases", href: "/use-cases" },
-      { label: "Pricing", href: "/pricing" },
     ],
   },
   {

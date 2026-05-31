@@ -62,33 +62,45 @@ export function getGtmId(): string | null {
   return process.env.NEXT_PUBLIC_GTM_ID || null;
 }
 
-/** Check if tracking is configured and consented */
+/**
+ * Whether we can push analytics events. Analytics is on for every visitor
+ * (analytics_storage is granted by default), so we only require GTM to be
+ * configured — the banner choice does NOT gate measurement.
+ */
 export function canTrack(): boolean {
-  return getStoredConsent() === "granted" && !!getGtmId();
+  return !!getGtmId();
 }
 
 /**
  * Push Google Consent Mode v2 consent_update to dataLayer.
+ *
+ * Analytics is always granted (we measure every visitor). The banner choice
+ * only governs ADVERTISING signals: "Allow all" grants them, "Necessary ones"
+ * keeps them denied.
+ *
  * @param granted - `true` after "Allow all"; `false` after "Necessary ones".
  */
 export function pushConsentUpdate(granted: boolean): void {
   if (typeof window === "undefined") return;
   window.dataLayer = window.dataLayer || [];
-  const value = granted ? "granted" : "denied";
-  (window.dataLayer as object[]).push([
-    "consent",
-    "update",
-    {
-      ad_storage: value,
-      ad_user_data: value,
-      ad_personalization: value,
-      analytics_storage: value,
-    },
-  ]);
+  const adValue = granted ? "granted" : "denied";
+  // Consent Mode commands MUST be sent as a gtag `arguments` object, NOT a
+  // plain array. GTM ignores `dataLayer.push(["consent","update",...])`.
+  function gtag(..._args: unknown[]) {
+    // eslint-disable-next-line prefer-rest-params
+    (window.dataLayer as unknown[]).push(arguments);
+  }
+  gtag("consent", "update", {
+    ad_storage: adValue,
+    ad_user_data: adValue,
+    ad_personalization: adValue,
+    analytics_storage: "granted",
+  });
 }
 
 declare global {
   interface Window {
     dataLayer?: unknown[];
+    gtag?: (...args: unknown[]) => void;
   }
 }

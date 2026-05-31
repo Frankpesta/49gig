@@ -32,7 +32,7 @@ export function AnalyticsProvider() {
 
   return (
     <>
-      <GoogleTagManager consent={consent} gtmId={gtmId} />
+      <GoogleTagManager gtmId={gtmId} />
       <ConsentBanner onConsentChange={handleConsentChange} />
     </>
   );

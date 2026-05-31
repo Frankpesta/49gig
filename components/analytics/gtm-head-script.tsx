@@ -2,9 +2,11 @@ import Script from "next/script";
 
 /**
  * GTM + Google Consent Mode v2 - loads in root layout before React.
- * 1. Push consent_default (denied) so tags won't fire until consent
+ * 1. Push consent_default: analytics_storage GRANTED (we measure every visitor),
+ *    advertising signals DENIED until the user opts in via the banner.
  * 2. Load GTM container
- * When user accepts, AnalyticsProvider pushes consent_update via dataLayer.
+ * When user accepts "Allow all", AnalyticsProvider pushes consent_update to
+ * grant the advertising signals too.
  */
 export function GtmHeadScript() {
   const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
@@ -18,8 +20,7 @@ export function GtmHeadScript() {
       'ad_storage': 'denied',
       'ad_user_data': 'denied',
       'ad_personalization': 'denied',
-      'analytics_storage': 'denied',
-      'wait_for_update': 500
+      'analytics_storage': 'granted'
     });
     (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
