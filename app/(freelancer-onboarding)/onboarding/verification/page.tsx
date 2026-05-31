@@ -15,6 +15,7 @@ import { EnglishTest } from "@/components/vetting/english-test";
 import { SkillTestPathFlow } from "@/components/vetting/skill-test-path-flow";
 import { KycStep } from "@/components/vetting/kyc-step";
 import { VerificationFreelancerEndedCard } from "@/components/vetting/verification-freelancer-ended";
+import { CodingFeedbackCard, type CodingFeedback } from "@/components/vetting/coding-feedback-card";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { VERIFICATION_RETAKE_COOLDOWN_MINUTES } from "@/lib/verification-retake";
@@ -199,6 +200,13 @@ export default function OnboardingVerificationPage() {
     (vettingResult as { skillsRetakeAvailableAt?: number } | null | undefined)?.skillsRetakeAvailableAt;
   const englishOnLastAttempt = englishAttemptRound >= 1 && !stepsCompleted.includes("english");
   const skillsOnLastAttempt = skillsAttemptRound >= 1 && !stepsCompleted.includes("skills");
+  const codingFeedback = (vettingResult as { codingFeedback?: CodingFeedback } | null | undefined)
+    ?.codingFeedback;
+  const showCodingFeedback =
+    !!codingFeedback &&
+    !codingFeedback.isFinal &&
+    currentStep === "skills" &&
+    !stepsCompleted.includes("skills");
 
   const steps = [
     {
@@ -475,6 +483,9 @@ export default function OnboardingVerificationPage() {
                     </p>
                   </CardContent>
                 </Card>
+              )}
+              {showCodingFeedback && codingFeedback && (
+                <CodingFeedbackCard feedback={codingFeedback} />
               )}
               {skillsOnLastAttempt && currentStep === "skills" && (
                 <Card className="rounded-xl border-destructive/50 bg-destructive/5">

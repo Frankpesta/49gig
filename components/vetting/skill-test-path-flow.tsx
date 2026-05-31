@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Code, FileQuestion, Loader2, CheckCircle2, ChevronLeft, ChevronRight, Play, Upload, Clock } from "lucide-react";
+import { Code, FileQuestion, Loader2, CheckCircle2, XCircle, ChevronLeft, ChevronRight, Play, Upload, Clock } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { ErrorHandler } from "./error-handler";
@@ -26,6 +26,16 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 const SKILL_TEST_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+
+type TestCaseResult = {
+  passed: boolean;
+  input?: string;
+  expectedOutput?: string;
+  actualOutput?: string;
+  error?: string;
+  status?: string;
+  failureType?: string;
+};
 
 function DesktopRecommendedBanner() {
   return (
@@ -108,7 +118,7 @@ function SkillTestPathFlowInner() {
 
   const startSkillTest = useAction(api.vetting.skillTestSession.startSkillTest);
   const submitMcqAnswers = useMutation(api.vetting.mutations.submitMcqAnswers);
-  const submitCodingSubmission = useMutation(api.vetting.mutations.submitCodingSubmission);
+  const submitCodingChallenge = useAction(api.vetting.actions.submitCodingChallenge);
   const setSessionPortfolioScore = useMutation(api.vetting.mutations.setSessionPortfolioScore);
   const executeCoding = useAction(api.vetting.actions.executeCodingChallenge);
   const scorePortfolio = useAction(api.vetting.portfolioScoring.scorePortfolio);
@@ -444,11 +454,11 @@ function SkillTestPathFlowInner() {
       setSubmitCodingLoading(true);
       setError(null);
       try {
-        await submitCodingSubmission({
+        await submitCodingChallenge({
           sessionId: session._id,
           promptId: prompt._id as Id<"vettingCodingPrompts">,
           code,
-          runResult: runResult ?? undefined,
+          language: codeLanguage,
           userId,
         });
         setRunResult(null);
@@ -541,6 +551,61 @@ function SkillTestPathFlowInner() {
               {timeUp ? "Time's up" : isLast ? "Finish coding & go to MCQ" : "Submit & next challenge"}
             </Button>
           </div>
+          {runResult?.results && runResult.results.length > 0 && (
+            <div className="border-t bg-card px-4 py-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">
+                Test results · {runResult.passed}/{runResult.total} passed
+              </p>
+              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                {runResult.results.map((r: TestCaseResult, idx: number) => (
+                  <div
+                    key={idx}
+                    className={`rounded-md border px-3 py-2 text-xs ${
+                      r.passed
+                        ? "border-green-300 bg-green-50 dark:bg-green-950/20"
+                        : "border-red-300 bg-red-50 dark:bg-red-950/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between font-medium">
+                      <span className="flex items-center gap-1.5">
+                        {r.passed ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-red-600" />
+                        )}
+                        Test {idx + 1} {r.passed ? "passed" : "failed"}
+                      </span>
+                      {!r.passed && r.failureType && (
+                        <span className="text-[11px] text-muted-foreground">{r.failureType}</span>
+                      )}
+                    </div>
+                    {!r.passed && (
+                      <div className="mt-1.5 space-y-1 font-mono text-[11px] text-muted-foreground">
+                        {r.input != null && (
+                          <p className="truncate">
+                            <span className="text-foreground/70">input:</span> {String(r.input)}
+                          </p>
+                        )}
+                        <p className="truncate">
+                          <span className="text-foreground/70">expected:</span>{" "}
+                          {String(r.expectedOutput ?? "")}
+                        </p>
+                        <p className="truncate">
+                          <span className="text-foreground/70">got:</span>{" "}
+                          {String(r.actualOutput ?? "")}
+                        </p>
+                        {r.error && (
+                          <p className="whitespace-pre-wrap break-words text-red-600 dark:text-red-400">
+                            {r.error.slice(0, 300)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     );

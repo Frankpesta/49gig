@@ -81,7 +81,8 @@ export function VerificationFreelancerEndedCard({
           <div className="flex items-start gap-3 rounded-xl border border-border/80 bg-background/80 p-4">
             <Mail className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
             <p className="text-sm text-muted-foreground leading-relaxed">
-              We sent you an email with a short explanation. Please check your inbox and spam folder.
+              We sent you an email with an explanation — including specific feedback on your coding test where it
+              applies. Please check your inbox and spam folder.
             </p>
           </div>
           <div className="rounded-xl border border-destructive/25 bg-background/80 p-4 text-center space-y-2">

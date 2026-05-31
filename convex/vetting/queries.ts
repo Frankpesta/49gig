@@ -96,6 +96,7 @@ export const getVerificationStatus = query({
             autoFinalizeError: vettingResult.autoFinalizeError,
             weightedTerminationJobScheduled: vettingResult.weightedTerminationJobScheduled ?? false,
             weightedFailureScheduledFor: vettingResult.weightedFailureScheduledFor,
+            codingFeedback: vettingResult.codingFeedback,
           }
         : null,
       kycSubmission: kycSubmission
@@ -408,6 +409,69 @@ export const getMcqQuestionsForSession = query({
       }
     }
     out.sort((a, b) => a.questionIndex - b.questionIndex);
+    return out;
+  },
+});
+
+/**
+ * Internal: fetch a coding prompt's authoritative test cases (server-side grading).
+ * Never exposed to the client; used by submitCodingChallenge to re-run code.
+ */
+export const getCodingPromptTestCasesInternal = internalQuery({
+  args: {
+    promptId: v.id("vettingCodingPrompts"),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.promptId);
+    if (!doc) return null;
+    return {
+      title: doc.title,
+      testCases: doc.testCases ?? [],
+    };
+  },
+});
+
+/**
+ * Internal: latest completed skill-test session for a freelancer, with the coding
+ * submissions needed to generate failure feedback. Used by generateAndDeliverCodingFeedback.
+ */
+export const getLatestCompletedCodingSessionInternal = internalQuery({
+  args: {
+    freelancerId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const sessions = await ctx.db
+      .query("vettingSkillTestSessions")
+      .withIndex("by_freelancer_created", (q) => q.eq("freelancerId", args.freelancerId))
+      .order("desc")
+      .take(20);
+    const session = sessions.find((s) => s.status === "completed");
+    if (!session) return null;
+    return {
+      _id: session._id,
+      pathType: session.pathType,
+      selectedLanguage: session.selectedLanguage ?? null,
+      vettingResultId: session.vettingResultId,
+      codingSubmissions: session.codingSubmissions ?? [],
+    };
+  },
+});
+
+/**
+ * Internal: title/description metadata for a list of coding prompts (feedback grounding).
+ */
+export const getCodingPromptsMetaInternal = internalQuery({
+  args: {
+    promptIds: v.array(v.id("vettingCodingPrompts")),
+  },
+  handler: async (ctx, args) => {
+    const out: Array<{ promptId: Id<"vettingCodingPrompts">; title: string; description: string }> = [];
+    for (const id of args.promptIds) {
+      const doc = await ctx.db.get(id);
+      if (doc) {
+        out.push({ promptId: id, title: doc.title, description: doc.description });
+      }
+    }
     return out;
   },
 });
