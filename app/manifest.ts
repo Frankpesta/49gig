@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   const base = getCanonicalSiteUrl();
 
   return {
-    name: "49GIG — Freelance Marketplace",
+    name: "49GIG — Freelance Platform",
     short_name: "49GIG",
     description:
       "Hire verified African tech professionals across engineering, AI, DevOps, data, cloud, and design.",

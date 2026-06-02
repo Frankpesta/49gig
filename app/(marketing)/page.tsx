@@ -59,7 +59,7 @@ export const metadata: Metadata = {
         url: absoluteUrl("/opengraph-image"),
         width: 1200,
         height: 630,
-        alt: "49GIG freelance marketplace hero",
+        alt: "49GIG freelance platform hero",
       },
     ],
   },

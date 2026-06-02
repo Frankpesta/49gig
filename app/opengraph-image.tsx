@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 
 /** Default social share image — used when routes do not specify their own `openGraph.images`. */
 
-export const alt = "49GIG — high-trust freelance marketplace for world-class African talent";
+export const alt = "49GIG — high-trust freelance platform for world-class African talent";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 

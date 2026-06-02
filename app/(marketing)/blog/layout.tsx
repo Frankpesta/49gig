@@ -7,7 +7,7 @@ const origin = getCanonicalSiteUrl();
 export const metadata: Metadata = {
   title: "Blog | 49GIG",
   description:
-    "Insights, updates, and stories from the 49GIG team and our community — a high-trust freelance marketplace connecting global teams with verified African tech talent.",
+    "Insights, updates, and stories from the 49GIG team and our community — a high-trust freelance platform connecting global teams with verified African tech talent.",
   openGraph: {
     title: "Blog | 49GIG",
     description:

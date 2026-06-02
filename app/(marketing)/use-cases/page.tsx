@@ -28,7 +28,7 @@ import type { Metadata } from "next";
 import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
 
 export const metadata: Metadata = buildMarketingRouteMetadata({
-  absoluteTitle: "Use cases | 49GIG freelance marketplace",
+  absoluteTitle: "Use cases | 49GIG freelance platform",
   description:
     "Product builds, analytics, content, specialty projects for clients — and steady work, teams, upskilling for freelancers.",
   path: "/use-cases",
@@ -138,7 +138,7 @@ export default function UseCasesPage() {
     <div className="w-full">
       <PageHero
         title="How 49GIG Helps Businesses and Freelancers Succeed"
-        description="49GIG is more than a freelance marketplace. It's a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients."
+        description="49GIG is more than a freelance platform. It's a reliable, structured ecosystem where businesses can hire top African talent and freelancers can work with trusted international clients."
         badge={{ icon: Briefcase, text: "Use Cases" }}
         breadcrumbs={breadcrumbs}
         pathname="/use-cases"

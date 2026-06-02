@@ -33,6 +33,7 @@ export const getOrGenerateSkillMcqQuestions = internalAction({
       internalAny.vetting.internalQueries.getExistingMcqIds,
       {
         categoryId: args.categoryId,
+        skillTopics: args.skillTopics,
         experienceLevel: args.experienceLevel,
         excludeIds: args.excludeQuestionIds,
       }

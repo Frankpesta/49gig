@@ -29,7 +29,7 @@
 
 ### 🎯 Core Business Model
 
-**49GIG** is a **high-trust, curated freelance marketplace** that operates fundamentally differently from traditional platforms:
+**49GIG** is a **high-trust, curated freelance platform** that operates fundamentally differently from traditional platforms:
 
 1. **No Public Job Postings**: Clients submit structured project intake forms instead of posting jobs publicly
 2. **Pre-Funding Required**: Clients must pre-fund projects via Stripe before matching begins
