@@ -569,7 +569,7 @@ export default function OnboardingVerificationPage() {
                             setWeightedLocalDeadline(Date.now() + (r.countdownSeconds ?? 15) * 1000);
                           } else if (result.accountDeleted) {
                             setAccountDeletedMessage(result.message ?? "Your account has been removed.");
-                            setTimeout(() => router.push("/login"), 4000);
+                            setTimeout(() => router.push("/"), 5000);
                           } else if (!result.success && result.message) {
                             setAccountDeletedMessage(result.message);
                           }
@@ -603,8 +603,9 @@ export default function OnboardingVerificationPage() {
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-medium text-amber-800 dark:text-amber-200">Not quite there yet</p>
+                    <p className="font-medium text-amber-800 dark:text-amber-200">Verification unsuccessful</p>
                     <p className="text-sm text-muted-foreground mt-1">{accountDeletedMessage}</p>
+                    <p className="text-xs text-muted-foreground mt-2">Returning you to the homepage…</p>
                   </div>
                 </div>
               </CardContent>
@@ -651,7 +652,7 @@ function WeightedFailureFinalization({
 
   useEffect(() => {
     if (remainingSec <= 0) {
-      router.replace("/login");
+      router.replace("/");
     }
   }, [remainingSec, router]);
 
