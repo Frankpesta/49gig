@@ -49,7 +49,7 @@ export async function GET() {
   <channel>
     <title>49GIG Blog</title>
     <link>${esc(baseUrl)}/blog</link>
-    <description>Stories and updates from the 49GIG high-trust freelance marketplace.</description>
+    <description>Stories and updates from the 49GIG high-trust freelance platform.</description>
     <language>en-us</language>
     <lastBuildDate>${rssDate(Date.now())}</lastBuildDate>
     <atom:link href="${esc(baseUrl)}/rss.xml" rel="self" type="application/rss+xml" />

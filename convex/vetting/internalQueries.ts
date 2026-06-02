@@ -19,22 +19,30 @@ export const getVettingResultDocInternal = internalQuery({
   },
 });
 
-/** Return up to 50 existing MCQ question IDs for a category+level (any matching skill set). */
+/** Return up to 50 existing MCQ question IDs for a category+skills+level. */
 export const getExistingMcqIds = internalQuery({
   args: {
     categoryId: v.string(),
+    skillTopics: v.array(v.string()),
     experienceLevel: experienceLevelValidator,
     excludeIds: v.optional(v.array(v.id("vettingMcqQuestions"))),
   },
   handler: async (ctx, args) => {
     const exclude = new Set((args.excludeIds ?? []).map(String));
+    const normalizedTarget = [...args.skillTopics].sort().join(",").toLowerCase();
     const questions = await ctx.db
       .query("vettingMcqQuestions")
       .withIndex("by_category_level", (q) =>
         q.eq("categoryId", args.categoryId).eq("experienceLevel", args.experienceLevel)
       )
-      .take(200);
-    return questions.filter((q) => !exclude.has(String(q._id))).map((q) => q._id);
+      .take(500);
+    return questions
+      .filter((q) => {
+        if (exclude.has(String(q._id))) return false;
+        const normalized = [...(q.skillTopics ?? [])].sort().join(",").toLowerCase();
+        return normalized === normalizedTarget;
+      })
+      .map((q) => q._id);
   },
 });
 

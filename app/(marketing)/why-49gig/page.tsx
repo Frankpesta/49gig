@@ -16,7 +16,7 @@ import type { Metadata } from "next";
 import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
 
 export const metadata: Metadata = buildMarketingRouteMetadata({
-  absoluteTitle: "Why 49GIG | African freelance marketplace",
+  absoluteTitle: "Why 49GIG | African freelance platform",
   description:
     "Eight reasons teams choose 49GIG — vetted talent, fair pricing, milestone delivery, disputes support, and no endless bidding wars.",
   path: "/why-49gig",

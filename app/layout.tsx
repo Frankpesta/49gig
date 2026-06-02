@@ -33,7 +33,7 @@ const canonicalOrigin = getCanonicalSiteUrl();
 export const metadata: Metadata = {
   metadataBase: new URL(canonicalOrigin),
   title: {
-    default: "49GIG — High-trust freelance marketplace",
+    default: "49GIG — High-trust freelance platform",
     template: "%s · 49GIG",
   },
   description:
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: canonicalOrigin,
     siteName: "49GIG",
-    title: "49GIG — High-trust freelance marketplace",
+    title: "49GIG — High-trust freelance platform",
     description:
       "Vetted freelancers for engineering, design, AI, data & infrastructure. Hire fast with escrow, milestones & secure payouts.",
     images: [
@@ -68,7 +68,7 @@ export const metadata: Metadata = {
         url: absoluteUrl("/opengraph-image"),
         width: 1200,
         height: 630,
-        alt: "49GIG freelance marketplace branding",
+        alt: "49GIG freelance platform branding",
       },
     ],
   },

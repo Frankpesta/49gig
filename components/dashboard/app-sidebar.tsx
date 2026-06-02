@@ -161,7 +161,7 @@ export function AppSidebar() {
                 )}>
                   <span className="truncate font-semibold">49GIG</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    Freelance Marketplace
+                    Freelance Platform
                   </span>
                 </div>
               </Link>
