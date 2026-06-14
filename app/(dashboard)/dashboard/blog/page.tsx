@@ -28,7 +28,7 @@ import { formatDistanceToNow } from "date-fns";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
-import { FileText, Plus, Pencil, Trash2, Eye, Loader2, Send } from "lucide-react";
+import { FileText, Plus, Pencil, Trash2, Eye, Loader2, Send, BarChart2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Id } from "@/convex/_generated/dataModel";
@@ -42,6 +42,7 @@ type BlogPost = {
   status: string;
   createdAt: number;
   updatedAt: number;
+  viewCount?: number;
 };
 
 export default function DashboardBlogPage() {
@@ -113,6 +114,7 @@ export default function DashboardBlogPage() {
 
   const publishedCount = (posts ?? []).filter((p: BlogPost) => p.status === "published").length;
   const draftCount = (posts ?? []).filter((p: BlogPost) => p.status === "draft").length;
+  const totalViews = (posts ?? []).reduce((sum: number, p: BlogPost) => sum + (p.viewCount ?? 0), 0);
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
@@ -157,6 +159,9 @@ export default function DashboardBlogPage() {
             <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
               <span className="font-semibold text-orange-500">{draftCount}</span> drafts
             </span>
+            <span className="rounded-lg border border-border/50 bg-muted/30 px-3 py-1.5">
+              <span className="font-semibold text-primary">{totalViews.toLocaleString()}</span> total views
+            </span>
           </div>
 
           {/* Table */}
@@ -166,6 +171,7 @@ export default function DashboardBlogPage() {
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableHead>Title</TableHead>
                   <TableHead className="w-[120px]">Status</TableHead>
+                  <TableHead className="w-[90px]">Views</TableHead>
                   <TableHead className="w-[160px]">Last updated</TableHead>
                   <TableHead className="w-[130px] text-right">Actions</TableHead>
                 </TableRow>
@@ -181,6 +187,12 @@ export default function DashboardBlogPage() {
                       <Badge variant={post.status === "published" ? "default" : "secondary"} className="capitalize">
                         {post.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+                        <BarChart2 className="h-3.5 w-3.5" />
+                        {(post.viewCount ?? 0).toLocaleString()}
+                      </span>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDistanceToNow(post.updatedAt, { addSuffix: true })}

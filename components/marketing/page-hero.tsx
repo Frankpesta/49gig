@@ -1,5 +1,4 @@
 import { Fragment, ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Home, LucideIcon } from "lucide-react";
@@ -74,9 +73,6 @@ export function PageHero({
   badge,
   breadcrumbs,
   rightContent,
-  imageSrc,
-  imageAlt,
-  imageUnoptimized,
   actions,
   className,
   pathname,
@@ -100,84 +96,107 @@ export function PageHero({
           }}
         />
       ) : null}
+
       <section
-      className={cn(
-        "relative isolate overflow-hidden border-b border-border/40 bg-black",
-        className
-      )}
-    >
-      {imageSrc ? (
-        <Image
-          src={imageSrc}
-          alt={imageAlt ?? title}
-          fill
-          className="object-cover"
-          sizes="100vw"
-          priority
-          unoptimized={imageUnoptimized}
-        />
-      ) : (
-        <div className="absolute inset-0 bg-linear-to-br from-slate-900 via-slate-800 to-slate-900" />
-      )}
-
-      <div className="absolute inset-0 bg-linear-to-b from-black/50 via-black/55 to-black/95" />
-      <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/40 to-black/20" />
-      <div className="absolute inset-0 bg-linear-to-tr from-primary/20 via-transparent to-secondary/20" />
-
-      <div className="relative mx-auto flex min-h-[68svh] max-w-7xl items-end px-4 pb-10 pt-24 sm:min-h-[74svh] sm:px-6 sm:pb-14 sm:pt-28 lg:min-h-[80svh] lg:px-8 lg:pb-16 lg:pt-32">
-        <div className="w-full max-w-4xl rounded-2xl border border-white/25 bg-black/35 p-5 shadow-2xl backdrop-blur-md sm:p-7 lg:p-9">
-          {breadcrumbs && breadcrumbs.length > 0 && (
-            <nav
-              className="mb-4 flex flex-wrap items-center gap-1.5 text-xs text-white/80 sm:text-sm"
-              aria-label="Breadcrumb"
-            >
-              <Link href="/" className="inline-flex items-center gap-1 hover:text-white">
-                <Home className="h-3.5 w-3.5" />
-                Home
-              </Link>
-              {breadcrumbs.map((item, idx) => (
-                <span key={`${item.label}-${idx}`} className="inline-flex items-center gap-1.5">
-                  <ChevronRight className="h-3.5 w-3.5 text-white/60" />
-                  {item.href ? (
-                    <Link href={item.href} className="inline-flex items-center gap-1 hover:text-white">
-                      {item.icon && <item.icon className="h-3.5 w-3.5" />}
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-white">
-                      {item.icon && <item.icon className="h-3.5 w-3.5" />}
-                      {item.label}
-                    </span>
-                  )}
-                </span>
-              ))}
-            </nav>
-          )}
-
-          {badge && (
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white sm:text-[11px]">
-              {badge.icon && <badge.icon className="h-3.5 w-3.5" />}
-              <span>{badge.text}</span>
-            </div>
-          )}
-
-          <h1 className="text-3xl font-bold leading-[1.05] tracking-tight text-white sm:text-4xl lg:text-5xl xl:text-6xl">
-            {title}
-          </h1>
-          {description && (
-            <p className="mt-4 max-w-3xl text-base leading-relaxed text-white/90 sm:text-lg lg:text-xl">
-              {description}
-            </p>
-          )}
-          {actions && (
-            <div className="mt-5 flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden *:h-10 *:px-4 *:text-sm [&>*_svg]:h-4 [&>*_svg]:w-4 sm:gap-3 sm:*:h-11 sm:*:px-5 sm:*:text-base sm:[&>*_svg]:h-5 sm:[&>*_svg]:w-5">
-              {actions}
-            </div>
-          )}
-          {rightContent && <div className="pt-4">{rightContent}</div>}
+        className={cn(
+          "relative overflow-hidden border-b border-white/10 bg-[#07122B]",
+          className
+        )}
+      >
+        {/* Mesh gradient glows */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-32 left-1/4 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-primary/30 blur-[130px] opacity-60" />
+          <div className="absolute -bottom-24 right-1/3 h-[400px] w-[400px] rounded-full bg-secondary/25 blur-[110px] opacity-50" />
+          <div className="absolute top-1/2 -left-20 h-[280px] w-[280px] -translate-y-1/2 rounded-full bg-primary/20 blur-[90px] opacity-40" />
         </div>
-      </div>
-    </section>
+
+        {/* Subtle grid pattern */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.6) 1px, transparent 1px)",
+            backgroundSize: "80px 80px",
+          }}
+        />
+
+        {/* Thin top accent line */}
+        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+
+        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-24 lg:py-28">
+          <div className="max-w-3xl">
+            {/* Breadcrumbs */}
+            {breadcrumbs && breadcrumbs.length > 0 && (
+              <nav
+                className="mb-6 flex flex-wrap items-center gap-1.5 text-xs sm:text-sm text-white/45"
+                aria-label="Breadcrumb"
+              >
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-1 transition-colors hover:text-white/75"
+                >
+                  <Home className="h-3.5 w-3.5" />
+                  Home
+                </Link>
+                {breadcrumbs.map((item, idx) => (
+                  <span
+                    key={`${item.label}-${idx}`}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    <ChevronRight className="h-3.5 w-3.5 text-white/25" />
+                    {item.href ? (
+                      <Link
+                        href={item.href}
+                        className="inline-flex items-center gap-1 transition-colors hover:text-white/75"
+                      >
+                        {item.icon && <item.icon className="h-3.5 w-3.5" />}
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-white/70">
+                        {item.icon && <item.icon className="h-3.5 w-3.5" />}
+                        {item.label}
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </nav>
+            )}
+
+            {/* Badge */}
+            {badge && (
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-white/75 backdrop-blur-sm">
+                {badge.icon && (
+                  <badge.icon className="h-3.5 w-3.5 text-secondary" />
+                )}
+                <span>{badge.text}</span>
+              </div>
+            )}
+
+            {/* Title */}
+            <h1 className="text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.25rem] xl:text-6xl">
+              {title}
+            </h1>
+
+            {/* Description */}
+            {description && (
+              <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/65 sm:text-lg">
+                {description}
+              </p>
+            )}
+
+            {/* Actions */}
+            {actions && (
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                {actions}
+              </div>
+            )}
+
+            {/* Right content */}
+            {rightContent && <div className="mt-6">{rightContent}</div>}
+          </div>
+        </div>
+      </section>
     </Fragment>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { PageHero } from "@/components/marketing/page-hero";
 import { BlogContentRenderer } from "@/components/blog/blog-content-renderer";
@@ -31,6 +31,15 @@ export default function BlogPostPage() {
     post?._id ? { postId: post._id, ...(user?._id && { userId: user._id }) } : "skip"
   );
   const toggleLike = useMutation((api as any).blog.mutations.toggleLike);
+  const incrementViewCount = useMutation((api as any).blog.mutations.incrementViewCount);
+
+  // Fire once when the post first loads — tracks a page view for the admin
+  useEffect(() => {
+    if (post?._id) {
+      void incrementViewCount({ postId: post._id });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post?._id]);
 
   const handleLove = async () => {
     if (!user?._id) {
