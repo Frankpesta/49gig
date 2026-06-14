@@ -3,7 +3,6 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { CTAButton } from "@/components/marketing/cta-buttons";
 import { SectionTransition } from "@/components/ui/section-transition";
-import { FlipWords } from "@/components/ui/flip-words";
 import {
   CheckCircle2,
   Users,
@@ -204,24 +203,15 @@ export default function Home() {
         <div className="relative z-10 px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8 lg:pt-36">
           <div className="mx-auto w-full max-w-5xl">
             <div className="mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:max-w-3xl lg:items-start lg:text-left">
-              <h1 className="text-4xl font-bold leading-[1.1] tracking-tight text-[#0a0a0a] sm:text-6xl sm:leading-[1.08] lg:text-7xl lg:leading-[1.06] xl:text-8xl dark:text-white [font-family:var(--font-hero-serif),Georgia,serif]">
-                <span className="block">World-class</span>
-                <span className="block">African talent,</span>
-                <span className="mt-1 block italic text-secondary">
-                  <span className="inline-flex flex-wrap items-baseline justify-center gap-x-2 gap-y-1 lg:justify-start">
-                    <span className="whitespace-nowrap">Hire them</span>
-                    <FlipWords
-                      words={["faster", "smarter", "confidently", "securely"]}
-                      duration={4500}
-                      className="font-bold not-italic text-secondary"
-                    />
-                  </span>
-                </span>
+              <h1 className="text-3xl font-bold leading-[1.15] tracking-tight text-[#0a0a0a] sm:text-4xl sm:leading-[1.1] lg:text-5xl lg:leading-[1.08] dark:text-white [font-family:var(--font-hero-serif),Georgia,serif]">
+                <span className="block">Hire world-class</span>
+                <span className="block">tech talent —</span>
+                <span className="mt-1 block italic text-secondary">rigorously vetted,</span>
+                <span className="block italic text-secondary">ranked and delivery-ready.</span>
               </h1>
 
               <p className="mt-8 max-w-xl text-base leading-relaxed text-[#3f3f3f] sm:text-lg dark:text-zinc-300">
-                49GIG connects you with the top 3% of vetted African tech professionals across Software
-                Engineering, AI, DevOps, Cloud, Data, and Product Design
+                49GIG connects you with the top 3% of vetted African tech talent across Software Engineering, AI, DevOps, Cloud, Data, and Product Design, faster and more cost-efficiently.
               </p>
 
               <div className="mt-8 w-full max-w-md lg:max-w-lg">

@@ -7,7 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 
 /**
  * Standalone layout for freelancer verification / onboarding (no dashboard sidebar).
@@ -79,12 +79,9 @@ export default function FreelancerOnboardingLayout({
       </div>
       <header className="relative z-10 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <span>49GIG</span>
-            <span className="text-muted-foreground font-normal text-sm hidden sm:inline">
+          <Link href="/" className="flex items-center gap-3">
+            <Logo width={110} height={36} priority />
+            <span className="text-muted-foreground font-normal text-sm hidden sm:inline border-l border-border/60 pl-3">
               Freelancer verification
             </span>
           </Link>

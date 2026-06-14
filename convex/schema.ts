@@ -1662,6 +1662,7 @@ export default defineSchema({
     publishedAt: v.optional(v.number()),
     metaTitle: v.optional(v.string()),
     metaDescription: v.optional(v.string()),
+    viewCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

@@ -266,6 +266,21 @@ export const toggleLike = mutation({
 });
 
 /**
+ * Increment view count for a published blog post. Public — called client-side on page load.
+ * Optional: does nothing for drafts or missing posts.
+ */
+export const incrementViewCount = mutation({
+  args: { postId: v.id("blogPosts") },
+  handler: async (ctx, args) => {
+    const post = await ctx.db.get(args.postId);
+    if (!post || post.status !== "published") return;
+    await ctx.db.patch(args.postId, {
+      viewCount: (post.viewCount ?? 0) + 1,
+    });
+  },
+});
+
+/**
  * Generate upload URL for blog images (banner / inline). Admin/moderator only.
  */
 export const generateUploadUrl = mutation({
