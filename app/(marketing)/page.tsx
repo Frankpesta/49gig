@@ -35,6 +35,7 @@ import {
   Brain,
   Clock,
 } from "lucide-react";
+import { TestimonialsMarquee } from "@/components/marketing/testimonials-marquee";
 import { getCanonicalSiteUrl, absoluteUrl } from "@/lib/seo/site-url";
 import { SITE_TWITTER_CREATOR, SITE_TWITTER_SITE } from "@/lib/seo/social";
 
@@ -205,7 +206,7 @@ export default function Home() {
             <div className="mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:max-w-3xl lg:items-start lg:text-left">
               <h1 className="text-3xl font-bold leading-[1.15] tracking-tight text-[#0a0a0a] sm:text-4xl sm:leading-[1.1] lg:text-5xl lg:leading-[1.08] dark:text-white [font-family:var(--font-hero-serif),Georgia,serif]">
                 <span className="block">Hire world-class</span>
-                <span className="block">tech talent —</span>
+                <span className="block">tech talent</span>
                 <span className="mt-1 block italic text-secondary">rigorously vetted,</span>
                 <span className="block italic text-secondary">ranked and delivery-ready.</span>
               </h1>
@@ -218,15 +219,23 @@ export default function Home() {
                 <ul className="mx-auto inline-block space-y-3 text-left text-[0.9375rem] font-medium leading-snug text-foreground sm:text-base lg:mx-0">
                   <li className="flex gap-3">
                     <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Rigorous vetting — only the top 3% make the network</span>
+                    <span>Rigorous vetting — only the top 3% of African tech talent joins our network</span>
                   </li>
                   <li className="flex gap-3">
                     <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Milestone-based delivery and secure payments</span>
+                    <span>Hire part-time or full-time professionals matched to your exact needs</span>
                   </li>
                   <li className="flex gap-3">
                     <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Fast matching to your stack, timeline, and team size</span>
+                    <span>Get matched with qualified talent in as little as 48 hours — no CV screening or interview hassle</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
+                    <span>Secure monthly escrow payments with cost-effective global talent</span>
+                  </li>
+                  <li className="flex gap-3">
+                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
+                    <span>Fast replacement support</span>
                   </li>
                 </ul>
               </div>
@@ -536,6 +545,8 @@ export default function Home() {
           </SectionTransition>
         </div>
       </section>
+
+      <TestimonialsMarquee />
 
       {/* WHY FREELANCERS CHOOSE US */}
       <section className="relative overflow-hidden border-y border-border/40 bg-[#07122B] py-20 text-white sm:py-24 lg:py-28">
