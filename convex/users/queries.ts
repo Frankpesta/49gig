@@ -304,6 +304,7 @@ export const getUserByIdInternal = internalQuery({
       role: user.role,
       status: user.status,
       profile: user.profile,
+      notificationPreferences: user.notificationPreferences,
     };
   },
 });
@@ -333,7 +334,7 @@ export const listFreelancersNeedingVerificationReminderInternal = internalQuery(
   handler: async (ctx) => {
     const now = Date.now();
     const minAccountAgeMs = 2 * DAY_MS;
-    const reminderCooldownMs = 2 * DAY_MS;
+    const reminderCooldownMs = 5 * DAY_MS;
 
     const freelancers = await ctx.db
       .query("users")
@@ -344,6 +345,9 @@ export const listFreelancersNeedingVerificationReminderInternal = internalQuery(
 
     for (const u of freelancers) {
       if (u.status !== "active" || !u.email) continue;
+
+      // Respect the user's email notification preference
+      if (u.notificationPreferences?.email === false) continue;
 
       const verification = u.verificationStatus ?? "not_started";
       if (verification !== "not_started" && verification !== "in_progress") continue;

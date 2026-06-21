@@ -795,6 +795,99 @@ export function VerificationIncompleteReminderEmail({
   );
 }
 
+export function VerificationReminderOpportunitiesEmail({
+  name = "there",
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps) {
+  const verifyUrl = `${appUrl}/onboarding/verification`;
+  return (
+    <EmailLayout
+      preview="Global clients are waiting — complete your 49GIG verification to get matched."
+      heroLabel="Opportunities Waiting"
+      heroTitle="Clients are looking for your skills."
+      heroAccent="your skills."
+      heroSubtitle="Verified freelancers on 49GIG get matched with serious global clients. Complete your profile to be discovered."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>,
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        Right now, clients on 49GIG are actively searching for professionals with skills like yours. The difference
+        between being matched and being invisible is one thing: completing your verification.
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        You&apos;re just a few steps away. Finish your English and skills assessments, then complete KYC — and
+        you&apos;ll be eligible for client matches.
+      </Text>
+      <Text style={mutedTextStyle}>
+        Verified freelancers consistently receive better-fit project opportunities and higher visibility on the platform.
+      </Text>
+      <EmailButton href={verifyUrl}>See what's waiting for me</EmailButton>
+    </EmailLayout>
+  );
+}
+
+export function VerificationReminderUrgencyEmail({
+  name = "there",
+  appUrl,
+  logoUrl,
+  date,
+}: BaseEmailProps) {
+  const verifyUrl = `${appUrl}/onboarding/verification`;
+  return (
+    <EmailLayout
+      preview="Don't lose your spot — complete your 49GIG verification now."
+      heroLabel="Don't Miss Out"
+      heroTitle="Your profile is incomplete."
+      heroAccent="incomplete."
+      heroSubtitle="Every day without verification is a day you're not visible to clients. Pick up where you left off."
+      logoUrl={logoUrl}
+      appUrl={appUrl}
+      date={date}
+    >
+      <Text style={textStyle}>
+        Hi <strong>{name}</strong>,
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        You created your 49GIG account but haven&apos;t yet completed verification. Until your profile is verified,
+        you won&apos;t appear in client searches or be matched to projects.
+      </Text>
+      <Text style={{ ...textStyle, marginTop: "12px" }}>
+        Here&apos;s all that&apos;s left:
+      </Text>
+      <Section style={{ margin: "16px 0" }}>
+        {[
+          "Complete the English proficiency assessment",
+          "Complete your skills test",
+          "Submit your KYC documents once tests are passed",
+        ].map((step, i) => (
+          <Row key={i} style={{ marginBottom: "8px" }}>
+            <Column style={{ width: "24px", verticalAlign: "top" }}>
+              <Text style={{ fontFamily: sans, fontSize: "13px", color: "#07122B", margin: "0", fontWeight: "700" }}>
+                {i + 1}.
+              </Text>
+            </Column>
+            <Column>
+              <Text style={{ fontFamily: sans, fontSize: "13px", color: "#3f3f3f", margin: "0", lineHeight: "1.6" }}>
+                {step}
+              </Text>
+            </Column>
+          </Row>
+        ))}
+      </Section>
+      <EmailButton href={verifyUrl}>Complete my verification now</EmailButton>
+      <Text style={mutedTextStyle}>
+        This reminder was sent because your account has open verification steps. If you&apos;ve already completed verification, you can ignore this email.
+      </Text>
+    </EmailLayout>
+  );
+}
+
 export function DisputeUpdateEmail({
   name = "there",
   headline,

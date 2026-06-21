@@ -31,7 +31,6 @@ const footerSections = [
     links: [
       { label: "Hire Talent", href: "/signup/client" },
       { label: "Hire a Team", href: "/hire-team" },
-      { label: "Use Cases", href: "/use-cases" },
     ],
   },
   {

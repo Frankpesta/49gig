@@ -54,7 +54,7 @@ export const sendMonthlyCyclePendingReminders = internalAction({
         internalAny.users.queries.getUserByIdInternal,
         { userId: p.clientId }
       );
-      if (client?.email) {
+      if (client?.email && client.notificationPreferences?.email !== false) {
         await ctx.runAction(
           internalAny.projects.actions.sendMonthlyCyclePendingReminderEmail,
           {

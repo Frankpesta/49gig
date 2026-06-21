@@ -360,8 +360,13 @@
     animation: marquee 40s linear infinite;
   }
 
+  .animate-marquee-slower {
+    animation: marquee 75s linear infinite;
+  }
+
   .animate-marquee:hover,
-  .animate-marquee-slow:hover {
+  .animate-marquee-slow:hover,
+  .animate-marquee-slower:hover {
     animation-play-state: paused;
   }
 

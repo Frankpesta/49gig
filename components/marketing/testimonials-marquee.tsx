@@ -26,6 +26,14 @@ const testimonials = [
     country: null,
     initial: "P",
   },
+  {
+    quote:
+      "We were skeptical about remote hiring at first, but 49GIG made it seamless. The talent integrated quickly with our team and delivered beyond expectations.",
+    role: "CTO",
+    company: "Cabwire",
+    country: "Canada",
+    initial: "C",
+  },
 ];
 
 const doubled = [...testimonials, ...testimonials];

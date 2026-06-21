@@ -590,7 +590,7 @@ export default function UserDetailPage() {
               <InfoRow label="Address" value={(profileData.profile as any)?.address} icon={MapPin} />
               <InfoRow
                 label="Country"
-                value={profileData.profile?.country}
+                value={profileData.profile?.country ?? "Not provided"}
                 icon={Globe}
               />
               <InfoRow
