@@ -38,10 +38,9 @@ const navLinks: NavLink[] = [
   { label: "For Freelancers", href: "/for-freelancers" },
   {
     label: "Resources",
-    href: "/use-cases",
+    href: "/blog",
     children: [
       { label: "Blog", href: "/blog" },
-      { label: "Use Cases", href: "/use-cases" },
       { label: "Contact Us", href: "/contact" },
     ],
   },

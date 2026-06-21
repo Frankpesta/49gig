@@ -7,6 +7,8 @@ import React from "react";
 import {
   CodingFeedbackEmail,
   VerificationIncompleteReminderEmail,
+  VerificationReminderOpportunitiesEmail,
+  VerificationReminderUrgencyEmail,
   VerificationTerminatedEmail,
 } from "../../emails/templates";
 
@@ -95,6 +97,24 @@ export const sendCodingFeedbackEmailInternal = internalAction({
   },
 });
 
+const REMINDER_VARIANTS: Array<{
+  subject: string;
+  component: React.ComponentType<{ name?: string; appUrl: string; date: string }>;
+}> = [
+  {
+    subject: "[49GIG] Reminder: complete your freelancer verification",
+    component: VerificationIncompleteReminderEmail,
+  },
+  {
+    subject: "[49GIG] Global clients are looking for your skills",
+    component: VerificationReminderOpportunitiesEmail,
+  },
+  {
+    subject: "[49GIG] Your profile is incomplete — don't miss out",
+    component: VerificationReminderUrgencyEmail,
+  },
+];
+
 export const sendVerificationIncompleteReminderInternal = internalAction({
   args: {
     email: v.string(),
@@ -109,10 +129,12 @@ export const sendVerificationIncompleteReminderInternal = internalAction({
       day: "numeric",
     });
     if (!args.email) return { sent: false };
+
+    const variant = REMINDER_VARIANTS[Math.floor(Math.random() * REMINDER_VARIANTS.length)];
     await sendEmail({
       to: args.email,
-      subject: "[49GIG] Reminder: complete your freelancer verification",
-      react: React.createElement(VerificationIncompleteReminderEmail, {
+      subject: variant.subject,
+      react: React.createElement(variant.component, {
         name: args.name,
         appUrl,
         date,

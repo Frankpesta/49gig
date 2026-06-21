@@ -75,7 +75,7 @@ export const sendUnfundedProjectReminders = internalAction({
         internalAny.users.queries.getUserByIdInternal,
         { userId: project.clientId }
       );
-      if (client?.email) {
+      if (client?.email && client.notificationPreferences?.email !== false) {
         await ctx.runAction(
           internalAny.projects.actions.sendUnfundedProjectReminderEmail,
           {
@@ -102,7 +102,7 @@ export const sendUnfundedProjectReminders = internalAction({
         internalAny.users.queries.getUserByIdInternal,
         { userId: project.clientId }
       );
-      if (client?.email) {
+      if (client?.email && client.notificationPreferences?.email !== false) {
         await ctx.runAction(
           internalAny.projects.actions.sendUnfundedProjectReminderEmail,
           {
