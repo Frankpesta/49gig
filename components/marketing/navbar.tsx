@@ -27,8 +27,9 @@ const navLinks: NavLink[] = [
   { label: "Why 49GIG?", href: "/why-49gig" },
   {
     label: "Hire Talent",
-    href: "/signup",
+    href: "/hire-talent",
     children: [
+      { label: "Hire Talent", href: "/hire-talent" },
       { label: "Hire a Team", href: "/hire-team" },
       { label: "Talent Categories", href: "/talent-categories" },
     ],
