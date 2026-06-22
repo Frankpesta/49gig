@@ -259,8 +259,14 @@ export const getUserProfileForAdmin = query({
     const target = await ctx.db.get(args.targetUserId);
     if (!target) return null;
 
+    const lastSession = await ctx.db
+      .query("sessions")
+      .withIndex("by_user", (q) => q.eq("userId", args.targetUserId))
+      .order("desc")
+      .first();
+
     const { passwordHash, ...rest } = target;
-    return rest;
+    return { ...rest, _lastSessionIp: lastSession?.ipAddress ?? null };
   },
 });
 

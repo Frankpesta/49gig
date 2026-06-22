@@ -69,10 +69,45 @@ import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-heade
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
 import { formatDistanceToNow, format } from "date-fns";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
+
+const COUNTRY_CODES: Record<string, string> = {
+  AF: "Afghanistan", AL: "Albania", DZ: "Algeria", AO: "Angola", AR: "Argentina",
+  AU: "Australia", AT: "Austria", AZ: "Azerbaijan", BS: "Bahamas", BH: "Bahrain",
+  BD: "Bangladesh", BE: "Belgium", BJ: "Benin", BW: "Botswana", BR: "Brazil",
+  BF: "Burkina Faso", BI: "Burundi", CM: "Cameroon", CA: "Canada", CV: "Cape Verde",
+  CF: "Central African Republic", TD: "Chad", CL: "Chile", CN: "China", CO: "Colombia",
+  KM: "Comoros", CG: "Congo", CD: "DR Congo", CI: "Côte d'Ivoire", HR: "Croatia",
+  CY: "Cyprus", CZ: "Czech Republic", DK: "Denmark", DJ: "Djibouti", EG: "Egypt",
+  GQ: "Equatorial Guinea", ER: "Eritrea", ET: "Ethiopia", FI: "Finland", FR: "France",
+  GA: "Gabon", GM: "Gambia", GE: "Georgia", DE: "Germany", GH: "Ghana", GR: "Greece",
+  GT: "Guatemala", GN: "Guinea", GW: "Guinea-Bissau", GY: "Guyana", HT: "Haiti",
+  HN: "Honduras", HU: "Hungary", IN: "India", ID: "Indonesia", IQ: "Iraq", IE: "Ireland",
+  IL: "Israel", IT: "Italy", JM: "Jamaica", JP: "Japan", JO: "Jordan", KZ: "Kazakhstan",
+  KE: "Kenya", KW: "Kuwait", LB: "Lebanon", LS: "Lesotho", LR: "Liberia", LY: "Libya",
+  MG: "Madagascar", MW: "Malawi", MY: "Malaysia", MV: "Maldives", ML: "Mali", MT: "Malta",
+  MR: "Mauritania", MU: "Mauritius", MX: "Mexico", MA: "Morocco", MZ: "Mozambique",
+  NA: "Namibia", NL: "Netherlands", NZ: "New Zealand", NI: "Nicaragua", NE: "Niger",
+  NG: "Nigeria", NO: "Norway", OM: "Oman", PK: "Pakistan", PA: "Panama", PY: "Paraguay",
+  PE: "Peru", PH: "Philippines", PL: "Poland", PT: "Portugal", QA: "Qatar",
+  RW: "Rwanda", SA: "Saudi Arabia", SN: "Senegal", SL: "Sierra Leone", SO: "Somalia",
+  ZA: "South Africa", SS: "South Sudan", ES: "Spain", LK: "Sri Lanka", SD: "Sudan",
+  SZ: "Eswatini", SE: "Sweden", CH: "Switzerland", SY: "Syria", TZ: "Tanzania",
+  TH: "Thailand", TG: "Togo", TT: "Trinidad and Tobago", TN: "Tunisia", TR: "Turkey",
+  UG: "Uganda", UA: "Ukraine", AE: "United Arab Emirates", GB: "United Kingdom",
+  US: "United States", UY: "Uruguay", UZ: "Uzbekistan", VE: "Venezuela", VN: "Vietnam",
+  YE: "Yemen", ZM: "Zambia", ZW: "Zimbabwe",
+};
+
+function resolveCountry(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (/^[A-Z]{2}$/.test(trimmed)) return COUNTRY_CODES[trimmed] ?? trimmed;
+  return trimmed;
+}
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -424,6 +459,13 @@ export default function UserDetailPage() {
   const isFreelancer = profileData.role === "freelancer";
   const isClient = profileData.role === "client";
   const initials = profileData.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
+
+  const resolvedCountry = useMemo(
+    () => resolveCountry(profileData.profile?.country),
+    [profileData.profile?.country]
+  );
+  const lastSessionIp = (profileData as any)._lastSessionIp as string | null | undefined;
+  const countryDisplay = resolvedCountry ?? (lastSessionIp ? `IP: ${lastSessionIp}` : "Not provided");
   const matchingGateCleared = isFreelancerMatchingGateCleared(
     profileData,
     vettingData !== undefined,
@@ -590,7 +632,7 @@ export default function UserDetailPage() {
               <InfoRow label="Address" value={(profileData.profile as any)?.address} icon={MapPin} />
               <InfoRow
                 label="Country"
-                value={profileData.profile?.country ?? "Not provided"}
+                value={countryDisplay}
                 icon={Globe}
               />
               <InfoRow
@@ -965,7 +1007,7 @@ export default function UserDetailPage() {
                 <InfoRow label="Company Size" value={profileData.profile?.companySize} icon={User} />
                 <InfoRow label="Work Email" value={profileData.profile?.workEmail} icon={Mail} />
                 <InfoRow label="Website" value={profileData.profile?.companyWebsite} icon={Globe} />
-                <InfoRow label="Country" value={profileData.profile?.country} icon={MapPin} />
+                <InfoRow label="Country" value={resolvedCountry ?? (lastSessionIp ? `IP: ${lastSessionIp}` : undefined)} icon={MapPin} />
               </CardContent>
             </Card>
           )}
