@@ -17,9 +17,6 @@ import {
   Cloud,
   Brain,
   Target,
-  BarChart3,
-  Headphones,
-  PenLine,
   Layers,
   Lock,
   Star,
@@ -121,13 +118,13 @@ const howItWorks = [
 const categories = [
   { icon: Code, label: "Software Development" },
   { icon: Palette, label: "UI/UX & Product Design" },
-  { icon: Database, label: "Data & Analytics" },
-  { icon: BarChart3, label: "Digital Marketing" },
-  { icon: PenLine, label: "Writing & Content" },
-  { icon: Layers, label: "Product & Project Management" },
-  { icon: Headphones, label: "Customer Support" },
-  { icon: Brain, label: "AI & Machine Learning" },
-  { icon: Cloud, label: "DevOps & Cloud" },
+  { icon: Database, label: "Data Analytics" },
+  { icon: Cloud, label: "DevOps & Cloud Engineering" },
+  { icon: Shield, label: "Cybersecurity & IT Infrastructure" },
+  { icon: Brain, label: "AI" },
+  { icon: Brain, label: "Machine Learning" },
+  { icon: Brain, label: "Blockchain" },
+  { icon: CheckCircle2, label: "Quality Assurance & Testing" },
 ];
 
 const protections = [

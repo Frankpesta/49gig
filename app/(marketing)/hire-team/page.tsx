@@ -166,8 +166,8 @@ export default function HireTeamPage() {
         badge={{ icon: Layers, text: "Team Hiring" }}
         breadcrumbs={breadcrumbs}
         pathname="/hire-team"
-        imageSrc="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80"
-        imageAlt="Team collaboration"
+        imageSrc="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=80"
+        imageAlt="Diverse team collaborating around a table"
         actions={
           <>
             <CTAButton href="/signup/client" variant="primary" className="gap-2">

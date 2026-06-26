@@ -39,28 +39,58 @@ const SOFTWARE_DEV = "software_development";
 
 /** Programming-language-like skills (profile.languagesWritten or skills that imply coding). */
 const PROGRAMMING_LANGUAGE_IDS = new Set([
+  // Web / scripting
   "javascript",
   "typescript",
+  "php",
+  "ruby",
+  "perl",
+  "lua",
+  "bash",
+  "shell",
+  "node.js",
+  "react",
+  "vue.js",
+  "angular",
+  // General-purpose
   "python",
   "java",
+  "kotlin",
+  "scala",
+  "groovy",
+  "clojure",
+  // Systems
+  "c",
   "c++",
   "c#",
   "go",
   "rust",
-  "php",
-  "ruby",
-  "sql",
   "swift",
-  "kotlin",
-  "scala",
+  "dart",
+  "d",
+  "objective-c",
+  "assembly",
+  // Functional
+  "haskell",
+  "erlang",
+  "elixir",
+  "ocaml",
+  "f#",
+  "lisp",
+  // Legacy / niche
+  "cobol",
+  "pascal",
+  "basic",
+  "prolog",
+  // Data / scientific
   "r",
   "matlab",
-  "html/css",
-  "react",
-  "node.js",
-  "vue.js",
-  "angular",
+  "octave",
+  "sql",
+  // Blockchain
   "solidity",
+  // UI
+  "html/css",
 ]);
 
 function hasProgrammingLanguage(profile: {

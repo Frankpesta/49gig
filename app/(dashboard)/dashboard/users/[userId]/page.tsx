@@ -425,6 +425,12 @@ export default function UserDetailPage() {
   const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
   const adminDeleteFreelancerReview = useMutation(api.reviews.mutations.adminDeleteFreelancerReview);
 
+  const resolvedCountry = useMemo(
+    () => resolveCountry(profileData?.profile?.country),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [profileData?.profile?.country]
+  );
+
   if (!isAuthenticated || !currentUser) {
     return <DashboardEmptyState icon={User} title="Please log in" iconTone="muted" />;
   }
@@ -460,10 +466,6 @@ export default function UserDetailPage() {
   const isClient = profileData.role === "client";
   const initials = profileData.name?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) ?? "?";
 
-  const resolvedCountry = useMemo(
-    () => resolveCountry(profileData.profile?.country),
-    [profileData.profile?.country]
-  );
   const lastSessionIp = (profileData as any)._lastSessionIp as string | null | undefined;
   const countryDisplay = resolvedCountry ?? (lastSessionIp ? `IP: ${lastSessionIp}` : "Not provided");
   const matchingGateCleared = isFreelancerMatchingGateCleared(
