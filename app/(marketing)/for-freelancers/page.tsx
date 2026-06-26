@@ -325,10 +325,6 @@ export default function ForFreelancersPage() {
                     <div className="text-sm text-muted-foreground">Countries Served</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-semibold text-green-600">$2M+</div>
-                    <div className="text-sm text-muted-foreground">Paid to Freelancers</div>
-                  </div>
-                  <div className="space-y-2">
                     <div className="text-3xl font-semibold text-purple-600">4.9★</div>
                     <div className="text-sm text-muted-foreground">Average Rating</div>
                   </div>
@@ -536,10 +532,6 @@ export default function ForFreelancersPage() {
                   <div className="space-y-2">
                     <div className="text-2xl font-bold text-primary">24/7</div>
                     <div className="text-sm text-muted-foreground">Platform support</div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl font-bold text-green-600">$2M+</div>
-                    <div className="text-sm text-muted-foreground">Paid to freelancers</div>
                   </div>
                 </div>
               </div>

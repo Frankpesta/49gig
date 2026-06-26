@@ -486,7 +486,7 @@ export default function HowItWorksPage() {
 
           {/* Success Metrics */}
           <SectionTransition variant="fade" delay={600}>
-            <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="mt-20 grid grid-cols-1 md:grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
               <div className="bg-background/50 backdrop-blur-sm rounded-2xl p-6 border border-border/30 hover:border-primary/30 transition-colors duration-300">
                 <div className="text-3xl font-semibold text-primary mb-2">98%</div>
                 <div className="text-sm text-muted-foreground">Project Success Rate</div>
@@ -494,10 +494,6 @@ export default function HowItWorksPage() {
               <div className="bg-background/50 backdrop-blur-sm rounded-2xl p-6 border border-border/30 hover:border-secondary/30 transition-colors duration-300">
                 <div className="text-3xl font-semibold text-secondary mb-2">24/7</div>
                 <div className="text-sm text-muted-foreground">Support Available</div>
-              </div>
-              <div className="bg-background/50 backdrop-blur-sm rounded-2xl p-6 border border-border/30 hover:border-green-500/30 transition-colors duration-300">
-                <div className="text-3xl font-semibold text-green-600 mb-2">$2M+</div>
-                <div className="text-sm text-muted-foreground">Paid to Freelancers</div>
               </div>
             </div>
           </SectionTransition>

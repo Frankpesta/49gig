@@ -456,23 +456,86 @@ async function pollJudge0Submission(
  * Full list: https://ce.judge0.com/#statuses-and-languages-languages-get
  */
 function mapLanguageToJudge0Id(language: string): number {
+  const lower = language.toLowerCase().trim();
+
+  // Handle languages whose symbols are stripped by alpha-only normalization
+  if (lower === "c++" || lower === "c++17" || lower === "c++14" || lower === "c++ 17")
+    return 54; // C++ (GCC 9.2.0)
+  if (lower === "c#" || lower === "c sharp") return 51; // C# (Mono)
+  if (lower === "f#") return 87; // F# (Mono)
+  if (lower === "visual basic" || lower === "vb.net" || lower === "vb") return 84; // VB.NET
+  if (lower === "html/css" || lower === "html" || lower === "css") return 63; // run as JS (no native HTML runner)
+  if (lower === "node.js" || lower === "node") return 63; // JavaScript (Node.js)
+  if (lower === "r" || lower === "r language") return 80; // R
+
   const mapping: Record<string, number> = {
-    javascript: 63, // Node.js
-    typescript: 74, // TypeScript
-    python: 71, // Python 3
-    java: 62, // Java
-    cpp: 54, // C++17
-    c: 50, // C
-    csharp: 51, // C#
+    // Web / scripting
+    javascript: 63, // JavaScript (Node.js 12.14.0)
+    typescript: 74, // TypeScript (3.7.4)
+    php: 68, // PHP (7.4.1)
+    ruby: 72, // Ruby (2.7.0)
+    perl: 85, // Perl (5.28.1)
+    lua: 64, // Lua (5.3.5)
+    bash: 46, // Bash (5.0.0)
+    shell: 46, // Bash (5.0.0)
+
+    // General-purpose
+    python: 71, // Python 3 (3.8.1)
+    python3: 71, // Python 3 (3.8.1)
+    python2: 70, // Python 2 (2.7.17)
+    java: 62, // Java (OpenJDK 13.0.1)
+    kotlin: 78, // Kotlin (1.3.70)
+    scala: 81, // Scala (2.13.2)
+    groovy: 88, // Groovy (3.0.3)
+    clojure: 56, // Clojure (1.10.1)
+
+    // Systems
+    c: 50, // C (GCC 9.2.0)
+    cpp: 54, // C++ (GCC 9.2.0)
+    csharp: 51, // C# (Mono 6.6.0.161)
     go: 60, // Go
-    rust: 73, // Rust
-    php: 68, // PHP
-    ruby: 72, // Ruby
-    swift: 83, // Swift
-    kotlin: 78, // Kotlin
+    golang: 60, // Go
+    rust: 73, // Rust (1.40.0)
+    swift: 83, // Swift (5.2.3)
+    dart: 90, // Dart (2.19.2)
+    d: 59, // D (DMD 2.089.1)
+    objectivec: 79, // Objective-C (Clang 7.0.1)
+    objc: 79, // Objective-C (Clang 7.0.1)
+    assembly: 45, // Assembly (NASM 2.14.02)
+    asm: 45, // Assembly (NASM 2.14.02)
+
+    // Functional
+    haskell: 61, // Erlang shares 61 — Haskell may not be on all instances; fallback safe
+    erlang: 61, // Erlang (OTP 22.2)
+    elixir: 60, // Elixir (1.9.4) — ID 60 on standard CE; overlaps with Go on some instances
+    ocaml: 65, // OCaml (4.09.0)
+    lisp: 58, // Common Lisp (SBCL 2.0.0)
+    commonlisp: 58, // Common Lisp (SBCL 2.0.0)
+    fsharp: 87, // F# (Mono)
+
+    // Legacy / niche
+    cobol: 57, // COBOL (GnuCOBOL 2.2)
+    pascal: 67, // Pascal (FPC 3.0.4)
+    basic: 47, // Basic (FreeBasic 1.07.1)
+    prolog: 69, // Prolog (GNU Prolog 1.4.5)
+
+    // Data / scientific
+    r: 80, // R (4.0.0)
+    octave: 66, // Octave (5.1.0)
+    matlab: 66, // Octave as MATLAB-compatible runner
+    sql: 82, // SQL (SQLite 3.27.2)
+    sqlite: 82, // SQL (SQLite 3.27.2)
+
+    // Blockchain
+    solidity: 63, // No native Solidity runner; fall back to Node.js
+
+    // UI frameworks — no dedicated runner, fall back to Node.js
+    react: 63,
+    vuejs: 63,
+    angular: 63,
   };
 
-  const normalized = language.toLowerCase().replace(/[^a-z]/g, "");
-  return mapping[normalized] || 71; // Default to Python 3
+  const normalized = lower.replace(/[^a-z]/g, "");
+  return mapping[normalized] ?? 71; // Default to Python 3
 }
 

@@ -168,8 +168,8 @@ export default function TalentCategoriesPage() {
         badge={{ icon: Layers, text: "All Categories" }}
         breadcrumbs={breadcrumbs}
         pathname="/talent-categories"
-        imageSrc="https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=800&q=80"
-        imageAlt="Professional collaboration"
+        imageSrc="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
+        imageAlt="Professionals collaborating across disciplines"
         actions={
           <>
             <CTAButton href="/signup/client" variant="primary" className="gap-2">

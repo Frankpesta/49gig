@@ -137,7 +137,7 @@ export default function Home() {
       icon: CheckCircle2,
       title: "Quality Assurance & Testing",
       description: "QA engineers ensuring software quality",
-      image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1504639725590-34d0984388bd?w=800&q=80",
     },
   ];
 

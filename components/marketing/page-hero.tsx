@@ -1,4 +1,5 @@
 import { Fragment, ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Home, LucideIcon } from "lucide-react";
@@ -73,6 +74,9 @@ export function PageHero({
   badge,
   breadcrumbs,
   rightContent,
+  imageSrc,
+  imageAlt,
+  imageUnoptimized,
   actions,
   className,
   pathname,
@@ -84,6 +88,79 @@ export function PageHero({
     pathname.startsWith("/")
       ? breadcrumbSchemaJsonLd(breadcrumbs, pathname)
       : null;
+
+  const hasRightCol = !!imageSrc || !!rightContent;
+
+  const textContent = (
+    <>
+      {/* Breadcrumbs */}
+      {breadcrumbs && breadcrumbs.length > 0 && (
+        <nav
+          className="mb-6 flex flex-wrap items-center gap-1.5 text-xs sm:text-sm text-white/45"
+          aria-label="Breadcrumb"
+        >
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 transition-colors hover:text-white/75"
+          >
+            <Home className="h-3.5 w-3.5" />
+            Home
+          </Link>
+          {breadcrumbs.map((item, idx) => (
+            <span
+              key={`${item.label}-${idx}`}
+              className="inline-flex items-center gap-1.5"
+            >
+              <ChevronRight className="h-3.5 w-3.5 text-white/25" />
+              {item.href ? (
+                <Link
+                  href={item.href}
+                  className="inline-flex items-center gap-1 transition-colors hover:text-white/75"
+                >
+                  {item.icon && <item.icon className="h-3.5 w-3.5" />}
+                  {item.label}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-white/70">
+                  {item.icon && <item.icon className="h-3.5 w-3.5" />}
+                  {item.label}
+                </span>
+              )}
+            </span>
+          ))}
+        </nav>
+      )}
+
+      {/* Badge */}
+      {badge && (
+        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-white/75 backdrop-blur-sm">
+          {badge.icon && (
+            <badge.icon className="h-3.5 w-3.5 text-secondary" />
+          )}
+          <span>{badge.text}</span>
+        </div>
+      )}
+
+      {/* Title */}
+      <h1 className="text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.25rem] xl:text-6xl">
+        {title}
+      </h1>
+
+      {/* Description */}
+      {description && (
+        <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/65 sm:text-lg">
+          {description}
+        </p>
+      )}
+
+      {/* Actions */}
+      {actions && (
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          {actions}
+        </div>
+      )}
+    </>
+  );
 
   return (
     <Fragment>
@@ -124,77 +201,32 @@ export function PageHero({
         <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-24 lg:py-28">
-          <div className="max-w-3xl">
-            {/* Breadcrumbs */}
-            {breadcrumbs && breadcrumbs.length > 0 && (
-              <nav
-                className="mb-6 flex flex-wrap items-center gap-1.5 text-xs sm:text-sm text-white/45"
-                aria-label="Breadcrumb"
-              >
-                <Link
-                  href="/"
-                  className="inline-flex items-center gap-1 transition-colors hover:text-white/75"
-                >
-                  <Home className="h-3.5 w-3.5" />
-                  Home
-                </Link>
-                {breadcrumbs.map((item, idx) => (
-                  <span
-                    key={`${item.label}-${idx}`}
-                    className="inline-flex items-center gap-1.5"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5 text-white/25" />
-                    {item.href ? (
-                      <Link
-                        href={item.href}
-                        className="inline-flex items-center gap-1 transition-colors hover:text-white/75"
-                      >
-                        {item.icon && <item.icon className="h-3.5 w-3.5" />}
-                        {item.label}
-                      </Link>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-white/70">
-                        {item.icon && <item.icon className="h-3.5 w-3.5" />}
-                        {item.label}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </nav>
-            )}
+          {hasRightCol ? (
+            <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
+              <div>{textContent}</div>
 
-            {/* Badge */}
-            {badge && (
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-white/75 backdrop-blur-sm">
-                {badge.icon && (
-                  <badge.icon className="h-3.5 w-3.5 text-secondary" />
+              <div className="hidden lg:block">
+                {imageSrc ? (
+                  <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl shadow-2xl border border-white/10">
+                    <Image
+                      src={imageSrc}
+                      alt={imageAlt ?? title}
+                      fill
+                      className="object-cover"
+                      unoptimized={imageUnoptimized}
+                      sizes="(max-width: 1024px) 100vw, 50vw"
+                      priority
+                    />
+                    <div className="absolute inset-0 bg-linear-to-t from-[#07122B]/40 via-transparent to-transparent" />
+                  </div>
+                ) : (
+                  rightContent
                 )}
-                <span>{badge.text}</span>
               </div>
-            )}
-
-            {/* Title */}
-            <h1 className="text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-[3.25rem] xl:text-6xl">
-              {title}
-            </h1>
-
-            {/* Description */}
-            {description && (
-              <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/65 sm:text-lg">
-                {description}
-              </p>
-            )}
-
-            {/* Actions */}
-            {actions && (
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                {actions}
-              </div>
-            )}
-
-            {/* Right content */}
-            {rightContent && <div className="mt-6">{rightContent}</div>}
-          </div>
+            </div>
+          ) : (
+            <div className="max-w-3xl">{textContent}</div>
+          )}
         </div>
       </section>
     </Fragment>

@@ -48,7 +48,7 @@ export const metadata: Metadata = buildMarketingRouteMetadata({
 
 export default function ForClientsPage() {
   const clientStats = [
-    { value: "95", label: "Client Satisfaction", suffix: "%", icon: Star },
+    { value: "98", label: "Client Satisfaction", suffix: "%", icon: Star },
     { value: "48", label: "Hours to Hire", suffix: "hrs", icon: Clock },
     { value: "500", label: "Companies Served", suffix: "+", icon: Building2 },
     { value: "3", label: "Days Average", suffix: "days", icon: Zap },
@@ -171,8 +171,8 @@ export default function ForClientsPage() {
         badge={{ icon: Briefcase, text: "For Clients" }}
         breadcrumbs={breadcrumbs}
         pathname="/for-clients"
-        imageSrc="https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
-        imageAlt="Team collaboration"
+        imageSrc="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=800&q=80"
+        imageAlt="Business team in a professional meeting"
         actions={
           <>
             <CTAButton href="/signup/client" variant="primary" className="gap-2">
@@ -343,7 +343,7 @@ export default function ForClientsPage() {
                     <div className="text-sm text-muted-foreground">Companies Served</div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-3xl font-semibold text-secondary">95%</div>
+                    <div className="text-3xl font-semibold text-secondary">98%</div>
                     <div className="text-sm text-muted-foreground">Client Satisfaction</div>
                   </div>
                   <div className="space-y-2">
