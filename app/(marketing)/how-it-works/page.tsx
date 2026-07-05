@@ -53,7 +53,7 @@ export default function HowItWorksPage() {
         badge={{ icon: Workflow, text: "How It Works" }}
         breadcrumbs={breadcrumbs}
         pathname="/how-it-works"
-        imageSrc="https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
+        imageSrc="https://images.unsplash.com/photo-1600880292089-90a7e086ee0c?w=800&q=80"
         imageAlt="Team collaboration"
         actions={
           <>

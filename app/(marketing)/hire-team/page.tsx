@@ -14,10 +14,8 @@ import {
   CheckCircle2,
   Shield,
   Target,
-  FileText,
   UserCheck,
   BarChart3,
-  Megaphone,
 } from "lucide-react";
 import type { Metadata } from "next";
 import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
@@ -108,8 +106,6 @@ export default function HireTeamPage() {
     { icon: Briefcase, label: "Product Managers" },
     { icon: CheckCircle2, label: "QA Engineers" },
     { icon: Database, label: "Data Analysts" },
-    { icon: Megaphone, label: "Digital Marketers" },
-    { icon: FileText, label: "Content Specialists" },
   ];
 
   const supportItems = [
@@ -299,8 +295,15 @@ export default function HireTeamPage() {
                   Teams are assembled based on what your project requires—nothing extra.
                 </p>
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  {teamRoles.map((role) => (
-                    <div key={role.label} className="flex items-center gap-2 rounded-lg border border-border/50 bg-background/80 px-3 py-2 text-sm text-foreground">
+                  {teamRoles.map((role, idx) => (
+                    <div
+                      key={role.label}
+                      className={`flex items-center gap-2 rounded-lg border border-border/50 bg-background/80 px-3 py-2 text-sm text-foreground ${
+                        idx === teamRoles.length - 1 && teamRoles.length % 2 !== 0
+                          ? "sm:col-span-2 sm:mx-auto sm:w-1/2"
+                          : ""
+                      }`}
+                    >
                       <role.icon className="h-4 w-4 text-primary" />
                       {role.label}
                     </div>

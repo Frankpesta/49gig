@@ -71,8 +71,8 @@ export default function AboutPage() {
   return (
     <div className="w-full">
       <PageHero
-        title="Building Global Opportunities"
-        description="49GIG connects exceptional African talent with world-class opportunities. We're redefining freelancing by prioritizing vetted quality, transparent relationships, and sustainable careers."
+        title="The Infrastructure Behind Africa's Global Talent"
+        description="49GIG is the infrastructure that powers remote hiring from Africa — vetting, matching, contracts, and payments built into one reliable system for global companies and African professionals alike."
         badge={{ icon: Building2, text: "About 49GIG" }}
         breadcrumbs={breadcrumbs}
         pathname="/about"
