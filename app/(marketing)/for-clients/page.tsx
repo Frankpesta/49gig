@@ -50,7 +50,6 @@ export default function ForClientsPage() {
   const clientStats = [
     { value: "98", label: "Client Satisfaction", suffix: "%", icon: Star },
     { value: "48", label: "Hours to Hire", suffix: "hrs", icon: Clock },
-    { value: "500", label: "Companies Served", suffix: "+", icon: Building2 },
     { value: "3", label: "Days Average", suffix: "days", icon: Zap },
   ];
   const whyChooseReasons = [
@@ -106,7 +105,7 @@ export default function ForClientsPage() {
       icon: Briefcase,
       title: "Choose How to Hire",
       description: "Select whether you want to hire a single talent or a full team based on your project needs.",
-      image: "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1600880292089-90a7e086ee0c?w=800&q=80",
     },
     {
       step: "2",
@@ -192,7 +191,7 @@ export default function ForClientsPage() {
       {/* Stats */}
       <section className="py-8 sm:py-10 border-b border-border/30 bg-muted/20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-3 gap-6 sm:gap-8">
             {clientStats.map((stat, index) => (
               <div key={index} className="text-center">
                 <div className="flex h-12 w-12 sm:h-14 sm:w-14 mx-auto items-center justify-center rounded-xl bg-primary/10 mb-3">
@@ -298,7 +297,7 @@ export default function ForClientsPage() {
                         <Image
                           src={
                             index === 0
-                              ? "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80"
+                              ? "https://images.unsplash.com/photo-1573164713988-8665fc963095?w=800&q=80"
                               : index === 1
                               ? "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
                               : index === 2

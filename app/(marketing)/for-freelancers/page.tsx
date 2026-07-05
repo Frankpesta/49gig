@@ -52,13 +52,13 @@ export default function ForFreelancersPage() {
       icon: BadgeCheck,
       title: "Work With Verified Global Clients",
       description: "All clients on 49GIG are verified and committed to real projects with secured budgets. No fake jobs. No unpaid work. No uncertainty.",
-      image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1573164713988-8665fc963095?w=800&q=80",
     },
     {
       icon: Target,
       title: "No Bidding, No Race to the Bottom",
       description: "You don't compete on price. Projects are assigned based on your skills, expertise, vetting score, performance, reliability, and availability. Your quality speaks for you.",
-      image: "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&q=80",
       features: [
         "Skills and expertise",
         "Vetting score",
@@ -93,15 +93,15 @@ export default function ForFreelancersPage() {
   ];
 
   const skillCategories = [
-    { icon: Code, title: "Software Development", color: "primary" },
-    { icon: Palette, title: "UI/UX and Product Design", color: "primary" },
-    { icon: Database, title: "Data Analytics", color: "primary" },
-    { icon: Cloud, title: "DevOps & Cloud Engineering", color: "primary" },
-    { icon: Shield, title: "Cybersecurity & IT Infrastructure", color: "primary" },
-    { icon: Brain, title: "AI", color: "primary" },
-    { icon: Brain, title: "Machine Learning", color: "primary" },
-    { icon: Brain, title: "Blockchain", color: "primary" },
-    { icon: CheckCircle2, title: "Quality Assurance & Testing", color: "primary" },
+    { icon: Code, title: "Software Development", color: "primary", description: "Build websites, apps, and software solutions", stat: "1,000+ Devs" },
+    { icon: Palette, title: "UI/UX and Product Design", color: "primary", description: "Create stunning designs and user experiences", stat: "500+ Designers" },
+    { icon: Database, title: "Data Analytics", color: "primary", description: "Analyze data and drive business insights", stat: "300+ Analysts" },
+    { icon: Cloud, title: "DevOps & Cloud Engineering", color: "primary", description: "Automate deployments and manage cloud infrastructure", stat: "300+ Engineers" },
+    { icon: Shield, title: "Cybersecurity & IT Infrastructure", color: "primary", description: "Secure systems and manage IT infrastructure", stat: "250+ Specialists" },
+    { icon: Brain, title: "AI", color: "primary", description: "Build and deploy intelligent AI-powered solutions", stat: "200+ AI Experts" },
+    { icon: Brain, title: "Machine Learning", color: "primary", description: "Design and train machine learning models", stat: "180+ ML Engineers" },
+    { icon: Brain, title: "Blockchain", color: "primary", description: "Build decentralized apps and smart contracts", stat: "150+ Blockchain Devs" },
+    { icon: CheckCircle2, title: "Quality Assurance & Testing", color: "primary", description: "Ensure software quality through rigorous testing", stat: "220+ QA Engineers" },
   ];
 
   const howItWorksSteps = [
@@ -124,7 +124,7 @@ export default function ForFreelancersPage() {
       icon: Search,
       title: "Get Matched to Projects",
       description: "Once approved, you'll be matched to projects based on skill fit, performance rating, and availability. You don't apply or bid—projects come to you.",
-      image: "https://images.unsplash.com/photo-1552664730-d307ca8849d1?w=800&q=80",
+      image: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=800&q=80",
     },
     {
       step: "4",
@@ -167,8 +167,8 @@ export default function ForFreelancersPage() {
         badge={{ icon: Users, text: "For Freelancers" }}
         breadcrumbs={breadcrumbs}
         pathname="/for-freelancers"
-        imageSrc="https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&q=80"
-        imageAlt="Freelancer working remotely"
+        imageSrc="https://images.unsplash.com/photo-1573164713988-8665fc963095?w=800&q=80"
+        imageAlt="African tech professional working remotely"
         actions={
           <>
             <CTAButton href="/signup/freelancer" variant="primary" className="gap-2">
@@ -376,14 +376,7 @@ export default function ForFreelancersPage() {
                           {category.title}
                         </h3>
                         <p className="text-sm text-muted-foreground group-hover:text-foreground/90 transition-colors duration-300 leading-relaxed">
-                          {index === 0 && "Build websites, apps, and software solutions"}
-                          {index === 1 && "Create stunning designs and user experiences"}
-                          {index === 2 && "Analyze data and drive business insights"}
-                          {index === 3 && "Grow brands and increase online presence"}
-                          {index === 4 && "Write compelling content and copy"}
-                          {index === 5 && "Lead projects and manage teams"}
-                          {index === 6 && "Provide excellent customer support"}
-                          {index === 7 && "Deliver exceptional client service"}
+                          {category.description}
                         </p>
                       </div>
 
@@ -399,14 +392,7 @@ export default function ForFreelancersPage() {
                         <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                           <span className="text-sm font-medium text-primary">
-                            {index === 0 && "1,000+ Devs"}
-                            {index === 1 && "500+ Designers"}
-                            {index === 2 && "300+ Analysts"}
-                            {index === 3 && "400+ Marketers"}
-                            {index === 4 && "600+ Writers"}
-                            {index === 5 && "200+ Managers"}
-                            {index === 6 && "150+ Support"}
-                            {index === 7 && "800+ Experts"}
+                            {category.stat}
                           </span>
                         </div>
                       </div>

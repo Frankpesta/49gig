@@ -1,0 +1,17 @@
+
+> 49gig@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.100.7:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  · optimizePackageImports
+
+✓ Starting...
+✓ Ready in 1783ms
+ GET / 200 in 2.2s (compile: 1325ms, proxy.ts: 249ms, render: 668ms)
+ GET /about 200 in 1137ms (compile: 714ms, proxy.ts: 7ms, render: 416ms)
+ GET /manifest.webmanifest 200 in 192ms (compile: 147ms, proxy.ts: 10ms, render: 36ms)
+[?25h
