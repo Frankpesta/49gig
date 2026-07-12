@@ -37,6 +37,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   User,
   Mail,
   Phone,
@@ -64,6 +71,8 @@ import {
   Github,
   Linkedin,
   ExternalLink,
+  FileText,
+  Download,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
@@ -333,6 +342,32 @@ function AdminProfileLinkRow({
   );
 }
 
+function KycDocLink({ url, label }: { url: string | null | undefined; label: string }) {
+  if (!url) {
+    return (
+      <div className="rounded-lg border border-border/40 bg-muted/30 p-4 space-y-1">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className="text-sm text-muted-foreground italic">Not submitted</p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-border/40 bg-muted/30 p-4 space-y-2">
+      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+      <a
+        href={url}
+        download
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+      >
+        <Download className="h-4 w-4" />
+        Download document
+      </a>
+    </div>
+  );
+}
+
 function ScoreBar({ label, score, max = 100 }: { label: string; score?: number | null; max?: number }) {
   if (score == null) return null;
   const pct = Math.min(100, Math.round((score / max) * 100));
@@ -365,6 +400,8 @@ export default function UserDetailPage() {
 
   const [reviewDeleteId, setReviewDeleteId] = useState<Id<"reviews"> | null>(null);
   const [isDeletingReview, setIsDeletingReview] = useState(false);
+
+  const [kycModalOpen, setKycModalOpen] = useState(false);
 
   const profileData = useQuery(
     api.users.queries.getUserProfileForAdmin,
@@ -418,6 +455,18 @@ export default function UserDetailPage() {
           freelancerId: userId as Id<"users">,
           viewerUserId: currentUser._id,
         }
+      : "skip"
+  );
+
+  const kycData = useQuery(
+    api.kyc.queries.getKycByFreelancerId,
+    kycModalOpen &&
+      isAuthenticated &&
+      currentUser?._id &&
+      currentUser.role === "admin" &&
+      profileData?.role === "freelancer" &&
+      profileData.kycStatus === "approved"
+      ? { freelancerId: userId as Id<"users">, reviewerUserId: currentUser._id }
       : "skip"
   );
 
@@ -708,6 +757,12 @@ export default function UserDetailPage() {
                     <ShieldCheck className="h-3.5 w-3.5" />
                     KYC Review
                   </Link>
+                </Button>
+              )}
+              {isFreelancer && currentUser.role === "admin" && profileData.kycStatus === "approved" && (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setKycModalOpen(true)}>
+                  <FileText className="h-3.5 w-3.5" />
+                  View KYC Details
                 </Button>
               )}
             </CardContent>
@@ -1127,6 +1182,80 @@ export default function UserDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* KYC details modal */}
+      <Dialog open={kycModalOpen} onOpenChange={setKycModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>KYC Details</DialogTitle>
+            <DialogDescription>
+              Identity and address verification for {profileData.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          {kycData === undefined ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" />
+              Loading KYC details…
+            </div>
+          ) : !kycData ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No KYC submission found.
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-muted/30 px-4 py-3">
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <StatusBadge status={kycData.status} />
+                </div>
+                <div className="rounded-lg bg-muted/30 px-4 py-3">
+                  <p className="text-xs text-muted-foreground">Approved</p>
+                  <p className="text-sm font-medium">
+                    {profileData.kycApprovedAt ? format(profileData.kycApprovedAt, "PPP") : "—"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Identity document
+                  {kycData.idType ? (
+                    <span className="normal-case font-normal"> — {kycData.idType.replace(/_/g, " ")}</span>
+                  ) : null}
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <KycDocLink url={kycData.idFrontUrl} label="ID — Front" />
+                  <KycDocLink url={kycData.idBackUrl} label="ID — Back" />
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Proof of address
+                  {kycData.addressDocType ? (
+                    <span className="normal-case font-normal"> — {kycData.addressDocType.replace(/_/g, " ")}</span>
+                  ) : null}
+                </p>
+                <KycDocLink url={kycData.addressUrl} label="Address Document" />
+              </div>
+
+              <div className="space-y-0 divide-y divide-border/40">
+                <InfoRow
+                  label="Submitted"
+                  value={kycData.submittedAt ? format(kycData.submittedAt, "PPP 'at' p") : null}
+                  icon={Clock}
+                />
+                <InfoRow
+                  label="Reviewed"
+                  value={kycData.reviewedAt ? format(kycData.reviewedAt, "PPP 'at' p") : null}
+                  icon={Calendar}
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={reviewDeleteId != null} onOpenChange={(open) => !open && setReviewDeleteId(null)}>
         <AlertDialogContent>
