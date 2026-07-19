@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   Shield,
   Target,
-  UserCheck,
   BarChart3,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -187,7 +186,7 @@ export default function HireTeamPage() {
               At 49GIG, we help companies hire fully vetted, project-ready teams made up of top African professionals—carefully assembled to match your project requirements, timeline, and budget.
             </p>
             <p className="mt-5 text-base sm:text-lg leading-relaxed text-muted-foreground">
-              Whether you're building a product, scaling operations, or delivering for a client, 49GIG provides the right team, ready to work.
+              Whether you&apos;re building a product, scaling operations, or delivering for a client, 49GIG provides the right team, ready to work.
             </p>
           </SectionTransition>
 

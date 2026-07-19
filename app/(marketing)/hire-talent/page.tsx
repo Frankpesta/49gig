@@ -378,30 +378,6 @@ export default function HireTalentPage() {
                 Get matched with vetted African talent that delivers — on time, on budget, and to global standards.
               </p>
 
-              <div className="mt-8 grid gap-4 text-center sm:grid-cols-3 max-w-2xl mx-auto">
-                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Shield className="h-4 w-4" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-foreground">100% Vetted</h4>
-                  <p className="mt-1 text-xs text-muted-foreground">Top 3% only</p>
-                </div>
-                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary-foreground">
-                    <Zap className="h-4 w-4" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-foreground">48hr Match</h4>
-                  <p className="mt-1 text-xs text-muted-foreground">Fast placement</p>
-                </div>
-                <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
-                  <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-green-500/10 text-green-600">
-                    <Lock className="h-4 w-4" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-foreground">Secure Payments</h4>
-                  <p className="mt-1 text-xs text-muted-foreground">Milestone protected</p>
-                </div>
-              </div>
-
               <div className="mt-8 flex flex-col justify-center gap-4 sm:flex-row">
                 <CTAButton href="/signup/client" variant="primary" className="gap-2">
                   <Briefcase className="h-4 w-4" />

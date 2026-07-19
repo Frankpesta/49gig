@@ -80,7 +80,7 @@ export default function Home() {
   const stats = [
     { prefix: "", value: "3,500", label: "Vetted Professionals", suffix: "+", icon: Users },
     { prefix: "", value: "98", label: "Client Satisfaction", suffix: "%", icon: Trophy },
-    { prefix: "", value: "35", label: "Countries Served", suffix: "+", icon: Globe },
+    { prefix: "", value: "48-Hour", label: "Average Match Time", suffix: "", icon: Clock },
     { prefix: "", value: "50", label: "Faster Time to Hire", suffix: "%", icon: Clock },
   ];
 

@@ -54,7 +54,7 @@ export default function ContactPage() {
     }));
   };
 
-  const submitEnquiry = useAction((api as any).contactEnquiries.actions.submitContactEnquiry);
+  const submitEnquiry = useAction(api.contactEnquiries.actions.submitContactEnquiry);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,7 +110,7 @@ export default function ContactPage() {
     {
       icon: Briefcase,
       question: "How do I hire talent on 49GIG?",
-      answer: "Sign up as a client, create a project with our intake form (skills, budget, timeline), and we'll match you with vetted African professionals. No job postings or bidding—we handle the matching. Most clients are matched within 48 hours.",
+      answer: "Sign up as a client, create a project with our intake form (skills, budget, timeline), and we'll match you with vetted African professionals. No job postings or bidding—we handle the matching quickly and directly.",
     },
     {
       icon: Users,
@@ -210,7 +210,7 @@ export default function ContactPage() {
                         Message sent successfully!
                       </h3>
                       <p className="text-sm text-muted-foreground">
-                        Thank you for contacting us. We'll get back to you within 24 hours.
+                        Thank you for contacting us. We&apos;ll get back to you within 24 hours.
                       </p>
                     </CardContent>
                   </Card>
@@ -398,7 +398,7 @@ export default function ContactPage() {
                         </h3>
                       </div>
                       <div className="space-y-2 text-sm text-muted-foreground">
-                        <p><span className="font-medium text-foreground">Monday - Sunday:</span> Open 24/7</p>
+                        <p><span className="font-medium text-foreground">Monday - Sunday:</span> Always open for enquiries</p>
                       </div>
                     </CardContent>
                   </Card>

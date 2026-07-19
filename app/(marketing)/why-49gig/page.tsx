@@ -8,7 +8,6 @@ import {
   Briefcase,
   CheckCircle2,
   Layers,
-  Shield,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -151,7 +150,7 @@ export default function Why49GigPage() {
               At 49GIG, we believe hiring top-quality African professionals should be simple, reliable, and rewarding. We built a platform that connects global companies with vetted, skilled freelancers and teams—delivering world-class results at affordable rates.
             </p>
             <p className="mt-4 text-base sm:text-lg leading-relaxed text-muted-foreground">
-              Here's why 49GIG stands out:
+              Here&apos;s why 49GIG stands out:
             </p>
           </SectionTransition>
         </div>
@@ -277,4 +276,3 @@ export default function Why49GigPage() {
     </div>
   );
 }
-

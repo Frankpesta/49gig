@@ -30,7 +30,6 @@ import {
   Play,
   Lightbulb,
   MessageCircle,
-  ThumbsUp,
   Rocket,
   Workflow,
   Brain,
@@ -93,15 +92,15 @@ export default function ForFreelancersPage() {
   ];
 
   const skillCategories = [
-    { icon: Code, title: "Software Development", color: "primary", description: "Build websites, apps, and software solutions", stat: "1,000+ Devs" },
-    { icon: Palette, title: "UI/UX and Product Design", color: "primary", description: "Create stunning designs and user experiences", stat: "500+ Designers" },
-    { icon: Database, title: "Data Analytics", color: "primary", description: "Analyze data and drive business insights", stat: "300+ Analysts" },
-    { icon: Cloud, title: "DevOps & Cloud Engineering", color: "primary", description: "Automate deployments and manage cloud infrastructure", stat: "300+ Engineers" },
-    { icon: Shield, title: "Cybersecurity & IT Infrastructure", color: "primary", description: "Secure systems and manage IT infrastructure", stat: "250+ Specialists" },
-    { icon: Brain, title: "AI", color: "primary", description: "Build and deploy intelligent AI-powered solutions", stat: "200+ AI Experts" },
-    { icon: Brain, title: "Machine Learning", color: "primary", description: "Design and train machine learning models", stat: "180+ ML Engineers" },
-    { icon: Brain, title: "Blockchain", color: "primary", description: "Build decentralized apps and smart contracts", stat: "150+ Blockchain Devs" },
-    { icon: CheckCircle2, title: "Quality Assurance & Testing", color: "primary", description: "Ensure software quality through rigorous testing", stat: "220+ QA Engineers" },
+    { icon: Code, title: "Software Development", color: "primary", description: "Build websites, apps, and software solutions" },
+    { icon: Palette, title: "UI/UX and Product Design", color: "primary", description: "Create polished designs and user experiences" },
+    { icon: Database, title: "Data Analytics", color: "primary", description: "Analyze data and drive business insights" },
+    { icon: Cloud, title: "DevOps & Cloud Engineering", color: "primary", description: "Automate deployments and manage cloud infrastructure" },
+    { icon: Shield, title: "Cybersecurity & IT Infrastructure", color: "primary", description: "Secure systems and manage IT infrastructure" },
+    { icon: Brain, title: "AI", color: "primary", description: "Build and deploy intelligent AI-powered solutions" },
+    { icon: Brain, title: "Machine Learning", color: "primary", description: "Design and train machine learning models" },
+    { icon: Brain, title: "Blockchain", color: "primary", description: "Build decentralized apps and smart contracts" },
+    { icon: CheckCircle2, title: "Quality Assurance & Testing", color: "primary", description: "Ensure software quality through rigorous testing" },
   ];
 
   const howItWorksSteps = [
@@ -186,25 +185,19 @@ export default function ForFreelancersPage() {
       />
 
       {/* MODERN WHY FREELANCERS CHOOSE 49GIG */}
-      <section className="py-20 sm:py-24 lg:py-32 bg-gradient-to-br from-background via-secondary/5 to-background relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        </div>
-
+      <section className="border-b border-border/40 bg-background py-20 sm:py-24 lg:py-28">
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionTransition variant="fade" delay={200}>
             <div className="text-center mb-20 lg:mb-24">
-              <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-secondary/10 to-primary/10 px-6 py-3 text-sm font-bold text-secondary border border-secondary/20 shadow-lg">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-r from-secondary/20 to-primary/20">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-2 text-xs font-semibold text-primary">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/15">
                   <Lightbulb className="h-3.5 w-3.5 text-secondary" />
                 </div>
                 Why Choose 49GIG
               </div>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-semibold text-foreground mb-5 leading-tight">
                 Why Freelancers Choose <br className="hidden lg:block" />
-                <span className="bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">49GIG</span>
+                <span className="text-primary">49GIG</span>
               </h2>
               <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
                 Join thousands of African professionals building successful global careers with verified clients and fair pay.
@@ -219,27 +212,21 @@ export default function ForFreelancersPage() {
                   {/* Modern Content Card */}
                   <div className="space-y-8">
                     <div className="group relative">
-                      {/* Hover Glow Effect */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-secondary/10 to-primary/10 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-2xl scale-110" />
-
-                      <div className="relative bg-background/80 backdrop-blur-xl border border-border/30 rounded-3xl p-8 lg:p-10 shadow-xl hover:shadow-2xl hover:shadow-secondary/10 transition-all duration-500 hover:scale-105">
-                        {/* Animated Background */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-
+                      <div className="relative rounded-2xl border border-border/60 bg-background p-7 shadow-sm transition hover:shadow-md lg:p-9">
                         <div className="relative space-y-8">
                           <div className="flex items-start gap-6">
-                            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-secondary/10 to-primary/10 group-hover:from-secondary/20 group-hover:to-primary/20 transition-all duration-500 shadow-lg group-hover:shadow-secondary/20 group-hover:scale-110">
-                              <reason.icon className="h-10 w-10 text-secondary group-hover:scale-110 transition-transform duration-300" />
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                              <reason.icon className="h-6 w-6" />
                             </div>
                             <div className="space-y-3 flex-1">
-                              <h3 className="text-2xl lg:text-3xl font-bold text-foreground group-hover:text-secondary transition-colors duration-300 leading-tight">
+                              <h3 className="text-2xl font-semibold text-foreground leading-tight">
                                 {reason.title}
                               </h3>
-                              <div className="h-1 w-16 bg-gradient-to-r from-secondary to-primary rounded-full group-hover:w-24 transition-all duration-300" />
+                              <div className="h-px w-16 bg-primary/40" />
                             </div>
                           </div>
 
-                          <p className="text-lg lg:text-xl text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
+                          <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
                             {reason.description}
                           </p>
 
@@ -248,10 +235,10 @@ export default function ForFreelancersPage() {
                               {reason.features.map((feature, idx) => (
                                 <SectionTransition key={idx} variant="slide" direction="up" delay={500 + idx * 100}>
                                   <div className="flex items-start gap-4 group/item">
-                                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 group-hover/item:from-green-600 group-hover/item:to-emerald-600 transition-all duration-300 shadow-lg group-hover/item:scale-110">
-                                      <CheckCircle2 className="h-4 w-4 text-white" />
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                                      <CheckCircle2 className="h-4 w-4 text-primary" />
                                     </div>
-                                    <span className="text-base font-medium text-foreground leading-relaxed group-hover/item:text-green-700 transition-colors duration-300 flex-1">
+                                    <span className="text-base font-medium text-foreground leading-relaxed flex-1">
                                       {feature}
                                     </span>
                                   </div>
@@ -260,13 +247,7 @@ export default function ForFreelancersPage() {
                             </div>
                           )}
 
-                          {/* Call to Action */}
-                          <div className="flex items-center justify-between pt-4 border-t border-border/30 group-hover:border-secondary/30 transition-colors duration-300">
-                            <span className="text-sm font-medium text-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                              Learn more about this benefit
-                            </span>
-                            <ArrowRight className="h-4 w-4 text-secondary opacity-0 group-hover:opacity-100 transition-all duration-300 group-hover:translate-x-1" />
-                          </div>
+                          <div className="h-px bg-border/60" />
                         </div>
                       </div>
                     </div>
@@ -275,22 +256,22 @@ export default function ForFreelancersPage() {
                   {/* Enhanced Image Section */}
                   <div className={`relative ${index % 2 === 1 ? '' : 'lg:order-last'}`}>
                     <div className="relative group">
-                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-secondary/20 transition-all duration-500 group-hover:scale-105">
+                      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border/40 shadow-lg">
                         <Image
                           src={reason.image}
                           alt={reason.title}
                           fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-110"
+                          className="object-cover"
                           sizes="(max-width: 1024px) 100vw, 50vw"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-tr from-secondary/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <div className="absolute inset-0 bg-linear-to-t from-primary/15 via-transparent to-transparent" />
 
-                        {/* Success metrics overlay */}
+                        {/* Context overlay */}
                         <div className="absolute bottom-4 left-4 bg-background/95 backdrop-blur-sm rounded-2xl px-4 py-2 border border-border/30 shadow-lg">
                           <div className="flex items-center gap-2">
-                            <ThumbsUp className="h-4 w-4 text-green-600" />
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
                             <span className="text-sm font-medium text-foreground">
-                              {index === 0 && "100% Verified Clients"}
+                              {index === 0 && "Verified Clients"}
                               {index === 1 && "No Bidding Required"}
                               {index === 2 && "Secure Payments"}
                               {index === 3 && "Career Growth"}
@@ -305,33 +286,6 @@ export default function ForFreelancersPage() {
             ))}
           </div>
 
-          {/* Social Proof Section */}
-          <SectionTransition variant="fade" delay={600}>
-            <div className="mt-20 text-center">
-              <div className="bg-gradient-to-r from-secondary/5 via-primary/5 to-secondary/5 rounded-3xl p-8 border border-border/30">
-                <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
-                  Join a Growing Community
-                </h3>
-                <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  Thousands of African freelancers have already built successful careers on 49GIG. Join them today.
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-                  <div className="space-y-2">
-                    <div className="text-3xl font-semibold text-secondary">10K+</div>
-                    <div className="text-sm text-muted-foreground">Active Freelancers</div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-3xl font-semibold text-primary">50+</div>
-                    <div className="text-sm text-muted-foreground">Countries Served</div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-3xl font-semibold text-purple-600">4.9★</div>
-                    <div className="text-sm text-muted-foreground">Average Rating</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </SectionTransition>
         </div>
       </section>
 
@@ -387,15 +341,6 @@ export default function ForFreelancersPage() {
                         </div>
                       </div>
 
-                      {/* Stats */}
-                      <div className="pt-2">
-                        <div className="inline-flex items-center gap-2 bg-primary/10 rounded-full px-4 py-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          <span className="text-sm font-medium text-primary">
-                            {category.stat}
-                          </span>
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -500,29 +445,6 @@ export default function ForFreelancersPage() {
             </BentoGrid>
           </div>
 
-          {/* Process Overview */}
-          <SectionTransition variant="fade" delay={800}>
-            <div className="mt-20 text-center">
-              <div className="bg-gradient-to-r from-secondary/5 via-primary/5 to-secondary/5 rounded-3xl p-8 border border-border/30">
-                <h3 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">
-                  The Complete Freelancer Journey
-                </h3>
-                <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  From application to building a successful freelance career, we support you every step of the way.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                  <div className="space-y-2">
-                    <div className="text-2xl font-bold text-secondary">5 Days</div>
-                    <div className="text-sm text-muted-foreground">Average approval time</div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="text-2xl font-bold text-primary">24/7</div>
-                    <div className="text-sm text-muted-foreground">Platform support</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </SectionTransition>
         </div>
       </section>
 
@@ -569,7 +491,7 @@ export default function ForFreelancersPage() {
                       <span className="text-sm font-bold text-amber-700">High Performers Get Rewarded</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Top-rated freelancers get priority access to high-value projects and can earn up to 3x more than average performers.
+                      Top-rated freelancers get priority access to better-fit projects and stronger long-term opportunities.
                     </p>
                   </div>
                 </SectionTransition>
@@ -589,25 +511,6 @@ export default function ForFreelancersPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-amber-500/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 </div>
 
-                {/* Quality metrics overlay */}
-                <div className="absolute bottom-6 left-6 right-6">
-                  <div className="bg-background/95 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-border/30">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="text-lg font-bold text-amber-600">4.9★</div>
-                        <div className="text-xs text-muted-foreground">Avg. Rating</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-primary">98%</div>
-                        <div className="text-xs text-muted-foreground">Success Rate</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-green-600">$50K</div>
-                        <div className="text-xs text-muted-foreground">Avg. Earnings</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </SectionTransition>
           </div>
@@ -660,7 +563,7 @@ export default function ForFreelancersPage() {
                   <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-3xl p-6 border border-green-500/20">
                     <div className="flex items-center gap-3 mb-3">
                       <MessageCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-bold text-green-700">24/7 Support Team</span>
+                      <span className="text-sm font-bold text-green-700">Dedicated Support Team</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Our dedicated support team is always here to help you succeed. Get assistance with projects, payments, or any platform questions.
@@ -683,25 +586,6 @@ export default function ForFreelancersPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-green-500/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 </div>
 
-                {/* Support metrics overlay */}
-                <div className="absolute bottom-6 left-6 right-6">
-                  <div className="bg-background/95 backdrop-blur-xl rounded-2xl p-4 shadow-xl border border-border/30">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="text-lg font-bold text-green-600">24/7</div>
-                        <div className="text-xs text-muted-foreground">Support</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-primary">5 min</div>
-                        <div className="text-xs text-muted-foreground">Avg. Response</div>
-                      </div>
-                      <div>
-                        <div className="text-lg font-bold text-secondary">98%</div>
-                        <div className="text-xs text-muted-foreground">Resolution Rate</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </SectionTransition>
           </div>
@@ -769,4 +653,3 @@ export default function ForFreelancersPage() {
     </div>
   );
 }
-
