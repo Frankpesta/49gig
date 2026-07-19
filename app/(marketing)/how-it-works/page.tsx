@@ -1,7 +1,3 @@
-
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import { PageHero } from "@/components/marketing/page-hero";
 import { CTAButton } from "@/components/marketing/cta-buttons";
@@ -14,11 +10,8 @@ import {
   Handshake,
   DollarSign,
   Shield,
-  ChevronRight,
   Target,
   Award,
-  FileCheck,
-  Clock,
   ArrowRight,
   Play,
   Search,
@@ -26,11 +19,6 @@ import {
   Rocket,
   Workflow,
   Lightbulb,
-  TrendingUp,
-  Star,
-  MapPin,
-  MessageCircle,
-  ThumbsUp,
 } from "lucide-react";
 import type { Metadata } from "next";
 import { buildMarketingRouteMetadata } from "@/lib/seo/marketing-page-metadata";
@@ -402,7 +390,7 @@ export default function HowItWorksPage() {
                 title: "Quality First",
                 description: "Only vetted professionals are allowed on the platform.",
                 color: "from-blue-500 to-blue-600",
-                metric: "Top 3%",
+                assurance: "Quality-led",
                 colSpan: 2 as const,
                 rowSpan: 2 as const,
                 placement: { col: 1, row: 1 },
@@ -412,7 +400,7 @@ export default function HowItWorksPage() {
                 title: "Transparent Process",
                 description: "Clear contracts, milestones, and expectations from day one.",
                 color: "from-green-500 to-green-600",
-                metric: "100% Clear",
+                assurance: "Transparent",
                 colSpan: 1 as const,
                 rowSpan: 2 as const,
                 placement: { col: 3, row: 1 },
@@ -422,7 +410,7 @@ export default function HowItWorksPage() {
                 title: "Built-In Protection",
                 description: "Secure payments, dispute resolution, and performance tracking.",
                 color: "from-purple-500 to-purple-600",
-                metric: "Bank-Level",
+                assurance: "Protected",
                 colSpan: 1 as const,
                 rowSpan: 1 as const,
                 placement: { col: 1, row: 3 },
@@ -432,7 +420,7 @@ export default function HowItWorksPage() {
                 title: "Fair & Affordable",
                 description: "Clients get great value. Freelancers get fair pay.",
                 color: "from-orange-500 to-orange-600",
-                metric: "Best Value",
+                assurance: "Fair value",
                 colSpan: 2 as const,
                 rowSpan: 1 as const,
                 placement: { col: 2, row: 3 },
@@ -456,7 +444,7 @@ export default function HowItWorksPage() {
                             {item.title}
                           </h3>
                           <div className={`px-3 py-1 rounded-full bg-gradient-to-r ${item.color} text-white text-xs font-bold shadow-lg`}>
-                            {item.metric}
+                            {item.assurance}
                           </div>
                         </div>
                         <p className="text-base text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors duration-300">
@@ -484,19 +472,6 @@ export default function HowItWorksPage() {
             ))}
           </BentoGrid>
 
-          {/* Success Metrics */}
-          <SectionTransition variant="fade" delay={600}>
-            <div className="mt-20 grid grid-cols-1 md:grid-cols-2 gap-8 text-center max-w-2xl mx-auto">
-              <div className="bg-background/50 backdrop-blur-sm rounded-2xl p-6 border border-border/30 hover:border-primary/30 transition-colors duration-300">
-                <div className="text-3xl font-semibold text-primary mb-2">98%</div>
-                <div className="text-sm text-muted-foreground">Project Success Rate</div>
-              </div>
-              <div className="bg-background/50 backdrop-blur-sm rounded-2xl p-6 border border-border/30 hover:border-secondary/30 transition-colors duration-300">
-                <div className="text-3xl font-semibold text-secondary mb-2">24/7</div>
-                <div className="text-sm text-muted-foreground">Support Available</div>
-              </div>
-            </div>
-          </SectionTransition>
         </div>
       </section>
 
