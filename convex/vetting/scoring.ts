@@ -36,8 +36,15 @@ export function averageSkillScore(vetting: Doc<"vettingResults">): number {
   return arr.reduce((s, a) => s + a.score, 0) / arr.length;
 }
 
-/** Weighted verification score: English composite 30%, average skill 70%. */
+/**
+ * Weighted verification score: English composite 30%, average skill 70%.
+ * For freelancers who signed up after the English test cutover (`englishSkipped`),
+ * the score is skills-only (100% weight) since there is no English component.
+ */
 export function weightedVerificationOverall(vetting: Doc<"vettingResults">): number | null {
+  if (vetting.englishSkipped) {
+    return Math.round(averageSkillScore(vetting) * 100) / 100;
+  }
   const eng = englishCompositeFromVetting(vetting.englishProficiency);
   if (eng == null) return null;
   return calculateOverallScore({

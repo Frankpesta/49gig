@@ -109,3 +109,39 @@ export const getAutomaticMatchingEnabledInternal = internalQuery({
     return doc.value;
   },
 });
+
+/**
+ * Signup-time cutover (epoch ms) after which new freelancers skip the English test.
+ * Returns null when unset — English stays required for everyone until an admin
+ * explicitly sets this (dormant by default).
+ */
+export const getEnglishTestCutoverAt = query({
+  args: {},
+  handler: async (ctx): Promise<number | null> => {
+    const doc = await ctx.db
+      .query("platformSettings")
+      .withIndex("by_key", (q) => q.eq("key", "englishTestCutoverAt"))
+      .first();
+
+    if (!doc || typeof doc.value !== "number") {
+      return null;
+    }
+    return doc.value;
+  },
+});
+
+/** Internal: for use inside mutations (initializeVerification). */
+export const getEnglishTestCutoverAtInternal = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<number | null> => {
+    const doc = await ctx.db
+      .query("platformSettings")
+      .withIndex("by_key", (q) => q.eq("key", "englishTestCutoverAt"))
+      .first();
+
+    if (!doc || typeof doc.value !== "number") {
+      return null;
+    }
+    return doc.value;
+  },
+});

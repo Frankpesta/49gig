@@ -635,6 +635,12 @@ export default defineSchema({
      * Set on first English failure; `submitEnglishProficiency` enforces it. Cleared early if the freelancer skips wait.
      */
     englishRetakeAvailableAt: v.optional(v.number()),
+    /**
+     * Set once at initializeVerification time by comparing user._creationTime to the
+     * englishTestCutoverAt platformSettings value in effect at that moment. Immutable
+     * afterwards. Absent on all existing rows == not skipped (safe default).
+     */
+    englishSkipped: v.optional(v.boolean()),
     /** Skills composite attempt round for 50% gate + retake. */
     skillsAttemptRound: v.optional(v.number()),
     skillsFailedAttempts: v.optional(v.number()),
