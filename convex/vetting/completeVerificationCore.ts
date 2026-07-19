@@ -87,10 +87,15 @@ export async function runCompleteVerificationForFreelancer(
     updatedAt: Date.now(),
   });
 
-  const englishComposite = englishCompositeFromVetting(vettingRow.englishProficiency);
-  if (englishComposite == null) {
+  const englishComposite = vettingRow.englishSkipped
+    ? null
+    : englishCompositeFromVetting(vettingRow.englishProficiency);
+  if (!vettingRow.englishSkipped && englishComposite == null) {
     throw new Error("Finish the English test (including the written section) before submitting.");
   }
+  // Informational only (audit details / failure-message display) — genuinely null
+  // for englishSkipped freelancers, who have no English component.
+  const englishScoreForDisplay = englishComposite != null ? Math.round(englishComposite) : undefined;
 
   if (vettingRow.skillAssessments.length === 0) {
     throw new Error("At least one skill assessment is required");
@@ -98,7 +103,7 @@ export async function runCompleteVerificationForFreelancer(
 
   const avgSkillScore = averageSkillScore(vettingRow);
   const MIN_PERCENT = MIN_PERCENT_TO_PASS;
-  const englishFailed = englishComposite < MIN_PERCENT;
+  const englishFailed = !vettingRow.englishSkipped && englishComposite! < MIN_PERCENT;
   const skillsFailed = avgSkillScore < MIN_PERCENT;
 
   const engRound = vettingRow.englishAttemptRound ?? 0;
@@ -116,6 +121,9 @@ export async function runCompleteVerificationForFreelancer(
   }
 
   if (englishFailed) {
+    // englishFailed is only ever true when !englishSkipped, so englishComposite was
+    // already validated non-null above.
+    const eng = englishComposite as number;
     if (engRound >= 1) {
       await hardFailVerification("english_below_minimum_after_retake");
       return {
@@ -129,7 +137,7 @@ export async function runCompleteVerificationForFreelancer(
     const overallScore =
       weightedVerificationOverall(vettingRow) ??
       calculateOverallScore({
-        englishScore: englishComposite,
+        englishScore: eng,
         skillScores: vettingRow.skillAssessments.map((a) => a.score),
       });
     const newStepsCompleted = vettingRow.stepsCompleted.filter((s) => s !== "english");
@@ -167,7 +175,7 @@ export async function runCompleteVerificationForFreelancer(
       targetType: "vettingResult",
       targetId: vettingRow._id,
       details: {
-        englishComposite,
+        englishComposite: eng,
         avgSkillScore,
         minRequired: MIN_PERCENT,
         dimension: "english",
@@ -179,7 +187,7 @@ export async function runCompleteVerificationForFreelancer(
       success: false,
       accountDeleted: false,
       status: "rejected",
-      englishScore: Math.round(englishComposite),
+      englishScore: Math.round(eng),
       avgSkillScore: Math.round(avgSkillScore),
       message: `You scored below ${MIN_PERCENT}% on the English assessment (average of grammar, comprehension, and writing). You failed the first try — tap Retake below to try once more. If you score below ${MIN_PERCENT}% again, your application will be closed.`,
     };
@@ -212,7 +220,9 @@ export async function runCompleteVerificationForFreelancer(
     const overallScore =
       weightedVerificationOverall(vettingRow) ??
       calculateOverallScore({
-        englishScore: englishComposite,
+        // Unreachable for englishSkipped rows: weightedVerificationOverall never
+        // returns null for them. The ?? 0 is only to satisfy the type here.
+        englishScore: englishComposite ?? 0,
         skillScores: vettingRow.skillAssessments.map((a) => a.score),
       });
     const newStepsCompleted = vettingRow.stepsCompleted.filter((s) => s !== "skills");
@@ -267,7 +277,7 @@ export async function runCompleteVerificationForFreelancer(
       success: false,
       accountDeleted: false,
       status: "rejected",
-      englishScore: Math.round(englishComposite),
+      englishScore: englishScoreForDisplay,
       avgSkillScore: Math.round(avgSkillScore),
       message: `You scored below ${MIN_PERCENT}% on the skills assessment (average across your skill tests). You failed the first try — start the skill test again for one more attempt. If you score below ${MIN_PERCENT}% again, your application will be closed.`,
     };
@@ -276,7 +286,9 @@ export async function runCompleteVerificationForFreelancer(
   const overallScore =
     weightedVerificationOverall(vettingRow) ??
     calculateOverallScore({
-      englishScore: englishComposite,
+      // Unreachable for englishSkipped rows: weightedVerificationOverall never
+      // returns null for them. The ?? 0 is only to satisfy the type here.
+      englishScore: englishComposite ?? 0,
       skillScores: vettingRow.skillAssessments.map((a) => a.score),
     });
 
@@ -339,9 +351,12 @@ export async function runCompleteVerificationForFreelancer(
   }
 
   const proc = vettingRow.proctoringSummary;
-  if (!proc?.englishProctoringReadyAt || !proc?.skillsProctoringReadyAt) {
+  const englishProctoringOk = vettingRow.englishSkipped || !!proc?.englishProctoringReadyAt;
+  if (!englishProctoringOk || !proc?.skillsProctoringReadyAt) {
     throw new Error(
-      "Enable your webcam for both the English and skill assessments before submitting. Open each section, allow camera access, then submit again.",
+      vettingRow.englishSkipped
+        ? "Enable your webcam for the skill assessment before submitting. Open the section, allow camera access, then submit again."
+        : "Enable your webcam for both the English and skill assessments before submitting. Open each section, allow camera access, then submit again.",
     );
   }
 

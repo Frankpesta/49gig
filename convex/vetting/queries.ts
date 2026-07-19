@@ -81,6 +81,7 @@ export const getVerificationStatus = query({
             currentStep: vettingResult.currentStep,
             stepsCompleted: vettingResult.stepsCompleted,
             overallScore: vettingResult.overallScore,
+            englishSkipped: vettingResult.englishSkipped ?? false,
             englishProficiency: vettingResult.englishProficiency,
             skillAssessments: vettingResult.skillAssessments,
             fraudFlags: vettingResult.fraudFlags,

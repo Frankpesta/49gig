@@ -146,3 +146,85 @@ export const setAutomaticMatchingEnabled = mutation({
     return { success: true, enabled: args.enabled };
   },
 });
+
+/**
+ * Set the signup-time cutover after which new freelancers skip the English test
+ * entirely (skills-only scoring). Admin only. Freelancers whose vettingResults row
+ * already exists are never affected — the flag is computed once, at
+ * initializeVerification time, from the cutover value in effect at that moment.
+ */
+export const setEnglishTestCutoverAt = mutation({
+  args: {
+    cutoverAt: v.number(),
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = args.userId
+      ? await ctx.db.get(args.userId)
+      : await getCurrentUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "admin") {
+      throw new Error("Only admins can change the English test cutover");
+    }
+    if (!Number.isFinite(args.cutoverAt) || args.cutoverAt < 0) {
+      throw new Error("Cutover timestamp must be a valid time.");
+    }
+
+    const now = Date.now();
+    const existing = await ctx.db
+      .query("platformSettings")
+      .withIndex("by_key", (q) => q.eq("key", "englishTestCutoverAt"))
+      .first();
+
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        value: args.cutoverAt,
+        updatedAt: now,
+        updatedBy: user._id,
+      });
+    } else {
+      await ctx.db.insert("platformSettings", {
+        key: "englishTestCutoverAt",
+        value: args.cutoverAt,
+        updatedAt: now,
+        updatedBy: user._id,
+      });
+    }
+
+    return { success: true, cutoverAt: args.cutoverAt };
+  },
+});
+
+/**
+ * Clear the English test cutover, restoring "English required for everyone."
+ * Admin only. Does not affect freelancers whose vettingResults row already exists.
+ */
+export const disableEnglishTestCutover = mutation({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const user = args.userId
+      ? await ctx.db.get(args.userId)
+      : await getCurrentUser(ctx);
+    if (!user) {
+      throw new Error("Not authenticated");
+    }
+    if (user.role !== "admin") {
+      throw new Error("Only admins can change the English test cutover");
+    }
+
+    const existing = await ctx.db
+      .query("platformSettings")
+      .withIndex("by_key", (q) => q.eq("key", "englishTestCutoverAt"))
+      .first();
+
+    if (existing) {
+      await ctx.db.delete(existing._id);
+    }
+
+    return { success: true };
+  },
+});

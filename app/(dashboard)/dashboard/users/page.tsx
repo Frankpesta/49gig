@@ -366,14 +366,14 @@ function UsersPageContent() {
         reviewNotes: notes,
         adminUserId: user._id,
       });
-      toast.success("Verification rejected.");
+      toast.success("Verification rejected — account deleted.");
       setRejectDialogOpen(false);
       setRejectReviewNotes("");
       setSelectedUser(null);
     } catch (error) {
       setErrorDialog({
         open: true,
-        title: "Rejection failed",
+        title: "Rejection blocked",
         message: getUserFriendlyError(error) || "Could not reject verification.",
       });
     } finally {
@@ -991,14 +991,22 @@ function UsersPageContent() {
                                             <div className="grid gap-2 sm:grid-cols-2 text-xs">
                                               <div className="rounded-md bg-background/60 border border-border/50 p-2">
                                                 <p className="font-medium text-foreground mb-1">English</p>
-                                                <p className="text-muted-foreground">
-                                                  Grammar: {en.grammarScore ?? "—"}% · Comprehension:{" "}
-                                                  {en.comprehensionScore ?? "—"}%
-                                                </p>
-                                                <p className="text-muted-foreground">
-                                                  Written: {en.writtenResponseScore ?? "—"}% · Overall:{" "}
-                                                  {en.overallScore ?? "—"}%
-                                                </p>
+                                                {vr.englishSkipped ? (
+                                                  <p className="text-muted-foreground">
+                                                    Skipped (signed up after cutover) — scored on skills only.
+                                                  </p>
+                                                ) : (
+                                                  <>
+                                                    <p className="text-muted-foreground">
+                                                      Grammar: {en.grammarScore ?? "—"}% · Comprehension:{" "}
+                                                      {en.comprehensionScore ?? "—"}%
+                                                    </p>
+                                                    <p className="text-muted-foreground">
+                                                      Written: {en.writtenResponseScore ?? "—"}% · Overall:{" "}
+                                                      {en.overallScore ?? "—"}%
+                                                    </p>
+                                                  </>
+                                                )}
                                               </div>
                                               <div className="rounded-md bg-background/60 border border-border/50 p-2">
                                                 <p className="font-medium text-foreground mb-1">Skills</p>
@@ -1408,9 +1416,15 @@ function UsersPageContent() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Reject freelancer verification?</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Reject verification — this permanently deletes the account
+            </DialogTitle>
             <DialogDescription>
-              The freelancer will be notified. Provide clear notes they can act on.
+              Rejecting a freelancer at this stage permanently erases their account: profile, test
+              results, KYC documents, messages, and all related records. This cannot be undone —
+              there is no separate soft-reject. The freelancer will be emailed and must sign up
+              again from scratch to reapply.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
@@ -1423,6 +1437,10 @@ function UsersPageContent() {
               rows={4}
               className="resize-none"
             />
+            <p className="text-xs text-muted-foreground">
+              Recorded for audit purposes only — the account is deleted, so the freelancer won&apos;t
+              see these notes in-app.
+            </p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
@@ -1439,7 +1457,7 @@ function UsersPageContent() {
               onClick={() => void handleRejectFreelancerVetting()}
               disabled={vettingActionLoading}
             >
-              {vettingActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reject verification"}
+              {vettingActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reject & delete account"}
             </Button>
           </DialogFooter>
         </DialogContent>

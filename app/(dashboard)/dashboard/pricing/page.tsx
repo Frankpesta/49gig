@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, DollarSign, Save, RotateCcw, Percent } from "lucide-react";
+import { Loader2, DollarSign, Save, RotateCcw, Percent, Languages, X } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { TALENT_CATEGORY_LABELS } from "@/lib/platform-skills";
@@ -31,6 +31,12 @@ const DEFAULT_RATES: Record<string, { junior: number; mid: number; senior: numbe
   "Quality Assurance and Testing": { junior: 24, mid: 42, senior: 70, expert: 108 },
 };
 
+function epochToDatetimeLocal(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function buildEmptyRates(): Record<string, { junior: number; mid: number; senior: number; expert: number }> {
   const out: Record<string, { junior: number; mid: number; senior: number; expert: number }> = {};
   for (const cat of TALENT_CATEGORY_LABELS) {
@@ -47,6 +53,9 @@ export default function PricingPage() {
   const setPlatformFeePct = useMutation(api.platformSettings.mutations.setPlatformFeePercentage);
   const referralBonusPct = useQuery(api.platformSettings.queries.getReferralBonusPercentage);
   const setReferralBonusPct = useMutation(api.platformSettings.mutations.setReferralBonusPercentage);
+  const englishTestCutoverAt = useQuery(api.platformSettings.queries.getEnglishTestCutoverAt);
+  const setEnglishTestCutoverAt = useMutation(api.platformSettings.mutations.setEnglishTestCutoverAt);
+  const disableEnglishTestCutover = useMutation(api.platformSettings.mutations.disableEnglishTestCutover);
 
   const [rates, setRates] = useState<Record<string, { junior: number; mid: number; senior: number; expert: number }>>(buildEmptyRates);
   const [saving, setSaving] = useState(false);
@@ -55,6 +64,8 @@ export default function PricingPage() {
   const [platformFeeTouched, setPlatformFeeTouched] = useState(false);
   const [referralBonus, setReferralBonus] = useState<number>(4);
   const [referralBonusTouched, setReferralBonusTouched] = useState(false);
+  const [englishCutoverInput, setEnglishCutoverInput] = useState<string>("");
+  const [englishCutoverTouched, setEnglishCutoverTouched] = useState(false);
 
   const hydrateFromConfig = useCallback(() => {
     if (config === undefined) return;
@@ -90,6 +101,12 @@ export default function PricingPage() {
       setReferralBonus(referralBonusPct);
     }
   }, [referralBonusPct]);
+
+  useEffect(() => {
+    if (englishTestCutoverAt === undefined) return;
+    setEnglishCutoverInput(englishTestCutoverAt == null ? "" : epochToDatetimeLocal(englishTestCutoverAt));
+    setEnglishCutoverTouched(false);
+  }, [englishTestCutoverAt]);
 
   const handleChange = (category: string, level: Level, value: string) => {
     const parsed = value.trim() === "" ? 0 : parseFloat(value);
@@ -172,6 +189,40 @@ export default function PricingPage() {
       toast.success("Referral bonus percentage updated.");
     } catch (e) {
       toast.error(getUserFriendlyError(e) || "Failed to save referral bonus");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveEnglishCutover = async () => {
+    if (!user?._id || !englishCutoverInput) return;
+    const ms = new Date(englishCutoverInput).getTime();
+    if (isNaN(ms)) {
+      toast.error("Enter a valid date and time");
+      return;
+    }
+    setSaving(true);
+    try {
+      await setEnglishTestCutoverAt({ cutoverAt: ms, userId: user._id });
+      setEnglishCutoverTouched(false);
+      toast.success("English test cutover saved.");
+    } catch (e) {
+      toast.error(getUserFriendlyError(e) || "Failed to save cutover");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleClearEnglishCutover = async () => {
+    if (!user?._id) return;
+    setSaving(true);
+    try {
+      await disableEnglishTestCutover({ userId: user._id });
+      setEnglishCutoverInput("");
+      setEnglishCutoverTouched(false);
+      toast.success("English test is now required for everyone again.");
+    } catch (e) {
+      toast.error(getUserFriendlyError(e) || "Failed to clear cutover");
     } finally {
       setSaving(false);
     }
@@ -291,6 +342,60 @@ export default function PricingPage() {
               <span className="text-sm text-amber-600 dark:text-amber-400">Unsaved</span>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Languages className="h-4 w-4" />
+            English test cutover
+          </CardTitle>
+          <CardDescription>
+            Freelancers who sign up after this date and time skip the English test entirely and are scored on
+            skills only. Freelancers who signed up before it (including anyone already mid-verification) are
+            unaffected and still take the English test as normal. Leave unset to require English for everyone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              type="datetime-local"
+              value={englishCutoverInput}
+              onChange={(e) => {
+                setEnglishCutoverInput(e.target.value);
+                setEnglishCutoverTouched(true);
+              }}
+              className="w-64 h-9"
+            />
+            <Button
+              size="sm"
+              onClick={handleSaveEnglishCutover}
+              disabled={saving || !englishCutoverTouched || !englishCutoverInput}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save
+            </Button>
+            {englishTestCutoverAt != null && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleClearEnglishCutover}
+                disabled={saving}
+              >
+                <X className="h-4 w-4" />
+                Clear (require English for everyone)
+              </Button>
+            )}
+            {englishCutoverTouched && (
+              <span className="text-sm text-amber-600 dark:text-amber-400">Unsaved</span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {englishTestCutoverAt != null
+              ? `Currently active: freelancers who signed up after ${new Date(englishTestCutoverAt).toLocaleString()} skip English.`
+              : "Currently inactive: English is required for every freelancer."}
+          </p>
         </CardContent>
       </Card>
 

@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { checkFraudFlags } from "./engine";
 import { runCompleteVerificationForFreelancer } from "./completeVerificationCore";
 import { getCurrentUser } from "../auth";
+import { hardDeleteUserAccount } from "../users/hardDeleteUser";
 import { Doc, Id } from "../_generated/dataModel";
 import type { FunctionReference } from "convex/server";
 
@@ -195,6 +196,16 @@ export const initializeVerification = mutation({
       throw new Error("Verification already initialized");
     }
 
+    // Skip English entirely for freelancers who signed up after the admin-configured
+    // cutover. Computed once here and persisted on the row — later changes to the
+    // cutover setting must never retroactively affect a freelancer already mid-flow.
+    const englishTestCutoverAt: number | null = await ctx.runQuery(
+      internalAny.platformSettings.queries.getEnglishTestCutoverAtInternal,
+      {}
+    );
+    const englishSkipped =
+      englishTestCutoverAt != null && user._creationTime > englishTestCutoverAt;
+
     // Create initial vetting result
     const vettingResultId = await ctx.db.insert("vettingResults", {
       freelancerId: user._id,
@@ -202,8 +213,13 @@ export const initializeVerification = mutation({
       skillAssessments: [],
       overallScore: 0,
       status: "pending",
-      currentStep: "english",
-      stepsCompleted: [],
+      currentStep: englishSkipped ? "skills" : "english",
+      // Pre-mark "english" as completed for skipped users so the existing
+      // stepsCompleted.includes("english") gates (auto-complete triggers,
+      // completeVerificationCore's requiredSteps check) pass without any
+      // further special-casing.
+      stepsCompleted: englishSkipped ? ["english"] : [],
+      englishSkipped,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -792,22 +808,10 @@ export const rejectVerification = mutation({
       throw new Error("Verification not found");
     }
 
-    // Update vetting result
-    await ctx.db.patch(vettingResult._id, {
-      status: "rejected",
-      reviewedBy: admin._id,
-      reviewedAt: Date.now(),
-      reviewNotes: args.reviewNotes,
-      updatedAt: Date.now(),
-    });
-
-    // Update user verification status
-    await ctx.db.patch(args.freelancerId, {
-      verificationStatus: "rejected",
-      updatedAt: Date.now(),
-    });
-
-    // Create audit log
+    // Record the human decision before the hard delete removes vettingResult/users
+    // entirely — this audit row is not swept by hardDeleteUserAccount's own purge
+    // (that only deletes rows where actorId or targetId matches the freelancer;
+    // here actorId is the admin and targetType is "vettingResult").
     await ctx.db.insert("auditLogs", {
       action: "verification_rejected",
       actionType: "admin",
@@ -822,17 +826,28 @@ export const rejectVerification = mutation({
       createdAt: Date.now(),
     });
 
-    const sendSystemNotification =
-      api.api.notifications.actions.sendSystemNotification as unknown as FunctionReference<
-        "action",
-        "internal"
-      >;
-    await ctx.scheduler.runAfter(0, sendSystemNotification, {
-      userIds: [args.freelancerId],
-      title: "Verification rejected",
-      message: "Your verification was rejected. Please review the feedback.",
-      type: "verification",
-      data: { vettingResultId: vettingResult._id },
+    // Email the freelancer before the account is gone (an in-app notification
+    // would target a soon-to-be-deleted user id, so email is the right channel
+    // here — matches the other automatic termination paths).
+    await ctx.scheduler.runAfter(
+      0,
+      internalAny.vetting.staffEmails.sendVerificationTerminatedEmailInternal,
+      {
+        email: freelancer.email,
+        name: freelancer.name,
+      },
+    );
+
+    // Final rejection at this stage permanently wipes the account. Do NOT wrap
+    // this in try/catch — if hardDeleteUserAccount's safety guards block deletion
+    // (active project, wallet balance, open dispute, etc.) the thrown error must
+    // propagate to the admin as-is, not be swallowed into a silent soft-reject.
+    await hardDeleteUserAccount(ctx, {
+      targetUserId: args.freelancerId,
+      auditActorId: admin._id,
+      auditActorRole: admin.role,
+      auditActionType: "admin",
+      reason: `manual_admin_rejection: ${args.reviewNotes}`,
     });
 
     return { success: true };

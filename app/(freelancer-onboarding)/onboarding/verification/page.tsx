@@ -115,6 +115,7 @@ export default function OnboardingVerificationPage() {
   const { verificationStatus: status, vettingResult, kycStatus } = verificationStatus;
   const stepsCompleted = vettingResult?.stepsCompleted || [];
   const currentStep = vettingResult?.currentStep || "english";
+  const englishSkipped = Boolean(vettingResult?.englishSkipped);
   const vettingComplete = stepsCompleted.includes("english") && stepsCompleted.includes("skills");
   const verificationEvaluatedAt = vettingResult?.verificationEvaluatedAt;
   const autoFinalizeError = vettingResult?.autoFinalizeError;
@@ -209,17 +210,21 @@ export default function OnboardingVerificationPage() {
     !stepsCompleted.includes("skills");
 
   const steps = [
-    {
-      id: "english",
-      name: "English Proficiency",
-      description: "Complete English grammar, comprehension, and writing tests",
-      completed: stepsCompleted.includes("english"),
-      inProgress: currentStep === "english" && !stepsCompleted.includes("english"),
-      attemptLabel: !stepsCompleted.includes("english")
-        ? `Attempt ${englishAttemptRound + 1} of 2`
-        : undefined,
-      lastAttempt: englishOnLastAttempt,
-    },
+    ...(englishSkipped
+      ? []
+      : [
+          {
+            id: "english",
+            name: "English Proficiency",
+            description: "Complete English grammar, comprehension, and writing tests",
+            completed: stepsCompleted.includes("english"),
+            inProgress: currentStep === "english" && !stepsCompleted.includes("english"),
+            attemptLabel: !stepsCompleted.includes("english")
+              ? `Attempt ${englishAttemptRound + 1} of 2`
+              : undefined,
+            lastAttempt: englishOnLastAttempt,
+          },
+        ]),
     {
       id: "skills",
       name: "Skill Assessment",
@@ -271,14 +276,15 @@ export default function OnboardingVerificationPage() {
         <Card className="rounded-2xl border-border/80 shadow-sm">
           <CardHeader>
             <CardTitle>What you&apos;ll do</CardTitle>
-            <CardDescription>Three steps — most people finish in under an hour.</CardDescription>
+            <CardDescription>A short process — most people finish in under an hour.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
                 <span>
-                  <strong>English proficiency</strong> — grammar, comprehension, and writing. You need a 50% average across the three to pass.
+                  <strong>English proficiency</strong> (if required for your account) — grammar,
+                  comprehension, and writing. You need a 50% average across the three to pass.
                 </span>
               </li>
               <li className="flex items-start gap-3">
@@ -360,7 +366,8 @@ export default function OnboardingVerificationPage() {
                 <span className="text-2xl font-bold">{vettingResult.overallScore}%</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                English 30% + skills 70%. KYC is reviewed separately by an admin.
+                {englishSkipped ? "Based on your skills assessments." : "English 30% + skills 70%."} KYC is
+                reviewed separately by an admin.
               </p>
             </div>
           )}
@@ -499,6 +506,7 @@ export default function OnboardingVerificationPage() {
                 </Card>
               )}
               {canTakeTests &&
+                !englishSkipped &&
                 currentStep === "english" &&
                 !stepsCompleted.includes("english") &&
                 user &&
