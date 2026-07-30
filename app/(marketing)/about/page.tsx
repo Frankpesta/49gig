@@ -132,24 +132,9 @@ export default function AboutPage() {
             </SectionTransition>
           </div>
 
-          <div className="grid gap-16 lg:grid-cols-2 lg:gap-20 items-center mt-20">
-            <SectionTransition variant="slide" direction="left" delay={600}>
-              <div className="relative group order-2 lg:order-1">
-                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-border/40 shadow-lg">
-                  <Image
-                    src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80"
-                    alt="Global business success"
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-secondary/15 via-transparent to-transparent" />
-                </div>
-              </div>
-            </SectionTransition>
-
+          <div className="mx-auto max-w-3xl mt-20">
             <SectionTransition variant="slide" direction="right" delay={400}>
-              <div className="space-y-8 order-1 lg:order-2">
+              <div className="space-y-8">
                 <div className="inline-flex items-center gap-2 rounded-full border border-secondary/30 bg-secondary/10 px-4 py-2 text-xs font-semibold text-secondary-foreground">
                   <div className="flex h-5 w-5 items-center justify-center rounded-full bg-secondary/20">
                     <Eye className="h-3.5 w-3.5 text-secondary" />
