@@ -5,7 +5,7 @@ import { useAction } from "convex/react";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { toast } from "sonner";
 import { executeRecaptcha, isRecaptchaConfigured } from "@/lib/recaptcha-client";
-import { api } from "@/convex/_generated/api";
+import { convexApiAny } from "@/lib/convex-api-runtime";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -54,7 +54,7 @@ export default function ContactPage() {
     }));
   };
 
-  const submitEnquiry = useAction(api.contactEnquiries.actions.submitContactEnquiry);
+  const submitEnquiry = useAction(convexApiAny.contactEnquiries.actions.submitContactEnquiry);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

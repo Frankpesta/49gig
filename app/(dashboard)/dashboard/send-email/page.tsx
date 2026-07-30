@@ -17,7 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Mail, Send, Loader2, Users, User, Briefcase } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Mail, Send, Loader2, Users, User, Briefcase, Search, ChevronsUpDown, Check } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
@@ -39,6 +44,8 @@ export default function SendEmailPage() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [userSearchOpen, setUserSearchOpen] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
 
   const counts = useQuery(
     api.users.queries.getBroadcastRecipientCounts,
@@ -106,6 +113,22 @@ export default function SendEmailPage() {
   }
 
   const usersList = users && Array.isArray(users) ? users : [];
+  const emailedUsers = usersList.filter((u: { email?: string }) => u.email) as {
+    _id: Id<"users">;
+    name: string;
+    email: string;
+    role: string;
+  }[];
+  const selectedUser = emailedUsers.find((u) => u._id === recipientUserId);
+  const filteredUsers = (() => {
+    const query = userSearchQuery.trim().toLowerCase();
+    if (!query) return emailedUsers;
+    return emailedUsers.filter(
+      (u) =>
+        u.name?.toLowerCase().includes(query) ||
+        u.email?.toLowerCase().includes(query)
+    );
+  })();
 
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
@@ -170,24 +193,72 @@ export default function SendEmailPage() {
           {recipientType === "individual" && (
             <div className="space-y-2">
               <Label>Select user</Label>
-              <Select
-                value={recipientUserId || "none"}
-                onValueChange={(v) => setRecipientUserId(v === "none" ? "" : (v as Id<"users">))}
+              <Popover
+                open={userSearchOpen}
+                onOpenChange={(open) => {
+                  setUserSearchOpen(open);
+                  if (!open) setUserSearchQuery("");
+                }}
               >
-                <SelectTrigger className="w-full sm:max-w-md">
-                  <SelectValue placeholder="Choose a user..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— Select user —</SelectItem>
-                  {usersList
-                    .filter((u: { email?: string }) => u.email)
-                    .map((u: { _id: Id<"users">; name: string; email: string; role: string }) => (
-                      <SelectItem key={u._id} value={u._id}>
-                        {u.name} ({u.email}) — {u.role}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={userSearchOpen}
+                    className="w-full sm:max-w-md justify-between font-normal"
+                  >
+                    <span className={selectedUser ? "" : "text-muted-foreground"}>
+                      {selectedUser
+                        ? `${selectedUser.name} (${selectedUser.email}) — ${selectedUser.role}`
+                        : "Choose a user..."}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[--radix-popover-trigger-width] p-0 sm:max-w-md"
+                  align="start"
+                >
+                  <div className="flex items-center gap-2 border-b px-3 py-2">
+                    <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <input
+                      autoFocus
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      placeholder="Search by name or email..."
+                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto p-1">
+                    {filteredUsers.length === 0 ? (
+                      <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+                        No users found
+                      </p>
+                    ) : (
+                      filteredUsers.map((u) => (
+                        <button
+                          key={u._id}
+                          type="button"
+                          onClick={() => {
+                            setRecipientUserId(u._id);
+                            setUserSearchOpen(false);
+                            setUserSearchQuery("");
+                          }}
+                          className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                        >
+                          <Check
+                            className={`h-4 w-4 shrink-0 ${u._id === recipientUserId ? "opacity-100" : "opacity-0"}`}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {u.name} ({u.email}) — {u.role}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           )}
 

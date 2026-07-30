@@ -526,7 +526,7 @@ export default function ForFreelancersPage() {
         </div>
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
+          <div className="mx-auto max-w-3xl">
             <SectionTransition variant="slide" direction="left" delay={200}>
               <div className="space-y-8">
                 <div className="inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-green-500/10 to-emerald-500/10 px-6 py-3 text-sm font-bold text-green-700 border border-green-500/20 shadow-lg">
@@ -570,22 +570,6 @@ export default function ForFreelancersPage() {
                     </p>
                   </div>
                 </SectionTransition>
-              </div>
-            </SectionTransition>
-
-            <SectionTransition variant="scale" delay={400}>
-              <div className="relative group">
-                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-3xl shadow-2xl border border-border/30 group-hover:shadow-green-500/20 transition-all duration-500 group-hover:scale-105">
-                  <Image
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&q=80"
-                    alt="Support and protection"
-                    fill
-                    className="object-cover transition-transform duration-700 group-hover:scale-110"
-                    sizes="(max-width: 1024px) 100vw, 50vw"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-green-500/10 via-transparent to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </div>
-
               </div>
             </SectionTransition>
           </div>

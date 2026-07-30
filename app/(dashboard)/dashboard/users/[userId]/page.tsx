@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   User,
@@ -73,12 +76,14 @@ import {
   ExternalLink,
   FileText,
   Download,
+  CheckCircle2,
 } from "lucide-react";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
 import { DashboardLoadingState } from "@/components/dashboard/dashboard-loading-state";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { FreelancerSignupApprovalManageBlock } from "@/components/dashboard/freelancer-signup-approval-manage-block";
 import { formatDistanceToNow, format } from "date-fns";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { getUserFriendlyError } from "@/lib/error-handling";
 import Link from "next/link";
@@ -403,6 +408,25 @@ export default function UserDetailPage() {
 
   const [kycModalOpen, setKycModalOpen] = useState(false);
 
+  const [freelancerSkillsInput, setFreelancerSkillsInput] = useState("");
+  const [freelancerExperienceLevel, setFreelancerExperienceLevel] = useState<
+    "junior" | "mid" | "senior" | "expert"
+  >("junior");
+  const [freelancerTechField, setFreelancerTechField] = useState<string>("other");
+  const [isSavingFreelancerProfile, setIsSavingFreelancerProfile] = useState(false);
+
+  const [verificationOverrideOpen, setVerificationOverrideOpen] = useState(false);
+  const [verificationOverrideReason, setVerificationOverrideReason] = useState("");
+  const [verificationOverrideApproveKyc, setVerificationOverrideApproveKyc] = useState(true);
+  const [verificationOverrideLoading, setVerificationOverrideLoading] = useState(false);
+
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReviewNotes, setRejectReviewNotes] = useState("");
+  const [vettingActionLoading, setVettingActionLoading] = useState(false);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+
   const profileData = useQuery(
     api.users.queries.getUserProfileForAdmin,
     isAuthenticated && currentUser?._id && (currentUser.role === "admin" || currentUser.role === "moderator")
@@ -473,12 +497,31 @@ export default function UserDetailPage() {
   const updateUserRole = useMutation(api.users.mutations.updateUserRole);
   const updateUserStatus = useMutation(api.users.mutations.updateUserStatus);
   const adminDeleteFreelancerReview = useMutation(api.reviews.mutations.adminDeleteFreelancerReview);
+  const updateFreelancerProfileByAdmin = useMutation(
+    (api as any).users.mutations.updateFreelancerProfileByAdmin
+  );
+  const adminOverrideVerification = useMutation(
+    api.vetting.mutations.adminOverrideFreelancerVerificationAndTests
+  );
+  const approveVerification = useMutation(api.vetting.mutations.approveVerification);
+  const rejectVerification = useMutation(api.vetting.mutations.rejectVerification);
 
   const resolvedCountry = useMemo(
     () => resolveCountry(profileData?.profile?.country),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [profileData?.profile?.country]
   );
+
+  useEffect(() => {
+    if (profileData?.role === "freelancer") {
+      setFreelancerTechField((profileData.profile?.techField as string) ?? "other");
+      setFreelancerExperienceLevel(
+        (profileData.profile?.experienceLevel as "junior" | "mid" | "senior" | "expert") ?? "junior"
+      );
+      setFreelancerSkillsInput((profileData.profile?.skills ?? []).join(", "));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileData?._id]);
 
   if (!isAuthenticated || !currentUser) {
     return <DashboardEmptyState icon={User} title="Please log in" iconTone="muted" />;
@@ -611,14 +654,140 @@ export default function UserDetailPage() {
     }
   };
 
+  const handleFreelancerProfileUpdate = async () => {
+    if (!currentUser?._id || profileData.role !== "freelancer") return;
+    const skills = freelancerSkillsInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    setIsSavingFreelancerProfile(true);
+    try {
+      await updateFreelancerProfileByAdmin({
+        targetUserId: profileData._id,
+        adminUserId: currentUser._id,
+        experienceLevel: freelancerExperienceLevel,
+        techField: freelancerTechField as any,
+        skills,
+      });
+      toast.success("Freelancer profile updated.");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not update freelancer profile.");
+    } finally {
+      setIsSavingFreelancerProfile(false);
+    }
+  };
+
+  const handleAdminVerificationOverride = async () => {
+    if (!currentUser?._id || profileData.role !== "freelancer") return;
+    setVerificationOverrideLoading(true);
+    try {
+      await adminOverrideVerification({
+        freelancerId: profileData._id,
+        adminUserId: currentUser._id,
+        reason: verificationOverrideReason.trim() || undefined,
+        approveKyc: verificationOverrideApproveKyc,
+      });
+      toast.success("Verification and tests overridden for this freelancer.");
+      setVerificationOverrideOpen(false);
+      setVerificationOverrideReason("");
+      setVerificationOverrideApproveKyc(true);
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Override failed");
+    } finally {
+      setVerificationOverrideLoading(false);
+    }
+  };
+
+  const handleApproveFreelancerVetting = async () => {
+    if (!currentUser?._id) return;
+    setVettingActionLoading(true);
+    try {
+      await approveVerification({
+        freelancerId: profileData._id,
+        adminUserId: currentUser._id,
+      });
+      toast.success("Freelancer verification approved.");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not approve verification.");
+    } finally {
+      setVettingActionLoading(false);
+    }
+  };
+
+  const handleRejectFreelancerVetting = async () => {
+    if (!currentUser?._id) return;
+    const notes = rejectReviewNotes.trim();
+    if (!notes) {
+      toast.error("Add review notes explaining the rejection.");
+      return;
+    }
+    setVettingActionLoading(true);
+    try {
+      await rejectVerification({
+        freelancerId: profileData._id,
+        reviewNotes: notes,
+        adminUserId: currentUser._id,
+      });
+      toast.success("Verification rejected — account deleted.");
+      setRejectDialogOpen(false);
+      setRejectReviewNotes("");
+      router.push("/dashboard/users");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not reject verification.");
+    } finally {
+      setVettingActionLoading(false);
+    }
+  };
+
+  const handleAdminDeleteAccount = async () => {
+    if (!currentUser?._id || currentUser.role !== "admin") return;
+    setDeleteAccountLoading(true);
+    try {
+      await updateUserStatus({
+        userId: profileData._id,
+        newStatus: "deleted",
+        adminUserId: currentUser._id,
+      });
+      toast.success("Account permanently deleted.");
+      setDeleteDialogOpen(false);
+      router.push("/dashboard/users");
+    } catch (err) {
+      toast.error(getUserFriendlyError(err) || "Could not delete this account.");
+    } finally {
+      setDeleteAccountLoading(false);
+    }
+  };
+
+  const canFinalApprove =
+    currentUser.role === "admin" &&
+    !!vettingData?.vettingResult &&
+    (vettingData.vettingResult.status === "pending_admin" || vettingData.vettingResult.status === "flagged") &&
+    profileData.verificationStatus === "pending_review";
+
   return (
     <div className="space-y-6 animate-in fade-in-50 duration-300">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild className="shrink-0">
-          <Link href={isModeratorViewer ? "/dashboard" : "/dashboard/users"}>
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0"
+          onClick={() => {
+            if (isModeratorViewer) {
+              router.push("/dashboard");
+              return;
+            }
+            // Prefer browser back so the list page restores its exact
+            // search/filter/page state from the URL instead of resetting.
+            if (typeof window !== "undefined" && window.history.length > 2) {
+              router.back();
+            } else {
+              router.push("/dashboard/users");
+            }
+          }}
+        >
+          <ArrowLeft className="h-4 w-4" />
         </Button>
         <DashboardPageHeader
           title="User Details"
@@ -631,6 +800,15 @@ export default function UserDetailPage() {
           className="flex-1"
         />
       </div>
+
+      {isFreelancer && currentUser.role === "admin" && currentUser._id && (
+        <FreelancerSignupApprovalManageBlock
+          freelancerId={profileData._id}
+          adminUserId={currentUser._id}
+          enabled
+          onAfterAction={() => {}}
+        />
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* LEFT: Identity card */}
@@ -768,6 +946,36 @@ export default function UserDetailPage() {
             </CardContent>
           </Card>
 
+          {/* Delete account — admin only, destructive */}
+          {currentUser.role === "admin" && profileData._id !== currentUser._id && profileData.status !== "deleted" && (
+            <Card className="rounded-xl overflow-hidden border-destructive/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2 text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                  Delete Account
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Permanently removes the user document and purges their sessions, vetting, wallet (must be
+                  zero), notifications, and other user-owned data. Blocked if they are a client on any project,
+                  tied to an active hire, have open disputes, or pending referral payouts.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={isActioning || deleteAccountLoading}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete account…
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Wallet Stats — admin only; hidden from moderators */}
           {currentUser.role === "admin" ? (
             <Card className="rounded-xl overflow-hidden">
@@ -841,6 +1049,85 @@ export default function UserDetailPage() {
                   )}
                 </CardContent>
               </Card>
+
+              {currentUser.role === "admin" && (
+                <Card className="rounded-xl overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-primary" />
+                      Edit Freelancer Profile
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Tech field</Label>
+                      <Select
+                        value={freelancerTechField}
+                        onValueChange={setFreelancerTechField}
+                        disabled={isSavingFreelancerProfile}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="development">Development</SelectItem>
+                          <SelectItem value="data_science">Data Science</SelectItem>
+                          <SelectItem value="technical_writing">Technical Writing</SelectItem>
+                          <SelectItem value="design">Design</SelectItem>
+                          <SelectItem value="software_development">Software Development</SelectItem>
+                          <SelectItem value="ui_ux_design">UI/UX Design</SelectItem>
+                          <SelectItem value="data_analytics">Data Analytics</SelectItem>
+                          <SelectItem value="devops_cloud">DevOps/Cloud</SelectItem>
+                          <SelectItem value="cybersecurity_it">Cybersecurity/IT</SelectItem>
+                          <SelectItem value="ai">AI</SelectItem>
+                          <SelectItem value="machine_learning">Machine Learning</SelectItem>
+                          <SelectItem value="blockchain">Blockchain</SelectItem>
+                          <SelectItem value="qa_testing">QA Testing</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Experience level</Label>
+                      <Select
+                        value={freelancerExperienceLevel}
+                        onValueChange={(value) =>
+                          setFreelancerExperienceLevel(value as "junior" | "mid" | "senior" | "expert")
+                        }
+                        disabled={isSavingFreelancerProfile}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="junior">Junior</SelectItem>
+                          <SelectItem value="mid">Mid</SelectItem>
+                          <SelectItem value="senior">Senior</SelectItem>
+                          <SelectItem value="expert">Expert</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Skills (comma-separated)</Label>
+                      <Input
+                        value={freelancerSkillsInput}
+                        onChange={(e) => setFreelancerSkillsInput(e.target.value)}
+                        placeholder="React, Node.js, PostgreSQL"
+                        disabled={isSavingFreelancerProfile}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => void handleFreelancerProfileUpdate()}
+                      disabled={isSavingFreelancerProfile}
+                    >
+                      {isSavingFreelancerProfile ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      Save freelancer profile
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card className="rounded-xl overflow-hidden">
                 <CardHeader className="pb-3">
@@ -1045,8 +1332,66 @@ export default function UserDetailPage() {
                       ))}
                     </div>
                   )}
+
+                  {canFinalApprove && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={vettingActionLoading}
+                        onClick={() => void handleApproveFreelancerVetting()}
+                      >
+                        {vettingActionLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                        Final approve
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                        disabled={vettingActionLoading}
+                        onClick={() => {
+                          setRejectReviewNotes("");
+                          setRejectDialogOpen(true);
+                        }}
+                      >
+                        Reject verification…
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
+
+              {currentUser.role === "admin" && (
+                <Card className="rounded-xl overflow-hidden border-amber-500/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                      <ShieldCheck className="h-4 w-4" />
+                      Admin: Override Verification &amp; Tests
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Waives English and skill verification requirements, closes any in-progress skill sessions,
+                      and marks vetting as approved. Use when you have verified this person outside the platform.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-600/50 text-amber-900 hover:bg-amber-500/10 dark:text-amber-100"
+                      onClick={() => setVerificationOverrideOpen(true)}
+                    >
+                      Override verification &amp; tests…
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </>
           )}
 
@@ -1276,6 +1621,179 @@ export default function UserDetailPage() {
             >
               {isDeletingReview ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Remove rating
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Admin override verification dialog */}
+      <Dialog
+        open={verificationOverrideOpen}
+        onOpenChange={(open) => {
+          setVerificationOverrideOpen(open);
+          if (!open) {
+            setVerificationOverrideReason("");
+            setVerificationOverrideApproveKyc(true);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Override verification &amp; tests?</DialogTitle>
+            <DialogDescription>
+              This immediately approves vetting and skill tests for{" "}
+              <span className="font-medium text-foreground">{profileData.name}</span>. It is recorded in audit
+              logs.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-start gap-3 space-y-0">
+              <Checkbox
+                id="approve-kyc-override"
+                checked={verificationOverrideApproveKyc}
+                onCheckedChange={(c) => setVerificationOverrideApproveKyc(c === true)}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <label
+                  htmlFor="approve-kyc-override"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Also approve KYC
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Required for matching if identity checks are normally mandatory. Uncheck if only tests should be
+                  waived.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="override-reason">Notes (optional)</Label>
+              <Textarea
+                id="override-reason"
+                placeholder="e.g. Vetted via partner program, manual interview completed…"
+                value={verificationOverrideReason}
+                onChange={(e) => setVerificationOverrideReason(e.target.value)}
+                rows={3}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setVerificationOverrideOpen(false)}
+              disabled={verificationOverrideLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              onClick={() => void handleAdminVerificationOverride()}
+              disabled={verificationOverrideLoading}
+            >
+              {verificationOverrideLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Applying…
+                </>
+              ) : (
+                "Confirm override"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject verification dialog */}
+      <Dialog
+        open={rejectDialogOpen}
+        onOpenChange={(open) => {
+          setRejectDialogOpen(open);
+          if (!open) setRejectReviewNotes("");
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Reject verification — this permanently deletes the account
+            </DialogTitle>
+            <DialogDescription>
+              Rejecting a freelancer at this stage permanently erases their account: profile, test results, KYC
+              documents, messages, and all related records. This cannot be undone — there is no separate
+              soft-reject. The freelancer will be emailed and must sign up again from scratch to reapply.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="reject-notes">Review notes (required)</Label>
+            <Textarea
+              id="reject-notes"
+              placeholder="Explain what failed or what they should fix"
+              value={rejectReviewNotes}
+              onChange={(e) => setRejectReviewNotes(e.target.value)}
+              rows={4}
+              className="resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              Recorded for audit purposes only — the account is deleted, so the freelancer won&apos;t see these
+              notes in-app.
+            </p>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRejectDialogOpen(false)}
+              disabled={vettingActionLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleRejectFreelancerVetting()}
+              disabled={vettingActionLoading}
+            >
+              {vettingActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Reject & delete account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete account confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Delete this account?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  This permanently deletes{" "}
+                  <span className="font-medium text-foreground">{profileData.name}</span> ({profileData.email})
+                  from the database, including related records (sessions, vetting, notifications, etc.). This
+                  cannot be undone.
+                </p>
+                <p>
+                  It will fail if they own any client projects, are on an active hire or escrow flow, have open
+                  disputes, a non-zero wallet, or pending referral payout requests.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteAccountLoading}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleAdminDeleteAccount()}
+              disabled={deleteAccountLoading}
+            >
+              {deleteAccountLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete account"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
