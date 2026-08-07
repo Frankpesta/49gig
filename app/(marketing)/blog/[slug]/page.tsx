@@ -1,83 +1,31 @@
-"use client";
-
-import { useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { useParams } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PageHero } from "@/components/marketing/page-hero";
-import { BlogContentRenderer } from "@/components/blog/blog-content-renderer";
-import { EMPTY_TIPTAP_DOC_JSON } from "@/components/blog/blog-editor";
-import { BlogComments } from "@/components/blog/blog-comments";
-import { useAuth } from "@/hooks/use-auth";
-import { formatDistanceToNow } from "date-fns";
-import { BookOpen, Calendar, User, Heart, ChevronLeft, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BlogPostActions } from "@/components/blog/blog-post-actions";
+import { fetchPublishedBlogPostBySlug } from "@/lib/seo/blog-post-server";
+import { renderBlogContentHtml, blogContentProseClassNames } from "@/lib/blog/render-content-html";
+import { EMPTY_TIPTAP_DOC_JSON } from "@/lib/blog/tiptap-doc";
+import { BookOpen, Calendar, User } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
-import { toast } from "sonner";
-import { getUserFriendlyError } from "@/lib/error-handling";
 
-export default function BlogPostPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-  const { user } = useAuth();
+export const revalidate = 300;
 
-  const post = useQuery(
-    (api as any).blog.queries.getBySlug,
-    slug ? { slug } : "skip"
-  );
-  const likeData = useQuery(
-    (api as any).blog.queries.getLikeCountAndUserLiked,
-    post?._id ? { postId: post._id, ...(user?._id && { userId: user._id }) } : "skip"
-  );
-  const toggleLike = useMutation((api as any).blog.mutations.toggleLike);
-  const incrementViewCount = useMutation((api as any).blog.mutations.incrementViewCount);
+export default async function BlogPostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const post = await fetchPublishedBlogPostBySlug(slug);
 
-  // Fire once when the post first loads — tracks a page view for the admin
-  useEffect(() => {
-    if (post?._id) {
-      void incrementViewCount({ postId: post._id });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?._id]);
-
-  const handleLove = async () => {
-    if (!user?._id) {
-      toast.error("Sign in to like this post");
-      return;
-    }
-    if (!post?._id) return;
-    try {
-      await toggleLike({ postId: post._id, userId: user._id });
-    } catch (e) {
-      toast.error(getUserFriendlyError(e) ?? "Could not update like");
-    }
-  };
-
-  if (slug && post === null) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4">
-        <BookOpen className="h-16 w-16 text-muted-foreground/50 mb-4" />
-        <h1 className="text-2xl font-semibold text-foreground mb-2">Post not found</h1>
-        <p className="text-muted-foreground mb-6">The post may have been removed or the link is incorrect.</p>
-        <Button asChild>
-          <Link href="/blog">Back to Blog</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  if (post === undefined) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-      </div>
-    );
+  if (!post) {
+    notFound();
   }
 
   const postId = post._id as Id<"blogPosts">;
-  const count = likeData?.count ?? 0;
-  const userLiked = likeData?.userLiked ?? false;
+  const contentJson =
+    typeof post.content === "string" && post.content.trim() ? post.content : EMPTY_TIPTAP_DOC_JSON;
+  const html = renderBlogContentHtml(contentJson);
 
   return (
     <div className="w-full">
@@ -89,9 +37,6 @@ export default function BlogPostPage() {
           { label: post.title },
         ]}
         pathname={`/blog/${slug}`}
-        imageSrc={post.bannerUrl ?? undefined}
-        imageAlt={post.title}
-        imageUnoptimized={!!post.bannerUrl}
       />
 
       <article className="relative py-12 sm:py-16 lg:py-20">
@@ -100,7 +45,11 @@ export default function BlogPostPage() {
             {post.publishedAt && (
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
-                {formatDistanceToNow(post.publishedAt, { addSuffix: true })}
+                {new Date(post.publishedAt).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
               </span>
             )}
             {post.author?.name && (
@@ -111,39 +60,12 @@ export default function BlogPostPage() {
             )}
           </div>
 
-          <BlogContentRenderer
-            contentJson={post.content ?? EMPTY_TIPTAP_DOC_JSON}
-            className="text-foreground"
+          <div
+            className={`text-foreground ${blogContentProseClassNames}`}
+            dangerouslySetInnerHTML={{ __html: html }}
           />
 
-          <div className="mt-12 pt-8 border-t border-border">
-            <div className="flex flex-wrap items-center gap-4">
-              <Button
-                variant={userLiked ? "default" : "outline"}
-                size="sm"
-                className="gap-2"
-                onClick={handleLove}
-                disabled={!user?._id}
-              >
-                <Heart className={`h-4 w-4 ${userLiked ? "fill-current" : ""}`} />
-                {count} {count === 1 ? "love" : "loves"}
-              </Button>
-              <Button variant="ghost" size="sm" asChild className="gap-2">
-                <Link href="/blog" className="gap-2">
-                  <ChevronLeft className="h-4 w-4" />
-                  Back to Blog
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-14 pt-10 border-t border-border">
-            <BlogComments
-              postId={postId}
-              currentUserId={user?._id}
-              isAdminOrModerator={user?.role === "admin" || user?.role === "moderator"}
-            />
-          </div>
+          <BlogPostActions postId={postId} />
         </div>
       </article>
     </div>
