@@ -210,7 +210,7 @@ export default function Home() {
               </h1>
 
               <p className="mt-6 max-w-2xl text-base leading-relaxed text-[#3f3f3f] sm:text-lg dark:text-zinc-300">
-                49GIG is a hiring infrastructure that connects global companies with highly vetted, delivery-ready professionals across Software Engineering, AI, DevOps, Cloud, Data, and Product Design — faster and more cost-efficiently.
+                49GIG is a hiring infrastructure that helps global companies hire highly vetted, delivery-ready professionals across Software Engineering, AI, DevOps, Cloud, Data, and Product Design. We handle vetting, compliance, contracts, and payroll, giving you a faster, safer, and simpler way to build your team.
               </p>
 
               <div className="mt-10 flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center">

@@ -14,7 +14,9 @@ const internalAny = require("../_generated/api").internal as any;
 
 const api = require("../_generated/api") as {
   api: {
-    notifications: { actions: { sendSystemNotification: unknown } };
+    notifications: {
+      actions: { sendSystemNotification: unknown; sendSystemBroadcast: unknown };
+    };
   };
 };
 
@@ -451,6 +453,18 @@ export async function runCompleteVerificationForFreelancer(
     type: "verification",
     data: { vettingResultId: vettingRow._id },
   });
+
+  if (vettingStatus === "pending_admin") {
+    const sendSystemBroadcast = api.api.notifications.actions
+      .sendSystemBroadcast as unknown as FunctionReference<"action", "internal">;
+    await ctx.scheduler.runAfter(0, sendSystemBroadcast, {
+      roles: ["admin"],
+      title: "Freelancer verification pending review",
+      message: `${fr.name ?? "A freelancer"} completed their verification tests and is awaiting review.`,
+      type: "admin",
+      data: { userId: fr._id, vettingResultId: vettingRow._id },
+    });
+  }
 
   return {
     success: vettingStatus !== "rejected",
