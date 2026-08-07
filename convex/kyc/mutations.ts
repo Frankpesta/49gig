@@ -6,8 +6,15 @@ import {
   weightedVerificationOverall,
 } from "../vetting/scoring";
 import { hardDeleteUserAccount } from "../users/hardDeleteUser";
+import type { FunctionReference } from "convex/server";
 
 const internalAny = require("../_generated/api").internal as any;
+
+const api = require("../_generated/api") as {
+  api: {
+    notifications: { actions: { sendSystemBroadcast: unknown } };
+  };
+};
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 
@@ -109,6 +116,16 @@ export const submitKyc = mutation({
     await ctx.db.patch(user._id, {
       kycStatus: "pending_review",
       updatedAt: now,
+    });
+
+    const sendSystemBroadcast = api.api.notifications.actions
+      .sendSystemBroadcast as unknown as FunctionReference<"action", "internal">;
+    await ctx.scheduler.runAfter(0, sendSystemBroadcast, {
+      roles: ["admin"],
+      title: "KYC submitted for review",
+      message: `${user.name ?? "A freelancer"} submitted KYC documents and is awaiting review.`,
+      type: "admin",
+      data: { userId: user._id },
     });
 
     return { success: true };
