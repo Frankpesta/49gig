@@ -26,25 +26,9 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { BlogRichPaste } from "@/components/blog/blog-paste-extension";
+import { EMPTY_TIPTAP_DOC_JSON, parseTipTapDocJson } from "@/lib/blog/tiptap-doc";
 
-/** Valid empty document for TipTap JSON storage (never use raw `{}`). */
-export const EMPTY_TIPTAP_DOC_JSON = JSON.stringify({ type: "doc", content: [] });
-
-export function parseTipTapDocJson(raw: string | undefined | null): Record<string, unknown> {
-  const s = raw?.trim() ?? "";
-  if (s === "" || s === "{}") {
-    return { type: "doc", content: [] };
-  }
-  try {
-    const v = JSON.parse(s) as { type?: string };
-    if (!v || typeof v !== "object" || v.type !== "doc") {
-      return { type: "doc", content: [] };
-    }
-    return v as Record<string, unknown>;
-  } catch {
-    return { type: "doc", content: [] };
-  }
-}
+export { EMPTY_TIPTAP_DOC_JSON, parseTipTapDocJson };
 
 /** TipTap + ProseMirror content area styles. */
 const editorContentClass = cn(

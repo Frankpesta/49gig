@@ -1,15 +1,14 @@
-"use client";
-
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import { PageHero } from "@/components/marketing/page-hero";
 import { BookOpen, Calendar, User, ArrowRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
+import { fetchPublishedBlogPosts } from "@/lib/blog/fetch-published-posts";
 
-export default function BlogListingPage() {
-  const result = useQuery((api as any).blog.queries.listPublished, { limit: 24 });
+export const revalidate = 300;
+
+export default async function BlogListingPage() {
+  const posts = await fetchPublishedBlogPosts(24);
 
   return (
     <div className="w-full">
@@ -23,20 +22,7 @@ export default function BlogListingPage() {
 
       <section className="relative py-16 sm:py-20 lg:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {result === undefined ? (
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="overflow-hidden border-border/60">
-                  <div className="aspect-video bg-muted animate-pulse" />
-                  <CardContent className="p-5">
-                    <div className="h-5 w-3/4 bg-muted rounded animate-pulse mb-3" />
-                    <div className="h-4 w-full bg-muted/80 rounded animate-pulse mb-2" />
-                    <div className="h-4 w-1/2 bg-muted/60 rounded animate-pulse" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : !result.posts.length ? (
+          {posts.length === 0 ? (
             <div className="text-center py-20">
               <BookOpen className="mx-auto h-14 w-14 text-muted-foreground/50 mb-4" />
               <h2 className="text-xl font-semibold text-foreground mb-2">No posts yet</h2>
@@ -46,15 +32,7 @@ export default function BlogListingPage() {
             </div>
           ) : (
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-              {result.posts.map((post: {
-                _id: string;
-                slug: string;
-                title: string;
-                excerpt: string;
-                publishedAt?: number;
-                bannerUrl: string | null;
-                authorName: string | null;
-              }) => (
+              {posts.map((post) => (
                 <Link key={post._id} href={`/blog/${post.slug}`} className="group">
                   <Card className="overflow-hidden border-border/60 h-full transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
                     <div className="aspect-video relative bg-muted overflow-hidden">

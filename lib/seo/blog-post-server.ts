@@ -4,8 +4,10 @@ import { api } from "@/convex/_generated/api";
 
 /** Convex public post shape from `blog.queries.getBySlug`. */
 export type BlogPostPublic = Record<string, unknown> & {
+  _id: string;
   title: string;
   excerpt?: string;
+  content?: string;
   metaTitle?: string;
   metaDescription?: string;
   bannerUrl?: string | null;
