@@ -35,24 +35,6 @@ export default async function BlogListingPage() {
               {posts.map((post) => (
                 <Link key={post._id} href={`/blog/${post.slug}`} className="group">
                   <Card className="overflow-hidden border-border/60 h-full transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
-                    <div className="aspect-video relative bg-muted overflow-hidden">
-                      {post.bannerUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={post.bannerUrl}
-                          alt={`${post.title} — featured image`}
-                          title={post.title}
-                          loading="lazy"
-                          decoding="async"
-                          fetchPriority="low"
-                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <BookOpen className="h-12 w-12 text-muted-foreground/40" />
-                        </div>
-                      )}
-                    </div>
                     <CardContent className="p-5">
                       <h3 className="font-semibold text-lg text-foreground line-clamp-2 group-hover:text-primary transition-colors mb-2">
                         {post.title}
