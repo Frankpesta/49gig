@@ -42,7 +42,7 @@ export default async function BlogListingPage() {
                       <p className="text-sm text-muted-foreground line-clamp-3 mb-4">
                         {post.excerpt}
                       </p>
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      {/* <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         {post.publishedAt && (
                           <span className="flex items-center gap-1">
                             <Calendar className="h-3.5 w-3.5" />
@@ -55,7 +55,7 @@ export default async function BlogListingPage() {
                             {post.authorName}
                           </span>
                         )}
-                      </div>
+                      </div> */}
                       <span className="inline-flex items-center gap-1 mt-3 text-sm font-medium text-primary group-hover:gap-2 transition-all">
                         Read more
                         <ArrowRight className="h-4 w-4" />

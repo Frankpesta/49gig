@@ -41,7 +41,7 @@ export default async function BlogPostPage({
 
       <article className="relative py-12 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-8">
+          {/* <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-8">
             {post.publishedAt && (
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-4 w-4" />
@@ -58,7 +58,7 @@ export default async function BlogPostPage({
                 {post.author.name}
               </span>
             )}
-          </div>
+          </div> */}
 
           <div
             className={`text-foreground ${blogContentProseClassNames}`}
