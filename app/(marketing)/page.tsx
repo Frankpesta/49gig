@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { TestimonialsMarquee } from "@/components/marketing/testimonials-marquee";
 import { CaseStudiesSlider } from "@/components/marketing/case-studies-slider";
+import { HomeHero } from "@/components/marketing/home-hero";
 import { getCanonicalSiteUrl, absoluteUrl } from "@/lib/seo/site-url";
 import { SITE_TWITTER_CREATOR, SITE_TWITTER_SITE } from "@/lib/seo/social";
 
@@ -197,69 +198,7 @@ export default function Home() {
 
   return (
     <div className="w-full">
-      {/* Hero — Andela-style serif stack, brand secondary accents, rotating flip words */}
-      <section
-        className="relative -mt-14 overflow-hidden border-b border-border/30 bg-linear-to-b from-[#f5f4f1] to-background pt-14 md:-mt-16 md:pt-16 dark:from-[#0b1327] dark:to-background"
-        aria-label="Hero"
-      >
-        <div className="relative z-10 px-4 pb-20 pt-24 sm:px-6 sm:pt-28 lg:px-8 lg:pt-36">
-          <div className="mx-auto w-full max-w-5xl">
-            <div className="mx-auto flex max-w-4xl flex-col items-center text-center">
-              <h1 className="text-4xl font-bold leading-[1.08] tracking-tight text-[#0a0a0a] sm:text-5xl sm:leading-[1.05] lg:text-7xl lg:leading-[1.02] dark:text-white">
-                Hire the top <span className="text-[#FEC110]">3%</span> of Africa&apos;s tech talent.
-              </h1>
-
-              <p className="mt-6 max-w-2xl text-base leading-relaxed text-[#3f3f3f] sm:text-lg dark:text-zinc-300">
-                49GIG is a hiring infrastructure that helps global companies hire highly vetted, delivery-ready professionals across Software Engineering, AI, DevOps, Cloud, Data, and Product Design. We handle vetting, compliance, contracts, and payroll, giving you a faster, safer, and simpler way to build your team.
-              </p>
-
-              <div className="mt-10 flex w-full flex-col items-center gap-3 sm:flex-row sm:justify-center">
-                <CTAButton
-                  href="/signup/client"
-                  variant="primary"
-                  className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-border/60 bg-white px-6 text-sm text-primary shadow-sm hover:bg-gray-100 sm:w-auto dark:bg-primary dark:text-primary-foreground dark:border-primary/50 dark:hover:bg-primary/90"
-                >
-                  Hire Talent
-                  <ArrowRight className="h-4 w-4" />
-                </CTAButton>
-                <CTAButton
-                  href="/signup/freelancer"
-                  variant="secondary"
-                  className="inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl border border-primary/50 bg-transparent px-6 text-sm text-foreground hover:bg-primary/5 sm:w-auto"
-                >
-                  Apply as a Freelancer
-                  <ArrowRight className="h-4 w-4" />
-                </CTAButton>
-              </div>
-
-              <div className="mt-10 w-full max-w-lg">
-                <ul className="mx-auto inline-block space-y-3 text-left text-[0.9375rem] font-medium leading-snug text-foreground sm:text-base">
-                  <li className="flex gap-3">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Rigorous vetting — only the top 3% of African tech talent joins our network</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Hire part-time or full-time professionals matched to your exact needs</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Get matched with qualified talent in as little as 48 hours — no CV screening or interview hassle</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Secure monthly escrow payments with cost-effective global talent</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <Check className="mt-0.5 h-5 w-5 shrink-0 text-secondary" aria-hidden />
-                    <span>Fast replacement support</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <HomeHero />
 
       <TestimonialsMarquee />
 
